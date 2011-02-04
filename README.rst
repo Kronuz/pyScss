@@ -1,5 +1,5 @@
-nginx-gridfs
-============
+xCSS for Python
+===============
 :Authors:
     German M. Bravo (Kronuz) <german.mb@gmail.com>
     Based on some code from the original xCSS project by Anton Pawlik
