@@ -21,7 +21,8 @@ structure but it's been completely rewritten and many bugs have been fixed.
 Usage
 =====
 # **Nested Rules**
-Example:
+    Example::
+
 	.selector {
 	    a {
 	        display: block;
@@ -30,7 +31,9 @@ Example:
 	        color: blue;
 	    }
 	}
-...produces:
+
+    ...produces::
+
 	.selector a {
 	    display: block;
 	}
@@ -39,7 +42,8 @@ Example:
 	}
 
 # **Variables**
-Example:
+    Example::
+
 	$main-color: #ce4dd6;
 	$style: solid;
         $side: bottom;
@@ -49,14 +53,17 @@ Example:
 	    style: $style;
 	  }
 	}
-...produces:
+
+    ...produces::
+
 	#navbar {
 		border-bottom-color: #ce4dd6;
 		border-bottom-style: solid;
 	}
 
 # **Mixins**
-Example:
+    Example::
+
 	@mixin rounded($side, $radius: 10px) {
 	  border-#{$side}-radius: $radius;
 	  -moz-border-radius-#{$side}: $radius;
@@ -65,7 +72,9 @@ Example:
 	#navbar li { @include rounded(top); }
 	#footer { @include rounded(top, 5px); }
 	#sidebar { @include rounded(left, 8px); }
-...produces:
+
+...produces::
+
 	#navbar li {
 		border-top-radius: 10px;
 		-moz-border-radius-top: 10px;
@@ -83,7 +92,8 @@ Example:
 	}
 
 # **Extend** (using `@extend`)
-Example:
+    Example::
+
 	.error {
 	  border: 1px #f00;
 	  background-color: #fdd;
@@ -95,7 +105,9 @@ Example:
 	  @extend .error;
 	  border-width: 3px;
 	}
-...produces:
+
+    ...produces::
+
 	.error,
 	.seriousError {
 		border: 1px red;
@@ -111,6 +123,8 @@ Example:
 
 Usage
 =====
+   Usage example::
+
 	from xcss import xCSS
 	css = xCSS()
 	css.compile("a { color: red + green; }")
