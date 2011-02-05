@@ -269,21 +269,21 @@ class xCSS(object):
         \#\{.*?\}
     |
         (?:
-            [[(][\][()\s]*
+            [[(][\][()\s\-]*
         )?
-        [#%.\w]+                # Accept a variable or constant or number (preceded by spaces or parenthesis)
+        [#%.\w]+                 # Accept a variable or constant or number (preceded by spaces or parenthesis or unary minus '-')
         (?:
             (?:
-                \(              # Accept either the start of a function call... ("function_call(")
+                \(                # Accept either the start of a function call... ("function_call(")
             |
-                [\][()\s]*      # ...or an operation ("+-*/")
+                [\][()\s]*        # ...or an operation ("+-*/")
                 (?:\s-\s|[+*/^,]) # (dash needs a surrounding space always)
             )
-            [\][()\s]*          
-            [#%.\w]+            # Accept a variable or constant or number (preceded by spaces or parenthesis)
-        )*                      # ...take n arguments,
+            [\][()\s\-]*        
+            [#%.\w]+             # Accept a variable or constant or number (preceded by spaces or parenthesis)
+        )*                        # ...take n arguments,
         (?:
-            [\][()\s]*[\])]     # but then finish accepting any missing parenthesis and spaces
+            [\][()\s]*[\])]       # but then finish accepting any missing parenthesis and spaces
             [^;}\s]*
         )?
         (?!.*?:)
@@ -1022,7 +1022,6 @@ def BNF():
         multop = mult | div
         ident  = Word(alphas, '_$' + alphas + nums)
         string = QuotedString('"', escChar='\\', multiline=True) | QuotedString("'", escChar='\\', multiline=True)
-        funct  = Combine(ident + lpar + expr.suppress() + ZeroOrMore(comma + expr.suppress()) + rpar)
         color  = Combine(color + Word(hexnums, exact=8) | # #RRGGBBAA
                          color + Word(hexnums, exact=6) | # #RRGGBB
                          color + Word(hexnums, exact=4) | # #RGBA
@@ -1032,13 +1031,14 @@ def BNF():
             Word( nums ) + Optional( point + Optional( Word( nums ) ) ) + Optional( units ) |
             point + Word( nums ) + Optional( units )
         )
-        
+        funct  = Combine(ident + lpar + expr.suppress() + ZeroOrMore(comma + expr.suppress()) + rpar)
+
         atom = (
             Optional('-') + ( fnumber | color ).setParseAction( pushFirst ) |
-            Optional('-') + ( funct ).setParseAction( pushFunct, callDuringTry=True ) |
+            Optional('-') + ( funct ).setParseAction( pushFunct ) |
             Optional('-') + ( string ).setParseAction( pushQuoted ) |
-            Optional('-') + ( ident  ).setParseAction( pushString ) |
-            Optional('-') + ( lpar + expr.suppress() + rpar + Optional( units )).setParseAction(pushUnifier)
+            Optional('-') + ( ident ).setParseAction( pushString ) |
+            Optional('-') + ( lpar + expr.suppress() + rpar + Optional( units.setParseAction(pushUnifier) ) )
         ).setParseAction(pushUMinus)
         
         # by defining exponentiation as 'atom [ ^ factor ]...' instead of 'atom [ ^ atom ]...', we get right-to-left exponents, instead of left-to-righ
