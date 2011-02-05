@@ -264,30 +264,32 @@ class xCSS(object):
         _reverse_colors[rgba_k] = k
     _reverse_colors_re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, _reverse_colors.keys()))+r')\b', re.IGNORECASE)
     _colors_re = re.compile(r'\b(' + '|'.join(map(re.escape, _colors.keys()))+r')\b', re.IGNORECASE)
-    
+
     _expr_re = re.compile(r'''
-        \#\{.*?\}
+        \#\{.*?\}                 # Global interpolation
     |
         (?:
-            [[(][\][()\s\-]*
+            [\[(]                 # optionally start with a parenthesis followed
+            [\]\[()\s\-]*         # by a number of parenthesis, spaces, or or unary minus operators '-'
         )?
-        [#%.\w]+                 # Accept a variable or constant or number (preceded by spaces or parenthesis or unary minus '-')
+        [#%.\w]+                  # Accept a variable or constant or number
         (?:
             (?:
-                \(                # Accept either the start of a function call... ("function_call(")
+                \(                # Accept either the start of a function call...
             |
-                [\][()\s]*        # ...or an operation ("+-*/")
+                [\]\[()\s]*       # ...or an operation ("+-*/")
                 (?:\s-\s|[+*/^,]) # (dash needs a surrounding space always)
             )
-            [\][()\s\-]*        
-            [#%.\w]+             # Accept a variable or constant or number (preceded by spaces or parenthesis)
+            [\]\[()\s\-]*
+            [#%.\w]+              # Accept a variable or constant or number (preceded by spaces or parenthesis)
         )*                        # ...take n arguments,
         (?:
-            [\][()\s]*[\])]       # but then finish accepting any missing parenthesis and spaces
-            [^;}\s]*
+            [\]\[()\s]*           # but optionally then finish accepting any missing parenthesis and spaces
+            [\])]                 # with a closing parenthesis...
+            [^;}\s]*              # ...until it hits a new expression or the end of the line or the rule.
         )?
-        (?!.*?:)
-        (?=.*?;)
+        (?!.*?:)                  # If not in Global Interpolation, then accept expressions only inside properties
+        (?=.*?;)                  # or inside the selectors.
     ''', re.VERBOSE)
     #_expr_re = re.compile(r'(\[.*?\])([\s;}]|$|.+?\S)') # <- This is the old method, required parenthesis around the expression
     _ml_comment_re = re.compile(r'\/\*(.*?)\*\/', re.DOTALL)
@@ -318,7 +320,7 @@ class xCSS(object):
                 common = start
             start += 1
         return common
-    
+
     def longest_common_suffix(self, seq1, seq2):
         return self.longest_common_prefix(seq1[::-1], seq2[::-1])
 
@@ -762,7 +764,7 @@ class xCSS(object):
         for p_selectors, p_rules in self.parts.items():
             _p_selectors, _, _ = p_selectors.partition(' extends ')
             _p_selectors = _p_selectors.split(',')
-            
+
             new_selectors = set()
             found = False
 
@@ -986,11 +988,11 @@ def pushString( strg, loc, toks ):
     exprStack.append( u"'%s'" % escape(toks[0]) )
 
 def pushUnifier( strg, loc, toks ):
-    if toks and toks[0] in _units: 
+    if toks and toks[0] in _units:
         exprStack.append( 'unary ' + toks[0] )
 
 def pushUMinus( strg, loc, toks ):
-    if toks and toks[0]=='-': 
+    if toks and toks[0]=='-':
         exprStack.append( 'unary -' )
 
 bnf = None
@@ -1009,7 +1011,7 @@ def BNF():
         lpar   = Literal( '(' ).suppress()
         rpar   = Literal( ')' ).suppress()
         comma  = Literal( ',' )
-        
+
         __units = None
         for u in _units:
             if not __units:
@@ -1040,12 +1042,12 @@ def BNF():
             Optional('-') + ( ident ).setParseAction( pushString ) |
             Optional('-') + ( lpar + expr.suppress() + rpar + Optional( units.setParseAction(pushUnifier) ) )
         ).setParseAction(pushUMinus)
-        
+
         # by defining exponentiation as 'atom [ ^ factor ]...' instead of 'atom [ ^ atom ]...', we get right-to-left exponents, instead of left-to-righ
         # that is, 2^3^2 = 2^(3^2), not (2^3)^2.
         factor = Forward()
         factor << atom + ZeroOrMore( ( expop + factor ).setParseAction( pushFirst ) )
-        
+
         term = factor + ZeroOrMore( ( multop + factor ).setParseAction( pushFirst ) )
         expr << term + ZeroOrMore( ( addop + term ).setParseAction( pushFirst ) )
         bnf = expr
@@ -1151,7 +1153,7 @@ def _float(val):
         assert len(units_type) <= 1, "Units mismatch"
         _val /= factor
         _val = float2str(_val)
-        
+
         if unit in _units:
             _val += unit
     _val = float2str(_val)
@@ -1168,7 +1170,7 @@ def _opacify(_color, _amount):
     a = _amount[1]
     a = 0.0 if a < 0 else 1.0 if a > 1 else a
     return __rgba_add(_color, 0, 0, 0, a)
-    
+
 def _transparentize(_color, _amount):
     a = _amount[1]
     a = 0.0 if a < 0 else 1.0 if a > 1 else a
@@ -1214,22 +1216,22 @@ def _complement(_color):
 def _mix(_color1, _color2, _weight=None):
     """
     Mixes together two colors. Specifically, takes the average of each of the
-    RGB components, optionally weighted by the given percentage. 
+    RGB components, optionally weighted by the given percentage.
     The opacity of the colors is also considered when weighting the components.
 
     Specifically, takes the average of each of the RGB components,
     optionally weighted by the given percentage.
     The opacity of the colors is also considered when weighting the components.
-    
+
     The weight specifies the amount of the first color that should be included
     in the returned color.
     50%, means that half the first color
         and half the second color should be used.
     25% means that a quarter of the first color
         and three quarters of the second color should be used.
-    
+
     For example:
-    
+
         mix(#f00, #00f) => #7f007f
         mix(#f00, #00f, 25%) => #3f00bf
         mix(rgba(255, 0, 0, 0.5), #00f) => rgba(63, 0, 191, 0.75)
@@ -1260,10 +1262,10 @@ def _mix(_color1, _color2, _weight=None):
     p = 0.0 if p < 0 else 1.0 if p > 1 else p
     w = p * 2 - 1
     a = _color1[2][3] - _color2[2][3]
-    
+
     w1 = ((w if (w * a == -1) else (w + a) / (1 + w * a)) + 1) / 2.0
     w2 = 1 - w1
-    
+
     d = _color1[3].copy()
     for k, v in _color2[3].items():
         d.setdefault(k, 0)
@@ -1316,7 +1318,7 @@ def _quote(_str):
     else:
         s = _str[0]
     return ('"%s"' % unscape(s), None, None, {})
-    
+
 def _ops(op):
     _op = op
     op = {
@@ -1350,7 +1352,7 @@ def _ops(op):
         quoting = (a_str[0] == '"' or b_str[0] == '"')
         if a_str[0] == '"' or a_str[0] == "'": a_str = a_str[1:-1]
         if b_str[0] == '"' or b_str[0] == "'": a_str = b_str[1:-1]
-        
+
         if (a_rgba is not None and b is not None or
             b_rgba is not None and a is not None or
            a_rgba is not None and b_rgba is not None):
@@ -1505,7 +1507,7 @@ def eval_expr(expr):
     #print '>>',expr,'<<'
     results = BNF().parseString( expr, parseAll=True )
     val = evaluateStack( exprStack[:] )
-    
+
     #print '--',val,'--'
     val = val[0]
     if val:
@@ -1920,7 +1922,7 @@ http://sass-lang.com/tutorial.html
 ... /* style.scss */
 ... $side: top;
 ... $radius: 10px;
-... 
+...
 ... .rounded-#{$side} {
 ...   border-#{$side}-radius: $radius;
 ...   -moz-border-radius-#{$side}: $radius;
@@ -1940,16 +1942,16 @@ http://sass-lang.com/tutorial.html
 
 >>> print css.compile('''
 ... /* style.scss */
-... 
+...
 ... @mixin rounded-top {
 ...   $side: top;
 ...   $radius: 10px;
-... 
+...
 ...   border-#{$side}-radius: $radius;
 ...   -moz-border-radius-#{$side}: $radius;
 ...   -webkit-border-#{$side}-radius: $radius;
 ... }
-... 
+...
 ... #navbar li { @include rounded-top; }
 ... #footer { @include rounded-top; }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
@@ -1967,13 +1969,13 @@ http://sass-lang.com/tutorial.html
 
 >>> print css.compile('''
 ... /* style.scss */
-... 
+...
 ... @mixin rounded($side, $radius: 10px) {
 ...   border-#{$side}-radius: $radius;
 ...   -moz-border-radius-#{$side}: $radius;
 ...   -webkit-border-#{$side}-radius: $radius;
 ... }
-... 
+...
 ... #navbar li { @include rounded(top); }
 ... #footer { @include rounded(top, 5px); }
 ... #sidebar { @include rounded(left, 8px); }
@@ -2001,8 +2003,8 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html#extend
 
 >>> from xcss import *
 >>> css = xCSS()
->>> 
->>> 
+>>>
+>>>
 >>> print css.compile('''
 ... .error {
 ...   border: 1px #f00;
@@ -2246,41 +2248,41 @@ a {
 ... .functions {
 ...     opacify: opacify(rgba(0, 0, 0, 0.5), 0.1); // rgba(0, 0, 0, 0.6)
 ...     opacify: opacify(rgba(0, 0, 17, 0.8), 0.2); // #001
-... 
+...
 ...     transparentize: transparentize(rgba(0, 0, 0, 0.5), 0.1); // rgba(0, 0, 0, 0.4)
 ...     transparentize: transparentize(rgba(0, 0, 0, 0.8), 0.2); // rgba(0, 0, 0, 0.6)
-... 
+...
 ...     lighten: lighten(hsl(0, 0%, 0%), 30%); // hsl(0, 0, 30)
 ...     lighten: lighten(#800, 20%); // #e00
-... 
+...
 ...     darken: darken(hsl(25, 100%, 80%), 30%); // hsl(25, 100%, 50%)
 ...     darken: darken(#800, 20%); // #200
-... 
+...
 ...     saturate: saturate(hsl(120, 30%, 90%), 20%); // hsl(120, 50%, 90%)
 ...     saturate: saturate(#855, 20%); // #9e3f3f
-... 
+...
 ...     desaturate: desaturate(hsl(120, 30%, 90%), 20%); // hsl(120, 10%, 90%)
 ...     desaturate: desaturate(#855, 20%); // #726b6b
-... 
+...
 ...     adjust: adjust_hue(hsl(120, 30%, 90%), 60deg); // hsl(180, 30%, 90%)
 ...     adjust: adjust_hue(hsl(120, 30%, 90%), 060deg); // hsl(60, 30%, 90%)
 ...     adjust: adjust_hue(#811, 45deg); // #886a11
-... 
+...
 ...     mix: mix(#f00, #00f, 50%); // #7f007f
 ...     mix: mix(#f00, #00f, 25%); // #3f00bf
 ...     mix: mix(rgba(255, 0, 0, 0.5), #00f, 50%); // rgba(64, 0, 191, 0.75)
-... 
+...
 ...     percentage: percentage(100px / 50px); // 200%
-... 
+...
 ...     round: round(10.4px); // 10px
 ...     round: round(10.6px); // 11px
-... 
+...
 ...     ceil: ceil(10.4px); // 11px
 ...     ceil: ceil(10.6px); // 11px
-... 
+...
 ...     floor: floor(10.4px); // 10px
 ...     floor: floor(10.6px); // 10px
-... 
+...
 ...     abs: abs(10px); // 10px
 ...     abs: abs(-10px); // 10px
 ... }
@@ -2389,7 +2391,7 @@ a:hover {
 http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 >>> print css.compile('''
 ... #fake-links .link {@extend a}
-... 
+...
 ... a {
 ...   color: blue;
 ...   &:hover {text-decoration: underline}
