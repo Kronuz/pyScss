@@ -123,7 +123,7 @@ Usage
 
 Usage
 =====
-   Usage example::
+    Usage example::
 
 	from xcss import xCSS
 	css = xCSS()
