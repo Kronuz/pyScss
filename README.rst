@@ -20,7 +20,7 @@ structure but it's been completely rewritten and many bugs have been fixed.
 
 Usage
 =====
-# **Nested Rules**
+#. **Nested Rules**
     Example::
 
 	.selector {
@@ -41,7 +41,7 @@ Usage
 	    color: #00f;
 	}
 
-# **Variables**
+#. **Variables**
     Example::
 
 	$main-color: #ce4dd6;
@@ -61,7 +61,7 @@ Usage
 		border-bottom-style: solid;
 	}
 
-# **Mixins**
+#. **Mixins**
     Example::
 
 	@mixin rounded($side, $radius: 10px) {
@@ -73,7 +73,7 @@ Usage
 	#footer { @include rounded(top, 5px); }
 	#sidebar { @include rounded(left, 8px); }
 
-...produces::
+    ...produces::
 
 	#navbar li {
 		border-top-radius: 10px;
@@ -91,7 +91,7 @@ Usage
 		-webkit-border-left-radius: 8px;
 	}
 
-# **Extend** (using `@extend`)
+#. **Extend** (using `@extend`)
     Example::
 
 	.error {
