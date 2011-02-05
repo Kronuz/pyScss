@@ -209,7 +209,7 @@ _colors = {
 
 def float2str(num):
     if isinstance(num, float):
-        return ('%0.04f' % num).rstrip('0').rstrip('.')
+        return ('%0.03f' % num).rstrip('0').rstrip('.')
     return str(num)
 
 FILEID = 0
@@ -256,7 +256,7 @@ class xCSS(object):
         # Calculate the different possible representations of a color:
         short_k = _short_color_re.sub(r'#\1\2\3', v).lower()
         rgb_k = _long_color_re.sub(lambda m: 'rgb(%d, %d, %d)' % (int(m.group(1), 16), int(m.group(2), 16), int(m.group(3), 16)), v)
-        rgba_k = _long_color_re.sub(lambda m: 'rgba(%d, %d, %d, 255)' % (int(m.group(1), 16), int(m.group(2), 16), int(m.group(3), 16)), v)
+        rgba_k = _long_color_re.sub(lambda m: 'rgba(%d, %d, %d, 1)' % (int(m.group(1), 16), int(m.group(2), 16), int(m.group(3), 16)), v)
         # get the shortest of all to use it:
         k = min([short_k, long_k, rgb_k, rgba_k], key=len)
         _reverse_colors[short_k] = k
@@ -532,7 +532,7 @@ class xCSS(object):
         final_cont = ''
         for fileid in self.css_files:
             if fileid != 'string':
-                final_cont += '/* Generated frm: ' + fileid + ' */\n'
+                final_cont += '/* Generated from: ' + fileid + ' */\n'
             fcont = self.create_css(fileid)
             fcont = self.do_math(fcont)
             fcont = self.post_process(fcont)
@@ -966,18 +966,28 @@ from pyparsing import *
 
 exprStack = []
 
+def escape(str):
+    return re.sub(r'(["\'\\])', '\\\\\g<1>', str)
+
+def unescape(str):
+    return re.sub(re.escape('\\')+'(.)', "\g<1>", str)
+
 def pushFirst( strg, loc, toks ):
     exprStack.append( toks[0] )
 
+def pushFunct( strg, loc, toks ):
+    toks = toks[0].split(',')
+    exprStack.append( 'funct ' + toks[0] + ':' + str(len(toks)))
+
 def pushQuoted( strg, loc, toks ):
-    exprStack.append( u'"%s"' % toks[0] )
+    exprStack.append( u'"%s"' % escape(toks[0]))
 
 def pushString( strg, loc, toks ):
-    exprStack.append( u"'%s'" % toks[0] )
+    exprStack.append( u"'%s'" % escape(toks[0]) )
 
 def pushUnifier( strg, loc, toks ):
     if toks and toks[0] in _units: 
-        exprStack.append( u"unary %s" % toks[0] )
+        exprStack.append( 'unary ' + toks[0] )
 
 def pushUMinus( strg, loc, toks ):
     if toks and toks[0]=='-': 
@@ -990,44 +1000,45 @@ def BNF():
         expr = Forward()
 
         point  = Literal( '.' )
-        comma  = Literal( ',' ).suppress()
         plus   = Literal( '+' )
         minus  = Literal( '-' )
         mult   = Literal( '*' )
         div    = Literal( '/' )
+        expop  = Literal( '^' )
+        color  = Literal( '#' )
         lpar   = Literal( '(' ).suppress()
         rpar   = Literal( ')' ).suppress()
-        expop  = Literal( '^' )
+        comma  = Literal( ',' )
         
-        units = None
+        __units = None
         for u in _units:
-            if not units:
-                units = Literal( u )
+            if not __units:
+                __units = Literal( u )
             else:
-                units |= Literal( u )
-        unit = Combine( units )
+                __units |= Literal( u )
+        units = Combine( __units )
 
         addop  = plus | minus
         multop = mult | div
-        ident  = Word(alphas, alphas+nums+'_$')
-        string = QuotedString('"') | QuotedString("'")
+        ident  = Word(alphas, '_$' + alphas + nums)
+        string = QuotedString('"', escChar='\\', multiline=True) | QuotedString("'", escChar='\\', multiline=True)
         funct  = Combine(ident + lpar + expr.suppress() + ZeroOrMore(comma + expr.suppress()) + rpar)
-        color  = Combine(Literal( '#' ) + Word(hexnums, exact=8) | # #RRGGBBAA
-                         Literal( '#' ) + Word(hexnums, exact=6) | # #RRGGBB
-                         Literal( '#' ) + Word(hexnums, exact=4) | # #RGBA
-                         Literal( '#' ) + Word(hexnums, exact=3)   # #RGB
+        color  = Combine(color + Word(hexnums, exact=8) | # #RRGGBBAA
+                         color + Word(hexnums, exact=6) | # #RRGGBB
+                         color + Word(hexnums, exact=4) | # #RGBA
+                         color + Word(hexnums, exact=3)   # #RGB
         )
         fnumber = Combine(
-            Word( '+-'+nums, nums ) + Optional( point + Optional( Word( nums ) ) ) + Optional( unit ) |
-            point + Word( nums ) + Optional( Literal( '%' ) )
+            Word( nums ) + Optional( point + Optional( Word( nums ) ) ) + Optional( units ) |
+            point + Word( nums ) + Optional( units )
         )
         
         atom = (
-            Optional('-') +
-            ( fnumber | funct | color ).setParseAction( pushFirst ) |
-            ( string ).setParseAction( pushQuoted ) |
-            ( ident  ).setParseAction( pushString ) |
-            ( lpar + expr.suppress() + rpar + Optional( unit )).setParseAction(pushUnifier)
+            Optional('-') + ( fnumber | color ).setParseAction( pushFirst ) |
+            Optional('-') + ( funct ).setParseAction( pushFunct, callDuringTry=True ) |
+            Optional('-') + ( string ).setParseAction( pushQuoted ) |
+            Optional('-') + ( ident  ).setParseAction( pushString ) |
+            Optional('-') + ( lpar + expr.suppress() + rpar + Optional( units )).setParseAction(pushUnifier)
         ).setParseAction(pushUMinus)
         
         # by defining exponentiation as 'atom [ ^ factor ]...' instead of 'atom [ ^ atom ]...', we get right-to-left exponents, instead of left-to-righ
@@ -1089,7 +1100,7 @@ def _rgba(_r, _g, _b, _a, d=None):
         if p:
             d.setdefault('%', 0)
             d['%'] = p
-        return ('rgba(%s, %s, %s, %s)' % (float2str(r), float2str(g), float2str(b), float2str(a)), None, (r, g, b, a), d)
+        return ('rgba(%d, %d, %d, %s)' % (int(round(r)), int(round(g)), int(round(b)), float2str(a)), None, (r, g, b, a), d)
 
 def _hsl(_h, _s, _l, d=None):
     return _hsla(_h, _s, _l, ('', 1.0, None, {}), d)
@@ -1115,7 +1126,7 @@ def _hsla(_h, _s, _l, _a, d=None):
         if p:
             d.setdefault('%', 0)
             d['%'] = p
-        return ('hsl(%s, %s, %s)' % (float2str(h), float2str(s), float2str(l)), None, (r*255, g*255, b*255, 1.0), d)
+        return ('hsl(%s, %s%%, %s%%)' % (float2str(h), float2str(s*100.0), float2str(l*100.0)), None, (r*255, g*255, b*255, 1.0), d)
     else:
         d = {}
         d.setdefault('hsla', 0)
@@ -1124,7 +1135,7 @@ def _hsla(_h, _s, _l, _a, d=None):
         if p:
             d.setdefault('%', 0)
             d['%'] = p
-        return ('hsla(%s, %s, %s)' % (float2str(h), float2str(s), float2str(l), float2str(a)), None, (r*255, g*255, b*255, a), d)
+        return ('hsla(%s, %s%%, %s%%)' % (float2str(h), float2str(s*100.0), float2str(l*100.0), float2str(a)), None, (r*255, g*255, b*255, a), d)
 
 def _float(val):
     _val = val[1]
@@ -1200,7 +1211,7 @@ def _adjust_hue(_color, _degrees):
 def _complement(_color):
     return __hsla_add(_color, 180.0, 0, 0, 0)
 
-def _mix(_color1, _color2, _weight):
+def _mix(_color1, _color2, _weight=None):
     """
     Mixes together two colors. Specifically, takes the average of each of the
     RGB components, optionally weighted by the given percentage. 
@@ -1245,7 +1256,7 @@ def _mix(_color1, _color2, _weight):
     # Finally, the weight of color1 is renormalized to be within [0, 1]
     # and the weight of color2 is given by 1 minus the weight of color1.
 
-    p = _weight[1]
+    p = _weight[1] if _weight is not None else 0.5
     p = 0.0 if p < 0 else 1.0 if p > 1 else p
     w = p * 2 - 1
     a = _color1[2][3] - _color2[2][3]
@@ -1295,7 +1306,7 @@ def _unquote(_str):
         s = _str[0][1:-1]
     else:
         s = _str[0]
-    return ("'%s'" % s.replace('"', '\\"'), _str[1], _str[2], _str[3])
+    return ("'%s'" % unescape(s), _str[1], _str[2], _str[3])
 
 def _quote(_str):
     if _str[0] == '"':
@@ -1304,7 +1315,7 @@ def _quote(_str):
         s = _str[0][1:-1]
     else:
         s = _str[0]
-    return ('"%s"' % s.replace('"', '\\"'), None, None, {})
+    return ('"%s"' % unscape(s), None, None, {})
     
 def _ops(op):
     _op = op
@@ -1382,51 +1393,54 @@ def _func(fn):
         val = (float2str(val), val, None, _val[3])
         return _float(val)
     return _func
+
 fncs = {
-    'opacify': (2, _opacify),
-    'fadein': (2, _opacify),
-    'fade_in': (2, _opacify),
-    'transparentize': (2, _transparentize),
-    'fadeout': (2, _transparentize),
-    'fade_out': (2, _transparentize),
-    'lighten': (2, _lighten),
-    'darken': (2, _darken),
-    'saturate': (2, _saturate),
-    'desaturate': (2, _desaturate),
-    'grayscale': (1, _grayscale),
-    'adjust_hue': (2, _adjust_hue),
-    'spin': (2, _adjust_hue),
-    'complement': (1, _complement),
-    'mix': (3, _mix),
-    'hsl': (3, _hsl),
-    'hsla': (4, _hsla),
-    'rgb': (3, _rgb),
-    'rgba': (4, _rgba),
+    'opacify:2': _opacify,
+    'fadein:2': _opacify,
+    'fade_in:2': _opacify,
+    'transparentize:2': _transparentize,
+    'fadeout:2': _transparentize,
+    'fade_out:2': _transparentize,
+    'lighten:2': _lighten,
+    'darken:2': _darken,
+    'saturate:2': _saturate,
+    'desaturate:2': _desaturate,
+    'grayscale:1': _grayscale,
+    'adjust_hue:2': _adjust_hue,
+    'spin:2': _adjust_hue,
+    'complement:1': _complement,
+    'mix:2': _mix,
+    'mix:3': _mix,
+    'hsl:3': _hsl,
+    'hsla:4': _hsla,
+    'rgb:3': _rgb,
+    'rgba:4': _rgba,
 
-    'red': (1, _red),
-    'green': (1, _green),
-    'blue': (1, _blue),
-    'alpha': (1, _alpha),
-    'opacity': (1, _alpha),
-    'hue': (1, _hue),
-    'saturation': (1, _saturation),
-    'lightness': (1, _lightness),
+    'red:1': _red,
+    'green:1': _green,
+    'blue:1': _blue,
+    'alpha:1': _alpha,
+    'opacity:1': _alpha,
+    'hue:1': _hue,
+    'saturation:1': _saturation,
+    'lightness:1': _lightness,
 
-    'percentage': (1, _percentage),
-    'unitless': (1, _unitless),
-    'quote': (1, _quote),
-    'unquote': (1, _unquote),
-    'escape': (1, _unquote),
-    'e': (1, _unquote),
+    'percentage:1': _percentage,
+    'unitless:1': _unitless,
+    'quote:1': _quote,
+    'unquote:1': _unquote,
+    'escape:1': _unquote,
+    'e:1': _unquote,
 
-    'sin' : (1, _func(math.sin)),
-    'cos' : (1, _func(math.cos)),
-    'tan' : (1, _func(math.tan)),
-    'abs' : (1, _func(abs)),
-    'round' : (1, _func(round)),
-    'ceil' : (1, _func(math.ceil)),
-    'floor' : (1, _func(math.floor)),
+    'sin:1': _func(math.sin),
+    'cos:1': _func(math.cos),
+    'tan:1': _func(math.tan),
+    'abs:1': _func(abs),
+    'round:1': _func(round),
+    'ceil:1': _func(math.ceil),
+    'floor:1': _func(math.floor),
 }
+
 def evaluateStack( s ):
     op = s.pop()
     if op.startswith('unary '):
@@ -1455,13 +1469,16 @@ def evaluateStack( s ):
         op2 = evaluateStack( s )
         op1 = evaluateStack( s )
         return opn[op]( op1, op2 )
-    elif op in fncs:
-        args, fn = fncs[op]
+    elif op.startswith('funct '):
+        fn = op[6:]
+        _, _, args = op.partition(':')
+        args = int(args)
         ops = []
         while args:
             args -= 1
             op = evaluateStack( s )
             ops.insert(0, op)
+        fn = fncs[fn]
         return fn( *ops )
     elif op[0] == '#':
         return _rgbhex(op)
@@ -1488,11 +1505,13 @@ def eval_expr(expr):
     #print '>>',expr,'<<'
     results = BNF().parseString( expr, parseAll=True )
     val = evaluateStack( exprStack[:] )
+    
     #print '--',val,'--'
     val = val[0]
-    if val[0] == "'":
-        val = val[1:-1]
-    return val
+    if val:
+        if val[0] == "'":
+            val = val[1:-1]
+    return val or ''
 
 
 __doc__ += """
@@ -2217,7 +2236,7 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 a {
 	color: #de7b5f;
-	color: hsl(13.2, 0.661, 0.624);
+	color: hsl(13.2, 66.1%, 62.4%);
 	color-hue: 13.2;
 	color-saturation: 66.1%;
 	color-lightness: 62.4%;
@@ -2249,7 +2268,7 @@ a {
 ... 
 ...     mix: mix(#f00, #00f, 50%); // #7f007f
 ...     mix: mix(#f00, #00f, 25%); // #3f00bf
-...     mix: mix(rgba(255, 0, 0, 0.5), #00f, 50%); // rgba(63, 0, 191, 0.75)
+...     mix: mix(rgba(255, 0, 0, 0.5), #00f, 50%); // rgba(64, 0, 191, 0.75)
 ... 
 ...     percentage: percentage(100px / 50px); // 200%
 ... 
@@ -2263,7 +2282,7 @@ a {
 ...     floor: floor(10.6px); // 10px
 ... 
 ...     abs: abs(10px); // 10px
-...     //abs: abs(-10px); // 10px
+...     abs: abs(-10px); // 10px
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .functions {
@@ -2271,20 +2290,20 @@ a {
     opacify: #001;
     transparentize: rgba(0, 0, 0, 0.4);
     transparentize: rgba(0, 0, 0, 0.6);
-    lighten: hsl(0, 0, 0.3);
-    lighten: hsl(0, 1, 0.4667);
-    darken: hsl(25, 1, 0.5);
-    darken: hsl(0, 1, 0.0667);
-    saturate: hsl(120, 0.5, 0.9);
-    saturate: hsl(0, 0.4308, 0.4333);
-    desaturate: hsl(120, 0.1, 0.9);
-    desaturate: hsl(0, 0.0308, 0.4333);
-    adjust: hsl(180, 0.3, 0.9);
-    adjust: hsl(180, 0.3, 0.9);
-    adjust: hsl(45, 0.7778, 0.3);
+    lighten: hsl(0, 0, 30%);
+    lighten: hsl(0, 100%, 46.667%);
+    darken: hsl(25, 100%, 50%);
+    darken: hsl(0, 100%, 6.667%);
+    saturate: hsl(120, 50%, 90%);
+    saturate: hsl(0, 43.077%, 43.333%);
+    desaturate: hsl(120, 10%, 90%);
+    desaturate: hsl(0, 3.077%, 43.333%);
+    adjust: hsl(180, 30%, 90%);
+    adjust: hsl(180, 30%, 90%);
+    adjust: hsl(45, 77.778%, 30%);
     mix: #7f007f;
     mix: #3f00bf;
-    mix: rgba(63.75, 0, 191.25, 0.75);
+    mix: rgba(64, 0, 191, 0.75);
     percentage: 200%;
     round: 10px;
     round: 11px;
@@ -2292,6 +2311,7 @@ a {
     ceil: 11px;
     floor: 10px;
     floor: 10px;
+    abs: 10px;
     abs: 10px;
 }
 
@@ -2322,13 +2342,13 @@ a {
 ... }
 ... '''
 >>> print css.compile() #doctest: +NORMALIZE_WHITESPACE
-/* Generated frm: second.css */
+/* Generated from: second.css */
 .basicClass,
 .specialClass {
     padding: 20px;
     background-color: red;
 }
-/* Generated frm: first.css */
+/* Generated from: first.css */
 .specialClass {
     padding: 10px;
     font-size: 14px;
