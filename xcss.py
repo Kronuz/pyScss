@@ -1151,7 +1151,7 @@ def __rgba_add(_color, _r, _g, _b, _a, d=None):
     g = ('', _color[2][1] + _g, None, {})
     b = ('', _color[2][2] + _b, None, {})
     a = ('', _color[2][3] + _a, None, {})
-    return rgba(r, g, b, a, d)
+    return _rgba(r, g, b, a, d)
 
 def _opacify(_color, _amount):
     a = _amount[1]
@@ -1169,9 +1169,9 @@ def __hsla_add(_color, _h, _s, _l, _a, d=None):
     s = ('', s + _s, None, {'%': 1})
     l = ('', l + _l, None, {'%': 1})
     a = ('', _color[2][3] + _a, None, {})
-    return hsla(h, s, l, a, d)
+    return _hsla(h, s, l, a, d)
 
-def _darken(_color, amount):
+def _darken(_color, _amount):
     a = _amount[1]
     a = 0.0 if a < 0 else 1.0 if a > 1 else a
     return __hsla_add(_color, 0, 0, -a, 0)
@@ -1205,44 +1205,88 @@ def _mix(_color1, _color2, _weight):
     Mixes together two colors. Specifically, takes the average of each of the
     RGB components, optionally weighted by the given percentage. 
     The opacity of the colors is also considered when weighting the components.
+
+    Specifically, takes the average of each of the RGB components,
+    optionally weighted by the given percentage.
+    The opacity of the colors is also considered when weighting the components.
+    
+    The weight specifies the amount of the first color that should be included
+    in the returned color.
+    50%, means that half the first color
+        and half the second color should be used.
+    25% means that a quarter of the first color
+        and three quarters of the second color should be used.
+    
+    For example:
+    
+        mix(#f00, #00f) => #7f007f
+        mix(#f00, #00f, 25%) => #3f00bf
+        mix(rgba(255, 0, 0, 0.5), #00f) => rgba(63, 0, 191, 0.75)
+
     """
-    #FIXME: Needs to take into account the alpha channel for the opacity
-    w = _weight[1]
-    w = 0.0 if w < 0 else 1.0 if w > 1 else w
+    # This algorithm factors in both the user-provided weight
+    # and the difference between the alpha values of the two colors
+    # to decide how to perform the weighted average of the two RGB values.
+    #
+    # It works by first normalizing both parameters to be within [-1, 1],
+    # where 1 indicates "only use color1", -1 indicates "only use color 0",
+    # and all values in between indicated a proportionately weighted average.
+    #
+    # Once we have the normalized variables w and a,
+    # we apply the formula (w + a)/(1 + w*a)
+    # to get the combined weight (in [-1, 1]) of color1.
+    # This formula has two especially nice properties:
+    #
+    #   * When either w or a are -1 or 1, the combined weight is also that number
+    #     (cases where w * a == -1 are undefined, and handled as a special case).
+    #
+    #   * When a is 0, the combined weight is w, and vice versa
+    #
+    # Finally, the weight of color1 is renormalized to be within [0, 1]
+    # and the weight of color2 is given by 1 minus the weight of color1.
+
+    p = _weight[1]
+    p = 0.0 if p < 0 else 1.0 if p > 1 else p
+    w = p * 2 - 1
+    a = _color1[2][3] - _color2[2][3]
+    
+    w1 = ((w if (w * a == -1) else (w + a) / (1 + w * a)) + 1) / 2.0
+    w2 = 1 - w1
+    
     d = _color1[3].copy()
     for k, v in _color2[3].items():
         d.setdefault(k, 0)
         d[k] += 1
-    r = ('', _color1[2][0] * w + _color2[2][0] * (1 - w), None, {})
-    g = ('', _color1[2][1] * w + _color2[2][1] * (1 - w), None, {})
-    b = ('', _color1[2][2] * w + _color2[2][2] * (1 - w), None, {})
-    a = ('', _color1[2][3] * w + _color2[2][3] * (1 - w), None, {})
+    r = ('', _color1[2][0] * w1 + _color2[2][0] * w2, None, {})
+    g = ('', _color1[2][1] * w1 + _color2[2][1] * w2, None, {})
+    b = ('', _color1[2][2] * w1 + _color2[2][2] * w2, None, {})
+    a = ('', _color1[2][3] * p + _color2[2][3] * (1 - p), None, {})
     return _rgba(r, g, b, a, d)
 
 def _red(_color):
-    return _float('', _color[2][0], None, {})
+    return _float(('', _color[2][0], None, {}))
 def _green(_color):
-    return _float('', _color[2][1], None, {})
+    return _float(('', _color[2][1], None, {}))
 def _blue(_color):
-    return _float('', _color[2][2], None, {})
+    return _float(('', _color[2][2], None, {}))
 def _alpha(_color):
-    return _float('', _color[2][3], None, {})
+    return _float(('', _color[2][3], None, {}))
 
 def _hue(_color):
     h, l, s = colorsys.rgb_to_hls(_color[2][0]/255.0, _color[2][1]/255.0, _color[2][2]/255.0)
-    return _float('', h*360.0, None, {})
+    return _float(('', h*360.0, None, {}))
 def _saturation(_color):
     h, l, s = colorsys.rgb_to_hls(_color[2][0]/255.0, _color[2][1]/255.0, _color[2][2]/255.0)
-    return _float('', s, None, { '%': 1 })
+    return _float(('', s, None, { '%': 1 }))
 def _lightness(_color):
     h, l, s = colorsys.rgb_to_hls(_color[2][0]/255.0, _color[2][1]/255.0, _color[2][2]/255.0)
-    return _float('', l, None, { '%': 1 })
+    return _float(('', l, None, { '%': 1 }))
 
 def _percentage(_value):
-    return _float('', _value[1], None, { '%': 1 })
+    return _float(('', _value[1], None, { '%': 1 }))
 
 def _unitless(_value):
-    return _float('', _value[1], None, {})
+    return _float(('', _value[1], None, {}))
 
 def _unquote(_str):
     if _str[0] != '"':
@@ -1335,20 +1379,22 @@ def _func(fn):
             val = fn(_val[1])
         else:
             val = 0.0
-        return (float2str(val), val, None, _val[3])
+        val = (float2str(val), val, None, _val[3])
+        return _float(val)
+    return _func
 fncs = {
     'opacify': (2, _opacify),
     'fadein': (2, _opacify),
-    'fade-in': (2, _opacify),
+    'fade_in': (2, _opacify),
     'transparentize': (2, _transparentize),
     'fadeout': (2, _transparentize),
-    'fade-out': (2, _transparentize),
+    'fade_out': (2, _transparentize),
     'lighten': (2, _lighten),
     'darken': (2, _darken),
     'saturate': (2, _saturate),
     'desaturate': (2, _desaturate),
     'grayscale': (1, _grayscale),
-    'adjust-hue': (2, _adjust_hue),
+    'adjust_hue': (2, _adjust_hue),
     'spin': (2, _adjust_hue),
     'complement': (1, _complement),
     'mix': (3, _mix),
@@ -2158,17 +2204,95 @@ http://groups.google.com/group/xcss/browse_thread/thread/b5757c24586c1519#
 
 TESTS
 --------------------------------------------------------------------------------
-
-
 http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 >>> print css.compile('''
 ... a {
+...     $color: rgba(0.872536*255, 0.48481984*255, 0.375464*255, 1);
+...     color: $color;
 ...     color: hsl(13.2, 0.661, 0.624);
-...     background: rgba(0.931*255, 0.463*255, 0.316*255, 1);
+...     color-hue: hue($color); // 60deg
+...     color-saturation: saturation($color); // 60%
+...     color-lightness: lightness($color); // 50%
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 a {
-    color: rgba(123, 200, 155, 0.3);
+	color: #de7b5f;
+	color: hsl(13.2, 0.661, 0.624);
+	color-hue: 13.2;
+	color-saturation: 66.1%;
+	color-lightness: 62.4%;
+}
+
+>>> print css.compile('''
+... .functions {
+...     opacify: opacify(rgba(0, 0, 0, 0.5), 0.1); // rgba(0, 0, 0, 0.6)
+...     opacify: opacify(rgba(0, 0, 17, 0.8), 0.2); // #001
+... 
+...     transparentize: transparentize(rgba(0, 0, 0, 0.5), 0.1); // rgba(0, 0, 0, 0.4)
+...     transparentize: transparentize(rgba(0, 0, 0, 0.8), 0.2); // rgba(0, 0, 0, 0.6)
+... 
+...     lighten: lighten(hsl(0, 0%, 0%), 30%); // hsl(0, 0, 30)
+...     lighten: lighten(#800, 20%); // #e00
+... 
+...     darken: darken(hsl(25, 100%, 80%), 30%); // hsl(25, 100%, 50%)
+...     darken: darken(#800, 20%); // #200
+... 
+...     saturate: saturate(hsl(120, 30%, 90%), 20%); // hsl(120, 50%, 90%)
+...     saturate: saturate(#855, 20%); // #9e3f3f
+... 
+...     desaturate: desaturate(hsl(120, 30%, 90%), 20%); // hsl(120, 10%, 90%)
+...     desaturate: desaturate(#855, 20%); // #726b6b
+... 
+...     adjust: adjust_hue(hsl(120, 30%, 90%), 60deg); // hsl(180, 30%, 90%)
+...     adjust: adjust_hue(hsl(120, 30%, 90%), 060deg); // hsl(60, 30%, 90%)
+...     adjust: adjust_hue(#811, 45deg); // #886a11
+... 
+...     mix: mix(#f00, #00f, 50%); // #7f007f
+...     mix: mix(#f00, #00f, 25%); // #3f00bf
+...     mix: mix(rgba(255, 0, 0, 0.5), #00f, 50%); // rgba(63, 0, 191, 0.75)
+... 
+...     percentage: percentage(100px / 50px); // 200%
+... 
+...     round: round(10.4px); // 10px
+...     round: round(10.6px); // 11px
+... 
+...     ceil: ceil(10.4px); // 11px
+...     ceil: ceil(10.6px); // 11px
+... 
+...     floor: floor(10.4px); // 10px
+...     floor: floor(10.6px); // 10px
+... 
+...     abs: abs(10px); // 10px
+...     //abs: abs(-10px); // 10px
+... }
+... ''') #doctest: +NORMALIZE_WHITESPACE
+.functions {
+    opacify: rgba(0, 0, 0, 0.6);
+    opacify: #001;
+    transparentize: rgba(0, 0, 0, 0.4);
+    transparentize: rgba(0, 0, 0, 0.6);
+    lighten: hsl(0, 0, 0.3);
+    lighten: hsl(0, 1, 0.4667);
+    darken: hsl(25, 1, 0.5);
+    darken: hsl(0, 1, 0.0667);
+    saturate: hsl(120, 0.5, 0.9);
+    saturate: hsl(0, 0.4308, 0.4333);
+    desaturate: hsl(120, 0.1, 0.9);
+    desaturate: hsl(0, 0.0308, 0.4333);
+    adjust: hsl(180, 0.3, 0.9);
+    adjust: hsl(180, 0.3, 0.9);
+    adjust: hsl(45, 0.7778, 0.3);
+    mix: #7f007f;
+    mix: #3f00bf;
+    mix: rgba(63.75, 0, 191.25, 0.75);
+    percentage: 200%;
+    round: 10px;
+    round: 11px;
+    ceil: 11px;
+    ceil: 11px;
+    floor: 10px;
+    floor: 10px;
+    abs: 10px;
 }
 
 >>> print css.compile('''
