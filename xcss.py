@@ -1102,11 +1102,11 @@ def _hsla(_h, _s, _l, _a, d=None):
     hp = 1 if '%' in _h[3] else 0
     sp = 1 if '%' in _s[3] else 0
     lp = 1 if '%' in _l[3] else 0
-    h = h * 360.0 if hp else 0.0 if h < 0 else 360.0 if h > 360 else h
+    h = h * 360.0 if hp else h % 360.0
     s = 0.0 if s < 0 else 1.0 if s > 1 else s
     l = 0.0 if l < 0 else 1.0 if l > 1 else l
     a = 0.0 if a < 0 else 1.0 if a > 1 else a
-    r, g, b = colorsys.hls_to_rgb(h/360, l, s)
+    r, g, b = colorsys.hls_to_rgb(h/360.0, l, s)
     if a == 1:
         d = d or {}
         d.setdefault('hsl', 0)
@@ -1196,7 +1196,10 @@ def _grayscale(_color):
 
 def _adjust_hue(_color, _degrees):
     return __hsla_add(_color, _degrees[1] % 360.0, 0, 0, 0)
-    
+
+def _complement(_color):
+    return __hsla_add(_color, 180.0, 0, 0, 0)
+
 def _mix(_color1, _color2, _weight):
     """
     Mixes together two colors. Specifically, takes the average of each of the
@@ -1215,6 +1218,25 @@ def _mix(_color1, _color2, _weight):
     b = ('', _color1[2][2] * w + _color2[2][2] * (1 - w), None, {})
     a = ('', _color1[2][3] * w + _color2[2][3] * (1 - w), None, {})
     return _rgba(r, g, b, a, d)
+
+def _red(_color):
+    return _float('', _color[2][0], None, {})
+def _green(_color):
+    return _float('', _color[2][1], None, {})
+def _blue(_color):
+    return _float('', _color[2][2], None, {})
+def _alpha(_color):
+    return _float('', _color[2][3], None, {})
+
+def _hue(_color):
+    h, l, s = colorsys.rgb_to_hls(_color[2][0]/255.0, _color[2][1]/255.0, _color[2][2]/255.0)
+    return _float('', h*360.0, None, {})
+def _saturation(_color):
+    h, l, s = colorsys.rgb_to_hls(_color[2][0]/255.0, _color[2][1]/255.0, _color[2][2]/255.0)
+    return _float('', s, None, { '%': 1 })
+def _lightness(_color):
+    h, l, s = colorsys.rgb_to_hls(_color[2][0]/255.0, _color[2][1]/255.0, _color[2][2]/255.0)
+    return _float('', l, None, { '%': 1 })
 
 def _percentage(_value):
     return _float('', _value[1], None, { '%': 1 })
@@ -1316,25 +1338,40 @@ def _func(fn):
         return (float2str(val), val, None, _val[3])
 fncs = {
     'opacify': (2, _opacify),
-    'fade_in': (2, _opacify),
+    'fadein': (2, _opacify),
+    'fade-in': (2, _opacify),
     'transparentize': (2, _transparentize),
-    'fade_out': (2, _transparentize),
+    'fadeout': (2, _transparentize),
+    'fade-out': (2, _transparentize),
     'lighten': (2, _lighten),
     'darken': (2, _darken),
     'saturate': (2, _saturate),
     'desaturate': (2, _desaturate),
     'grayscale': (1, _grayscale),
-    'adjust_hue': (2, _adjust_hue),
+    'adjust-hue': (2, _adjust_hue),
+    'spin': (2, _adjust_hue),
+    'complement': (1, _complement),
     'mix': (3, _mix),
     'hsl': (3, _hsl),
     'hsla': (4, _hsla),
     'rgb': (3, _rgb),
     'rgba': (4, _rgba),
 
+    'red': (1, _red),
+    'green': (1, _green),
+    'blue': (1, _blue),
+    'alpha': (1, _alpha),
+    'opacity': (1, _alpha),
+    'hue': (1, _hue),
+    'saturation': (1, _saturation),
+    'lightness': (1, _lightness),
+
     'percentage': (1, _percentage),
     'unitless': (1, _unitless),
-    'unquote': (1, _unquote),
     'quote': (1, _quote),
+    'unquote': (1, _unquote),
+    'escape': (1, _unquote),
+    'e': (1, _unquote),
 
     'sin' : (1, _func(math.sin)),
     'cos' : (1, _func(math.cos)),
