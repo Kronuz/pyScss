@@ -30,8 +30,6 @@ structure but it's been completely rewritten and many bugs have been fixed.
 import re
 import sys
 
-from django.utils.datastructures import SortedDict
-
 # units and conversions
 _units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
           'grad', 'ms', 's', 'hz', 'khz', '%']
@@ -54,6 +52,9 @@ _conv = {
     'freq': {
         'hz':  1.0,
         'khz': 1000.0
+    },
+    'any': {
+        '%': 1.0 / 100
     }
 }
 _conv_mapping = {}
@@ -276,7 +277,7 @@ class xCSS(object):
                 \(              # Accept either the start of a function call... ("function_call(")
             |
                 [\][()\s]*      # ...or an operation ("+-*/")
-                (?:\s-\s|[+*/^]) # (dash needs a surrounding space always)
+                (?:\s-\s|[+*/^,]) # (dash needs a surrounding space always)
             )
             [\][()\s]*          
             [#%.\w]+            # Accept a variable or constant or number (preceded by spaces or parenthesis)
@@ -478,14 +479,18 @@ class xCSS(object):
                             is_var = False
                         prop = prop.strip()
                         if prop:
+                            default = False
+                            if '!default' in value:
+                                default = True
+                                value.replace('!default', '')
                             value = value.strip()
                             _prop = scope + prop
                             if is_var or prop[0] == '$':
-                                if value:
+                                if value and (not default or _prop not in context):
                                     context[_prop] = value
                             else:
                                 if properties is not None and value:
-                                    properties[_prop] = value
+                                    properties.append((_prop, value))
             elif p_selectors[-1] == ':':
                 self.process_properties(p_codestr, context, options, properties, scope + p_selectors[:-1] + '-')
 
@@ -883,7 +888,7 @@ class xCSS(object):
                 if position is not None and codestr and properties is None:
                     assert selectors is None, "Rule body is repeated for different selectors!"
                     rule[SELECTORS] = _selectors
-                    rule[PROPERTIES] = properties = rule[PROPERTIES] or SortedDict()
+                    rule[PROPERTIES] = properties = rule[PROPERTIES] or []
                     rule[CONTEXT] = context = rule[CONTEXT] or {}
                     rule[OPTIONS] = context = rule[OPTIONS] or {}
                     self.process_properties(codestr, context, options, properties)
@@ -912,7 +917,7 @@ class xCSS(object):
                         for k, v in context.items():
                             result += '\t\t' + k + ' = ' + v + ';\n'
                         result += '\t*/\n'
-                for prop, value in properties.items():
+                for prop, value in properties:
                     result += '\t' + prop + ': ' + value + ';\n'
                 result += '}\n'
         return result
@@ -954,9 +959,10 @@ class xCSS(object):
         return cont
 
 
-from pyparsing import *
 import math
 import operator
+import colorsys
+from pyparsing import *
 
 exprStack = []
 
@@ -1037,29 +1043,23 @@ def BNF():
 # map operator symbols to corresponding arithmetic operations
 hex2rgba = {
     9: lambda c: (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), int(c[7:9], 16)),
-    7: lambda c: (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), 255),
+    7: lambda c: (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), 1.0),
     5: lambda c: (int(c[1]*2, 16), int(c[2]*2, 16), int(c[3]*2, 16), int(c[4]*2, 16)),
-    4: lambda c: (int(c[1]*2, 16), int(c[2]*2, 16), int(c[3]*2, 16), 255),
+    4: lambda c: (int(c[1]*2, 16), int(c[2]*2, 16), int(c[3]*2, 16), 1.0),
 }
-def _rgbhex(hex):
-    return (hex, None, hex2rgba[len(hex)](hex), {'#':1})
-def _rgb(_r, _g, _b):
-    r = _r[1]
-    g = _g[1]
-    b = _b[1]
-    rp = 1 if '%' in _r[3] else 0
-    gp = 1 if '%' in _g[3] else 0
-    bp = 1 if '%' in _b[3] else 0
-    r = r * 255 if rp else 0 if r < 0 else 255 if r > 255 else r
-    g = g * 255 if rp else 0 if g < 0 else 255 if g > 255 else g
-    b = b * 255 if rp else 0 if b < 0 else 255 if b > 255 else b
-    d = { 'rgb': 1 }
-    p = rp + gp + bp
-    if p: d['%'] = p
-    return ('#%02x%02x%02x' % (r,g,b), None, (r, g, b, 255), )
-def _rgba(_r, _g, _b, _a):
-    if _a[1] == 255:
-        return _rgb(_r, _g, _b)
+
+def _rgbhex(hex, d=None):
+    _r, _g, _b, _a = hex2rgba[len(hex)](hex)
+    _r = ('', _r, None, {})
+    _g = ('', _g, None, {})
+    _b = ('', _b, None, {})
+    _a = ('', _a, None, {})
+    return _rgba(_r, _g, _b, _a, d)
+
+def _rgb(_r, _g, _b, d=None):
+    return _rgba(_r, _g, _b, ('', 1.0, None, {}), d)
+
+def _rgba(_r, _g, _b, _a, d=None):
     r = _r[1]
     g = _g[1]
     b = _b[1]
@@ -1067,16 +1067,65 @@ def _rgba(_r, _g, _b, _a):
     rp = 1 if '%' in _r[3] else 0
     gp = 1 if '%' in _g[3] else 0
     bp = 1 if '%' in _b[3] else 0
-    ap = 1 if '%' in _a[3] else 0
-    p = (r > 0 and r <= 1 and g > 0 and g <= 1 and b > 0 and b <= 1 and a > 0 and a <= 1)
-    r = r * 255 if rp else 0 if r < 0 else 255 if r > 255 else r
-    g = g * 255 if gp else 0 if g < 0 else 255 if g > 255 else g
-    b = b * 255 if bp else 0 if b < 0 else 255 if b > 255 else b
-    a = a * 255 if ap else 0 if a < 0 else 255 if a > 255 else a
-    d = { 'rgba': 1 }
-    p = rp + gp + bp
-    if p: d['%'] = p
-    return ('rgba(%s, %s, %s, %s)' % (float2str(r), float2str(g), float2str(b), float2str(a)), None, (r, g, b, a), d)
+    r = r * 255.0 if rp else 0.0 if r < 0 else 255.0 if r > 255 else r
+    g = g * 255.0 if gp else 0.0 if g < 0 else 255.0 if g > 255 else g
+    b = b * 255.0 if bp else 0.0 if b < 0 else 255.0 if b > 255 else b
+    a = 0.0 if a < 0 else 1.0 if a > 1 else a
+    if a == 1:
+        d = d or {}
+        d.setdefault('rgb', 0)
+        d['rgb'] += 1
+        d = { 'rgb': 1 }
+        p = rp + gp + bp
+        if p:
+            d.setdefault('%', 0)
+            d['%'] = p
+        return ('#%02x%02x%02x' % (r,g,b), None, (r, g, b, 1.0), d)
+    else:
+        d = d or {}
+        d.setdefault('rgba', 0)
+        d['rgba'] += 1
+        p = rp + gp + bp
+        if p:
+            d.setdefault('%', 0)
+            d['%'] = p
+        return ('rgba(%s, %s, %s, %s)' % (float2str(r), float2str(g), float2str(b), float2str(a)), None, (r, g, b, a), d)
+
+def _hsl(_h, _s, _l, d=None):
+    return _hsla(_h, _s, _l, ('', 1.0, None, {}), d)
+
+def _hsla(_h, _s, _l, _a, d=None):
+    h = _h[1]
+    s = _s[1]
+    l = _l[1]
+    a = _a[1]
+    hp = 1 if '%' in _h[3] else 0
+    sp = 1 if '%' in _s[3] else 0
+    lp = 1 if '%' in _l[3] else 0
+    h = h * 360.0 if hp else 0.0 if h < 0 else 360.0 if h > 360 else h
+    s = 0.0 if s < 0 else 1.0 if s > 1 else s
+    l = 0.0 if l < 0 else 1.0 if l > 1 else l
+    a = 0.0 if a < 0 else 1.0 if a > 1 else a
+    r, g, b = colorsys.hls_to_rgb(h/360, l, s)
+    if a == 1:
+        d = d or {}
+        d.setdefault('hsl', 0)
+        d['hsl'] += 1
+        p = hp + sp + lp
+        if p:
+            d.setdefault('%', 0)
+            d['%'] = p
+        return ('hsl(%s, %s, %s)' % (float2str(h), float2str(s), float2str(l)), None, (r*255, g*255, b*255, 1.0), d)
+    else:
+        d = {}
+        d.setdefault('hsla', 0)
+        d['hsla'] += 1
+        p = hp + sp + lp + ap
+        if p:
+            d.setdefault('%', 0)
+            d['%'] = p
+        return ('hsla(%s, %s, %s)' % (float2str(h), float2str(s), float2str(l), float2str(a)), None, (r*255, g*255, b*255, a), d)
+
 def _float(val):
     _val = val[1]
     val[3].pop(None, None)
@@ -1097,6 +1146,100 @@ def _float(val):
     _val = float2str(_val)
     return (_val, val[1], val[2], val[3])
 
+def __rgba_add(_color, _r, _g, _b, _a, d=None):
+    r = ('', _color[2][0] + _r, None, {})
+    g = ('', _color[2][1] + _g, None, {})
+    b = ('', _color[2][2] + _b, None, {})
+    a = ('', _color[2][3] + _a, None, {})
+    return rgba(r, g, b, a, d)
+
+def _opacify(_color, _amount):
+    a = _amount[1]
+    a = 0.0 if a < 0 else 1.0 if a > 1 else a
+    return __rgba_add(_color, 0, 0, 0, a)
+    
+def _transparentize(_color, _amount):
+    a = _amount[1]
+    a = 0.0 if a < 0 else 1.0 if a > 1 else a
+    return __rgba_add(_color, 0, 0, 0, -a)
+
+def __hsla_add(_color, _h, _s, _l, _a, d=None):
+    h, l, s = colorsys.rgb_to_hls(_color[2][0]/255.0, _color[2][1]/255.0, _color[2][2]/255.0)
+    h = ('', h*360.0 + _h, None, {})
+    s = ('', s + _s, None, {'%': 1})
+    l = ('', l + _l, None, {'%': 1})
+    a = ('', _color[2][3] + _a, None, {})
+    return hsla(h, s, l, a, d)
+
+def _darken(_color, amount):
+    a = _amount[1]
+    a = 0.0 if a < 0 else 1.0 if a > 1 else a
+    return __hsla_add(_color, 0, 0, -a, 0)
+
+def _lighten(_color, _amount):
+    a = _amount[1]
+    a = 0.0 if a < 0 else 1.0 if a > 1 else a
+    return __hsla_add(_color, 0, 0, a, 0)
+
+def _saturate(_color, _amount):
+    a = _amount[1]
+    a = 0.0 if a < 0 else 1.0 if a > 1 else a
+    return __hsla_add(_color, 0, a, 0, 0)
+
+def _desaturate(_color, _amount):
+    a = _amount[1]
+    a = 0.0 if a < 0 else 1.0 if a > 1 else a
+    return __hsla_add(_color, 0, -a, 0, 0)
+
+def _grayscale(_color):
+    return __hsla_add(_color, 0, -1.0, 0, 0)
+
+def _adjust_hue(_color, _degrees):
+    return __hsla_add(_color, _degrees[1] % 360.0, 0, 0, 0)
+    
+def _mix(_color1, _color2, _weight):
+    """
+    Mixes together two colors. Specifically, takes the average of each of the
+    RGB components, optionally weighted by the given percentage. 
+    The opacity of the colors is also considered when weighting the components.
+    """
+    #FIXME: Needs to take into account the alpha channel for the opacity
+    w = _weight[1]
+    w = 0.0 if w < 0 else 1.0 if w > 1 else w
+    d = _color1[3].copy()
+    for k, v in _color2[3].items():
+        d.setdefault(k, 0)
+        d[k] += 1
+    r = ('', _color1[2][0] * w + _color2[2][0] * (1 - w), None, {})
+    g = ('', _color1[2][1] * w + _color2[2][1] * (1 - w), None, {})
+    b = ('', _color1[2][2] * w + _color2[2][2] * (1 - w), None, {})
+    a = ('', _color1[2][3] * w + _color2[2][3] * (1 - w), None, {})
+    return _rgba(r, g, b, a, d)
+
+def _percentage(_value):
+    return _float('', _value[1], None, { '%': 1 })
+
+def _unitless(_value):
+    return _float('', _value[1], None, {})
+
+def _unquote(_str):
+    if _str[0] != '"':
+        return _str
+    if _str[0] == "'":
+        s = _str[0][1:-1]
+    else:
+        s = _str[0]
+    return ("'%s'" % s.replace('"', '\\"'), _str[1], _str[2], _str[3])
+
+def _quote(_str):
+    if _str[0] == '"':
+        return _str
+    if _str[0] == "'":
+        s = _str[0][1:-1]
+    else:
+        s = _str[0]
+    return ('"%s"' % s.replace('"', '\\"'), None, None, {})
+    
 def _ops(op):
     _op = op
     op = {
@@ -1107,15 +1250,19 @@ def _ops(op):
         '^' : operator.pow,
     }[op]
     def __ops(_a, _b):
+        d = _a[3].copy()
+        for k, v in _b[3].items():
+            d.setdefault(k, 0)
+            d[k] += 1
         a = _a[1]
         b = _b[1]
         if a is not None and b is not None:
+            if '%' in d:
+                if '%' not in _a[3]:
+                    a /= 100.0;
+                if '%' not in _b[3]:
+                    b /= 100.0;
             val = op(a, b)
-            d = _a[3].copy()
-            for k, v in _b[3].items():
-                d.setdefault(k, 0)
-                d[k] += 1
-            
             return _float(('', val, _a[2], d))
 
         a_str = _a[0]
@@ -1139,6 +1286,7 @@ def _ops(op):
                 else:
                     __rgba[c] = op(__a, __b)
             final = _rgba(('',__rgba[0],None,{}), ('',__rgba[1],None,{}), ('',__rgba[2],None,{}), ('',__rgba[3],None,{}))
+            final[3].update(d)
         elif quoting:
             if _op == '*':
                 val = u'"%s"' % op(int(a) if a is not None else a_str, int(b) if b is not None else b_str)
@@ -1158,8 +1306,6 @@ opn = {
     '/' : _ops('/'),
     '^' : _ops('^'),
 }
-def trunc(v):
-    return float(int(v))
 
 def _func(fn):
     def _func(_val):
@@ -1169,19 +1315,34 @@ def _func(fn):
             val = 0.0
         return (float2str(val), val, None, _val[3])
 fncs = {
-    'opacify': (2, lambda c,v: c),
-    'transparentize': (2, lambda c,v: c),
-    'hsl': (3, lambda h,s,l: h),
-    'hsla': (4, lambda h,s,l,a: h),
+    'opacify': (2, _opacify),
+    'fade_in': (2, _opacify),
+    'transparentize': (2, _transparentize),
+    'fade_out': (2, _transparentize),
+    'lighten': (2, _lighten),
+    'darken': (2, _darken),
+    'saturate': (2, _saturate),
+    'desaturate': (2, _desaturate),
+    'grayscale': (1, _grayscale),
+    'adjust_hue': (2, _adjust_hue),
+    'mix': (3, _mix),
+    'hsl': (3, _hsl),
+    'hsla': (4, _hsla),
     'rgb': (3, _rgb),
     'rgba': (4, _rgba),
+
+    'percentage': (1, _percentage),
+    'unitless': (1, _unitless),
+    'unquote': (1, _unquote),
+    'quote': (1, _quote),
 
     'sin' : (1, _func(math.sin)),
     'cos' : (1, _func(math.cos)),
     'tan' : (1, _func(math.tan)),
     'abs' : (1, _func(abs)),
-    'trunc' : (1, _func(trunc)),
     'round' : (1, _func(round)),
+    'ceil' : (1, _func(math.ceil)),
+    'floor' : (1, _func(math.floor)),
 }
 def evaluateStack( s ):
     op = s.pop()
@@ -1244,10 +1405,10 @@ def eval_expr(expr):
     #print '>>',expr,'<<'
     results = BNF().parseString( expr, parseAll=True )
     val = evaluateStack( exprStack[:] )
+    #print '--',val,'--'
     val = val[0]
     if val[0] == "'":
         val = val[1:-1]
-    #print '--',val,'--'
     return val
 
 
@@ -1961,6 +2122,18 @@ http://groups.google.com/group/xcss/browse_thread/thread/b5757c24586c1519#
 TESTS
 --------------------------------------------------------------------------------
 
+
+http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
+>>> print css.compile('''
+... a {
+...     color: hsl(13.2, 0.661, 0.624);
+...     background: rgba(0.931*255, 0.463*255, 0.316*255, 1);
+... }
+... ''') #doctest: +NORMALIZE_WHITESPACE
+a {
+    color: rgba(123, 200, 155, 0.3);
+}
+
 >>> print css.compile('''
 ... .coloredClass {
 ...     $mycolor: green;
@@ -1974,7 +2147,7 @@ TESTS
     }
 
 
->>> css.xcss_files = SortedDict()
+>>> css.xcss_files = {}
 >>> css.xcss_files['first.css'] = '''
 ... .specialClass extends .basicClass {
 ...     padding: 10px;
