@@ -1190,7 +1190,6 @@ def _sprite(_map, _sprite, _offset_x=None, _offset_y=None):
     sprite_map = sprite_maps.get(_map[0], {})
     sprite = sprite_map.get(dequote(_sprite[0]))
     if sprite:
-        print sprite
         url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['_f_'], sprite_map['_t_'])
         _offset_x = _offset_x and _offset_x[1] or 0
         _offset_y = _offset_y and _offset_y[1] or 0
@@ -1229,7 +1228,6 @@ def _inline_image(_image, _mime_type=None):
     file.
     """
     file = MEDIA_ROOT+dequote(_image[0])
-    print file
     if os.path.exists(file):
         _mime_type = _mime_type and dequote(_mime_type[0]) or mimetypes.guess_type(file)[0]
         file = open(file, 'rb')
@@ -1706,7 +1704,7 @@ def evaluateStack( s ):
             op = evaluateStack( s )
             if op[1] is not None:
                 val = -op[1]
-                return (float2str(val), val, op[2], op[3])
+                return _float(('', val, op[2], op[3]))
             elif op[2] is None:
                 if op[0][0] == '"':
                     val = op[0]
