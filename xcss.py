@@ -246,7 +246,8 @@ class xCSS(object):
     }
 
     _default_xcss_opts = {
-        'verbosity': 1,
+        'verbosity': 0,
+        'compress': 1,
     }
 
     _short_color_re = re.compile(r'(?<!\w)#([a-f0-9])\1([a-f0-9])\2([a-f0-9])\3\b', re.IGNORECASE)
@@ -463,9 +464,21 @@ class xCSS(object):
                 for code in codes:
                     if code[0] == '@':
                         code, name = (code.split(None, 1)+[''])[:2]
-                        code = code.strip()
-                        name = name.strip()
-                        options[code] = name
+                        if code == '@options':
+                            for option in name.split(','):
+                                option, value = (option.split(':', 1)+[''])[:2]
+                                option = option.strip().lower()
+                                value = value.strip()
+                                if option:
+                                    if value.lower() in ('1', 'true', 't', 'yes', 'y'):
+                                        value = 1
+                                    elif value.lower() in ('0', 'false', 'f', 'no', 'n'):
+                                        value = 0
+                                    options[option] = value
+                        else:
+                            code = code.strip()
+                            name = name.strip()
+                            options[code] = name
                     else:
                         prop, value = (re.split(r'[:=]', code, 1) + [''])[:2]
                         try:
@@ -552,13 +565,11 @@ class xCSS(object):
         str = self._collapse_properties_space_re.sub(r'\1{', str)
 
         my_rules = []
-        context = {}
-        options = {}
         for _selectors, codestr, lose in self.locate_blocks(str):
             if lose is not None:
-                self.process_properties(lose, context, options)
+                self.process_properties(lose, self.xcss_vars, self.xcss_opts)
             elif _selectors[-1] == ':':
-                self.process_properties(_selectors + '{' + codestr + '}', context, options)
+                self.process_properties(_selectors + '{' + codestr + '}', self.xcss_vars, self.xcss_opts)
             else:
                 rule, name = (_selectors.split(None, 1)+[''])[:2]
                 rule = rule.strip()
@@ -639,8 +650,8 @@ class xCSS(object):
 
         for rule in my_rules:
             # give each rule a new copy of the context and its options
-            rule[CONTEXT] = context.copy()
-            rule[OPTIONS] = options.copy()
+            rule[CONTEXT] = self.xcss_vars.copy()
+            rule[OPTIONS] = self.xcss_opts.copy()
             rule[CODESTR] = self._includes_re.sub(expand_includes, rule[CODESTR])
 
 
@@ -702,9 +713,9 @@ class xCSS(object):
             if ' {' not in codestr:
                 self.process_properties(codestr, context, options)
                 c_codestr = self.use_vars(codestr, context, options)
-                codestr = construct + ' {' + codestr + '}\n'
+                codestr = construct + ' {' + codestr + '}'
             else:
-                codestr = construct + ' {}\n' + codestr
+                codestr = construct + ' {}' + codestr
 
             my_rules = []
             def _create_children(c_selectors, c_codestr):
@@ -900,23 +911,40 @@ class xCSS(object):
         else:
             rules = self.rules
 
+        compress = self.xcss_opts.get('compress', True)
+        if compress:
+            sc = False
+            sp = ''
+            tb = ''
+            nl = ''
+        else:
+            sc = True
+            sp = ' '
+            tb = '\t'
+            nl = '\n'
+        
         for rule in rules:
             fileid, position, codestr, deps, context, options, selectors, properties = rule
             #print >>sys.stderr, fileid, position, context, options, selectors, properties
             if position is not None and properties:
                 # feel free to modifie the indentations the way you like it
-                result += ',\n'.join(selectors.split(',')) + ' {\n'
-                if options.get('verbosity', self.verbosity) > 0:
-                    result += '\t/* file: ' + fileid + ' */\n'
+                selector = (',' + nl).join(selectors.split(',')) + sp + '{' + nl
+                result += selector
+                if not compress and options.get('verbosity', self.verbosity) > 0:
+                    result += tb + '/* file: ' + fileid + ' */' + nl
                     if context:
-                        result += '\t/* vars:\n'
+                        result += tb + '/* vars:' + nl
                         for k, v in context.items():
-                            result += '\t\t' + k + ' = ' + v + ';\n'
-                        result += '\t*/\n'
+                            result += tb + tb + k + ' = ' + v + ';' + nl
+                        result += tb + '*/' + nl
                 for prop, value in properties:
-                    result += '\t' + prop + ': ' + value + ';\n'
-                result += '}\n'
-        return result
+                    property = tb + prop + ':' + sp + value + ';' + nl
+                    result += property
+                if not sc:
+                    if result[-1] == ';':
+                        result = result [:-1]
+                result += '}' + nl
+        return result + '\n'
 
 
     def do_math(self, content):
@@ -933,7 +961,7 @@ class xCSS(object):
                 try:
                     better_expr_str = eval_expr(better_expr_str)
                 except:
-                    pass
+                    better_expr_str = better_expr_str
 
                 self._replaces[_base_str] = better_expr_str
             return better_expr_str
@@ -1518,6 +1546,7 @@ VARIABLES
 http://xcss.antpaw.org/docs/syntax/variables
 
 >>> print css.compile('''
+... @options compress: false;
 ... vars {
 ...     $path = ../img/tmpl1/png;
 ...     $color1 = #FF00FF;
@@ -1541,6 +1570,7 @@ NESTING CHILD OBJECTS
 http://xcss.antpaw.org/docs/syntax/children
 
 >>> print css.compile('''
+... @options compress: false;
 ... .selector {
 ...     a {
 ...         display: block;
@@ -1559,6 +1589,7 @@ http://xcss.antpaw.org/docs/syntax/children
 
 
 >>> print css.compile('''
+... @options compress: false;
 ... .selector {
 ...     self {
 ...         margin: 20px;
@@ -1583,6 +1614,7 @@ http://xcss.antpaw.org/docs/syntax/children
 
 
 >>> print css.compile('''
+... @options compress: false;
 ... .selector {
 ...     self {
 ...         margin: 20px;
@@ -1627,6 +1659,7 @@ EXTENDING OBJECTS
 http://xcss.antpaw.org/docs/syntax/extends
 
 >>> print css.compile('''
+... @options compress: false;
 ... .basicClass {
 ...     padding: 20px;
 ...     background-color: #FF0000;
@@ -1641,6 +1674,7 @@ http://xcss.antpaw.org/docs/syntax/extends
 
 
 >>> print css.compile('''
+... @options compress: false;
 ... .basicClass {
 ...     padding: 20px;
 ...     background-color: #FF0000;
@@ -1661,6 +1695,7 @@ http://xcss.antpaw.org/docs/syntax/extends
 }
 
 >>> print css.compile('''
+... @options compress: false;
 ... .specialClass extends .basicClass {
 ...     padding: 10px;
 ...     font-size: 14px;
@@ -1692,6 +1727,7 @@ http://xcss.antpaw.org/docs/syntax/extends
 }
 
 >>> print css.compile('''
+... @options compress: false;
 ... .basicList {
 ...     li {
 ...         padding: 5px 10px;
@@ -1728,6 +1764,7 @@ http://xcss.antpaw.org/docs/syntax/extends
 }
 
 >>> print css.compile('''
+... @options compress: false;
 ... .basicList {
 ...     li {
 ...         padding: 5px 10px;
@@ -1761,6 +1798,7 @@ MATH OPERATIONS
 http://xcss.antpaw.org/docs/syntax/math
 
 >>> print css.compile('''
+... @options compress: false;
 ... vars {
 ...     $color = #FFF555;
 ... }
@@ -1779,6 +1817,7 @@ http://xcss.antpaw.org/docs/syntax/math
 
 
 >>> print css.compile('''
+... @options compress: false;
 ... .selector {
 ...     padding: [(5px - 3) * (5px - 3)];
 ... }
@@ -1789,6 +1828,7 @@ http://xcss.antpaw.org/docs/syntax/math
 
 
 >>> print css.compile('''
+... @options compress: false;
 ... .selector {
 ...     padding: [5em - 3em + 5px]px;
 ...     margin: [20 - 10] [30% - 10];
@@ -1805,6 +1845,7 @@ SASS NESTING COMPATIBILITY
 http://sass-lang.com/tutorial.html
 
 >>> print css.compile('''
+... @options compress: false;
 ... /* style.scss */
 ... #navbar {
 ...   width: 80%;
@@ -1833,6 +1874,7 @@ http://sass-lang.com/tutorial.html
 
 
 >>> print css.compile('''
+... @options compress: false;
 ... /* style.scss */
 ... .fakeshadow {
 ...   border: {
@@ -1858,6 +1900,7 @@ http://sass-lang.com/tutorial.html
 
 
 >>> print css.compile('''
+... @options compress: false;
 ... /* style.scss */
 ... a {
 ...   color: #ce4dd6;
@@ -1881,6 +1924,7 @@ SASS VARIABLES COMPATIBILITY
 http://sass-lang.com/tutorial.html
 
 >>> print css.compile('''
+... @options compress: false;
 ... /* style.scss */
 ... $main-color: #ce4dd6;
 ... $style: solid;
@@ -1914,6 +1958,7 @@ SASS INTERPOLATION COMPATIBILITY
 http://sass-lang.com/tutorial.html
 
 >>> print css.compile('''
+... @options compress: false;
 ... /* style.scss */
 ... $side: top;
 ... $radius: 10px;
@@ -1936,6 +1981,7 @@ SASS MIXINS COMPATIBILITY
 http://sass-lang.com/tutorial.html
 
 >>> print css.compile('''
+... @options compress: false;
 ... /* style.scss */
 ...
 ... @mixin rounded-top {
@@ -1963,6 +2009,7 @@ http://sass-lang.com/tutorial.html
 
 
 >>> print css.compile('''
+... @options compress: false;
 ... /* style.scss */
 ...
 ... @mixin rounded($side, $radius: 10px) {
@@ -2001,6 +2048,7 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html#extend
 >>>
 >>>
 >>> print css.compile('''
+... @options compress: false;
 ... .error {
 ...   border: 1px #f00;
 ...   background-color: #fdd;
@@ -2029,6 +2077,7 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html#extend
 
 Multiple Extends
 >>> print css.compile('''
+... @options compress: false;
 ... .error {
 ...   border: 1px #f00;
 ...   background-color: #fdd;
@@ -2064,6 +2113,7 @@ FROM THE FORUM
 
 http://groups.google.com/group/xcss/browse_thread/thread/6989243973938362#
 >>> print css.compile('''
+... @options compress: false;
 ... body {
 ...     _width: expression(document.body.clientWidth > 1440? "1440px" : "auto");
 ... }
@@ -2075,6 +2125,7 @@ body {
 
 http://groups.google.com/group/xcss/browse_thread/thread/2d27ddec3c15c385#
 >>> print css.compile('''
+... @options compress: false;
 ... vars {
 ...     $ie6 = *html;
 ...     $ie7 = *:first-child+html;
@@ -2104,6 +2155,7 @@ http://groups.google.com/group/xcss/browse_thread/thread/2d27ddec3c15c385#
 
 http://groups.google.com/group/xcss/browse_thread/thread/04faafb4ef178984#
 >>> print css.compile('''
+... @options compress: false;
 ... .basicClass {
 ...     padding: 20px;
 ...     background-color: #FF0000;
@@ -2129,6 +2181,7 @@ ERRORS
 
 http://groups.google.com/group/xcss/browse_thread/thread/5f4f3af046883c3b#
 >>> print css.compile('''
+... @options compress: false;
 ... .some-selector { some:prop; }
 ... .some-selector-more { some:proop; }
 ... .parent {
@@ -2160,6 +2213,7 @@ http://groups.google.com/group/xcss/browse_thread/thread/5f4f3af046883c3b#
 
 http://groups.google.com/group/xcss/browse_thread/thread/540f8ad0771c053b#
 >>> print css.compile('''
+... @options compress: false;
 ... .noticeBox {
 ...     self {
 ...         background-color:red;
@@ -2183,6 +2237,7 @@ http://groups.google.com/group/xcss/browse_thread/thread/540f8ad0771c053b#
 
 http://groups.google.com/group/xcss/browse_thread/thread/b5757c24586c1519#
 >>> print css.compile('''
+... @options compress: false;
 ... .mod {
 ...     self {
 ...         margin: 10px;
@@ -2222,6 +2277,7 @@ TESTS
 --------------------------------------------------------------------------------
 http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 >>> print css.compile('''
+... @options compress: false;
 ... a {
 ...     $color: rgba(0.872536*255, 0.48481984*255, 0.375464*255, 1);
 ...     color: $color;
@@ -2240,6 +2296,7 @@ a {
 }
 
 >>> print css.compile('''
+... @options compress: false;
 ... .functions {
 ...     opacify: opacify(rgba(0, 0, 0, 0.5), 0.1); // rgba(0, 0, 0, 0.6)
 ...     opacify: opacify(rgba(0, 0, 17, 0.8), 0.2); // #001
@@ -2313,6 +2370,7 @@ a {
 }
 
 >>> print css.compile('''
+... @options compress: false;
 ... .coloredClass {
 ...     $mycolor: green;
 ...     padding: 20px;
@@ -2327,12 +2385,14 @@ a {
 
 >>> css.xcss_files = {}
 >>> css.xcss_files['first.css'] = '''
+... @options compress: false;
 ... .specialClass extends .basicClass {
 ...     padding: 10px;
 ...     font-size: 14px;
 ... }
 ... '''
 >>> css.xcss_files['second.css'] = '''
+... @options compress: false;
 ... .basicClass {
 ...     padding: 20px;
 ...     background-color: #FF0000;
@@ -2353,6 +2413,7 @@ a {
 
 
 >>> print css.compile('''
+... @options compress: false;
 ... a, button {
 ...     color: blue;
 ...     &:hover, .some & {
@@ -2374,6 +2435,7 @@ button:hover {
 
 All styles defined for a:hover are also applied to .hoverlink:
 >>> print css.compile('''
+... @options compress: false;
 ... a:hover { text-decoration: underline }
 ... .hoverlink { @extend a:hover }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
@@ -2385,6 +2447,7 @@ a:hover {
 
 http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 >>> print css.compile('''
+... @options compress: false;
 ... #fake-links .link {@extend a}
 ...
 ... a {
@@ -2403,6 +2466,7 @@ a:hover {
 
 
 >>> print css.compile('''
+... @options compress: false;
 ... .mod {
 ... 	margin: 10px;
 ... }
@@ -2434,6 +2498,7 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 
 Any rule that uses a:hover will also work for .hoverlink, even if they have other selectors as well
 >>> print css.compile('''
+... @options compress: false;
 ... .comment a.user:hover { font-weight: bold }
 ... .hoverlink { @extend a:hover }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
@@ -2450,6 +2515,7 @@ possibly match either sequence, this would make the stylesheet far too large.
 The simple example above, for instance, would require ten selectors. Instead,
 Sass generates only selectors that are likely to be useful.
 >>> print css.compile('''
+... @options compress: false;
 ... #admin .tabbar a { font-weight: bold }
 ... #demo .overview .fakelink { @extend a }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
