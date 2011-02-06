@@ -207,10 +207,96 @@ _colors = {
     'yellowgreen': '#9acd32'
 }
 
-def float2str(num):
-    if isinstance(num, float):
-        return ('%0.03f' % num).rstrip('0').rstrip('.')
-    return str(num)
+_default_xcss_vars = {
+    # unsafe chars will be hidden as vars
+    '$__doubleslash': '//',
+    '$__bigcopen': '/*',
+    '$__bigcclose': '*/',
+    '$__doubledot': ':',
+    '$__semicolon': ';',
+    '$__curlybracketopen': '{',
+    '$__curlybracketclosed': '}',
+
+    # shortcuts (it's "a hidden feature" for now)
+    'bg:': 'background:',
+    'bgc:': 'background-color:',
+}
+
+_default_xcss_opts = {
+    'verbosity': 0,
+    'compress': 1,
+    'short_colors': 0,
+    'reverse_colors': 0,
+}
+
+_short_color_re = re.compile(r'(?<!\w)#([a-f0-9])\1([a-f0-9])\2([a-f0-9])\3\b', re.IGNORECASE)
+_long_color_re = re.compile(r'(?<!\w)#([a-f0-9]){2}([a-f0-9]){2}([a-f0-9]){2}\b', re.IGNORECASE)
+_reverse_colors = dict((v, k) for k, v in _colors.items())
+for long_k, v in _colors.items():
+    # Calculate the different possible representations of a color:
+    short_k = _short_color_re.sub(r'#\1\2\3', v).lower()
+    rgb_k = _long_color_re.sub(lambda m: 'rgb(%d, %d, %d)' % (int(m.group(1), 16), int(m.group(2), 16), int(m.group(3), 16)), v)
+    rgba_k = _long_color_re.sub(lambda m: 'rgba(%d, %d, %d, 1)' % (int(m.group(1), 16), int(m.group(2), 16), int(m.group(3), 16)), v)
+    # get the shortest of all to use it:
+    k = min([short_k, long_k, rgb_k, rgba_k], key=len)
+    _reverse_colors[long_k] = k
+    _reverse_colors[short_k] = k
+    _reverse_colors[rgb_k] = k
+    _reverse_colors[rgba_k] = k
+_reverse_colors_re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, _reverse_colors.keys()))+r')\b', re.IGNORECASE)
+_colors_re = re.compile(r'\b(' + '|'.join(map(re.escape, _colors.keys()))+r')\b', re.IGNORECASE)
+
+_expr_simple_re = re.compile(r'''
+    \#\{.*?\}                 # Global Interpolation only
+''', re.VERBOSE)
+
+_expr_re = re.compile(r'''
+    \#\{.*?\}                 # Global Interpolation
+|
+    [\[(]
+    [\]\[()\s\-]*
+    [#%.\w]+
+    [\]\[()\s]*
+    [\])]
+|
+    (?:
+        [\[(]                 # optionally start with a parenthesis followed
+        [\]\[()\s\-]*         # by a number of parenthesis, spaces, or or unary minus operators '-'
+    )?
+    [#%.\w]+                  # Accept a variable or constant or number
+    (?:
+        (?:
+            \(                # Accept either the start of a function call...
+        |
+            [\]\[()\s]*       # ...or an operation ("+-*/")
+            (?:\s-\s|[+*/^,]) # (dash needs a surrounding space always)
+        )
+        [\]\[()\s\-]*
+        [#%.\w]+              # Accept a variable or constant or number (preceded by spaces or parenthesis)
+    )+                        # ...take n arguments,
+    (?:
+        [\]\[()\s]*           # but optionally then finish accepting any missing parenthesis and spaces
+        [\])]                 # with a closing parenthesis...
+        [^;}\s]*              # ...until it hits a new expression or the end of the line or the rule.
+    )?
+    (?!.*?:)                  # If not in Global Interpolation, then accept expressions only inside properties
+    (?=.*?;)                  # or inside the selectors.
+''', re.VERBOSE)
+#_expr_re = re.compile(r'(\[.*?\])([\s;}]|$|.+?\S)') # <- This is the old method, required parenthesis around the expression
+_ml_comment_re = re.compile(r'\/\*(.*?)\*\/', re.DOTALL)
+_sl_comment_re = re.compile(r'(?<!\w{2}:)\/\/.*')
+_zero_units_re = re.compile(r'\b0(' + '|'.join(map(re.escape, _units)) + r')(?!\w)', re.IGNORECASE)
+
+_includes_re = re.compile(r'@include\s+(.*?)\s*(\((.+?,)*(.+?)\))?\s*([;}]|$)', re.DOTALL)
+_remove_decls_re = re.compile(r'(@option\b.*?([;}]|$))', re.DOTALL | re.IGNORECASE)
+_spaces_re = re.compile(r'\s+')
+_expand_rules_space_re = re.compile(r'\s*{')
+_collapse_properties_space_re = re.compile(r'([:#])\s*{')
+
+_reverse_default_xcss_vars = dict((v, k) for k, v in _default_xcss_vars.items())
+_reverse_default_xcss_vars_re = re.compile(r'(content.*:.*(\'|").*)(' + '|'.join(map(re.escape, _reverse_default_xcss_vars.keys())) + ')(.*\2)')
+
+_blocks_re = re.compile(r'[{},;]|\n+')
 
 FILEID = 0
 POSITION = 1
@@ -226,99 +312,7 @@ class xCSS(object):
     construct = 'self'
     short_colors = True
     reverse_colors = True
-
-    #optinos
-    verbosity = 0
-
-    _default_xcss_vars = {
-        # unsafe chars will be hidden as vars
-        '$__doubleslash': '//',
-        '$__bigcopen': '/*',
-        '$__bigcclose': '*/',
-        '$__doubledot': ':',
-        '$__semicolon': ';',
-        '$__curlybracketopen': '{',
-        '$__curlybracketclosed': '}',
-
-        # shortcuts (it's "a hidden feature" for now)
-        'bg:': 'background:',
-        'bgc:': 'background-color:',
-    }
-
-    _default_xcss_opts = {
-        'verbosity': 0,
-        'compress': 1,
-    }
-
-    _short_color_re = re.compile(r'(?<!\w)#([a-f0-9])\1([a-f0-9])\2([a-f0-9])\3\b', re.IGNORECASE)
-    _long_color_re = re.compile(r'(?<!\w)#([a-f0-9]){2}([a-f0-9]){2}([a-f0-9]){2}\b', re.IGNORECASE)
-    _reverse_colors = dict((v, k) for k, v in _colors.items())
-    for long_k, v in _colors.items():
-        # Calculate the different possible representations of a color:
-        short_k = _short_color_re.sub(r'#\1\2\3', v).lower()
-        rgb_k = _long_color_re.sub(lambda m: 'rgb(%d, %d, %d)' % (int(m.group(1), 16), int(m.group(2), 16), int(m.group(3), 16)), v)
-        rgba_k = _long_color_re.sub(lambda m: 'rgba(%d, %d, %d, 1)' % (int(m.group(1), 16), int(m.group(2), 16), int(m.group(3), 16)), v)
-        # get the shortest of all to use it:
-        k = min([short_k, long_k, rgb_k, rgba_k], key=len)
-        _reverse_colors[long_k] = k
-        _reverse_colors[short_k] = k
-        _reverse_colors[rgb_k] = k
-        _reverse_colors[rgba_k] = k
-    _reverse_colors_re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, _reverse_colors.keys()))+r')\b', re.IGNORECASE)
-    _colors_re = re.compile(r'\b(' + '|'.join(map(re.escape, _colors.keys()))+r')\b', re.IGNORECASE)
-
-    _expr_simple_re = re.compile(r'''
-        \#\{.*?\}                 # Global Interpolation only
-    ''', re.VERBOSE)
     
-    _expr_re = re.compile(r'''
-        \#\{.*?\}                 # Global Interpolation
-    |
-        [\[(]
-        [\]\[()\s\-]*
-        [#%.\w]+
-        [\]\[()\s]*
-        [\])]
-    |
-        (?:
-            [\[(]                 # optionally start with a parenthesis followed
-            [\]\[()\s\-]*         # by a number of parenthesis, spaces, or or unary minus operators '-'
-        )?
-        [#%.\w]+                  # Accept a variable or constant or number
-        (?:
-            (?:
-                \(                # Accept either the start of a function call...
-            |
-                [\]\[()\s]*       # ...or an operation ("+-*/")
-                (?:\s-\s|[+*/^,]) # (dash needs a surrounding space always)
-            )
-            [\]\[()\s\-]*
-            [#%.\w]+              # Accept a variable or constant or number (preceded by spaces or parenthesis)
-        )+                        # ...take n arguments,
-        (?:
-            [\]\[()\s]*           # but optionally then finish accepting any missing parenthesis and spaces
-            [\])]                 # with a closing parenthesis...
-            [^;}\s]*              # ...until it hits a new expression or the end of the line or the rule.
-        )?
-        (?!.*?:)                  # If not in Global Interpolation, then accept expressions only inside properties
-        (?=.*?;)                  # or inside the selectors.
-    ''', re.VERBOSE)
-    #_expr_re = re.compile(r'(\[.*?\])([\s;}]|$|.+?\S)') # <- This is the old method, required parenthesis around the expression
-    _ml_comment_re = re.compile(r'\/\*(.*?)\*\/', re.DOTALL)
-    _sl_comment_re = re.compile(r'(?<!\w{2}:)\/\/.*')
-    _zero_units_re = re.compile(r'\b0(' + '|'.join(map(re.escape, _units)) + r')(?!\w)', re.IGNORECASE)
-
-    _includes_re = re.compile(r'@include\s+(.*?)\s*(\((.+?,)*(.+?)\))?\s*([;}]|$)', re.DOTALL)
-    _remove_decls_re = re.compile(r'(@option\b.*?([;}]|$))', re.DOTALL | re.IGNORECASE)
-    _spaces_re = re.compile(r'\s+')
-    _collapse_properties_space_re = re.compile(r'([:#])\s*{')
-    _expand_rules_space_re = re.compile(r'\s*{')
-
-    _reverse_default_xcss_vars = dict((v, k) for k, v in _default_xcss_vars.items())
-    _reverse_default_xcss_vars_re = re.compile(r'(content.*:.*(\'|").*)(' + '|'.join(map(re.escape, _reverse_default_xcss_vars.keys())) + ')(.*\2)')
-    
-    _blocks_re = re.compile(r'[{},]|\n+')
-
     def __init__(self):
         pass
 
@@ -350,7 +344,7 @@ class xCSS(object):
         i = init = safe = lose = 0
         start = end = None
         str_len = len(str)
-        for m in self._blocks_re.finditer(str):
+        for m in _blocks_re.finditer(str):
             i = m.end(0) - 1
             if str[i] == '{':
                 if depth == 0:
@@ -381,7 +375,10 @@ class xCSS(object):
                             thin = None
                         skip = False
             elif depth == 0:
-                if str[i] == ',':
+                if str[i] == ';':
+                    init = safe = i + 1
+                    thin = None
+                elif str[i] == ',':
                     if thin is not None and str[thin:i-1].strip():
                         init = thin
                     thin = None
@@ -401,7 +398,7 @@ class xCSS(object):
         added to the final normalized selectors string.
         """
         # Fixe tabs and spaces in selectors
-        _selectors = self._spaces_re.sub(' ', _selectors)
+        _selectors = _spaces_re.sub(' ', _selectors)
 
         if isinstance(extra_selectors, basestring):
             extra_selectors = extra_selectors.split(',')
@@ -452,7 +449,7 @@ class xCSS(object):
             self._contexts[tuple(vars)] = remove_vars_re, interpolate_re
 
         # remove variables declarations from the rules
-        cont = self._remove_decls_re.sub('', cont)
+        cont = _remove_decls_re.sub('', cont)
         cont = remove_vars_re.sub('', cont)
 
         cnt = 0
@@ -487,8 +484,6 @@ class xCSS(object):
                                         value = 0
                                     options[option] = value
                         else:
-                            code = code.strip()
-                            name = name.strip()
                             options[code] = name
                     else:
                         prop, value = (re.split(r'[:=]', code, 1) + [''])[:2]
@@ -520,8 +515,8 @@ class xCSS(object):
         self._rules = {}
         self.parts = {}
         self.css_files = []
-        self.xcss_vars = self._default_xcss_vars.copy()
-        self.xcss_opts = self._default_xcss_opts.copy()
+        self.xcss_vars = _default_xcss_vars.copy()
+        self.xcss_opts = _default_xcss_opts.copy()
 
         self._contexts = {}
         self._replaces = {}
@@ -559,18 +554,18 @@ class xCSS(object):
 
     def parse_xcss_string(self, fileid, str):
         # protects content: "..." strings
-        str = self._reverse_default_xcss_vars_re.sub(lambda m: m.group(0) + self._reverse_default_xcss_vars.get(m.group(2)) + m.group(3), str)
+        str = _reverse_default_xcss_vars_re.sub(lambda m: m.group(0) + _reverse_default_xcss_vars.get(m.group(2)) + m.group(3), str)
 
         # removes multiple line comments
-        str = self._ml_comment_re.sub('', str)
+        str = _ml_comment_re.sub('', str)
 
         # removes inline comments, but not :// (protocol)
-        str = self._sl_comment_re.sub('', str)
+        str = _sl_comment_re.sub('', str)
 
         # expand the space in rules
-        str = self._expand_rules_space_re.sub(' {', str)
+        str = _expand_rules_space_re.sub(' {', str)
         # collapse the space in properties blocks
-        str = self._collapse_properties_space_re.sub(r'\1{', str)
+        str = _collapse_properties_space_re.sub(r'\1{', str)
 
         def expand_includes(m):
             funct = m.group(1)
@@ -604,54 +599,53 @@ class xCSS(object):
             elif _selectors[-1] == ':':
                 self.process_properties(_selectors + '{' + codestr + '}', self.xcss_vars, self.xcss_opts)
             else:
-                rule, name = (_selectors.split(None, 1)+[''])[:2]
-                rule = rule.strip()
-                name = name.strip()
-                if rule == '@variables' or rule == 'vars': # vars for backwards xCSS compatibility
-                    if name:
-                        name =  name + '.'
-                    self.process_properties(codestr, self.xcss_vars, self.xcss_opts, self.xcss_vars, name)
-                    _selectors = None
-                elif rule == '@mixin':
-                    if name:
-                        funct, _, params = name.partition('(')
-                        funct = funct.strip()
-                        params = params.strip('()').split(',')
-                        q = 0
-                        vars = {}
-                        defaults = {}
-                        new_params = []
-                        for param in params:
-                            id = chr(97+q)
-                            param, _, default = param.partition(':')
-                            param = param.strip()
-                            default = default.strip()
-                            if param:
-                                if default:
-                                    defaults['$__'+id+'__'] = default.strip()
-                                vars[param] = '[$__'+id+'__]'
-                                new_params.append(id)
-                                q += 1
-                        if vars:
-                            rename_vars_re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, vars.keys())) + r')(?!\w)')
-                            codestr = rename_vars_re.sub(lambda m: vars[m.group(0)], codestr)
-                        mixin = [ defaults, codestr ]
-                        if not new_params:
-                            self.xcss_opts['@mixin ' + funct] = mixin
-                        while len(new_params):
-                            self.xcss_opts['@mixin ' + funct + '('+','.join(new_params)+')'] = mixin
-                            param = '$__'+new_params.pop()+'__'
-                            if param not in defaults:
-                                break
-                    _selectors = None
-                elif rule == '@prototype':
-                    _selectors = name # prototype keyword simply ignored (all selectors are prototypes)
+                if _selectors[0] == '@':
+                    code, name = (_selectors.split(None, 1)+[''])[:2]
+                    if code == '@variables':
+                        if name:
+                            name =  name + '.'
+                        self.process_properties(codestr, self.xcss_vars, self.xcss_opts, self.xcss_vars, name)
+                        _selectors = None
+                    elif code == '@mixin':
+                        if name:
+                            funct, _, params = name.partition('(')
+                            funct = funct.strip()
+                            params = params.strip('()').split(',')
+                            q = 0
+                            vars = {}
+                            defaults = {}
+                            new_params = []
+                            for param in params:
+                                id = chr(97+q)
+                                param, _, default = param.partition(':')
+                                param = param.strip()
+                                default = default.strip()
+                                if param:
+                                    if default:
+                                        defaults['$__'+id+'__'] = default.strip()
+                                    vars[param] = '[$__'+id+'__]'
+                                    new_params.append(id)
+                                    q += 1
+                            if vars:
+                                rename_vars_re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, vars.keys())) + r')(?!\w)')
+                                codestr = rename_vars_re.sub(lambda m: vars[m.group(0)], codestr)
+                            mixin = [ defaults, codestr ]
+                            if not new_params:
+                                self.xcss_opts['@mixin ' + funct] = mixin
+                            while len(new_params):
+                                self.xcss_opts['@mixin ' + funct + '('+','.join(new_params)+')'] = mixin
+                                param = '$__'+new_params.pop()+'__'
+                                if param not in defaults:
+                                    break
+                        _selectors = None
+                    elif code == '@prototype':
+                        _selectors = name # prototype keyword simply ignored (all selectors are prototypes)
                 if _selectors:
                     # normalizing selectors by stripping them and joining them using a single ','
                     _selectors = self.normalize_selectors(_selectors)
 
                     if '@include' in codestr:
-                        codestr = self._includes_re.sub(expand_includes, codestr)
+                        codestr = _includes_re.sub(expand_includes, codestr)
                     
                     # give each rule a new copy of the context and its options
                     rule = [ fileid, len(self.rules), codestr, set(), self.xcss_vars.copy(), self.xcss_opts.copy(), None, None ]
@@ -677,7 +671,7 @@ class xCSS(object):
                         interpolated = True
                         if '#{' in new_selectors or '$' in _selectors:
                             new_selectors = self.use_vars(_selectors, rule[CONTEXT], rule[OPTIONS])
-                            new_selectors = self.do_math(new_selectors, self._expr_simple_re)
+                            new_selectors = self.do_math(new_selectors, _expr_simple_re)
                             new_selectors = self.normalize_selectors(new_selectors)
                     if rule[PROPERTIES] is None:
                         properties = []
@@ -691,6 +685,7 @@ class xCSS(object):
                         rule[PROPERTIES] = properties
                     if ' {' in rule[CODESTR]:
                         nested = True
+                        break
                 if nested:
                     # remove old selector:
                     del self.parts[_selectors]
@@ -744,15 +739,12 @@ class xCSS(object):
                 self.parts[better_selectors].append(_rule)
 
             for c_selectors, c_codestr, lose in self.locate_blocks(codestr):
-                if lose is not None or c_selectors[-1] == ':':
-                    # This is either a raw rule or a nested property...
-                    if lose is None:
-                        # ...it was a nested property or varialble, treat as raw
-                        lose = c_selectors + '{' + c_codestr + '}'
-                    c_selectors = construct
-                    c_codestr = lose.strip()
-                    if c_codestr:
-                        _create_children(c_selectors, c_codestr)
+                if lose is not None:
+                    # This is either a raw lose rule...
+                    _create_children(construct, lose)
+                elif c_selectors[-1] == ':':
+                    # ...it was a nested property or varialble, treat as raw
+                    _create_children(construct, c_selectors + '{' + c_codestr + '}')
                 else:
                     _create_children(c_selectors, c_codestr)
 
@@ -898,7 +890,7 @@ class xCSS(object):
         else:
             rules = self.rules
 
-        compress = self.xcss_opts.get('compress', True)
+        compress = self.xcss_opts.get('compress', 1)
         if compress:
             sc = False
             sp = ''
@@ -921,7 +913,7 @@ class xCSS(object):
                 # feel free to modifie the indentations the way you like it
                 selector = (',' + nl).join(selectors.split(',')) + sp + '{' + nl
                 result += selector
-                if not compress and options.get('verbosity', self.verbosity) > 0:
+                if not compress and options.get('verbosity', 0) > 0:
                     result += tb + '/* file: ' + fileid + ' */' + nl
                     if context:
                         result += tb + '/* vars:' + nl
@@ -953,7 +945,7 @@ class xCSS(object):
 
                 # To do math operations, we need to get the color's hex values (for color names)
                 # ...also we change brackets to parenthesis:
-                better_expr_str = self._colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_expr_str).replace('[', '(').replace(']', ')')
+                better_expr_str = _colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_expr_str).replace('[', '(').replace(']', ')')
 
                 try:
                     better_expr_str = eval_expr(better_expr_str)
@@ -968,13 +960,13 @@ class xCSS(object):
 
     def post_process(self, cont):
         # short colors:
-        if self.short_colors:
-            cont = self._short_color_re.sub(r'#\1\2\3', cont)
+        if self.xcss_opts.get('short_colors', 0):
+            cont = _short_color_re.sub(r'#\1\2\3', cont)
         # color names:
-        if self.reverse_colors:
-            cont = self._reverse_colors_re.sub(lambda m: self._reverse_colors[m.group(0).lower()], cont)
+        if self.xcss_opts.get('reverse_colors', 0):
+            cont = _reverse_colors_re.sub(lambda m: _reverse_colors[m.group(0).lower()], cont)
         # zero units out (i.e. 0px or 0em -> 0):
-        cont = self._zero_units_re.sub('0', cont)
+        cont = _zero_units_re.sub('0', cont)
         return cont
 
 
@@ -1069,6 +1061,11 @@ def BNF():
         expr << term + ZeroOrMore( ( addop + term ).setParseAction( pushFirst ) )
         bnf = expr
     return bnf
+
+def float2str(num):
+    if isinstance(num, float):
+        return ('%0.03f' % num).rstrip('0').rstrip('.')
+    return str(num)
 
 # map operator symbols to corresponding arithmetic operations
 hex2rgba = {
@@ -1542,8 +1539,8 @@ VARIABLES
 http://xcss.antpaw.org/docs/syntax/variables
 
 >>> print css.compile('''
-... @options compress: false;
-... vars {
+... @options compress:false, short_colors:true, reverse_colors:true;
+... @variables {
 ...     $path = ../img/tmpl1/png;
 ...     $color1 = #FF00FF;
 ...     $border = border-top: 1px solid $color1;
@@ -1566,7 +1563,7 @@ NESTING CHILD OBJECTS
 http://xcss.antpaw.org/docs/syntax/children
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .selector {
 ...     a {
 ...         display: block;
@@ -1585,7 +1582,7 @@ http://xcss.antpaw.org/docs/syntax/children
 
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .selector {
 ...     self {
 ...         margin: 20px;
@@ -1610,7 +1607,7 @@ http://xcss.antpaw.org/docs/syntax/children
 
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .selector {
 ...     self {
 ...         margin: 20px;
@@ -1655,7 +1652,7 @@ EXTENDING OBJECTS
 http://xcss.antpaw.org/docs/syntax/extends
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .basicClass {
 ...     padding: 20px;
 ...     background-color: #FF0000;
@@ -1670,7 +1667,7 @@ http://xcss.antpaw.org/docs/syntax/extends
 
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .basicClass {
 ...     padding: 20px;
 ...     background-color: #FF0000;
@@ -1691,7 +1688,7 @@ http://xcss.antpaw.org/docs/syntax/extends
 }
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .specialClass extends .basicClass {
 ...     padding: 10px;
 ...     font-size: 14px;
@@ -1723,7 +1720,7 @@ http://xcss.antpaw.org/docs/syntax/extends
 }
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .basicList {
 ...     li {
 ...         padding: 5px 10px;
@@ -1760,7 +1757,7 @@ http://xcss.antpaw.org/docs/syntax/extends
 }
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .basicList {
 ...     li {
 ...         padding: 5px 10px;
@@ -1794,8 +1791,8 @@ MATH OPERATIONS
 http://xcss.antpaw.org/docs/syntax/math
 
 >>> print css.compile('''
-... @options compress: false;
-... vars {
+... @options compress:false, short_colors:true, reverse_colors:true;
+... @variables {
 ...     $color = #FFF555;
 ... }
 ... .selector {
@@ -1813,7 +1810,7 @@ http://xcss.antpaw.org/docs/syntax/math
 
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .selector {
 ...     padding: [(5px - 3) * (5px - 3)];
 ... }
@@ -1824,7 +1821,7 @@ http://xcss.antpaw.org/docs/syntax/math
 
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .selector {
 ...     padding: [5em - 3em + 5px]px;
 ...     margin: [20 - 10] [30% - 10];
@@ -1841,7 +1838,7 @@ SASS NESTING COMPATIBILITY
 http://sass-lang.com/tutorial.html
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... /* style.scss */
 ... #navbar {
 ...   width: 80%;
@@ -1870,7 +1867,7 @@ http://sass-lang.com/tutorial.html
 
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... /* style.scss */
 ... .fakeshadow {
 ...   border: {
@@ -1896,7 +1893,7 @@ http://sass-lang.com/tutorial.html
 
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... /* style.scss */
 ... a {
 ...   color: #ce4dd6;
@@ -1920,7 +1917,7 @@ SASS VARIABLES COMPATIBILITY
 http://sass-lang.com/tutorial.html
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... /* style.scss */
 ... $main-color: #ce4dd6;
 ... $style: solid;
@@ -1954,7 +1951,7 @@ SASS INTERPOLATION COMPATIBILITY
 http://sass-lang.com/tutorial.html
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... /* style.scss */
 ... $side: top;
 ... $radius: 10px;
@@ -1977,7 +1974,7 @@ SASS MIXINS COMPATIBILITY
 http://sass-lang.com/tutorial.html
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... /* style.scss */
 ...
 ... @mixin rounded-top {
@@ -2005,7 +2002,7 @@ http://sass-lang.com/tutorial.html
 
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... /* style.scss */
 ...
 ... @mixin rounded($side, $radius: 10px) {
@@ -2044,7 +2041,7 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html#extend
 >>>
 >>>
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .error {
 ...   border: 1px #f00;
 ...   background-color: #fdd;
@@ -2073,7 +2070,7 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html#extend
 
 Multiple Extends
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .error {
 ...   border: 1px #f00;
 ...   background-color: #fdd;
@@ -2109,7 +2106,7 @@ FROM THE FORUM
 
 http://groups.google.com/group/xcss/browse_thread/thread/6989243973938362#
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... body {
 ...     _width: expression(document.body.clientWidth > 1440? "1440px" : "auto");
 ... }
@@ -2121,8 +2118,8 @@ body {
 
 http://groups.google.com/group/xcss/browse_thread/thread/2d27ddec3c15c385#
 >>> print css.compile('''
-... @options compress: false;
-... vars {
+... @options compress:false, short_colors:true, reverse_colors:true;
+... @variables {
 ...     $ie6 = *html;
 ...     $ie7 = *:first-child+html;
 ... }
@@ -2151,7 +2148,7 @@ http://groups.google.com/group/xcss/browse_thread/thread/2d27ddec3c15c385#
 
 http://groups.google.com/group/xcss/browse_thread/thread/04faafb4ef178984#
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .basicClass {
 ...     padding: 20px;
 ...     background-color: #FF0000;
@@ -2177,7 +2174,7 @@ ERRORS
 
 http://groups.google.com/group/xcss/browse_thread/thread/5f4f3af046883c3b#
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .some-selector { some:prop; }
 ... .some-selector-more { some:proop; }
 ... .parent {
@@ -2209,7 +2206,7 @@ http://groups.google.com/group/xcss/browse_thread/thread/5f4f3af046883c3b#
 
 http://groups.google.com/group/xcss/browse_thread/thread/540f8ad0771c053b#
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .noticeBox {
 ...     self {
 ...         background-color:red;
@@ -2233,7 +2230,7 @@ http://groups.google.com/group/xcss/browse_thread/thread/540f8ad0771c053b#
 
 http://groups.google.com/group/xcss/browse_thread/thread/b5757c24586c1519#
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .mod {
 ...     self {
 ...         margin: 10px;
@@ -2273,7 +2270,7 @@ TESTS
 --------------------------------------------------------------------------------
 http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... a {
 ...     $color: rgba(0.872536*255, 0.48481984*255, 0.375464*255, 1);
 ...     color: $color;
@@ -2292,7 +2289,7 @@ a {
 }
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .functions {
 ...     opacify: opacify(rgba(0, 0, 0, 0.5), 0.1); // rgba(0, 0, 0, 0.6)
 ...     opacify: opacify(rgba(0, 0, 17, 0.8), 0.2); // #001
@@ -2366,7 +2363,7 @@ a {
 }
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .coloredClass {
 ...     $mycolor: green;
 ...     padding: 20px;
@@ -2381,14 +2378,14 @@ a {
 
 >>> css.xcss_files = {}
 >>> css.xcss_files['first.css'] = '''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .specialClass extends .basicClass {
 ...     padding: 10px;
 ...     font-size: 14px;
 ... }
 ... '''
 >>> css.xcss_files['second.css'] = '''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .basicClass {
 ...     padding: 20px;
 ...     background-color: #FF0000;
@@ -2409,7 +2406,7 @@ a {
 
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... a, button {
 ...     color: blue;
 ...     &:hover, .some & {
@@ -2431,7 +2428,7 @@ button:hover {
 
 All styles defined for a:hover are also applied to .hoverlink:
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... a:hover { text-decoration: underline }
 ... .hoverlink { @extend a:hover }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
@@ -2443,7 +2440,7 @@ a:hover {
 
 http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... #fake-links .link {@extend a}
 ...
 ... a {
@@ -2462,7 +2459,7 @@ a:hover {
 
 
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .mod {
 ... 	margin: 10px;
 ... }
@@ -2494,7 +2491,7 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 
 Any rule that uses a:hover will also work for .hoverlink, even if they have other selectors as well
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... .comment a.user:hover { font-weight: bold }
 ... .hoverlink { @extend a:hover }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
@@ -2511,7 +2508,7 @@ possibly match either sequence, this would make the stylesheet far too large.
 The simple example above, for instance, would require ten selectors. Instead,
 Sass generates only selectors that are likely to be useful.
 >>> print css.compile('''
-... @options compress: false;
+... @options compress:false, short_colors:true, reverse_colors:true;
 ... #admin .tabbar a { font-weight: bold }
 ... #demo .overview .fakelink { @extend a }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
