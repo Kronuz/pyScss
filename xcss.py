@@ -945,18 +945,24 @@ class xCSS(object):
             try:
                 better_expr_str = self._replaces[_base_str]
             except KeyError:
-                if _base_str[:2] == '#{' and _base_str[-1] == '}':
-                    _base_str = _base_str[2:-1]
+                better_expr_str = _base_str
+                
+                # If we are in a global variable, we remove
+                if better_expr_str[:2] == '#{' and better_expr_str[-1] == '}':
+                    better_expr_str = better_expr_str[2:-1]
 
-                better_expr_str = self._colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), _base_str).replace('[', '(').replace(']', ')')
+                # To do math operations, we need to get the color's hex values (for color names)
+                # ...also we change brackets to parenthesis:
+                better_expr_str = self._colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_expr_str).replace('[', '(').replace(']', ')')
+
                 try:
                     better_expr_str = eval_expr(better_expr_str)
                 except:
-                    pass
+                    better_expr_str = _base_str # leave untouched otherwise
 
                 self._replaces[_base_str] = better_expr_str
             return better_expr_str
-        #print >>sys.stderr, self._expr_re.findall(content)
+
         content = _expr_re.sub(calculate, content)
         return content
 
@@ -964,11 +970,9 @@ class xCSS(object):
         # short colors:
         if self.short_colors:
             cont = self._short_color_re.sub(r'#\1\2\3', cont)
-
         # color names:
         if self.reverse_colors:
             cont = self._reverse_colors_re.sub(lambda m: self._reverse_colors[m.group(0).lower()], cont)
-
         # zero units out (i.e. 0px or 0em -> 0):
         cont = self._zero_units_re.sub('0', cont)
         return cont
