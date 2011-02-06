@@ -260,7 +260,7 @@ _expr_re = re.compile(r'''
     \#\{.*?\}                   # Global Interpolation
 |
     (?<=\s)                     # Expression should have an space before it
-    (?:[\[\(\\-][\[\(\s\-]*)?   # ...then any number of opening parenthesis or spaces
+    (?:[\[\(\-][\[\(\s\-]*)?   # ...then any number of opening parenthesis or spaces
     (?:                         
         (['"]).*?\1             # If a string, consume the whole thing...
     |                           
@@ -280,7 +280,13 @@ _expr_re = re.compile(r'''
     )                           
     (?:                         # Here comes the other expressions (0..n)
         [\]\)\s\,]*?            
-        [-+*/^,]                # Get the operator (minus needs spaces)
+        (?:
+            [+*/^,]             # Get accepted operators
+        |
+            (?<=\s)-(?=\s)      # ...minus operator needs spaces
+        |
+            (?<!\s)-            # or be preceded by a non-space 
+        )                
         [\[\(\s\-]*             
         (?:                     
             (['"]).*?\2         # If a string, consume the whole thing...
@@ -300,8 +306,8 @@ _expr_re = re.compile(r'''
             )?
         )
     )*
-    [\]\)\s\,]*?               # ...keep closing parenthesis
-    (?:[\]\)\,]+[\w%]*)?       # and then try to get any units afterwards
+    [\]\)\s\,]*?                # ...keep closing parenthesis
+    (?:[\]\)\,]+[\w%]*)?        # and then try to get any units afterwards
 ''', re.VERBOSE)
 
 #_expr_re = re.compile(r'(\[.*?\])([\s;}]|$|.+?\S)') # <- This is the old method, required parenthesis around the expression
@@ -320,7 +326,7 @@ _reverse_default_xcss_vars_re = re.compile(r'(content.*:.*(\'|").*)(' + '|'.join
 
 _blocks_re = re.compile(r'[{},;]|\n+')
 
-_skip_word_re = re.compile('(?:[\w\s#.,:]|-(?![\d\s]))*$')
+_skip_word_re = re.compile('(?:[\w\s#.,:%]|-(?![\d\s]))*$')
 
 FILEID = 0
 POSITION = 1
