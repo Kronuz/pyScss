@@ -29,6 +29,7 @@ structure but it's been completely rewritten and many bugs have been fixed.
 
 import re
 import sys
+import string
 
 MEDIA_ROOT = '/usr/local/www/mdubalu/media/'
 ASSETS_ROOT = MEDIA_ROOT + 'assets/'
@@ -252,38 +253,50 @@ _reverse_colors_re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, _reverse_c
 _colors_re = re.compile(r'\b(' + '|'.join(map(re.escape, _colors.keys()))+r')\b', re.IGNORECASE)
 
 _expr_simple_re = re.compile(r'''
-    \#\{.*?\}                 # Global Interpolation only
+    \#\{.*?\}                   # Global Interpolation only
 ''', re.VERBOSE)
 
 _expr_re = re.compile(r'''
-    \#\{.*?\}                  # Global Interpolation
+    \#\{.*?\}                   # Global Interpolation
 |
-    (?<=\s)                    # Expression should have an space before it
-    (?:[\[\(\\-][\[\(\s\-]*)?  # ...then any number of opening parenthesis or spaces
-    (?:
-        (['"]).*?\1            # If a string, consume the whole thing...
-    |
-        [#\w.%]+               # ...otherwise get the word, variable or number
-        (?:
-            [\[\(]             # optionally, then start with a parenthesis
-            .*?                # followed by anything...
-            [\]\)][\w%]*       # until it closes, then try to get any units
-            [\]\)\s\,]*?       # ...and keep closing other parenthesis and parameters
-        )?
-    )
-    (?:                        # Here comes the other expressions (0..n)
-        [\]\)\s\,]*?
-        (?:\s-\s|[+*/^,])      # Get the operator (minus needs spaces)
-        [\[\(\s\-]*
-        (?:
-            (['"]).*?\2        # If a string, consume the whole thing...
+    (?<=\s)                     # Expression should have an space before it
+    (?:[\[\(\\-][\[\(\s\-]*)?   # ...then any number of opening parenthesis or spaces
+    (?:                         
+        (['"]).*?\1             # If a string, consume the whole thing...
+    |                           
+        (?:                     
+            \#[0-9a-fA-F]{6}     # Get an hex RGB
+        |                       
+            \#[0-9a-fA-F]{3}     # Get an hex RRGGBB
+        |                       
+            [\w.%]+             # ...otherwise get the word, variable or number
+        )                       
+        (?:                     
+            [\[\(]              # optionally, then start with a parenthesis
+            .*?                 # followed by anything...
+            [\]\)][\w%]*        # until it closes, then try to get any units
+            [\]\)\s\,]*?        # ...and keep closing other parenthesis and parameters
+        )?                      
+    )                           
+    (?:                         # Here comes the other expressions (0..n)
+        [\]\)\s\,]*?            
+        [-+*/^,]                # Get the operator (minus needs spaces)
+        [\[\(\s\-]*             
+        (?:                     
+            (['"]).*?\2         # If a string, consume the whole thing...
         |
-            [#\w.%]+           # ...otherwise get the word, variable or number
             (?:
-                [\[\(]         # optionally, then  start with a parenthesis
-                .*?            # followed by anything...
-                [\]\)][\w%]*   # until it closes, then try to get any units
-                [\]\)\s\,]*?   # ...and keep closing other parenthesis and parameters
+                \#[0-9a-fA-F]{6} # Get an hex RGB
+            |
+                \#[0-9a-fA-F]{3} # Get an hex RRGGBB
+            |
+                [\w.%]+         # ...otherwise get the word, variable or number
+            )               
+            (?:
+                [\[\(]          # optionally, then  start with a parenthesis
+                .*?             # followed by anything...
+                [\]\)][\w%]*    # until it closes, then try to get any units
+                [\]\)\s\,]*?    # ...and keep closing other parenthesis and parameters
             )?
         )
     )*
@@ -306,6 +319,8 @@ _reverse_default_xcss_vars = dict((v, k) for k, v in _default_xcss_vars.items())
 _reverse_default_xcss_vars_re = re.compile(r'(content.*:.*(\'|").*)(' + '|'.join(map(re.escape, _reverse_default_xcss_vars.keys())) + ')(.*\2)')
 
 _blocks_re = re.compile(r'[{},;]|\n+')
+
+_skip_word_re = re.compile('(?:[\w\s#.,:]|-(?![\d\s]))*$')
 
 FILEID = 0
 POSITION = 1
@@ -943,7 +958,7 @@ class xCSS(object):
         def calculate(result):
             _base_str = result.group(0)
 
-            if _base_str.isalnum():
+            if _skip_word_re.match(_base_str):
                 return _base_str
 
             try:
@@ -1057,7 +1072,7 @@ def BNF():
 
         addop  = plus | minus
         multop = mult | div
-        ident  = Word(alphas, '_$' + alphas + nums)
+        ident  = Word(alphas, '-_$' + alphas + nums)
         string = QuotedString('"', escChar='\\', multiline=True) | QuotedString("'", escChar='\\', multiline=True)
         color  = Combine(color + Word(hexnums, exact=8) | # #RRGGBBAA
                          color + Word(hexnums, exact=6) | # #RRGGBB
@@ -1632,35 +1647,35 @@ def _func(fn):
     return _func
 
 fncs = {
-    'sprite_map:1': _sprite_map,
+    'sprite-map:1': _sprite_map,
     'sprite:2': _sprite,
     'sprite:3': _sprite,
     'sprite:4': _sprite,
-    'sprite_map_name:1': _sprite_map_name,
-    'sprite_file:2': _sprite_file,
-    'sprite_url:1': _sprite_url,
-    'sprite_position:2': _sprite_position,
-    'sprite_position:3': _sprite_position,
-    'sprite_position:4': _sprite_position,
+    'sprite-map-name:1': _sprite_map_name,
+    'sprite-file:2': _sprite_file,
+    'sprite-url:1': _sprite_url,
+    'sprite-position:2': _sprite_position,
+    'sprite-position:3': _sprite_position,
+    'sprite-position:4': _sprite_position,
 
-    'inline_image:1': _inline_image,
-    'inline_image:2': _inline_image,
-    'image_url:1': _image_url,
-    'image_width:1': _image_width,
-    'image_height:1': _image_height,
+    'inline-image:1': _inline_image,
+    'inline-image:2': _inline_image,
+    'image-url:1': _image_url,
+    'image-width:1': _image_width,
+    'image-height:1': _image_height,
 
     'opacify:2': _opacify,
     'fadein:2': _opacify,
-    'fade_in:2': _opacify,
+    'fade-in:2': _opacify,
     'transparentize:2': _transparentize,
     'fadeout:2': _transparentize,
-    'fade_out:2': _transparentize,
+    'fade-out:2': _transparentize,
     'lighten:2': _lighten,
     'darken:2': _darken,
     'saturate:2': _saturate,
     'desaturate:2': _desaturate,
     'grayscale:1': _grayscale,
-    'adjust_hue:2': _adjust_hue,
+    'adjust-hue:2': _adjust_hue,
     'spin:2': _adjust_hue,
     'complement:1': _complement,
     'mix:2': _mix,
@@ -2549,9 +2564,9 @@ a {
 ...     desaturate: desaturate(hsl(120, 30%, 90%), 20%); // hsl(120, 10%, 90%)
 ...     desaturate: desaturate(#855, 20%); // #726b6b
 ...
-...     adjust: adjust_hue(hsl(120, 30%, 90%), 60deg); // hsl(180, 30%, 90%)
-...     adjust: adjust_hue(hsl(120, 30%, 90%), 060deg); // hsl(60, 30%, 90%)
-...     adjust: adjust_hue(#811, 45deg); // #886a11
+...     adjust: adjust-hue(hsl(120, 30%, 90%), 60deg); // hsl(180, 30%, 90%)
+...     adjust: adjust-hue(hsl(120, 30%, 90%), 060deg); // hsl(60, 30%, 90%)
+...     adjust: adjust-hue(#811, 45deg); // #886a11
 ...
 ...     mix: mix(#f00, #00f, 50%); // #7f007f
 ...     mix: mix(#f00, #00f, 25%); // #3f00bf
