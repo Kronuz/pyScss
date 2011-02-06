@@ -260,14 +260,25 @@ class xCSS(object):
         rgba_k = _long_color_re.sub(lambda m: 'rgba(%d, %d, %d, 1)' % (int(m.group(1), 16), int(m.group(2), 16), int(m.group(3), 16)), v)
         # get the shortest of all to use it:
         k = min([short_k, long_k, rgb_k, rgba_k], key=len)
+        _reverse_colors[long_k] = k
         _reverse_colors[short_k] = k
         _reverse_colors[rgb_k] = k
         _reverse_colors[rgba_k] = k
     _reverse_colors_re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, _reverse_colors.keys()))+r')\b', re.IGNORECASE)
     _colors_re = re.compile(r'\b(' + '|'.join(map(re.escape, _colors.keys()))+r')\b', re.IGNORECASE)
 
+    _expr_simple_re = re.compile(r'''
+        \#\{.*?\}                 # Global Interpolation only
+    ''', re.VERBOSE)
+    
     _expr_re = re.compile(r'''
-        \#\{.*?\}                 # Global interpolation
+        \#\{.*?\}                 # Global Interpolation
+    |
+        [\[(]
+        [\]\[()\s\-]*
+        [#%.\w]+
+        [\]\[()\s]*
+        [\])]
     |
         (?:
             [\[(]                 # optionally start with a parenthesis followed
@@ -283,7 +294,7 @@ class xCSS(object):
             )
             [\]\[()\s\-]*
             [#%.\w]+              # Accept a variable or constant or number (preceded by spaces or parenthesis)
-        )*                        # ...take n arguments,
+        )+                        # ...take n arguments,
         (?:
             [\]\[()\s]*           # but optionally then finish accepting any missing parenthesis and spaces
             [\])]                 # with a closing parenthesis...
@@ -531,9 +542,6 @@ class xCSS(object):
             # this will manage xCSS rule: ' extends '
             self.parse_extends()
 
-            # this will manage properties in rules
-            self.parse_properties()
-
             # this will manage the order of the rules
             self.manage_order()
 
@@ -564,7 +572,32 @@ class xCSS(object):
         # collapse the space in properties blocks
         str = self._collapse_properties_space_re.sub(r'\1{', str)
 
-        my_rules = []
+        def expand_includes(m):
+            funct = m.group(1)
+            funct = funct.strip()
+            params = m.group(2)
+            params = params and params.strip('()').split(',') or []
+            q = 0
+            _vars = {}
+            new_params = []
+            for param in params:
+                id = chr(97+q)
+                param = param.strip()
+                _vars['$__'+id+'__'] = param
+                new_params.append(id)
+                q += 1
+            new_params = new_params and '('+','.join(new_params)+')' or ''
+            mixin = self.xcss_opts.get('@mixin ' + funct + new_params)
+            if mixin:
+                codestr = mixin[1]
+                vars = mixin[0].copy()
+                vars.update(_vars)
+                if vars:
+                    rename_vars_re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, vars.keys())) + r')(?!\w)')
+                    codestr = rename_vars_re.sub(lambda m: vars[m.group(0)], codestr)
+                return codestr.replace('[', '(').replace(']', ')')
+            return m.group(0)
+
         for _selectors, codestr, lose in self.locate_blocks(str):
             if lose is not None:
                 self.process_properties(lose, self.xcss_vars, self.xcss_opts)
@@ -616,43 +649,15 @@ class xCSS(object):
                 if _selectors:
                     # normalizing selectors by stripping them and joining them using a single ','
                     _selectors = self.normalize_selectors(_selectors)
-                    rule = [ fileid, len(self.rules), codestr, set(), None, None, None, None ]
-                    my_rules.append(rule)
+
+                    if '@include' in codestr:
+                        codestr = self._includes_re.sub(expand_includes, codestr)
+                    
+                    # give each rule a new copy of the context and its options
+                    rule = [ fileid, len(self.rules), codestr, set(), self.xcss_vars.copy(), self.xcss_opts.copy(), None, None ]
                     self.rules.append(rule)
                     self.parts.setdefault(_selectors, [])
                     self.parts[_selectors].append(rule)
-
-        def expand_includes(m):
-            funct = m.group(1)
-            funct = funct.strip()
-            params = m.group(2)
-            params = params and params.strip('()').split(',') or []
-            q = 0
-            _vars = {}
-            new_params = []
-            for param in params:
-                id = chr(97+q)
-                param = param.strip()
-                _vars['$__'+id+'__'] = param
-                new_params.append(id)
-                q += 1
-            new_params = new_params and '('+','.join(new_params)+')' or ''
-            mixin = self.xcss_opts.get('@mixin ' + funct + new_params)
-            if mixin:
-                codestr = mixin[1]
-                vars = mixin[0].copy()
-                vars.update(_vars)
-                if vars:
-                    rename_vars_re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, vars.keys())) + r')(?!\w)')
-                    codestr = rename_vars_re.sub(lambda m: vars[m.group(0)], codestr)
-                return codestr.replace('[', '(').replace(']', ')')
-            return m.group(0)
-
-        for rule in my_rules:
-            # give each rule a new copy of the context and its options
-            rule[CONTEXT] = self.xcss_vars.copy()
-            rule[OPTIONS] = self.xcss_opts.copy()
-            rule[CODESTR] = self._includes_re.sub(expand_includes, rule[CODESTR])
 
 
     def parse_children(self):
@@ -662,18 +667,29 @@ class xCSS(object):
             cnt += 1
             children_left = False
             for _selectors, rules in self.parts.items():
-                nested = False
-                interpolated = False
                 new_selectors = _selectors
+                interpolated = False
+                nested = False
                 for rule in rules:
-                    fileid, position, codestr, deps, context, options, selectors, properties = rule
                     if not interpolated:
                         # First time only, interpolate the final selectors with whatever variables were inherited:
+                        # (FIXME: Perhaps rules with the same selectors but different contexts would produce different final selectors??)
                         interpolated = True
-                        new_selectors = self.use_vars(_selectors, context, options)
-                        ###new_selectors = self.do_math(new_selectors)
-                        new_selectors = self.normalize_selectors(new_selectors)
-                    if ' {' in codestr:
+                        if '#{' in new_selectors or '$' in _selectors:
+                            new_selectors = self.use_vars(_selectors, rule[CONTEXT], rule[OPTIONS])
+                            new_selectors = self.do_math(new_selectors, self._expr_simple_re)
+                            new_selectors = self.normalize_selectors(new_selectors)
+                    if rule[PROPERTIES] is None:
+                        properties = []
+                        options = dict(filter(lambda x: not x[0].startswith('@extend '), rule[OPTIONS].items())) # clean options
+                        self.process_properties(rule[CODESTR], rule[CONTEXT], rule[OPTIONS], properties)
+                        parents = rule[OPTIONS].get('@extend')
+                        if parents:
+                            parents = parents.replace(',', '&') # @extend can come with comma separated selectors...
+                            new_selectors = self.normalize_selectors(new_selectors, extra_parents=parents)
+                        rule[SELECTORS] = new_selectors
+                        rule[PROPERTIES] = properties
+                    if ' {' in rule[CODESTR]:
                         nested = True
                 if nested:
                     # remove old selector:
@@ -683,16 +699,6 @@ class xCSS(object):
                     # maybe there are some children still left...
                     children_left = True
                 else:
-                    # No more children, interpolate the plain CSS rule:
-                    for rule in rules:
-                        fileid, position, codestr, deps, context, options, selectors, properties = rule
-                        options = dict(filter(lambda x: not x[0].startswith('@extend '), options.items())) # clean options
-                        self.process_properties(codestr, context, options)
-                        rule[CODESTR] = self.use_vars(codestr, context, options)
-                        parents = options.get('@extend')
-                        if parents:
-                            parents = parents.replace(',', '&') # @extend can come with comma separated selectors...
-                            new_selectors = self.normalize_selectors(new_selectors, extra_parents=parents)
                     # rename selectors (if interpolated)
                     if new_selectors != _selectors:
                         del self.parts[_selectors]
@@ -711,13 +717,10 @@ class xCSS(object):
 
             # Check if the block has nested blocks and work it out:
             if ' {' not in codestr:
-                self.process_properties(codestr, context, options)
-                c_codestr = self.use_vars(codestr, context, options)
-                codestr = construct + ' {' + codestr + '}'
+                continue
             else:
                 codestr = construct + ' {}' + codestr
 
-            my_rules = []
             def _create_children(c_selectors, c_codestr):
                 better_selectors = set()
                 c_selectors, _, c_parents = c_selectors.partition(' extends ')
@@ -726,7 +729,7 @@ class xCSS(object):
                     for p_selector in p_selectors:
                         if c_selector == self.construct:
                             better_selectors.add(p_selector)
-                        elif '&' in c_selector: # Parent References (SASS)
+                        elif '&' in c_selector: # Parent References
                             better_selectors.add(c_selector.replace('&', p_selector))
                         else:
                             better_selectors.add(p_selector + ' ' + c_selector)
@@ -734,9 +737,8 @@ class xCSS(object):
                 if c_parents:
                     better_selectors += ' extends ' + c_parents
 
-                rule[POSITION] = None # Disable old rule
-                _rule = [ fileid, position, c_codestr, deps, None, None, None, None ]
-                my_rules.append(_rule)
+                rule[POSITION] = None # Disable this old rule (perhaps it could simply be removed instead??)
+                _rule = [ fileid, position, c_codestr, deps, context.copy(), options.copy(), None, None ]
                 self.rules.append(_rule)
                 self.parts.setdefault(better_selectors, [])
                 self.parts[better_selectors].append(_rule)
@@ -750,15 +752,9 @@ class xCSS(object):
                     c_selectors = construct
                     c_codestr = lose.strip()
                     if c_codestr:
-                        self.process_properties(c_codestr, context, options)
-                        c_codestr = self.use_vars(c_codestr, context, options)
                         _create_children(c_selectors, c_codestr)
                 else:
                     _create_children(c_selectors, c_codestr)
-
-            for rule in my_rules:
-                rule[CONTEXT] = context.copy()
-                rule[OPTIONS] = options.copy()
 
     def link_with_parents(self, parent, c_selectors, c_rules):
         """
@@ -808,10 +804,15 @@ class xCSS(object):
                     self.parts.setdefault(new_selectors, [])
                     self.parts[new_selectors].extend(p_rules)
 
+                deps = set()
                 # save child dependencies:
                 for c_rule in c_rules or []:
-                    for p_rule in p_rules:
-                        p_rule[DEPS].add(c_rule[POSITION]) # position is the "index" of the object
+                    c_rule[SELECTORS] = c_selectors # re-set the SELECTORS for the rules
+                    deps.add(c_rule[POSITION])
+                    
+                for p_rule in p_rules:
+                    p_rule[SELECTORS] = new_selectors # re-set the SELECTORS for the rules
+                    p_rule[DEPS].update(deps) # position is the "index" of the object
 
         return parent_found
 
@@ -832,17 +833,17 @@ class xCSS(object):
                     self.parts.setdefault(new_selectors, [])
                     self.parts[new_selectors].extend(rules)
                     rules = [] # further rules extending other parents will be empty
-
+        
         for _selectors, rules in self.parts.items():
             selectors, _, parent = _selectors.partition(' extends ')
             if parent:
                 if _selectors in self.parts:
                     # It might be that link_with_parents or previous iterations
                     # already have removed the selectors... !!??
-                    del self.parts[_selectors]
+                    del self.parts[_selectors] #FIXME: why is this "if" really needed??
                 self.parts.setdefault(selectors, [])
                 self.parts[selectors].extend(rules)
-
+                
                 parents = self.link_with_parents(parent, selectors, rules)
 
                 assert parents is not None, "Parent not found: %s (%s)" % (parent, selectors)
@@ -887,20 +888,6 @@ class xCSS(object):
                         self.css_files.append(fileid)
 
 
-    def parse_properties(self):
-        # build final properties:
-        for _selectors, rules in self.parts.items():
-            for rule in rules:
-                fileid, position, codestr, deps, context, options, selectors, properties = rule
-                if position is not None and codestr and properties is None:
-                    assert selectors is None, "Rule body is repeated for different selectors!"
-                    rule[SELECTORS] = _selectors
-                    rule[PROPERTIES] = properties = rule[PROPERTIES] or []
-                    rule[CONTEXT] = context = rule[CONTEXT] or {}
-                    rule[OPTIONS] = context = rule[OPTIONS] or {}
-                    self.process_properties(codestr, context, options, properties)
-
-
     def create_css(self, fileid=None):
         """
         Generate the final CSS string
@@ -927,6 +914,10 @@ class xCSS(object):
             fileid, position, codestr, deps, context, options, selectors, properties = rule
             #print >>sys.stderr, fileid, position, context, options, selectors, properties
             if position is not None and properties:
+                if '#{' in codestr or '$' in codestr:
+                    properties = []
+                    codestr = self.use_vars(codestr, context, options)
+                    self.process_properties(codestr, context, options, properties)
                 # feel free to modifie the indentations the way you like it
                 selector = (',' + nl).join(selectors.split(',')) + sp + '{' + nl
                 result += selector
@@ -947,7 +938,7 @@ class xCSS(object):
         return result + '\n'
 
 
-    def do_math(self, content):
+    def do_math(self, content, _expr_re=_expr_re):
         def calculate(result):
             _base_str = result.group(0)
 
@@ -961,12 +952,12 @@ class xCSS(object):
                 try:
                     better_expr_str = eval_expr(better_expr_str)
                 except:
-                    better_expr_str = better_expr_str
+                    pass
 
                 self._replaces[_base_str] = better_expr_str
             return better_expr_str
         #print >>sys.stderr, self._expr_re.findall(content)
-        content = self._expr_re.sub(calculate, content)
+        content = _expr_re.sub(calculate, content)
         return content
 
     def post_process(self, cont):
@@ -1526,11 +1517,12 @@ def evaluateStack( s ):
 def eval_expr(expr):
     global exprStack
     exprStack = []
-    #print '>>',expr,'<<'
+
+    #print >>sys.stderr, '>>',expr,'<<'
     results = BNF().parseString( expr, parseAll=True )
     val = evaluateStack( exprStack[:] )
+    #print >>sys.stderr, '--',val,'--'
 
-    #print '--',val,'--'
     val = val[0]
     if val:
         if val[0] == "'":
