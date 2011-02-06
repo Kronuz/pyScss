@@ -30,6 +30,11 @@ structure but it's been completely rewritten and many bugs have been fixed.
 import re
 import sys
 
+MEDIA_ROOT = '/usr/local/www/mdubalu/media/'
+ASSETS_ROOT = MEDIA_ROOT + 'assets/'
+MEDIA_URL = '/media/'
+ASSETS_URL = MEDIA_URL + 'assets/'
+
 # units and conversions
 _units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
           'grad', 'ms', 's', 'hz', 'khz', '%']
@@ -251,37 +256,41 @@ _expr_simple_re = re.compile(r'''
 ''', re.VERBOSE)
 
 _expr_re = re.compile(r'''
-    \#\{.*?\}                 # Global Interpolation
+    \#\{.*?\}                  # Global Interpolation
 |
-    [\[(]
-    [\]\[()\s\-]*
-    [#%.\w]+
-    [\]\[()\s]*
-    [\])]
-|
+    (?<=\s)                    # Expression should have an space before it
+    (?:[\[\(\\-][\[\(\s\-]*)?  # ...then any number of opening parenthesis or spaces
     (?:
-        [\[(]                 # optionally start with a parenthesis followed
-        [\]\[()\s\-]*         # by a number of parenthesis, spaces, or or unary minus operators '-'
-    )?
-    [#%.\w]+                  # Accept a variable or constant or number
-    (?:
+        (['"]).*?\1            # If a string, consume the whole thing...
+    |
+        [#\w.%]+               # ...otherwise get the word, variable or number
         (?:
-            \(                # Accept either the start of a function call...
+            [\[\(]             # optionally, then start with a parenthesis
+            .*?                # followed by anything...
+            [\]\)][\w%]*       # until it closes, then try to get any units
+            [\]\)\s\,]*?       # ...and keep closing other parenthesis and parameters
+        )?
+    )
+    (?:                        # Here comes the other expressions (0..n)
+        [\]\)\s\,]*?
+        (?:\s-\s|[+*/^,])      # Get the operator (minus needs spaces)
+        [\[\(\s\-]*
+        (?:
+            (['"]).*?\2        # If a string, consume the whole thing...
         |
-            [\]\[()\s]*       # ...or an operation ("+-*/")
-            (?:\s-\s|[+*/^,]) # (dash needs a surrounding space always)
+            [#\w.%]+           # ...otherwise get the word, variable or number
+            (?:
+                [\[\(]         # optionally, then  start with a parenthesis
+                .*?            # followed by anything...
+                [\]\)][\w%]*   # until it closes, then try to get any units
+                [\]\)\s\,]*?   # ...and keep closing other parenthesis and parameters
+            )?
         )
-        [\]\[()\s\-]*
-        [#%.\w]+              # Accept a variable or constant or number (preceded by spaces or parenthesis)
-    )+                        # ...take n arguments,
-    (?:
-        [\]\[()\s]*           # but optionally then finish accepting any missing parenthesis and spaces
-        [\])]                 # with a closing parenthesis...
-        [^;}\s]*              # ...until it hits a new expression or the end of the line or the rule.
-    )?
-    (?!.*?:)                  # If not in Global Interpolation, then accept expressions only inside properties
-    (?=.*?;)                  # or inside the selectors.
+    )*
+    [\]\)\s\,]*?               # ...keep closing parenthesis
+    (?:[\]\)\,]+[\w%]*)?       # and then try to get any units afterwards
 ''', re.VERBOSE)
+
 #_expr_re = re.compile(r'(\[.*?\])([\s;}]|$|.+?\S)') # <- This is the old method, required parenthesis around the expression
 _ml_comment_re = re.compile(r'\/\*(.*?)\*\/', re.DOTALL)
 _sl_comment_re = re.compile(r'(?<!\w{2}:)\/\/.*')
@@ -312,7 +321,7 @@ class xCSS(object):
     construct = 'self'
     short_colors = True
     reverse_colors = True
-    
+
     def __init__(self):
         pass
 
@@ -601,7 +610,7 @@ class xCSS(object):
             else:
                 if _selectors[0] == '@':
                     code, name = (_selectors.split(None, 1)+[''])[:2]
-                    if code == '@variables':
+                    if code in ('@variables', '@vars'):
                         if name:
                             name =  name + '.'
                         self.process_properties(codestr, self.xcss_vars, self.xcss_opts, self.xcss_vars, name)
@@ -646,7 +655,7 @@ class xCSS(object):
 
                     if '@include' in codestr:
                         codestr = _includes_re.sub(expand_includes, codestr)
-                    
+
                     # give each rule a new copy of the context and its options
                     rule = [ fileid, len(self.rules), codestr, set(), self.xcss_vars.copy(), self.xcss_opts.copy(), None, None ]
                     self.rules.append(rule)
@@ -801,7 +810,7 @@ class xCSS(object):
                 for c_rule in c_rules or []:
                     c_rule[SELECTORS] = c_selectors # re-set the SELECTORS for the rules
                     deps.add(c_rule[POSITION])
-                    
+
                 for p_rule in p_rules:
                     p_rule[SELECTORS] = new_selectors # re-set the SELECTORS for the rules
                     p_rule[DEPS].update(deps) # position is the "index" of the object
@@ -825,7 +834,7 @@ class xCSS(object):
                     self.parts.setdefault(new_selectors, [])
                     self.parts[new_selectors].extend(rules)
                     rules = [] # further rules extending other parents will be empty
-        
+
         for _selectors, rules in self.parts.items():
             selectors, _, parent = _selectors.partition(' extends ')
             if parent:
@@ -835,7 +844,7 @@ class xCSS(object):
                     del self.parts[_selectors] #FIXME: why is this "if" really needed??
                 self.parts.setdefault(selectors, [])
                 self.parts[selectors].extend(rules)
-                
+
                 parents = self.link_with_parents(parent, selectors, rules)
 
                 assert parents is not None, "Parent not found: %s (%s)" % (parent, selectors)
@@ -901,7 +910,7 @@ class xCSS(object):
             sp = ' '
             tb = '\t'
             nl = '\n'
-        
+
         for rule in rules:
             fileid, position, codestr, deps, context, options, selectors, properties = rule
             #print >>sys.stderr, fileid, position, context, options, selectors, properties
@@ -934,11 +943,14 @@ class xCSS(object):
         def calculate(result):
             _base_str = result.group(0)
 
+            if _base_str.isalnum():
+                return _base_str
+
             try:
                 better_expr_str = self._replaces[_base_str]
             except KeyError:
                 better_expr_str = _base_str
-                
+
                 # If we are in a global variable, we remove
                 if better_expr_str[:2] == '#{' and better_expr_str[-1] == '}':
                     better_expr_str = better_expr_str[2:-1]
@@ -955,6 +967,7 @@ class xCSS(object):
                 self._replaces[_base_str] = better_expr_str
             return better_expr_str
 
+        #print >>sys.stderr, _expr_re.findall(content)
         content = _expr_re.sub(calculate, content)
         return content
 
@@ -969,11 +982,21 @@ class xCSS(object):
         cont = _zero_units_re.sub('0', cont)
         return cont
 
-
+import os
+import hashlib
+import base64
+import time
+import datetime
+import mimetypes
+import glob
 import math
 import operator
 import colorsys
 from pyparsing import *
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
 
 exprStack = []
 
@@ -988,7 +1011,10 @@ def pushFirst( strg, loc, toks ):
 
 def pushFunct( strg, loc, toks ):
     toks = toks[0].split(',')
-    exprStack.append( 'funct ' + toks[0] + ':' + str(len(toks)))
+    args = len(toks)
+    if strg.endswith('()'):
+        args = 0
+    exprStack.append( 'funct ' + toks[0] + ':' + str(args))
 
 def pushQuoted( strg, loc, toks ):
     exprStack.append( u'"%s"' % escape(toks[0]))
@@ -1042,7 +1068,7 @@ def BNF():
             Word( nums ) + Optional( point + Optional( Word( nums ) ) ) + Optional( units ) |
             point + Word( nums ) + Optional( units )
         )
-        funct  = Combine(ident + lpar + expr.suppress() + ZeroOrMore(comma + expr.suppress()) + rpar)
+        funct  = Combine(ident + lpar + Optional(expr.suppress() + ZeroOrMore(comma + expr.suppress())) + rpar)
 
         atom = (
             Optional('-') + ( fnumber | color ).setParseAction( pushFirst ) |
@@ -1062,6 +1088,201 @@ def BNF():
         bnf = expr
     return bnf
 
+################################################################################
+# Compass like functionality for sprites and images:
+sprite_maps = {}
+def _sprite_map(_glob, *args):
+    """
+    Generates a sprite map from the files matching the glob pattern.
+    Uses the keyword-style arguments passed in to control the placement.
+    """
+    if not Image:
+        raise Exception("Images manipulation require PIL")
+
+    if _glob[0] in sprite_maps:
+        sprite_maps[_glob[0]]['_'] = datetime.datetime.now()
+    else:
+
+        gutter = 0
+        offset_x = 0
+        offset_y = 0
+        repeat = 'no-repeat'
+
+        files = sorted(glob.glob(MEDIA_ROOT + dequote(_glob[0])))
+
+        times = [ int(os.path.getmtime(file)) for file in files ]
+
+        key = files + times + [ gutter, offset_x, offset_y, repeat ]
+        key = base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
+        asset_file = key + '.png'
+        asset_path = ASSETS_ROOT + asset_file
+
+        images = tuple( Image.open(file) for file in files )
+        names = tuple( os.path.splitext(os.path.basename(file))[0] for file in files )
+        files = tuple( file[len(MEDIA_ROOT):] for file in files )
+        sizes = tuple( image.size for image in images )
+        offsets = []
+        if os.path.exists(asset_path):
+            filetime = int(os.path.getmtime(asset_path))
+            offset = gutter
+            for i, image in enumerate(images):
+                offsets.append(offset - gutter)
+                offset += sizes[i][0] + gutter * 2
+        else:
+            width = sum(zip(*sizes)[0]) + gutter * len(files) * 2
+            height = max(zip(*sizes)[1]) + gutter * 2
+
+            new_image = Image.new(
+                mode = 'RGBA',
+                size = (width, height),
+                color = (0, 0, 0, 0)
+            )
+
+            offset = gutter
+            for i, image in enumerate(images):
+                new_image.paste(image, (offset, gutter))
+                offsets.append(offset - gutter)
+                offset += sizes[i][0] + gutter * 2
+
+            new_image.save(asset_path)
+            filetime = int(time.mktime(datetime.datetime.now().timetuple()))
+
+        url = '%s%s?_=%s' % (MEDIA_URL, asset_file, filetime)
+        asset = "url('%s') %dpx %dpx %s" % (escape(url), int(offset_x), int(offset_y), repeat)
+        sprite_maps[asset] = dict(zip(names, zip(sizes, files, offsets)))
+        sprite_maps[asset]['_'] = datetime.datetime.now()
+        sprite_maps[asset]['_f_'] = asset_file
+        sprite_maps[asset]['_k_'] = key
+        sprite_maps[asset]['_t_'] = filetime
+        # Use the sorted list to remove older elements (keep only 500 objects):
+        if len(sprite_maps) > 1000:
+            for a in sorted(sprite_maps, key=lambda a: sprite_maps[a]['_'], reverse=True)[500:]:
+                del sprite_maps[a]
+
+    return (asset, None, None, {})
+
+def _sprite_map_name(_map):
+    """
+    Returns the name of a sprite map The name is derived from the folder than
+    contains the sprites.
+    """
+    sprite_map = sprite_maps.get(_map[0], {})
+    if sprite_map:
+        return (sprite_map['_k_'], None, None, {})
+    return ('', None, None, {})
+
+def _sprite_file(_map, _sprite):
+    """
+    Returns the relative path (from the images directory) to the original file
+    used when construction the sprite. This is suitable for passing to the
+    image_width and image_height helpers.
+    """
+    sprite = sprite_maps.get(_map[0], {}).get(dequote(_sprite[0]))
+    if sprite:
+        return (sprite[1], None, None, {})
+    return ('', None, None, {})
+
+def _sprite(_map, _sprite, _offset_x=None, _offset_y=None):
+    """
+    Returns the image and background position for use in a single shorthand
+    property
+    """
+    sprite_map = sprite_maps.get(_map[0], {})
+    sprite = sprite_map.get(dequote(_sprite[0]))
+    if sprite:
+        print sprite
+        url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['_f_'], sprite_map['_t_'])
+        _offset_x = _offset_x and _offset_x[1] or 0
+        _offset_y = _offset_y and _offset_y[1] or 0
+        pos = "url('%s') %dpx %dpx" % (escape(url), int(_offset_x - sprite[2]), int(_offset_y))
+        return (pos, None, None, {})
+    return ('0 0', None, None, {})
+
+def _sprite_url(_map):
+    """
+    Returns a url to the sprite image.
+    """
+    if _map[0] in sprite_maps:
+        sprite_map = sprite_maps[_map[0]]
+        url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['_f_'], sprite_map['_t_'])
+        return (url, None, None, {})
+    return ('', None, None, {})
+
+def _sprite_position(_map, _sprite, _offset_x=None, _offset_y=None):
+    """
+    Returns the position for the original image in the sprite.
+    This is suitable for use as a value to background-position.
+    """
+    sprite = sprite_maps.get(_map[0], {}).get(dequote(_sprite[0]))
+    if sprite:
+        _offset_x = _offset_x and _offset_x[1] or 0
+        _offset_y = _offset_y and _offset_y[1] or 0
+        pos = '%dpx %dpx' % (int(_offset_x - sprite[2]), int(_offset_y))
+        return (pos, None, None, {})
+    return ('0 0', None, None, {})
+
+def _inline_image(_image, _mime_type=None):
+    """
+    Embeds the contents of a file directly inside your stylesheet, eliminating
+    the need for another HTTP request. For small files such images or fonts,
+    this can be a performance benefit at the cost of a larger generated CSS
+    file.
+    """
+    file = MEDIA_ROOT+dequote(_image[0])
+    print file
+    if os.path.exists(file):
+        _mime_type = _mime_type and dequote(_mime_type[0]) or mimetypes.guess_type(file)[0]
+        file = open(file, 'rb')
+        url = 'data:'+_mime_type+';base64,'+base64.b64encode(file.read())
+        inline = "url('%s')" % (escape(url),)
+        return (inline, None, None, {})
+    return ('', None, None, {})
+
+def _image_url(_image):
+    """
+    Generates a path to an asset found relative to the project's images
+    directory.
+    """
+    file = dequote(_image[0])
+    path = MEDIA_ROOT + file
+    if os.path.exists(path):
+        filetime = int(os.path.getmtime(path))
+        url = '%s%s?_=%s' % (MEDIA_URL, file, filetime)
+        return (url, None, None, {})
+    return ('', None, None, {})
+
+def _image_width(_image):
+    """
+    Returns the width of the image found at the path supplied by `image`
+    relative to your project's images directory.
+    """
+    if not Image:
+        raise Exception("Images manipulation require PIL")
+    file = dequote(_image[0])
+    path = MEDIA_ROOT + file
+    if os.path.exists(path):
+        image = Image.open(path)
+        width = image.size[0]
+        return _float(('', width, None, { 'px': 1 }))
+    return _float('', 0.0, None, { 'px': 1 })
+
+def _image_height(_image):
+    """
+    Returns the height of the image found at the path supplied by `image`
+    relative to your project's images directory.
+    """
+    if not Image:
+        raise Exception("Images manipulation require PIL")
+    file = dequote(_image[0])
+    path = MEDIA_ROOT + file
+    if os.path.exists(path):
+        image = Image.open(path)
+        height = image.size[1]
+        return _float(('', height, None, { 'px': 1 }))
+    return _float('', 0.0, None, { 'px': 1 })
+
+################################################################################
+# Sass functionality:
 def float2str(num):
     if isinstance(num, float):
         return ('%0.03f' % num).rstrip('0').rstrip('.')
@@ -1309,29 +1530,32 @@ def _lightness(_color):
     h, l, s = colorsys.rgb_to_hls(_color[2][0]/255.0, _color[2][1]/255.0, _color[2][2]/255.0)
     return _float(('', l, None, { '%': 1 }))
 
+################################################################################
+
 def _percentage(_value):
     return _float(('', _value[1], None, { '%': 1 }))
 
 def _unitless(_value):
     return _float(('', _value[1], None, {}))
 
+def dequote(s):
+    if s[0] in ('"', "'"):
+        s = s[1:-1]
+    return unescape(s)
+
 def _unquote(_str):
-    if _str[0] != '"':
-        return _str
-    if _str[0] == "'":
-        s = _str[0][1:-1]
-    else:
-        s = _str[0]
-    return ("'%s'" % unescape(s), _str[1], _str[2], _str[3])
+    return ("'%s'" % escape(dequote(_str[0])), _str[1], _str[2], _str[3])
 
 def _quote(_str):
-    if _str[0] == '"':
+    if _str[0][0] == '"':
         return _str
-    if _str[0] == "'":
+    if _str[0][0] == "'":
         s = _str[0][1:-1]
     else:
-        s = _str[0]
-    return ('"%s"' % unscape(s), None, None, {})
+        s = escape(_str[0])
+    return ('"%s"' % s, None, None, {})
+
+################################################################################
 
 def _ops(op):
     _op = op
@@ -1362,10 +1586,9 @@ def _ops(op):
         b_str = _b[0]
         a_rgba = _a[2]
         b_rgba = _b[2]
-
         quoting = (a_str[0] == '"' or b_str[0] == '"')
-        if a_str[0] == '"' or a_str[0] == "'": a_str = a_str[1:-1]
-        if b_str[0] == '"' or b_str[0] == "'": a_str = b_str[1:-1]
+        a_str = dequote(a_str)
+        b_str = dequote(b_str)
 
         if (a_rgba is not None and b is not None or
             b_rgba is not None and a is not None or
@@ -1406,11 +1629,28 @@ def _func(fn):
             val = fn(_val[1])
         else:
             val = 0.0
-        val = (float2str(val), val, None, _val[3])
+        val = ('', val, None, _val[3])
         return _float(val)
     return _func
 
 fncs = {
+    'sprite_map:1': _sprite_map,
+    'sprite:2': _sprite,
+    'sprite:3': _sprite,
+    'sprite:4': _sprite,
+    'sprite_map_name:1': _sprite_map_name,
+    'sprite_file:2': _sprite_file,
+    'sprite_url:1': _sprite_url,
+    'sprite_position:2': _sprite_position,
+    'sprite_position:3': _sprite_position,
+    'sprite_position:4': _sprite_position,
+
+    'inline_image:1': _inline_image,
+    'inline_image:2': _inline_image,
+    'image_url:1': _image_url,
+    'image_width:1': _image_width,
+    'image_height:1': _image_height,
+
     'opacify:2': _opacify,
     'fadein:2': _opacify,
     'fade_in:2': _opacify,
@@ -1455,6 +1695,7 @@ fncs = {
     'round:1': _func(round),
     'ceil:1': _func(math.ceil),
     'floor:1': _func(math.floor),
+    'pi:0': lambda: _float(('', math.pi, None, {})),
 }
 
 def evaluateStack( s ):
@@ -1467,10 +1708,10 @@ def evaluateStack( s ):
                 val = -op[1]
                 return (float2str(val), val, op[2], op[3])
             elif op[2] is None:
-                if op[0][0] != '"':
-                    val = '-' + op[0]
-                else:
+                if op[0][0] == '"':
                     val = op[0]
+                else:
+                    val = '-' + dequote(op[0])
                 return (val, None, op[2], op[3])
             return op
         else:
@@ -1487,6 +1728,7 @@ def evaluateStack( s ):
         return opn[op]( op1, op2 )
     elif op.startswith('funct '):
         fn = op[6:]
+        
         _, _, args = op.partition(':')
         args = int(args)
         ops = []
