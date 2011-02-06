@@ -304,6 +304,8 @@ class xCSS(object):
 
     _reverse_default_xcss_vars = dict((v, k) for k, v in _default_xcss_vars.items())
     _reverse_default_xcss_vars_re = re.compile(r'(content.*:.*(\'|").*)(' + '|'.join(map(re.escape, _reverse_default_xcss_vars.keys())) + ')(.*\2)')
+    
+    _blocks_re = re.compile(r'[{},]|\n+')
 
     def __init__(self):
         pass
@@ -324,70 +326,61 @@ class xCSS(object):
     def longest_common_suffix(self, seq1, seq2):
         return self.longest_common_prefix(seq1[::-1], seq2[::-1])
 
-    def locate_blocks(self, str, open='{', close='}', joiner=','):
+    def locate_blocks(self, str):
         """
         Returns all code blocks between `open` and `close` and a proper key
         that can be multilined as long as it's joined by `joiner`.
         Returns the lose code that's not part of the code as a third item.
         """
         depth = 0
-        losing = 0
         skip = False
-        i = init = lose = 0
+        thin = None
+        i = init = safe = lose = 0
         start = end = None
         str_len = len(str)
-        open_len = len(open)
-        close_len = len(close)
-        joiner_len = len(joiner)
-        while i < str_len:
-            if i > 0 and str[i-1] == '#' and str[i:i+open_len] == open:
-                skip = True
-            if not skip and str[i:i+open_len] == open:
+        for m in self._blocks_re.finditer(str):
+            i = m.end(0) - 1
+            if str[i] == '{':
+                if depth == 0:
+                    if i > 0 and str[i-1] == '#':
+                        skip = True
+                    else:
+                        start = i
+                        if thin is not None and str[thin:i-1].strip():
+                            init = thin
+                        if lose < init:
+                            losestr = str[lose:init].strip()
+                            if losestr:
+                                yield None, None, str[lose:init]
+                            lose = init
+                        thin = None
                 depth += 1
-                if depth == 1:
-                    start = i
-                    if lose < init:
-                        losestr = str[lose:init]
-                        yield None, None, losestr
-                        lose = init
-                        losing = 0
-                i += open_len
-            elif not skip and str[i:i+close_len] == close:
+            elif str[i] == '}':
                 if depth > 0:
                     depth -= 1
                     if depth == 0:
-                        end = i
-                        selectors = str[init:start].strip()
-                        codestr = str[start+open_len:end].strip()
-                        if selectors:
-                            yield selectors, codestr, None
-                        init = lose = end + close_len
-                        losing = 0
-                else:
-                    init = lose = i + close_len
-                i += close_len
-            else:
-                if skip and str[i:i+close_len] == close:
-                    skip = False
-                if depth == 0:
-                    if str[i] == '\n':
-                        if losing:
-                            losing = 2 # If last thing we saw was a real character, we're now walking on ice...
-                    elif str[i:i+joiner_len] == joiner:
-                        losing = 0 # We're safe not (for the moment)
-                        i += joiner_len - 1
-                    elif str[i] not in ('\t', ' '):
-                        if losing == 2:
-                            init = i # We were walking on ice, now it's broken!
-                            losing = 0
-                        else:
-                            losing = 1 # We saw a real character!
-                    i += 1
-                else:
-                    i += 1
-        losestr = str[lose:]
-        yield None, None, losestr
-
+                        if not skip:
+                            end = i
+                            selectors = str[init:start].strip()
+                            codestr = str[start+1:end].strip()
+                            if selectors:
+                                yield selectors, codestr, None
+                            init = safe = lose = end + 1
+                            thin = None
+                        skip = False
+            elif depth == 0:
+                if str[i] == ',':
+                    if thin is not None and str[thin:i-1].strip():
+                        init = thin
+                    thin = None
+                    safe = i + 1
+                elif str[i] == '\n':
+                    if thin is None and str[safe:i-1].strip():
+                        thin = i + 1
+                    elif thin is not None and str[thin:i-1].strip():
+                        init = i + 1
+                        thin = None
+        yield None, None, str[lose:]
 
     def normalize_selectors(self, _selectors, extra_selectors=None, extra_parents=None):
         """
@@ -536,9 +529,10 @@ class xCSS(object):
             if fileid != 'string':
                 final_cont += '/* Generated from: ' + fileid + ' */\n'
             fcont = self.create_css(fileid)
-            fcont = self.do_math(fcont)
-            fcont = self.post_process(fcont)
             final_cont += fcont
+
+        final_cont = self.do_math(final_cont)
+        final_cont = self.post_process(final_cont)
 
         return final_cont
 
@@ -666,7 +660,7 @@ class xCSS(object):
                         # First time only, interpolate the final selectors with whatever variables were inherited:
                         interpolated = True
                         new_selectors = self.use_vars(_selectors, context, options)
-                        new_selectors = self.do_math(new_selectors)
+                        ###new_selectors = self.do_math(new_selectors)
                         new_selectors = self.normalize_selectors(new_selectors)
                     if ' {' in codestr:
                         nested = True
@@ -1733,7 +1727,8 @@ http://xcss.antpaw.org/docs/syntax/extends
 	some: props;
 }
 
->>> print css.compile('''.basicList {
+>>> print css.compile('''
+... .basicList {
 ...     li {
 ...         padding: 5px 10px;
 ...         border-bottom: 1px solid #000000;
