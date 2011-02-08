@@ -26,7 +26,6 @@ frameworks like as Sass. It's build on top of the original PHP xCSS codebase
 structure but it's been completely rewritten and many bugs have been fixed.
 
 """
-
 import re
 import sys
 import string
@@ -63,11 +62,13 @@ _conv = {
         '%': 1.0 / 100
     }
 }
-_conv_mapping = {}
+_conv_type = {}
+_conv_factor = {}
 for t, m in _conv.items():
-    for k in m:
-        _conv_mapping[k] = t
-del t, m, k
+    for k, f in m.items():
+        _conv_type[k] = t
+        _conv_factor[k] = f
+del t, m, k, f
 
 # color literals
 _colors = {
@@ -257,9 +258,7 @@ _expr_simple_re = re.compile(r'''
 ''', re.VERBOSE)
 
 _expr_re = re.compile(r'''
-    \#\{.*?\}                   # Global Interpolation
-|
-    (?:^|(?<=\s))               # Expression should have an space before it
+    (?:^|(?<!\w))               # Expression should'nt have a word before it
     (?:
         (?:[\[\(\-]|\bnot\b)
         (?:[\[\(\s\-]+|\bnot\b)?
@@ -332,7 +331,8 @@ _reverse_default_xcss_vars_re = re.compile(r'(content.*:.*(\'|").*)(' + '|'.join
 
 _blocks_re = re.compile(r'[{},;()\'"]|\n+')
 
-_skip_word_re = re.compile('(?:[\w\s#.,:%]|-(?![\d\s]))*$')
+_skip_word_re = re.compile('-?[\w\s#.,:%]*$|[\w\-#.,:%]*$', re.MULTILINE)
+_has_code_re = re.compile('''(^|(?<=[{;}]))\s*(\+|@include|@if|@else|@for)(?![^(:;}]*['"])''')
 
 FILEID = 0
 POSITION = 1
@@ -548,10 +548,10 @@ class xCSS(object):
                 final_cont += '/* Generated from: ' + fileid + ' */\n'
             fcont = self.create_css(fileid)
             final_cont += fcont
-        
+
         final_cont = self.do_math(final_cont)
         final_cont = self.post_process(final_cont)
-
+        
         return final_cont
 
     def parse_xcss_string(self, fileid, str):
@@ -588,7 +588,7 @@ class xCSS(object):
                 interpolated = False
                 nested = False
                 for rule in rules:
-                    if ' {' in rule[CODESTR] or '@include' in rule[CODESTR]:
+                    if ' {' in rule[CODESTR] or _has_code_re.search(rule[CODESTR]):
                         nested = True
                         break
                 if nested:
@@ -626,18 +626,13 @@ class xCSS(object):
                         is_var = False
                     prop = prop.strip()
                     if prop:
-                        default = False
-                        if '!default' in value:
-                            default = True
-                            value.replace('!default', '')
                         value = value.strip()
                         _prop = scope + prop
                         if is_var or prop[0] == '$':
-                            if value and (not default or _prop not in context):
+                            if value:
                                 context[_prop] = value
-                        else:
-                            if properties is not None and value:
-                                properties.append((_prop, value))
+                        elif properties is not None and value:
+                            properties.append((_prop, value))
 
         for p_selectors, p_codestr, lose in self.locate_blocks(codestr):
             if lose is not None:
@@ -663,10 +658,10 @@ class xCSS(object):
             fileid, position, codestr, deps, context, options, selectors, properties = rule
             
             # Check if the block has nested blocks and work it out:
-            if ' {' not in codestr and '@include' not in codestr:
-                continue
-            else:
+            if ' {' in codestr or _has_code_re.search(codestr):
                 codestr = construct + ' {}' + codestr
+            else:
+                continue
 
             # Find the exact position where the new children of this parent (rule) shuld be inserted
             pos = [ len(self.rules) ]
@@ -724,11 +719,15 @@ class xCSS(object):
                 rule[POSITION] = None # Disable this old rule (perhaps it could simply be removed instead??)
 
             def _handle_include(c_selectors, c_codestr):
-                if '@' in c_codestr:
+                if _has_code_re.search(codestr):
                     new_codestr = []
                     props = [ s.strip() for s in c_codestr.split(';') if s.strip() ]
                     for prop in props:
-                        code, name = (prop.split(None, 1)+[''])[:2]
+                        if prop[0] == '+': # expands a '+' at the beginning of a rule as @include
+                            code = '@include'
+                            name = prop[1:]
+                        else:
+                            code, name = (prop.split(None, 1)+[''])[:2]
                         if code == '@include':
                             # It's an @include, insert pending rules...
                             if new_codestr:
@@ -736,24 +735,29 @@ class xCSS(object):
                                 new_codestr = []
                             # ...then insert the include here:
                             funct, params = (name.split('(', 1)+[''])[:2]
-                            params = params and params.rstrip(')').split(',')
-                            q = 0
-                            _vars = {}
+                            params = params.rstrip(')')
+                            params = params and params.split(',') or []
+                            vars = {}
+                            defaults = {}
                             new_params = []
                             for param in params:
-                                id = chr(97+q)
+                                param, _, default = param.partition(':')
                                 param = param.strip()
-                                _vars['$__'+id+'__'] = param
-                                new_params.append(id)
-                                q += 1
-                            new_params = new_params and '('+','.join(new_params)+')' or ''
-                            mixin = options.get('@mixin ' + funct + new_params)
+                                default = default.strip()
+                                if param:
+                                    new_params.append(param)
+                                    if default:
+                                        defaults[param] = default.strip()
+                            mixin = options.get('@mixin ' + funct + ':' + str(len(new_params)))
                             if mixin:
-                                
-                                m_codestr = mixin[1]
-                                vars = mixin[0].copy()
-                                vars.update(_vars)
-                                _create_children(c_selectors, m_codestr, vars)
+                                m_params = mixin[0]
+                                m_vars = mixin[1].copy()
+                                m_codestr = mixin[2]
+                                for i, param in enumerate(new_params):
+                                    if param in defaults:
+                                        m_vars[m_params[i]] = defaults[param]
+                                    m_vars[m_params[i]] = param
+                                _create_children(c_selectors, m_codestr, m_vars)
                         else:
                             new_codestr.append(prop)
                     if new_codestr:
@@ -813,33 +817,29 @@ class xCSS(object):
                             funct, _, params = name.partition('(')
                             funct = funct.strip()
                             params = params.strip('()').split(',')
-                            q = 0
                             vars = {}
                             defaults = {}
                             new_params = []
                             for param in params:
-                                id = chr(97+q)
                                 param, _, default = param.partition(':')
                                 param = param.strip()
                                 default = default.strip()
                                 if param:
+                                    new_params.append(param)
                                     if default:
-                                        defaults['$__'+id+'__'] = default.strip()
-                                    vars[param] = '[$__'+id+'__]'
-                                    new_params.append(id)
-                                    q += 1
+                                        defaults[param] = default.strip()
                             if vars:
                                 rename_vars_re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, vars)) + r')(?!\w)')
                                 c_codestr = rename_vars_re.sub(lambda m: vars[m.group(0)], c_codestr)
-                            mixin = [ defaults, c_codestr ]
-                            if not new_params:
-                                options['@mixin ' + funct] = mixin
+                            mixin = [ list(new_params), defaults, c_codestr ]
                             # Insert as many @mixin options as the default parameters:
                             while len(new_params):
-                                options['@mixin ' + funct + '('+','.join(new_params)+')'] = mixin
-                                param = '$__'+new_params.pop()+'__'
+                                options['@mixin ' + funct + ':' + str(len(new_params))] = mixin
+                                param = new_params.pop()
                                 if param not in defaults:
                                     break
+                            if not new_params:
+                                options['@mixin ' + funct + ':0'] = mixin
                         c_selectors = None
                     elif code == '@prototype':
                         c_selectors = name # prototype keyword simply ignored (all selectors are prototypes)
@@ -982,6 +982,7 @@ class xCSS(object):
                 self._rules[fileid].append(rule)
                 if '#{' in codestr or '$' in codestr:
                     codestr = self.use_vars(codestr, context, options)
+                    codestr = self.do_math(codestr, _expr_simple_re)
                 rule[PROPERTIES] = properties = []
                 self.process_properties(codestr, context, options, properties)
                 if properties:
@@ -1013,6 +1014,7 @@ class xCSS(object):
             tb = '\t'
             nl = '\n'
 
+        scope = set()
         open = False
         old_selectors = None
         for rule in rules:
@@ -1030,6 +1032,7 @@ class xCSS(object):
                     result += selector
                     old_selectors = selectors
                     open = True
+                    scope = set()
                 if not compress and options.get('verbosity', 0) > 0:
                     result += tb + '/* file: ' + fileid + ' */' + nl
                     if context:
@@ -1038,6 +1041,11 @@ class xCSS(object):
                             result += tb + tb + k + ' = ' + v + ';' + nl
                         result += tb + '*/' + nl
                 for prop, value in properties:
+                    if '!default' in value:
+                        value = value.replace('!default', '').strip()
+                        if prop in scope:
+                            continue
+                    scope.add(prop)
                     property = tb + prop + ':' + sp + value + ';' + nl
                     result += property
         if open:
@@ -1052,9 +1060,10 @@ class xCSS(object):
         def calculate(result):
             _base_str = result.group(0)
 
-            if _skip_word_re.match(_base_str):
-                return _base_str
-
+            if _skip_word_re.match(_base_str) or _base_str.startswith('url('):
+                if ' and ' not in _base_str and ' or ' not in _base_str and 'not ' not in _base_str:
+                    return _base_str
+               
             try:
                 better_expr_str = self._replaces[_base_str]
             except KeyError:
@@ -1070,6 +1079,8 @@ class xCSS(object):
 
                 try:
                     better_expr_str = eval_expr(better_expr_str)
+                except ParseException:
+                    better_expr_str = _base_str # leave untouched otherwise
                 except:
                     better_expr_str = _base_str # leave untouched otherwise
 
@@ -1145,12 +1156,17 @@ def BNF():
     if not bnf:
         expr = Forward()
 
+        eq     = Literal( 'and' )
+        ne     = Literal( 'or' )
+        gt     = Literal( 'not' )
+
         eq     = Literal( '==' )
         ne     = Literal( '!=' )
         gt     = Literal( '>' )
         lt     = Literal( '<' )
         ge     = Literal( '>=' )
         le     = Literal( '<=' )
+
         point  = Literal( '.' )
         plus   = Literal( '+' )
         minus  = Literal( '-' )
@@ -1498,9 +1514,9 @@ def _float(val):
     if units:
         units_type = set()
         for unit in units:
-            units_type.add(_conv_mapping.get(unit))
+            units_type.add(_conv_type.get(unit))
         unit = units[0]
-        unit_type = _conv_mapping.get(unit)
+        unit_type = _conv_type.get(unit)
         factor = _conv.get(unit_type, {}).get(unit, 1)
         assert len(units_type) <= 1, "Units mismatch"
         _val /= factor
@@ -1649,8 +1665,11 @@ def _lightness(_color):
 
 ################################################################################
 
-def _nth(_list, n):
-    val = dequote(_list[0]).split()[n[1]]
+def _nth(_list, n=1):
+    """
+    Return the Nth item in the string
+    """
+    val = dequote(_list[0]).split()[int(n[1])-1]
     return (val, None, None, {})
 
 def _percentage(_value):
@@ -1826,8 +1845,8 @@ fncs = {
     'saturation:1': _saturation,
     'lightness:1': _lightness,
 
-    'nth::2': _nth,
-    'first-value-of::1': _nth,
+    'nth:2': _nth,
+    'first-value-of:1': _nth,
 
     'percentage:1': _percentage,
     'unitless:1': _unitless,
@@ -1888,6 +1907,8 @@ def evaluateStack( s ):
             args -= 1
             op = evaluateStack( s )
             ops.insert(0, op)
+        if fn not in fncs:
+            raise ParseException( fn, len(fn), "Function not found", None )
         fn = fncs[fn]
         return fn( *ops )
     elif op[0] == '#':
@@ -1904,7 +1925,7 @@ def evaluateStack( s ):
                 break
         val = float(op)
         if unit:
-            unit_type = _conv_mapping.get(unit)
+            unit_type = _conv_type.get(unit)
             val *= _conv.get(unit_type, {}).get(unit, 1)
             return (op+unit, val, None, {unit:1})
         return (op, val, None, {})
