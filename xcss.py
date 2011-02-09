@@ -1,11 +1,11 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #-*- coding: utf-8 -*-
 """
 xCSS Framework for Python
 
 @author    German M. Bravo (Kronuz)
            Based on some code from the original xCSS project by Anton Pawlik
-@version   0.4
+@version   0.5
 @see       http://xcss.antpaw.org/docs/
            http://sass-lang.com/
            http://oocss.org/spec/css-object-model.html
@@ -29,6 +29,8 @@ structure but it's been completely rewritten and many bugs have been fixed.
 import re
 import sys
 import string
+
+#from snippets.utils import print_timing
 
 MEDIA_ROOT = '/usr/local/www/mdubalu/media/'
 ASSETS_ROOT = MEDIA_ROOT + 'assets/'
@@ -257,31 +259,35 @@ _expr_simple_re = re.compile(r'''
     \#\{.*?\}                   # Global Interpolation only
 ''', re.VERBOSE)
 
+#_expr_re = re.compile(r'''
+#(?<=:)[^\{;}]+
+#''', re.VERBOSE)
+
 _expr_re = re.compile(r'''
     (?:^|(?<!\w))               # Expression should'nt have a word before it
     (?:
         (?:[\[\(\-]|\bnot\b)
         (?:[\[\(\s\-]+|\bnot\b)?
     )?                          # ...then any number of opening parenthesis or spaces
-    (?:                         
+    (?:
         (['"]).*?\1             # If a string, consume the whole thing...
-    |                           
-        (?:                     
+    |
+        (?:
             \#[0-9a-fA-F]{6}    # Get an hex RGB
-        |                       
+        |
             \#[0-9a-fA-F]{3}    # Get an hex RRGGBB
-        |                       
+        |
             [\w.%$]+             # ...otherwise get the word, variable or number
-        )                       
-        (?:                     
+        )
+        (?:
             [\[\(]              # optionally, then start with a parenthesis
             .*?                 # followed by anything...
             [\]\)][\w%]*        # until it closes, then try to get any units
             [\]\)\s\,]*?        # ...and keep closing other parenthesis and parameters
-        )?                      
-    )                           
+        )?
+    )
     (?:                         # Here comes the other expressions (0..n)
-        [\]\)\s\,]*?            
+        [\]\)\s\,]*?
         (?:
             [+*/^,]             # Get accepted operators
         |
@@ -292,9 +298,9 @@ _expr_re = re.compile(r'''
             and | or
         |
             == | != | [<>]=?    # Other operators for comparisons
-        )                
+        )
         (?:[\[\(\s\-]+|\bnot\b)?
-        (?:                     
+        (?:
             (['"]).*?\2         # If a string, consume the whole thing...
         |
             (?:
@@ -303,7 +309,7 @@ _expr_re = re.compile(r'''
                 \#[0-9a-fA-F]{3} # Get an hex RRGGBB
             |
                 [\w.%$]+         # ...otherwise get the word, variable or number
-            )               
+            )
             (?:
                 [\[\(]          # optionally, then  start with a parenthesis
                 .*?             # followed by anything...
@@ -511,6 +517,7 @@ class xCSS(object):
 
         return cont
 
+    #@print_timing
     def compile(self, input_xcss=None):
         # Initialize
         self.rules = []
@@ -551,7 +558,7 @@ class xCSS(object):
 
         final_cont = self.do_math(final_cont)
         final_cont = self.post_process(final_cont)
-        
+
         return final_cont
 
     def parse_xcss_string(self, fileid, str):
@@ -656,7 +663,7 @@ class xCSS(object):
 
         for rule in rules:
             fileid, position, codestr, deps, context, options, selectors, properties = rule
-            
+
             # Check if the block has nested blocks and work it out:
             if ' {' in codestr or _has_code_re.search(codestr):
                 codestr = construct + ' {}' + codestr
@@ -694,9 +701,9 @@ class xCSS(object):
                 _options.pop('@extend', None)
 
                 self.process_properties(c_codestr, _context, _options)
-                
+
                 parents = _options.get('@extend')
-                
+
                 if parents:
                     parents = parents.replace(',', '&') # @extend can come with comma separated selectors...
                     if c_parents:
@@ -707,7 +714,7 @@ class xCSS(object):
                 if '#{' in better_selectors or '$' in better_selectors:
                     better_selectors = self.use_vars(better_selectors, _context, _options)
                     better_selectors = self.do_math(better_selectors, _expr_simple_re)
-                
+
                 better_selectors = self.normalize_selectors(better_selectors)
 
                 _rule = [ fileid, len(self.rules), c_codestr, set(deps), _context, _options, better_selectors, None ]
@@ -726,6 +733,11 @@ class xCSS(object):
                         if prop[0] == '+': # expands a '+' at the beginning of a rule as @include
                             code = '@include'
                             name = prop[1:]
+                            try:
+                                if '(' not in name or name.index(':') < name.index('('):
+                                    name = name.replace(':', '(', 1)
+                            except ValueError:
+                                pass
                         else:
                             code, name = (prop.split(None, 1)+[''])[:2]
                         if code == '@include':
@@ -924,7 +936,7 @@ class xCSS(object):
                     self.parts.setdefault(new_selectors, [])
                     self.parts[new_selectors].extend(rules)
                     rules = [] # further rules extending other parents will be empty
-        
+
         cnt = 0
         parents_left = True
         while parents_left and cnt < 10:
@@ -936,17 +948,17 @@ class xCSS(object):
                     parents_left = True
                     if _selectors not in self.parts:
                         continue # Nodes might have been renamed while linking parents...
-                    
+
                     rules = self.parts[_selectors]
-                    
+
                     del self.parts[_selectors]
                     self.parts.setdefault(selectors, [])
                     self.parts[selectors].extend(rules)
-    
+
                     parents = self.link_with_parents(parent, selectors, rules)
-    
+
                     assert parents is not None, "Parent not found: %s (%s)" % (parent, selectors)
-    
+
                     # from the parent, inherit the context and the options:
                     new_context = {}
                     new_options = {}
@@ -1026,7 +1038,7 @@ class xCSS(object):
                         if not sc:
                             if result[-1] == ';':
                                 result = result [:-1]
-                        result += '}' + nl
+                        result += '}' + nl + nl
                     # feel free to modifie the indentations the way you like it
                     selector = (',' + nl).join(selectors.split(',')) + sp + '{' + nl
                     result += selector
@@ -1063,7 +1075,7 @@ class xCSS(object):
             if _skip_word_re.match(_base_str) or _base_str.startswith('url('):
                 if ' and ' not in _base_str and ' or ' not in _base_str and 'not ' not in _base_str:
                     return _base_str
-               
+
             try:
                 better_expr_str = self._replaces[_base_str]
             except KeyError:
@@ -1083,6 +1095,7 @@ class xCSS(object):
                     better_expr_str = _base_str # leave untouched otherwise
                 except:
                     better_expr_str = _base_str # leave untouched otherwise
+                    raise
 
                 self._replaces[_base_str] = better_expr_str
             return better_expr_str
@@ -1113,315 +1126,36 @@ import math
 import operator
 import colorsys
 from pyparsing import *
+ParserElement.enablePackrat()
+
 try:
     from PIL import Image
 except ImportError:
     Image = None
 
-exprStack = []
-
-def escape(str):
-    return re.sub(r'(["\'\\])', '\\\\\g<1>', str)
-
-def unescape(str):
-    return re.sub(re.escape('\\')+'(.)', "\g<1>", str)
-
-def pushFirst( strg, loc, toks ):
-    exprStack.append( toks[0] )
-
-def pushFunct( strg, loc, toks ):
-    toks = toks[0].split(',')
-    args = len(toks)
-    if strg.endswith('()'):
-        args = 0
-    exprStack.append( 'funct ' + toks[0] + ':' + str(args))
-
-def pushQuoted( strg, loc, toks ):
-    exprStack.append( u'"%s"' % escape(toks[0]))
-
-def pushString( strg, loc, toks ):
-    exprStack.append( u"'%s'" % escape(toks[0]) )
-
-def pushUnifier( strg, loc, toks ):
-    if toks and toks[0] in _units:
-        exprStack.append( 'unary ' + toks[0] )
-
-def pushUMinus( strg, loc, toks ):
-    if toks and toks[0]=='-':
-        exprStack.append( 'unary -' )
-
-bnf = None
-def BNF():
-    global bnf
-    if not bnf:
-        expr = Forward()
-
-        eq     = Literal( 'and' )
-        ne     = Literal( 'or' )
-        gt     = Literal( 'not' )
-
-        eq     = Literal( '==' )
-        ne     = Literal( '!=' )
-        gt     = Literal( '>' )
-        lt     = Literal( '<' )
-        ge     = Literal( '>=' )
-        le     = Literal( '<=' )
-
-        point  = Literal( '.' )
-        plus   = Literal( '+' )
-        minus  = Literal( '-' )
-        mult   = Literal( '*' )
-        div    = Literal( '/' )
-        expop  = Literal( '^' )
-        color  = Literal( '#' )
-        lpar   = Literal( '(' ).suppress()
-        rpar   = Literal( ')' ).suppress()
-        comma  = Literal( ',' )
-
-        __units = None
-        for u in _units:
-            if not __units:
-                __units = Literal( u )
-            else:
-                __units |= Literal( u )
-        units = Combine( __units )
-
-        addop  = plus | minus
-        multop = mult | div
-        boolop = eq | ne | gt | lt | ge | le
-        ident  = Word(alphas, '-_$' + alphas + nums)
-        string = QuotedString('"', escChar='\\', multiline=True) | QuotedString("'", escChar='\\', multiline=True)
-        color  = Combine(color + Word(hexnums, exact=8) | # #RRGGBBAA
-                         color + Word(hexnums, exact=6) | # #RRGGBB
-                         color + Word(hexnums, exact=4) | # #RGBA
-                         color + Word(hexnums, exact=3)   # #RGB
-        )
-        fnumber = Combine(
-            Word( nums ) + Optional( point + Optional( Word( nums ) ) ) + Optional( units ) |
-            point + Word( nums ) + Optional( units )
-        )
-        funct  = Combine(ident + lpar + Optional(expr.suppress() + ZeroOrMore(comma + expr.suppress())) + rpar)
-
-        atom = (
-            Optional('-') + ( fnumber | color ).setParseAction( pushFirst ) |
-            Optional('-') + ( funct ).setParseAction( pushFunct ) |
-            Optional('-') + ( string ).setParseAction( pushQuoted ) |
-            Optional('-') + ( ident ).setParseAction( pushString ) |
-            Optional('-') + ( lpar + expr.suppress() + rpar + Optional( units.setParseAction(pushUnifier) ) )
-        ).setParseAction(pushUMinus)
-
-        # by defining exponentiation as 'atom [ ^ factor ]...' instead of 'atom [ ^ atom ]...', we get right-to-left exponents, instead of left-to-righ
-        # that is, 2^3^2 = 2^(3^2), not (2^3)^2.
-        factor = Forward()
-        factor << atom + ZeroOrMore( ( expop + factor ).setParseAction( pushFirst ) )
-
-        term = factor + ZeroOrMore( ( multop + factor ).setParseAction( pushFirst ) )
-        expr << term + ZeroOrMore( ( addop + term ).setParseAction( pushFirst ) )
-        bnf = expr + Optional((boolop + expr).setParseAction( pushFirst ) )
-    return bnf
-
 ################################################################################
-# Compass like functionality for sprites and images:
-sprite_maps = {}
-def _sprite_map(_glob, *args):
-    """
-    Generates a sprite map from the files matching the glob pattern.
-    Uses the keyword-style arguments passed in to control the placement.
-    """
-    if not Image:
-        raise Exception("Images manipulation require PIL")
 
-    if _glob[0] in sprite_maps:
-        sprite_maps[_glob[0]]['_'] = datetime.datetime.now()
-    else:
-
-        gutter = 0
-        offset_x = 0
-        offset_y = 0
-        repeat = 'no-repeat'
-
-        files = sorted(glob.glob(MEDIA_ROOT + dequote(_glob[0])))
-        if not files:
-            return ('', None, None, {})
-
-        times = [ int(os.path.getmtime(file)) for file in files ]
-
-        key = files + times + [ gutter, offset_x, offset_y, repeat ]
-        key = base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
-        asset_file = key + '.png'
-        asset_path = ASSETS_ROOT + asset_file
-
-        images = tuple( Image.open(file) for file in files )
-        names = tuple( os.path.splitext(os.path.basename(file))[0] for file in files )
-        files = tuple( file[len(MEDIA_ROOT):] for file in files )
-        sizes = tuple( image.size for image in images )
-        offsets = []
-        if os.path.exists(asset_path):
-            filetime = int(os.path.getmtime(asset_path))
-            offset = gutter
-            for i, image in enumerate(images):
-                offsets.append(offset - gutter)
-                offset += sizes[i][0] + gutter * 2
-        else:
-            
-            width = sum(zip(*sizes)[0]) + gutter * len(files) * 2
-            height = max(zip(*sizes)[1]) + gutter * 2
-
-            new_image = Image.new(
-                mode = 'RGBA',
-                size = (width, height),
-                color = (0, 0, 0, 0)
-            )
-
-            offset = gutter
-            for i, image in enumerate(images):
-                new_image.paste(image, (offset, gutter))
-                offsets.append(offset - gutter)
-                offset += sizes[i][0] + gutter * 2
-
-            new_image.save(asset_path)
-            filetime = int(time.mktime(datetime.datetime.now().timetuple()))
-
-        url = '%s%s?_=%s' % (MEDIA_URL, asset_file, filetime)
-        asset = "url('%s') %dpx %dpx %s" % (escape(url), int(offset_x), int(offset_y), repeat)
-        sprite_maps[asset] = dict(zip(names, zip(sizes, files, offsets)))
-        sprite_maps[asset]['_'] = datetime.datetime.now()
-        sprite_maps[asset]['_f_'] = asset_file
-        sprite_maps[asset]['_k_'] = key
-        sprite_maps[asset]['_t_'] = filetime
-        # Use the sorted list to remove older elements (keep only 500 objects):
-        if len(sprite_maps) > 1000:
-            for a in sorted(sprite_maps, key=lambda a: sprite_maps[a]['_'], reverse=True)[500:]:
-                del sprite_maps[a]
-
-    return (asset, None, None, {})
-
-def _sprite_map_name(_map):
-    """
-    Returns the name of a sprite map The name is derived from the folder than
-    contains the sprites.
-    """
-    sprite_map = sprite_maps.get(_map[0], {})
-    if sprite_map:
-        return (sprite_map['_k_'], None, None, {})
-    return ('', None, None, {})
-
-def _sprite_file(_map, _sprite):
-    """
-    Returns the relative path (from the images directory) to the original file
-    used when construction the sprite. This is suitable for passing to the
-    image_width and image_height helpers.
-    """
-    sprite = sprite_maps.get(_map[0], {}).get(dequote(_sprite[0]))
-    if sprite:
-        return (sprite[1], None, None, {})
-    return ('', None, None, {})
-
-def _sprite(_map, _sprite, _offset_x=None, _offset_y=None):
-    """
-    Returns the image and background position for use in a single shorthand
-    property
-    """
-    sprite_map = sprite_maps.get(_map[0], {})
-    sprite = sprite_map.get(dequote(_sprite[0]))
-    if sprite:
-        url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['_f_'], sprite_map['_t_'])
-        _offset_x = _offset_x and _offset_x[1] or 0
-        _offset_y = _offset_y and _offset_y[1] or 0
-        pos = "url('%s') %dpx %dpx" % (escape(url), int(_offset_x - sprite[2]), int(_offset_y))
-        return (pos, None, None, {})
-    return ('0 0', None, None, {})
-
-def _sprite_url(_map):
-    """
-    Returns a url to the sprite image.
-    """
-    if _map[0] in sprite_maps:
-        sprite_map = sprite_maps[_map[0]]
-        url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['_f_'], sprite_map['_t_'])
-        return (url, None, None, {})
-    return ('', None, None, {})
-
-def _sprite_position(_map, _sprite, _offset_x=None, _offset_y=None):
-    """
-    Returns the position for the original image in the sprite.
-    This is suitable for use as a value to background-position.
-    """
-    sprite = sprite_maps.get(_map[0], {}).get(dequote(_sprite[0]))
-    if sprite:
-        _offset_x = _offset_x and _offset_x[1] or 0
-        _offset_y = _offset_y and _offset_y[1] or 0
-        pos = '%dpx %dpx' % (int(_offset_x - sprite[2]), int(_offset_y))
-        return (pos, None, None, {})
-    return ('0 0', None, None, {})
-
-def _inline_image(_image, _mime_type=None):
-    """
-    Embeds the contents of a file directly inside your stylesheet, eliminating
-    the need for another HTTP request. For small files such images or fonts,
-    this can be a performance benefit at the cost of a larger generated CSS
-    file.
-    """
-    file = MEDIA_ROOT+dequote(_image[0])
-    if os.path.exists(file):
-        _mime_type = _mime_type and dequote(_mime_type[0]) or mimetypes.guess_type(file)[0]
-        file = open(file, 'rb')
-        url = 'data:'+_mime_type+';base64,'+base64.b64encode(file.read())
-        inline = "url('%s')" % (escape(url),)
-        return (inline, None, None, {})
-    return ('', None, None, {})
-
-def _image_url(_image):
-    """
-    Generates a path to an asset found relative to the project's images
-    directory.
-    """
-    file = dequote(_image[0])
-    path = MEDIA_ROOT + file
-    if os.path.exists(path):
-        filetime = int(os.path.getmtime(path))
-        url = '%s%s?_=%s' % (MEDIA_URL, file, filetime)
-        return (url, None, None, {})
-    return ('', None, None, {})
-
-def _image_width(_image):
-    """
-    Returns the width of the image found at the path supplied by `image`
-    relative to your project's images directory.
-    """
-    if not Image:
-        raise Exception("Images manipulation require PIL")
-    file = dequote(_image[0])
-    path = MEDIA_ROOT + file
-    if os.path.exists(path):
-        image = Image.open(path)
-        width = image.size[0]
-        return _float(('', width, None, { 'px': 1 }))
-    return _float('', 0.0, None, { 'px': 1 })
-
-def _image_height(_image):
-    """
-    Returns the height of the image found at the path supplied by `image`
-    relative to your project's images directory.
-    """
-    if not Image:
-        raise Exception("Images manipulation require PIL")
-    file = dequote(_image[0])
-    path = MEDIA_ROOT + file
-    if os.path.exists(path):
-        image = Image.open(path)
-        height = image.size[1]
-        return _float(('', height, None, { 'px': 1 }))
-    return _float('', 0.0, None, { 'px': 1 })
-
-################################################################################
-# Sass functionality:
-def float2str(num):
+def to_str(num):
     if isinstance(num, float):
         return ('%0.03f' % num).rstrip('0').rstrip('.')
+    elif isinstance(num, bool):
+        return 'true' if num else 'false'
+    elif num is None:
+        return ''
     return str(num)
 
-# map operator symbols to corresponding arithmetic operations
+def to_float(num):
+    if isinstance(num, (float, int)):
+        return float(num)
+    num = to_str(num)
+    try:
+        if num and num[-1] == '%':
+            return float(num[:-1]) / 100.0
+        else:
+            return float(num)
+    except ValueError:
+        return 0.0
+
 hex2rgba = {
     9: lambda c: (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), int(c[7:9], 16)),
     7: lambda c: (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), 1.0),
@@ -1429,159 +1163,102 @@ hex2rgba = {
     4: lambda c: (int(c[1]*2, 16), int(c[2]*2, 16), int(c[3]*2, 16), 1.0),
 }
 
-def _rgbhex(hex, d=None):
-    _r, _g, _b, _a = hex2rgba[len(hex)](hex)
-    _r = ('', _r, None, {})
-    _g = ('', _g, None, {})
-    _b = ('', _b, None, {})
-    _a = ('', _a, None, {})
-    return _rgba(_r, _g, _b, _a, d)
+def escape(str):
+    return re.sub(r'(["\'\\])', '\\\\\g<1>', str)
 
-def _rgb(_r, _g, _b, d=None):
-    return _rgba(_r, _g, _b, ('', 1.0, None, {}), d)
+def unescape(str):
+    return re.sub(re.escape('\\')+'(.)', "\g<1>", str)
 
-def _rgba(_r, _g, _b, _a, d=None):
-    r = _r[1]
-    g = _g[1]
-    b = _b[1]
-    a = _a[1]
-    rp = 1 if '%' in _r[3] else 0
-    gp = 1 if '%' in _g[3] else 0
-    bp = 1 if '%' in _b[3] else 0
-    r = r * 255.0 if rp else 0.0 if r < 0 else 255.0 if r > 255 else r
-    g = g * 255.0 if gp else 0.0 if g < 0 else 255.0 if g > 255 else g
-    b = b * 255.0 if bp else 0.0 if b < 0 else 255.0 if b > 255 else b
-    a = 0.0 if a < 0 else 1.0 if a > 1 else a
-    if a == 1:
-        d = d or {}
-        d.setdefault('rgb', 0)
-        d['rgb'] += 1
-        d = { 'rgb': 1 }
-        p = rp + gp + bp
-        if p:
-            d.setdefault('%', 0)
-            d['%'] = p
-        return ('#%02x%02x%02x' % (r,g,b), None, (r, g, b, 1.0), d)
-    else:
-        d = d or {}
-        d.setdefault('rgba', 0)
-        d['rgba'] += 1
-        p = rp + gp + bp
-        if p:
-            d.setdefault('%', 0)
-            d['%'] = p
-        return ('rgba(%d, %d, %d, %s)' % (int(round(r)), int(round(g)), int(round(b)), float2str(a)), None, (r, g, b, a), d)
 
-def _hsl(_h, _s, _l, d=None):
-    return _hsla(_h, _s, _l, ('', 1.0, None, {}), d)
+def _rgb(r, g, b, type='rgb'):
+    return _rgba(r, g, b, 1.0, type)
 
-def _hsla(_h, _s, _l, _a, d=None):
-    h = _h[1]
-    s = _s[1]
-    l = _l[1]
-    a = _a[1]
-    hp = 1 if '%' in _h[3] else 0
-    sp = 1 if '%' in _s[3] else 0
-    lp = 1 if '%' in _l[3] else 0
-    h = h * 360.0 if hp else h % 360.0
-    s = 0.0 if s < 0 else 1.0 if s > 1 else s
-    l = 0.0 if l < 0 else 1.0 if l > 1 else l
-    a = 0.0 if a < 0 else 1.0 if a > 1 else a
-    r, g, b = colorsys.hls_to_rgb(h/360.0, l, s)
-    if a == 1:
-        d = d or {}
-        d.setdefault('hsl', 0)
-        d['hsl'] += 1
-        p = hp + sp + lp
-        if p:
-            d.setdefault('%', 0)
-            d['%'] = p
-        return ('hsl(%s, %s%%, %s%%)' % (float2str(h), float2str(s*100.0), float2str(l*100.0)), None, (r*255, g*255, b*255, 1.0), d)
-    else:
-        d = {}
-        d.setdefault('hsla', 0)
-        d['hsla'] += 1
-        p = hp + sp + lp + ap
-        if p:
-            d.setdefault('%', 0)
-            d['%'] = p
-        return ('hsla(%s, %s%%, %s%%)' % (float2str(h), float2str(s*100.0), float2str(l*100.0), float2str(a)), None, (r*255, g*255, b*255, a), d)
+def _rgba(r, g, b, a, type='rgba'):
+    c = NumberValue(r), NumberValue(g), NumberValue(b), NumberValue(a)
 
-def _float(val):
-    _val = val[1]
-    val[3].pop(None, None)
-    units = sorted(val[3], key=val[3].get, reverse=True)
-    if units:
-        units_type = set()
-        for unit in units:
-            units_type.add(_conv_type.get(unit))
-        unit = units[0]
-        unit_type = _conv_type.get(unit)
-        factor = _conv.get(unit_type, {}).get(unit, 1)
-        assert len(units_type) <= 1, "Units mismatch"
-        _val /= factor
-        _val = float2str(_val)
+    col = [ c[i].value * 255.0 if (c[i].unit == '%' or c[i].value > 0 and c[i].value <= 1) else
+            0.0 if c[i].value < 0 else
+            255.0 if c[i].value > 255 else
+            c[i].value
+            for i in range(3)
+          ]
+    col += [ 0.0 if c[3].value < 0 else 1.0 if c[3].value > 1 else c[3].value ]
+    col += [ type ]
+    return ColorValue(col)
 
-        if unit in _units:
-            _val += unit
-    _val = float2str(_val)
-    return (_val, val[1], val[2], val[3])
+def _hsl(h, s, l, type='hsl'):
+    return _hsla(h, s, l, 1.0, type)
 
-def __rgba_add(_color, _r, _g, _b, _a, d=None):
-    r = ('', _color[2][0] + _r, None, {})
-    g = ('', _color[2][1] + _g, None, {})
-    b = ('', _color[2][2] + _b, None, {})
-    a = ('', _color[2][3] + _a, None, {})
-    return _rgba(r, g, b, a, d)
+def _hsla(h, s, l, a, type='hsla'):
+    c = NumberValue(h), NumberValue(s), NumberValue(l), NumberValue(a)
+    col = [ c[0] if (c[0].unit == '%' or c[0].value > 0 and c[0].value <= 1) else (c[0].value % 360.0) / 360.0 ]
+    col += [ c[i].value if (c[i].unit == '%' or c[i].value > 0 and c[i].value <= 1) else
+            0.0 if c[i].value < 0 else
+            1.0 if c[i].value > 1 else
+            c[i].value / 255.0
+            for i in range(1, 4)
+          ]
+    col += [ type ]
+    col = ColorValue(tuple([ c * 255.0 for c in colorsys.hls_to_rgb(col[0], col[2], col[1]) ] + [ col[3], type ]))
+    return col
 
-def _opacify(_color, _amount):
-    a = _amount[1]
-    a = 0.0 if a < 0 else 1.0 if a > 1 else a
-    return __rgba_add(_color, 0, 0, 0, a)
+def __rgba_add(color, r, g, b, a):
+    color = ColorValue(color)
+    c = color.value
+    a = r, g, b, a
+    r = 255.0, 255.0, 255.0, 1.0
+    c = [ c[i] + a[i] for i in range(4) ]
+    c = [ 0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4) ]
+    color.value = tuple(c)
+    return color
 
-def _transparentize(_color, _amount):
-    a = _amount[1]
-    a = 0.0 if a < 0 else 1.0 if a > 1 else a
-    return __rgba_add(_color, 0, 0, 0, -a)
+def _opacify(color, amount):
+    a = NumberValue(amount).value
+    return __rgba_add(color, 0, 0, 0, a)
 
-def __hsla_add(_color, _h, _s, _l, _a, d=None):
-    h, l, s = colorsys.rgb_to_hls(_color[2][0]/255.0, _color[2][1]/255.0, _color[2][2]/255.0)
-    h = ('', h*360.0 + _h, None, {})
-    s = ('', s + _s, None, {'%': 1})
-    l = ('', l + _l, None, {'%': 1})
-    a = ('', _color[2][3] + _a, None, {})
-    return _hsla(h, s, l, a, d)
+def _transparentize(color, amount):
+    a = NumberValue(amount).value
+    return __rgba_add(color, 0, 0, 0, -a)
 
-def _darken(_color, _amount):
-    a = _amount[1]
-    a = 0.0 if a < 0 else 1.0 if a > 1 else a
-    return __hsla_add(_color, 0, 0, -a, 0)
+def __hsl_add(color, h, s, l):
+    color = ColorValue(color)
+    c = color.value
+    a = h / 360.0, s, l
+    h, l, s = list(colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0))
+    c = h, s, l
+    c = [ 0.0 if c[i] < 0 else 1.0 if c[i] > 1 else c[i] + a[i] for i in range(3) ]
+    c = colorsys.hls_to_rgb(((c[0] * 360.0) % 360) / 360.0, c[2], c[1])
+    color.value = (c[0] * 255.0, c[1] * 255.0, c[2] * 255.0, color.value[3])
+    return color
 
-def _lighten(_color, _amount):
-    a = _amount[1]
-    a = 0.0 if a < 0 else 1.0 if a > 1 else a
-    return __hsla_add(_color, 0, 0, a, 0)
+def _lighten(color, amount):
+    a = NumberValue(amount).value
+    return __hsl_add(color, 0, 0, a)
 
-def _saturate(_color, _amount):
-    a = _amount[1]
-    a = 0.0 if a < 0 else 1.0 if a > 1 else a
-    return __hsla_add(_color, 0, a, 0, 0)
+def _darken(color, amount):
+    a = NumberValue(amount).value
+    return __hsl_add(color, 0, 0, -a)
 
-def _desaturate(_color, _amount):
-    a = _amount[1]
-    a = 0.0 if a < 0 else 1.0 if a > 1 else a
-    return __hsla_add(_color, 0, -a, 0, 0)
+def _saturate(color, amount):
+    a = NumberValue(amount).value
+    return __hsl_add(color, 0, a, 0)
 
-def _grayscale(_color):
-    return __hsla_add(_color, 0, -1.0, 0, 0)
+def _desaturate(color, amount):
+    a = NumberValue(amount).value
+    return __hsl_add(color, 0, -a, 0)
 
-def _adjust_hue(_color, _degrees):
-    return __hsla_add(_color, _degrees[1] % 360.0, 0, 0, 0)
+def _grayscale(color):
+    return __hsl_add(color, 0, -1.0, 0)
 
-def _complement(_color):
-    return __hsla_add(_color, 180.0, 0, 0, 0)
+def _adjust_hue(color, degrees):
+    d = NumberValue(degrees).value
+    return __hsl_add(color, d, 0, 0)
 
-def _mix(_color1, _color2, _weight=None):
+def _complement(color):
+    return __hsl_add(color, 180.0, 0, 0)
+
+
+def _mix(color1, color2, weight=None):
     """
     Mixes together two colors. Specifically, takes the average of each of the
     RGB components, optionally weighted by the given percentage.
@@ -1625,179 +1302,805 @@ def _mix(_color1, _color2, _weight=None):
     #
     # Finally, the weight of color1 is renormalized to be within [0, 1]
     # and the weight of color2 is given by 1 minus the weight of color1.
+    #
+    # Algorithm from the Sass project: http://sass-lang.com/
 
-    p = _weight[1] if _weight is not None else 0.5
+    c1 = ColorValue(color1).value
+    c2 = ColorValue(color2).value
+    p = NumberValue(weight).value if weight is not None else 0.5
     p = 0.0 if p < 0 else 1.0 if p > 1 else p
+
     w = p * 2 - 1
-    a = _color1[2][3] - _color2[2][3]
+    a = c1[3] - c2[3]
 
     w1 = ((w if (w * a == -1) else (w + a) / (1 + w * a)) + 1) / 2.0
+
     w2 = 1 - w1
+    q = [ w1, w1, w1, p ]
+    r = [ w2, w2, w2, 1 - p ]
 
-    d = _color1[3].copy()
-    for k, v in _color2[3].items():
-        d.setdefault(k, 0)
-        d[k] += 1
-    r = ('', _color1[2][0] * w1 + _color2[2][0] * w2, None, {})
-    g = ('', _color1[2][1] * w1 + _color2[2][1] * w2, None, {})
-    b = ('', _color1[2][2] * w1 + _color2[2][2] * w2, None, {})
-    a = ('', _color1[2][3] * p + _color2[2][3] * (1 - p), None, {})
-    return _rgba(r, g, b, a, d)
+    color = ColorValue(None).merge(c1).merge(c2)
+    color.value = [ c1[i] * q[i] + c2[i] * r[i] for i in range(4) ]
 
-def _red(_color):
-    return _float(('', _color[2][0], None, {}))
-def _green(_color):
-    return _float(('', _color[2][1], None, {}))
-def _blue(_color):
-    return _float(('', _color[2][2], None, {}))
-def _alpha(_color):
-    return _float(('', _color[2][3], None, {}))
+    return color
 
-def _hue(_color):
-    h, l, s = colorsys.rgb_to_hls(_color[2][0]/255.0, _color[2][1]/255.0, _color[2][2]/255.0)
-    return _float(('', h*360.0, None, {}))
-def _saturation(_color):
-    h, l, s = colorsys.rgb_to_hls(_color[2][0]/255.0, _color[2][1]/255.0, _color[2][2]/255.0)
-    return _float(('', s, None, { '%': 1 }))
-def _lightness(_color):
-    h, l, s = colorsys.rgb_to_hls(_color[2][0]/255.0, _color[2][1]/255.0, _color[2][2]/255.0)
-    return _float(('', l, None, { '%': 1 }))
+def _red(color):
+    c = ColorValue(color).value
+    return NumberValue(c[0])
+def _green(color):
+    c = ColorValue(color).value
+    return NumberValue(c[1])
+def _blue(color):
+    c = ColorValue(color).value
+    return NumberValue(c[2])
+def _alpha(color):
+    c = ColorValue(color).value
+    return NumberValue(c[3])
+
+def _hue(color):
+    c = ColorValue(color).value
+    h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
+    ret = NumberValue(h * 360.0)
+    return ret
+def _saturation(color):
+    c = ColorValue(color).value
+    h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
+    ret = NumberValue(s)
+    ret.units['%'] = 1
+    return ret
+def _lightness(color):
+    c = ColorValue(color).value
+    h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
+    ret = NumberValue(l)
+    ret.units['%'] = 1
+    return ret
+
+################################################################################
+# Compass like functionality for sprites and images:
+sprite_maps = {}
+def _sprite_map(g, *args):
+    """
+    Generates a sprite map from the files matching the glob pattern.
+    Uses the keyword-style arguments passed in to control the placement.
+    """
+    g = StringValue(g).value
+    
+    if not Image:
+        raise Exception("Images manipulation require PIL")
+
+    if g in sprite_maps:
+        sprite_maps[glob]['_'] = datetime.datetime.now()
+    else:
+        gutter = 0
+        offset_x = 0
+        offset_y = 0
+        repeat = 'no-repeat'
+
+        files = sorted(glob.glob(MEDIA_ROOT + g))
+        
+        if not files:
+            return StringValue(None)
+
+        times = [ int(os.path.getmtime(file)) for file in files ]
+
+        key = files + times + [ gutter, offset_x, offset_y, repeat ]
+        key = base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
+        asset_file = key + '.png'
+        asset_path = ASSETS_ROOT + asset_file
+
+        images = tuple( Image.open(file) for file in files )
+        names = tuple( os.path.splitext(os.path.basename(file))[0] for file in files )
+        files = tuple( file[len(MEDIA_ROOT):] for file in files )
+        sizes = tuple( image.size for image in images )
+        offsets = []
+        
+        if os.path.exists(asset_path):
+            filetime = int(os.path.getmtime(asset_path))
+            offset = gutter
+            for i, image in enumerate(images):
+                offsets.append(offset - gutter)
+                offset += sizes[i][0] + gutter * 2
+        else:
+
+            width = sum(zip(*sizes)[0]) + gutter * len(files) * 2
+            height = max(zip(*sizes)[1]) + gutter * 2
+
+            new_image = Image.new(
+                mode = 'RGBA',
+                size = (width, height),
+                color = (0, 0, 0, 0)
+            )
+
+            offset = gutter
+            for i, image in enumerate(images):
+                new_image.paste(image, (offset, gutter))
+                offsets.append(offset - gutter)
+                offset += sizes[i][0] + gutter * 2
+
+            new_image.save(asset_path)
+            filetime = int(time.mktime(datetime.datetime.now().timetuple()))
+
+        url = '%s%s?_=%s' % (MEDIA_URL, asset_file, filetime)
+        asset = "url('%s') %dpx %dpx %s" % (escape(url), int(offset_x), int(offset_y), repeat)
+        # Use the sorted list to remove older elements (keep only 500 objects):
+        if len(sprite_maps) > 1000:
+            for a in sorted(sprite_maps, key=lambda a: sprite_maps[a]['_'], reverse=True)[500:]:
+                del sprite_maps[a]
+        # Add the new object:
+        sprite_maps[asset] = dict(zip(names, zip(sizes, files, offsets)))
+        sprite_maps[asset]['_'] = datetime.datetime.now()
+        sprite_maps[asset]['_f_'] = asset_file
+        sprite_maps[asset]['_k_'] = key
+        sprite_maps[asset]['_t_'] = filetime
+    return StringValue(asset)
+
+def _sprite_map_name(_map):
+    """
+    Returns the name of a sprite map The name is derived from the folder than
+    contains the sprites.
+    """
+    map = StringValue(map).value
+    sprite_map = sprite_maps.get(map, {})
+    if sprite_map:
+        return StringValue(sprite_map['_k_'])
+    return StringValue(None)
+
+def _sprite_file(map, sprite):
+    """
+    Returns the relative path (from the images directory) to the original file
+    used when construction the sprite. This is suitable for passing to the
+    image_width and image_height helpers.
+    """
+    map = StringValue(map).value
+    sprite = StringValue(sprite).value
+    sprite = sprite_maps.get(map, {}).get(sprite)
+    if sprite:
+        return StringValue(sprite[1])
+    return StringValue(None)
+
+def _sprite(map, sprite, offset_x=None, offset_y=None):
+    """
+    Returns the image and background position for use in a single shorthand
+    property
+    """
+    map = StringValue(map).value
+    sprite = StringValue(sprite).value
+    sprite_map = sprite_maps.get(map, {})
+    sprite = sprite_map.get(sprite)
+    if sprite:
+        url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['_f_'], sprite_map['_t_'])
+        offset_x = NumberValue(offset_x).value or 0
+        offset_y = NumberValue(offset_y).value or 0
+        pos = "url('%s') %dpx %dpx" % (escape(url), int(offset_x - sprite[2]), int(offset_y))
+        return StringValue(pos)
+    return StringValue('0 0')
+
+def _sprite_url(map):
+    """
+    Returns a url to the sprite image.
+    """
+    map = StringValue(map).value
+    if map in sprite_maps:
+        sprite_map = sprite_maps[map]
+        url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['_f_'], sprite_map['_t_'])
+        return StringValue(url)
+    return StringValue(None)
+
+def _sprite_position(map, sprite, offset_x=None, offset_y=None):
+    """
+    Returns the position for the original image in the sprite.
+    This is suitable for use as a value to background-position.
+    """
+    map = StringValue(map).value
+    sprite = StringValue(sprite).value
+    sprite = sprite_maps.get(map, {}).get(sprite)
+    if sprite:
+        offset_x = NumberValue(offset_x).value or 0
+        offset_y = NumberValue(offset_y).value or 0
+        pos = '%dpx %dpx' % (int(offset_x - sprite[2]), int(offset_y))
+        return StringValue(pos)
+    return StringValue('0 0')
+
+def _inline_image(image, mime_type=None):
+    """
+    Embeds the contents of a file directly inside your stylesheet, eliminating
+    the need for another HTTP request. For small files such images or fonts,
+    this can be a performance benefit at the cost of a larger generated CSS
+    file.
+    """
+    image = StringValue(image).value
+    file = MEDIA_ROOT+image
+    if os.path.exists(file):
+        mime_type = StringValue(mime_type).value or mimetypes.guess_type(file)[0]
+        file = open(file, 'rb')
+        url = 'data:'+_mime_type+';base64,'+base64.b64encode(file.read())
+        inline = "url('%s')" % escape(url)
+        return StringValue(inline)
+    return StringValue(None)
+
+def _image_url(image):
+    """
+    Generates a path to an asset found relative to the project's images
+    directory.
+    """
+    file = StringValue(image).value
+    path = MEDIA_ROOT + file
+    if os.path.exists(path):
+        filetime = int(os.path.getmtime(path))
+        url = '%s%s?_=%s' % (MEDIA_URL, file, filetime)
+        return StringValue(url)
+    return StringValue(None)
+
+def _image_width(image):
+    """
+    Returns the width of the image found at the path supplied by `image`
+    relative to your project's images directory.
+    """
+    if not Image:
+        raise Exception("Images manipulation require PIL")
+    file = StringValue(image).value
+    path = MEDIA_ROOT + file
+    if os.path.exists(path):
+        image = Image.open(path)
+        width = image.size[0]
+        ret = NumberValue(width)
+        ret.units['px'] = 1
+        return ret
+    ret = NumberValue(0)
+    ret.units['px'] = 1
+    return ret
+
+def _image_height(image):
+    """
+    Returns the height of the image found at the path supplied by `image`
+    relative to your project's images directory.
+    """
+    if not Image:
+        raise Exception("Images manipulation require PIL")
+    file = StringValue(image).value
+    path = MEDIA_ROOT + file
+    if os.path.exists(path):
+        image = Image.open(path)
+        height = image.size[1]
+        ret = NumberValue(height)
+        ret.units['px'] = 1
+        return ret
+    ret = NumberValue(0)
+    ret.units['px'] = 1
+    return ret
 
 ################################################################################
 
-def _nth(_list, n=1):
+def _nth(s, n=None):
     """
     Return the Nth item in the string
     """
-    val = dequote(_list[0]).split()[int(n[1])-1]
-    return (val, None, None, {})
+    s = StringValue(s)
+    n = NumberValue(n).value
+    val = s.value
+    try:
+        s.value = val.split()[int(n) - 1]
+    except IndexError:
+        pass
+    return s
 
-def _percentage(_value):
-    return _float(('', _value[1], None, { '%': 1 }))
+def _percentage(value):
+    value = NumberValue(value)
+    value.units.clear()
+    value.units['%'] = 1
+    return value
 
-def _unitless(_value):
-    return _float(('', _value[1], None, {}))
+def _unitless(value):
+    value = NumberValue(value)
+    value.units.clear()
+    return value
 
-def dequote(s):
-    if s[0] in ('"', "'"):
-        s = s[1:-1]
-    return unescape(s)
+def _unquote(s):
+    return StringValue(s)
 
-def _unquote(_str):
-    return ("'%s'" % escape(dequote(_str[0])), _str[1], _str[2], _str[3])
+def _quote(s):
+    return QuotedStringValue(s)
 
-def _quote(_str):
-    if _str[0][0] == '"':
-        return _str
-    if _str[0][0] == "'":
-        s = _str[0][1:-1]
-    else:
-        s = escape(_str[0])
-    return ('"%s"' % s, None, None, {})
+def _pi():
+    return NumberValue(math.pi)
 
-################################################################################
+def _convert_to(value, type):
+    return value.convert_to(type)
 
-def _ops(op):
-    _op = op
-    op = {
-        '+' : operator.add,
-        '-' : operator.sub,
-        '*' : operator.mul,
-        '/' : operator.truediv,
-        '^' : operator.pow,
-    }[op]
-    def __ops(_a, _b):
-        d = _a[3].copy()
-        for k, v in _b[3].items():
-            d.setdefault(k, 0)
-            d[k] += 1
-        a = _a[1]
-        b = _b[1]
-        if a is not None and b is not None:
-            if '%' in d:
-                if '%' not in _a[3]:
-                    a /= 100.0;
-                if '%' not in _b[3]:
-                    b /= 100.0;
-            val = op(a, b)
-            return _float(('', val, _a[2], d))
+def _inv(value):
+    if isinstance(value, NumberValue):
+        return value * -1
+    return '-' + StringValue(value)
 
-        a_str = _a[0]
-        b_str = _b[0]
-        a_rgba = _a[2]
-        b_rgba = _b[2]
-        quoting = (a_str[0] == '"' or b_str[0] == '"')
-        a_str = dequote(a_str)
-        b_str = dequote(b_str)
+def _and(a, b):
+    return a and b
+def _or(a, b):
+    return a or b
+def _not(a):
+    return not a
 
-        if (a_rgba is not None and b is not None or
-            b_rgba is not None and a is not None or
-           a_rgba is not None and b_rgba is not None):
-            __rgba = [0, 0, 0, 0]
-            for c in range(4):
-                __a = a_rgba[c] if a_rgba is not None else a if c < 3 else None
-                __b = b_rgba[c] if b_rgba is not None else b if c < 3 else None
-                if c == 3:
-                    __rgba[c] = __a if __b is None else __b if __a is None else (__a + __b) / 2
+class Value(object):
+    def __init__(self, tokens):
+        self.value = tokens[0]
+        self.tokens = tokens
+    @staticmethod
+    def _operatorOperands(tokenlist):
+        "generator to extract operators and operands in pairs"
+        it = iter(tokenlist)
+        while 1:
+            try:
+                yield (it.next(), it.next())
+            except StopIteration:
+                break
+    @staticmethod
+    def _merge_type(a, b):
+        if a.__class__ == b.__class__:
+            return a.__class__
+        if isinstance(a, QuotedStringValue) or isinstance(b, QuotedStringValue):
+            return QuotedStringValue
+        return StringValue
+    @staticmethod
+    def _wrap(fn):
+        """
+        Wrapper function to allow calling any function
+        using Value objects as parameters.
+        """
+        def _func(*args):
+            merged = None
+            _args = []
+            for arg in args:
+                if merged.__class__ != arg.__class__:
+                    if merged is None:
+                        merged = arg.__class__(None)
+                    else:
+                        merged = Value._merge_type(merged, arg)(None)
+                merged.merge(arg)
+                if isinstance(arg, Value):
+                    arg = arg.value
+                _args.append(arg)
+            ret = merged.value = fn(*_args)
+            return merged
+        return _func
+    @classmethod
+    def _do_bitops(cls, first, second, op):
+        first = StringValue(first)
+        second = StringValue(second)
+        k = op(first.value, second.value)
+        return first if first.value == k else second
+    def __repr__(self):
+        return '<%s: %s: %s>' % (self.__class__.__name__, repr(self.value), repr(self.tokens))
+    def __lt__(self, other):
+        return self._do_cmps(self, other, operator.__lt__)
+    def __le__(self, other):
+        return self._do_cmps(self, other, operator.__le__)
+    def __eq__(self, other):
+        return self._do_cmps(self, other, operator.__eq__)
+    def __ne__(self, other):
+        return self._do_cmps(self, other, operator.__ne__)
+    def __gt__(self, other):
+        return self._do_cmps(self, other, operator.__gt__)
+    def __ge__(self, other):
+        return self._do_cmps(self, other, operator.__ge__)
+    def __cmp__(self, other):
+        return self._do_cmps(self, other, operator.__cmp__)
+    def __rcmp__(self, other):
+        return self._do_cmps(other, self, operator.__cmp__)
+    def __and__(self, other):
+        return self._do_bitops(self, other, operator.__and__)
+    def __or__(self, other):        
+        return self._do_bitops(self, other, operator.__or__)
+    def __xor__(self, other):       
+        return self._do_bitops(self, other, operator.__xor__)
+    def __rand__(self, other):
+        return self._do_bitops(other, self, operator.__rand__)
+    def __ror__(self, other):
+        return self._do_bitops(other, self, operator.__ror__)
+    def __rxor__(self, other):
+        return self._do_bitops(other, self, operator.__rxor__)
+    def __nonzero__(self):
+        return self.value and True or False
+    def __add__(self, other):
+        return self._do_op(self, other, operator.__add__)
+    __radd__ = __add__
+    def __div__(self, other):
+        return self._do_op(self, other, operator.__div__)
+    def __rdiv__(self, other):
+        return self._do_op(other, self, operator.__div__)
+    def __sub__(self, other):
+        return self._do_op(self, other, operator.__sub__)
+    def __rsub__(self, other):
+        return self._do_op(other, self, operator.__sub__)
+    def __mul__(self, other):
+        return self._do_op(self, other, operator.__mul__)
+    __rmul__ = __mul__
+    def convert_to(self, type):
+        return self.value.convert_to(type)
+    def merge(self, obj):
+        if isinstance(obj, Value):
+            self.value = obj.value
+        else:
+            self.value = obj
+        return self
+    def eval(self, context):
+        return self
+
+class BooleanValue(Value):
+    def __init__(self, tokens):
+        self.tokens = tokens
+        if tokens is None:
+            self.value = False
+        elif isinstance(tokens, ParseResults):
+            self.value = tokens[0].lower() in ('true', '1', 'on', 'yes', 't', 'y')
+        elif isinstance(tokens, BooleanValue):
+            self.value = tokens.value
+        elif isinstance(tokens, NumberValue):
+            self.value = bool(tokens.value)
+        elif isinstance(tokens, (float, int)):
+            self.value = bool(tokens)
+        else:
+            self.value = to_str(tokens).lower() in ('true', '1', 'on', 'yes', 't', 'y')
+    def __str__(self):
+        return 'true' if self.value else 'false'
+    def merge(self, obj):
+        obj = BooleanValue(obj)
+        self.value = obj.value
+        return self
+
+class NumberValue(Value):
+    def __init__(self, tokens):
+        self.tokens = tokens
+        self.units = {}
+        if tokens is None:
+            self.value = 0.0
+        elif isinstance(tokens, ParseResults):
+            self.value = float(tokens[0])
+        elif isinstance(tokens, NumberValue):
+            self.value = tokens.value
+            self.units = tokens.units.copy()
+        elif isinstance(tokens, StringValue):
+            try:
+                if tokens.value and tokens.value[-1] == '%':
+                    self.value = to_float(tokens.value[:-1]) / 100.0
                 else:
-                    __rgba[c] = op(__a, __b)
-            final = _rgba(('',__rgba[0],None,{}), ('',__rgba[1],None,{}), ('',__rgba[2],None,{}), ('',__rgba[3],None,{}))
-            final[3].update(d)
-        elif quoting:
-            if _op == '*':
-                val = u'"%s"' % op(int(a) if a is not None else a_str, int(b) if b is not None else b_str)
-            else:
-                val = u'"%s"' % op(a_str, b_str)
-            final = (val, None, None, None, {})
+                    self.value = to_float(tokens.value)
+            except ValueError:
+                self.value = 0.0
+        elif isinstance(tokens, (int, float)):
+            self.value = float(tokens)
         else:
-            val = u"'%s%s%s'" % (a_str, _op, b_str)
-            final = (val, None, None, None, {})
-
-        return final
-    return __ops
-
-def _bool(op):
-    _op = op
-    op = {
-        'eq' : operator.eq,
-        'ne' : operator.ne,
-        'lt' : operator.lt,
-        'gt' : operator.gt,
-        'le': operator.le,
-        'ge': operator.ge,
-    }[op]
-    def __bool(__a, __b):
-        a = __a[2] if __a[2] is not None and __b[2] is not None else __a[1] if __a[1] is not None and __b[2] is not None else dequote(__a[0])
-        b = __b[2] if __a[2] is not None and __b[2] is not None else __b[1] if __a[1] is not None and __b[2] is not None else dequote(__b[0])
-        val = ('true' if op(a, b) else 'false', None, None, {})
+            try:
+                self.value = to_float(to_str(tokens))
+            except ValueError:
+                self.value = 0.0
+    def q__repr__(self):
+        return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.units))
+    def __str__(self):
+        unit = self.unit
+        val = self.value / _conv_factor.get(unit, 1.0)
+        val = to_str(val) + unit
         return val
-    return __bool
-
-opn = {
-    '+' : _ops('+'),
-    '-' : _ops('-'),
-    '*' : _ops('*'),
-    '/' : _ops('/'),
-    '^' : _ops('^'),
-    '==': _bool('eq'),
-    '!=': _bool('ne'),
-    '>': _bool('gt'),
-    '<': _bool('lt'),
-    '>=': _bool('ge'),
-    '<=': _bool('le'),
-}
-
-def _func(fn):
-    def _func(_val):
-        if _val[1] is not None:
-            val = fn(_val[1])
+    @classmethod
+    def _do_cmps(cls, first, second, op):
+        first = NumberValue(first)
+        second = NumberValue(second)
+        first_type = _conv_type.get(first.unit)
+        second_type = _conv_type.get(second.unit)
+        if first_type == second_type or first_type is None or second_type is None:
+            return op(first.value, second.value)
         else:
-            val = 0.0
-        val = ('', val, None, _val[3])
-        return _float(val)
-    return _func
+            return op(first_type, second_type)
+    @classmethod
+    def _do_op(cls, first, second, op):
+        first = NumberValue(first)
+        second = NumberValue(second)
+        first_unit = first.unit
+        second_unit = second.unit
+        if first_unit == '%' and not second_unit:
+            second.units['%'] = 1
+            second.value /= 100.0
+        elif second_unit == '%' and not first_unit:
+            first.units['%'] = 1
+            first.value /= 100.0
+        val = op(first.value, second.value)
+        ret = NumberValue(None).merge(first).merge(second)
+        ret. value = val
+        return ret
+    def merge(self, obj):
+        obj = NumberValue(obj)
+        self.value = obj.value
+        for unit, val in obj.units.items():
+            self.units.setdefault(unit, 0)
+            self.units[unit] += val
+        return self
+    def convert_to(self, type):
+        val = self.value
+        if not self.unit:
+            val *= _conv_factor.get(type, 1.0)
+        ret = NumberValue(val)
+        ret.units[type] = 1
+        return ret
+    @property
+    def unit(self):
+        unit = ''
+        if self.units:
+            units = sorted(self.units, key=self.units.get)
+            while len(units):
+                unit = units.pop()
+                if unit and unit != '%':
+                    break
+            if not unit and '%' in self.units:
+                unit = '%'
+        return unit
 
-fncs = {
+class ColorValue(Value):
+    def __init__(self, tokens):
+        self.tokens = tokens
+        self.types = {}
+        self.value = (0, 0, 0, 1)
+        if tokens is None:
+            self.value = (0, 0, 0, 1)
+        elif isinstance(tokens, ParseResults):
+            hex = tokens[0]
+            self.value = hex2rgba[len(hex)](hex)
+            self.types = { 'rgba': 1 }
+        elif isinstance(tokens, ColorValue):
+            self.value = tokens.value
+            self.types = tokens.types.copy()
+        elif isinstance(tokens, NumberValue):
+            val = tokens.value
+            self.value = (val, val, val, 1)
+        elif isinstance(tokens, (list, tuple)):
+            self.value = tuple(tokens[:4])
+            type = tokens[-1]
+            if type in ('rgb', 'rgba', 'hsl', 'hsla'):
+                self.types = { type: 1 }
+        elif isinstance(tokens, (int, float)):
+            val = float(tokens)
+            self.value = (val, val, val, 1)
+        else:
+            hex = to_str(tokens)
+            try:
+                self.value = hex2rgba[len(hex)](hex)
+            except:
+                try:
+                    val = to_float(hex)
+                    self.values = (val, val, val, 1)
+                except ValueError:
+                    try:
+                        hex.replace(' ', '').lower()
+                        type, _, colors = hex.pertition('(').rstrip(')')
+                        if type in ('rgb', 'rgba'):
+                            c = tuple(colors.split(','))
+                            try:
+                                c = [ to_float(c[i]) for i in range(4) ]
+                                col = [ 0.0 if c[i] < 0 else 255.0 if c[i] > 255 else c[i] for i in range(3) ]
+                                col += [ 0.0 if c[3] < 0 else 1.0 if c[3] > 1 else c[3] ]
+                                self.value = tuple(col)
+                                self.types = { type: 1 }
+                            except:
+                                pass
+                        if type in ('hsl', 'hsla'):
+                            c = colors.split(',')
+                            try:
+                                c = [ to_float(c[i]) for i in range(4) ]
+                                col = [ c[0] % 360.0 ] / 360.0
+                                col += [ 0.0 if c[i] < 0 else 1.0 if c[i] > 1 else c[i] for i in range(1,4) ]
+                                self.value = tuple([ c * 255.0 for c in colorsys.hls_to_rgb(col[0], col[2], col[1]) ] + [ col[3] ])
+                                self.types = { type: 1 }
+                            except:
+                                pass
+                    except:
+                        pass
+
+    def convert_to(self, type):
+        return self
+    def q__repr__(self):
+        return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.types))
+    def __str__(self):
+        type = self.type
+        c = self.value
+        if type == 'hsl' or type == 'hsla' and c[3] == 1:
+            h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
+            return 'hsl(%s, %s%%, %s%%)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0))
+        if type == 'hsla':
+            h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
+            return 'hsla(%s, %s%%, %s%%, %s)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0), to_str(a))
+        if c[3] == 1:
+            return '#%02x%02x%02x' % (c[0], c[1], c[2])
+        return 'rgba(%d, %d, %d, %s)' % (c[0], c[1], c[2], to_str(c[3]))
+    @classmethod
+    def _do_op(cls, first, second, op):
+        first = ColorValue(first)
+        second = ColorValue(second)
+        val = [ op(first.value[i], second.value[i]) for i in range(4) ]
+        val[3] = (first.value[3] + second.value[3]) / 2
+        c = val
+        r = 255.0, 255.0, 255.0, 1.0
+        c = [ 0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4) ]
+        ret = ColorValue(None).merge(first).merge(second)
+        ret.value = tuple(c)
+        return ret
+    def merge(self, obj):
+        obj = ColorValue(obj)
+        self.value = obj.value
+        for type, val in obj.types.items():
+            self.types.setdefault(type, 0)
+            self.types[type] += val
+        return self
+    def convert_to(self, type):
+        val = self.value
+        ret = ColorValue(val)
+        ret.types[type] = 1
+        return ret
+    @property
+    def type(self):
+        type = ''
+        if self.types:
+            types = sorted(self.types, key=self.types.get)
+            while len(types):
+                type = types.pop()
+                if type:
+                    break
+        return type
+
+class QuotedStringValue(Value):
+    def __init__(self, tokens):
+        self.tokens = tokens
+        if tokens is None:
+            self.value = ''
+        elif isinstance(tokens, ParseResults):
+            self.value = tokens[0]
+        elif isinstance(tokens, QuotedStringValue):
+            self.value = tokens.value
+        else:
+            self.value = to_str(tokens)
+    def convert_to(self, type):
+        return QuotedStringValue(self.value + unit)
+    def __str__(self):
+        return '"%s"' % escape(self.value)
+    @classmethod
+    def _do_cmps(cls, first, second, op):
+        first = QuotedStringValue(first)
+        second = QuotedStringValue(second)
+        return op(first.value, second.value)
+    @classmethod
+    def _do_op(cls, first, second, op):
+        first = QuotedStringValue(first)
+        second = QuotedStringValue(second)
+        val = op(first.value, second.value)
+        ret = QuotedStringValue(None).merge(first).merge(second)
+        ret.value = val
+        return ret
+    def merge(self, obj):
+        obj = QuotedStringValue(obj)
+        self.value = obj.value
+        return self
+
+class StringValue(QuotedStringValue):
+    def __str__(self):
+        return self.value
+    def __add__(self, other):
+        other = StringValue(other)
+        return StringValue(self.value + '+' + other.value)
+    def __radd__(self, other):
+        other = StringValue(other)
+        return StringValue(other.value + '+' + self.value)
+
+class FunctOp(Value):
+    def eval(self, context):
+        name = self.tokens[0]
+
+        args = len(self.tokens) - 1
+        fn = '%s:%d' % (name, args)
+
+        if args:
+            args = [ arg.eval(context) for arg in self.tokens[1:] ]
+        if fn not in context['fncs']:
+            raise ParseException( fn, len(fn), "Function not found", None )
+        fn = context['fncs'][fn]
+        return fn(*(args or []))
+
+class SignOp(Value):
+    "Class to evaluate expressions with a leading + or - sign"
+    def eval(self, context):
+        sign = self.value[0]
+        val = self.value[1].eval(context)
+        mult = { '+' :1, '-': -1 }[sign]
+        return mult * val
+
+class UnitOp(Value):
+    def eval(self, context):
+        unit = self.value[1]
+        val = self.value[0].eval(context)
+        return val.convert_to(unit)
+
+class MultOp(Value):
+    "Class to evaluate multiplication and division expressions"
+    def eval(self, context):
+        prod = self.value[0].eval(context)
+        for op, val in self._operatorOperands(self.value[1:]):
+            val = val.eval(context)
+            if op == '*':
+                prod *= val
+            if op == '/':
+                prod /= val
+        return prod
+
+class AddOp(Value):
+    "Class to evaluate addition and subtraction expressions"
+    def eval(self, context):
+        sum = self.value[0].eval(context)
+        for op, val in self._operatorOperands(self.value[1:]):
+            val = val.eval(context)
+            if op == '+':
+                sum += val
+            if op == '-':
+                sum -= val
+        return sum
+
+class ComparisonOp(Value):
+    "Class to evaluate comparison expressions"
+    opMap = {
+        "<" : lambda a,b : a < b,
+        "<=" : lambda a,b : a <= b,
+        ">" : lambda a,b : a > b,
+        ">=" : lambda a,b : a >= b,
+        "!=" : lambda a,b : a != b,
+        "==" : lambda a,b : a == b,
+    }
+    def eval(self, context):
+        val1 = self.value[0].eval(context)
+        for op, val in self._operatorOperands(self.value[1:]):
+            fn = ComparisonOp.opMap[op]
+            val2 = val.eval(context)
+            if not fn(val1, val2):
+                break
+            val1 = val2
+        else:
+            return True
+        return False
+
+class AndBoolOp(Value):
+    def eval(self, context):
+        anded = self.value[0].eval(context)
+        for op, val in self._operatorOperands(self.value[1:]):
+            anded = anded and val.eval(context)
+
+        return anded
+
+class OrBoolOp(Value):
+    def eval(self, context):
+        ored = self.value[0].eval(context)
+        for op, val in self._operatorOperands(self.value[1:]):
+            ored = ored or val.eval(context)
+        return ored
+
+class NotBoolOp(Value):
+    def eval(self, context):
+        val = self.value[1].eval(context)
+        return not val
+
+fnct = {
+    '^': operator.__pow__,
+    '+': operator.__add__,
+    '-': operator.__sub__,
+    '*': operator.__mul__,
+    '/': operator.__div__,
+    '!': operator.__neg__,
+    'not': _not,
+    '&&': _and,
+    'and': _and,
+    '||': _or,
+    'or': _or,
+    '&': operator.__and__,
+    '|': operator.__or__,
+    '==': operator.__eq__,
+    '!=': operator.__ne__,
+    '<=': operator.__le__,
+    '>=': operator.__ge__,
+    '>=': operator.__lt__,
+    '>': operator.__gt__,
+
     'sprite-map:1': _sprite_map,
     'sprite:2': _sprite,
     'sprite:3': _sprite,
@@ -1855,95 +2158,141 @@ fncs = {
     'escape:1': _unquote,
     'e:1': _unquote,
 
-    'sin:1': _func(math.sin),
-    'cos:1': _func(math.cos),
-    'tan:1': _func(math.tan),
-    'abs:1': _func(abs),
-    'round:1': _func(round),
-    'ceil:1': _func(math.ceil),
-    'floor:1': _func(math.floor),
-    'pi:0': lambda: _float(('', math.pi, None, {})),
+    'sin:1': Value._wrap(math.sin),
+    'cos:1': Value._wrap(math.cos),
+    'tan:1': Value._wrap(math.tan),
+    'abs:1': Value._wrap(abs),
+    'round:1': Value._wrap(round),
+    'ceil:1': Value._wrap(math.ceil),
+    'floor:1': Value._wrap(math.floor),
+    'pi:0': _pi,
+    'not:1': _inv,
+    '!:1': _inv,
 }
+for u in _units:
+    fnct[u+':2'] = _convert_to
 
-def evaluateStack( s ):
-    op = s.pop()
-    if op.startswith('unary '):
-        op = op[6:]
-        if op == '-':
-            op = evaluateStack( s )
-            if op[1] is not None:
-                val = -op[1]
-                return _float(('', val, op[2], op[3]))
-            elif op[2] is None:
-                if op[0][0] == '"':
-                    val = op[0]
-                else:
-                    val = '-' + dequote(op[0])
-                return (val, None, op[2], op[3])
-            return op
+def unitsOperator(token):
+    token.insert(0, token[-1])
+
+def unaryOperator(token):
+    if isinstance(token[0], basestring):
+        print 'u',token
+
+def binaryOperator(token):
+    if isinstance(token[0], basestring):
+        print 'b',token
+
+def callOperator(token):
+    if isinstance(token[0], basestring):
+        print 'c',token
+
+def bnf():
+    _lpar_ = Suppress('(')
+    _rpar_ = Suppress(')')
+    _comma_ = Suppress(',')
+    
+    _unit_ = oneOf(' '.join(_units))
+    _sign_ = oneOf('+ -')
+    _mul_ = oneOf('* /')
+    _add_ = oneOf('+ -')
+    _not_ = CaselessKeyword('not') | Literal('!')
+    _or_ = CaselessKeyword('or') | Literal('||')
+    _and_ = CaselessKeyword('and') | Literal('&&')
+    _cmp_ = oneOf('<= < >= > != ==')
+    
+    number = Combine((
+            Optional(_sign_) + Word( nums ) + Optional( '.' + Optional( Word( nums ) ) ) |
+            '.' + Word( nums )
+            ) + Optional(oneOf('e E')+Optional(oneOf('+ -')) +Word(nums)))\
+            .setParseAction(NumberValue)
+    
+    color  = Combine(
+        '#' + (
+            Word(hexnums, exact=8) |  # #RRGGBBAA
+            Word(hexnums, exact=6) | # #RRGGBB
+            Word(hexnums, exact=4) | # #RGBA
+            Word(hexnums, exact=3))  # #RGB
+        ).setParseAction(ColorValue)
+    
+    boolean = (
+            CaselessKeyword('true', '-_$' + alphanums) |
+            CaselessKeyword('false', '-_$' + alphanums)
+        ).setParseAction(BooleanValue)
+    
+    qstring = QuotedString("'", escChar='\\', multiline=True)\
+        .setParseAction(StringValue)
+    
+    ustring = QuotedString('"', escChar='\\', multiline=True)\
+        .setParseAction(QuotedStringValue)
+    
+    stringliteral = qstring | ustring
+    identifier = Word('-_$' + alphas, '-_' + alphanums)
+    variable = Word('-_$' + alphas, '-_' + alphanums).setParseAction(StringValue)
+    literal = stringliteral | number | boolean | color
+    
+    atom = Forward()
+    u_expr = Forward()
+    not_test = Forward()
+    
+    units = Group((atom + _unit_).setParseAction(unitsOperator))
+    u_expr = units | atom | (_sign_ + u_expr)
+    m_expr = Group((u_expr + ZeroOrMore( _mul_ + u_expr )))
+    a_expr = Group((m_expr + ZeroOrMore( _add_ + m_expr )))
+    and_expr = Group((a_expr + ZeroOrMore( _and_ + a_expr )))
+    or_expr = Group((and_expr + ZeroOrMore( _or_ + and_expr )))
+    comparison = Group((or_expr + ZeroOrMore( _cmp_ + or_expr )))
+    not_test << (comparison | Group(OneOrMore(( _not_ + not_test ))))
+    and_test = Group((not_test + ZeroOrMore( _and_ + not_test )))
+    expression = Group((and_test + ZeroOrMore( _or_ + and_test )))
+    expression_list = expression + ZeroOrMore( _comma_ + expression )
+    call = Group((identifier + _lpar_ + expression_list + _rpar_))
+    enclosure = Group((_lpar_ + expression + _rpar_))
+    atom << (enclosure | call | literal | variable)
+    return OneOrMore(expression)
+bnf = bnf()
+
+def eval_tree(node):
+    if isinstance(node, ParseResults):
+        if len(node) == 1:
+            node = eval_tree(node[0])
+        elif isinstance(node[0], basestring):
+            # Function call:
+            fn_name = '%s:%d' % (node[0], len(node) - 1)
+            fn = fnct.get(fn_name)
+            if not fn: raise ParseException("Function not found: "+ fn_name)
+            args = [ eval_tree(n) for n in node[1:] ]
+            node = fn(*args)
+        elif isinstance(node[1], basestring):
+            # Operator:
+            args = [ eval_tree(n) for n in node ]
+            args.reverse()
+            fns = args[1::2]
+            args = args[::2]
+            arg1 = args.pop()
+            while len(args):
+                arg2 = args.pop()
+                fn_name = fns.pop()
+                fn = fnct.get(fn_name)
+                if not fn: raise ParseException("Function not found: "+ fn_name)
+                arg1 = fn(arg1, arg2)
+            node = arg1
         else:
-            val = evaluateStack( s )
-            if val[1]:
-                val[3].clear()
-                val[3][op] = 1
-                val = _float(val)
-                return val
-            return val
-    elif op in '+-*/^':
-        op2 = evaluateStack( s )
-        op1 = evaluateStack( s )
-        return opn[op]( op1, op2 )
-    elif op in ('==', '!=', '<', '>', '<=', '>='):
-        op2 = evaluateStack( s )
-        op1 = evaluateStack( s )
-        return opn[op]( op1, op2 )
-    elif op.startswith('funct '):
-        fn = op[6:]
-        
-        _, _, args = op.partition(':')
-        args = int(args)
-        ops = []
-        while args:
-            args -= 1
-            op = evaluateStack( s )
-            ops.insert(0, op)
-        if fn not in fncs:
-            raise ParseException( fn, len(fn), "Function not found", None )
-        fn = fncs[fn]
-        return fn( *ops )
-    elif op[0] == '#':
-        return _rgbhex(op)
-    elif op[0] in ( '"', "'" ):
-        return (op, None, None, {})
-    else:
-        unit = None
-        for i in range(len(op)):
-            if op[-i-1].isdigit():
-                if i:
-                    unit = op[-i:]
-                    op = op[:-i]
-                break
-        val = float(op)
-        if unit:
-            unit_type = _conv_type.get(unit)
-            val *= _conv.get(unit_type, {}).get(unit, 1)
-            return (op+unit, val, None, {unit:1})
-        return (op, val, None, {})
+            node = [ eval_tree(n) for n in node ]
+    return node
 
 def eval_expr(expr):
-    global exprStack
-    exprStack = []
+    exprs = []
 
     #print >>sys.stderr, '>>',expr,'<<'
-    results = BNF().parseString( expr, parseAll=True )
-    val = evaluateStack( exprStack[:] )
-    #print >>sys.stderr, '--',val,'--'
+    results = bnf.parseString( expr, parseAll=True)
+    for r in results:
+        #print >>sys.stderr, r
+        exprs.append(eval_tree(r))
+    val = ' '.join(str(v) for v in exprs)
 
-    val = val[0]
-    if val:
-        if val[0] == "'":
-            val = val[1:-1]
-    return val or ''
+    #print >>sys.stderr, '--',val,'--', repr(val)
+    return val
 
 
 __doc__ += """
@@ -2725,7 +3074,7 @@ a {
 ...     desaturate: desaturate(#855, 20%); // #726b6b
 ...
 ...     adjust: adjust-hue(hsl(120, 30%, 90%), 60deg); // hsl(180, 30%, 90%)
-...     adjust: adjust-hue(hsl(120, 30%, 90%), 060deg); // hsl(60, 30%, 90%)
+...     adjust: adjust-hue(hsl(120, 30%, 90%), -60deg); // hsl(60, 30%, 90%)
 ...     adjust: adjust-hue(#811, 45deg); // #886a11
 ...
 ...     mix: mix(#f00, #00f, 50%); // #7f007f
@@ -2753,19 +3102,19 @@ a {
     transparentize: rgba(0, 0, 0, 0.4);
     transparentize: rgba(0, 0, 0, 0.6);
     lighten: hsl(0, 0, 30%);
-    lighten: hsl(0, 100%, 46.667%);
+    lighten: #e00;
     darken: hsl(25, 100%, 50%);
-    darken: hsl(0, 100%, 6.667%);
+    darken: #210000;
     saturate: hsl(120, 50%, 90%);
-    saturate: hsl(0, 43.077%, 43.333%);
+    saturate: #9e3e3e;
     desaturate: hsl(120, 10%, 90%);
-    desaturate: hsl(0, 3.077%, 43.333%);
+    desaturate: #716b6b;
     adjust: hsl(180, 30%, 90%);
-    adjust: hsl(180, 30%, 90%);
-    adjust: hsl(45, 77.778%, 30%);
+    adjust: hsl(60, 30%, 90%);
+    adjust: #886a10;
     mix: #7f007f;
     mix: #3f00bf;
-    mix: rgba(64, 0, 191, 0.75);
+    mix: rgba(63, 0, 191, 0.75);
     percentage: 200%;
     round: 10px;
     round: 11px;
