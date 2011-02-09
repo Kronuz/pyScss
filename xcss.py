@@ -5,7 +5,7 @@ xCSS Framework for Python
 
 @author    German M. Bravo (Kronuz)
            Based on some code from the original xCSS project by Anton Pawlik
-@version   0.3
+@version   0.4
 @see       http://xcss.antpaw.org/docs/
            http://sass-lang.com/
            http://oocss.org/spec/css-object-model.html
