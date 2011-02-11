@@ -26,15 +26,23 @@ frameworks like as Sass. It's build on top of the original PHP xCSS codebase
 structure but it's been completely rewritten and many bugs have been fixed.
 
 """
+################################################################################
+# Configuration:
+
+# Sass @import load_paths:
+LOAD_PATHS = '/usr/local/www/project/frameworks/'
+# Media base root path where images, fonts and other resources are located:
+MEDIA_ROOT = '/usr/local/www/project/media/'
+# Assets path, where new sprite files are created:
+ASSETS_ROOT = MEDIA_ROOT + 'assets/'
+# Urls for the media and assets:
+MEDIA_URL = '/media/'
+ASSETS_URL = MEDIA_URL + 'assets/'
+
+################################################################################
 import re
 import sys
 import string
-
-MEDIA_ROOT = '/usr/local/www/mdubalu/media/'
-ASSETS_ROOT = MEDIA_ROOT + 'assets/'
-MEDIA_URL = '/media/'
-ASSETS_URL = MEDIA_URL + 'assets/'
-SAAS_ROOT = '/usr/local/www/mdubalu/myapp/templates/frameworks'
 
 # units and conversions
 _units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
@@ -793,11 +801,11 @@ class xCSS(object):
                             if '..' not in name:
                                 try:
                                     filename = os.path.basename(name)
-                                    dirname = os.path.join(rule[PATH] or SAAS_ROOT, os.path.dirname(name))
+                                    dirname = os.path.join(rule[PATH] or LOAD_PATHS, os.path.dirname(name))
                                     i_codestr = open(os.path.join(dirname, '_'+filename+'.scss')).read()
                                 except:
                                     try:
-                                        dirname = os.path.join(SAAS_ROOT, os.path.dirname(name))
+                                        dirname = os.path.join(LOAD_PATHS, os.path.dirname(name))
                                         i_codestr = open(os.path.join(dirname, '_'+filename+'.scss')).read()
                                     except:
                                         pass
@@ -1455,7 +1463,7 @@ def _sprite_map(g, *args):
             new_image.save(asset_path)
             filetime = int(time.mktime(datetime.datetime.now().timetuple()))
 
-        url = '%s%s?_=%s' % (MEDIA_URL, asset_file, filetime)
+        url = '%s%s?_=%s' % (ASSETS_URL, asset_file, filetime)
         asset = "url('%s') %dpx %dpx %s" % (escape(url), int(offset_x), int(offset_y), repeat)
         # Use the sorted list to remove older elements (keep only 500 objects):
         if len(sprite_maps) > 1000:
