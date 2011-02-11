@@ -660,8 +660,8 @@ class xCSS(object):
         while pos < len(self.rules):
             rule = self.rules[pos]
             if rule[POSITION] is not None:
-                #print '='*80
-                #for i, r in enumerate(self.rules): print '>' if i == pos else ' ', repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:100]+'...')
+                #print >>sys.stderr, '='*80
+                #for i, r in enumerate(self.rules): print >>sys.stderr, '>' if i == pos else ' ', repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:100]+'...')
                 construct = self.construct
                 _selectors, _, _parents = rule[SELECTORS].partition(' extends ')
                 _selectors = _selectors.split(',')
@@ -674,8 +674,10 @@ class xCSS(object):
             pos += 1
 
         # prepare maps:
+        #print >>sys.stderr, '*'*80
         for pos, rule in enumerate(self.rules):
             if rule[POSITION] is not None:
+                #if rule[CODESTR]: print >>sys.stderr, '*', repr(rule[POSITION]), repr(rule[SELECTORS]), repr(rule[CODESTR][:100]+'...')
                 rule[POSITION] = pos
                 selectors = rule[SELECTORS]
                 self.parts.setdefault(selectors, [])
@@ -742,7 +744,7 @@ class xCSS(object):
                 if lose is not None:
                     pos = self._insert_child(pos, rule, p_selectors, construct, lose)
                 else:
-                    pos = self._insert_child(pos, rule, p_selectors, construct, c_selectors + '{' + c_codestr + '}')
+                    pos = self._insert_child(pos, rule, p_selectors, construct, c_selectors + ' {' + c_codestr + '}')
                 c_selectors = None
             elif lose is not None:
                 # This is either a raw lose rule...
