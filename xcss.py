@@ -1797,8 +1797,6 @@ class Value(object):
         else:
             self.value = obj
         return self
-    def eval(self, context):
-        return self
 
 class BooleanValue(Value):
     def __init__(self, tokens):
@@ -2079,100 +2077,6 @@ class StringValue(QuotedStringValue):
     def __radd__(self, other):
         other = StringValue(other)
         return StringValue(other.value + '+' + self.value)
-
-class FunctOp(Value):
-    def eval(self, context):
-        name = self.tokens[0]
-
-        args = len(self.tokens) - 1
-        fn = '%s:%d' % (name, args)
-
-        if args:
-            args = [ arg.eval(context) for arg in self.tokens[1:] ]
-        if fn not in context['fncs']:
-            raise ParseException( fn, len(fn), "Function not found", None )
-        fn = context['fncs'][fn]
-        return fn(*(args or []))
-
-class SignOp(Value):
-    "Class to evaluate expressions with a leading + or - sign"
-    def eval(self, context):
-        sign = self.value[0]
-        val = self.value[1].eval(context)
-        mult = { '+' :1, '-': -1 }[sign]
-        return mult * val
-
-class UnitOp(Value):
-    def eval(self, context):
-        unit = self.value[1]
-        val = self.value[0].eval(context)
-        return val.convert_to(unit)
-
-class MultOp(Value):
-    "Class to evaluate multiplication and division expressions"
-    def eval(self, context):
-        prod = self.value[0].eval(context)
-        for op, val in self._operatorOperands(self.value[1:]):
-            val = val.eval(context)
-            if op == '*':
-                prod *= val
-            if op == '/':
-                prod /= val
-        return prod
-
-class AddOp(Value):
-    "Class to evaluate addition and subtraction expressions"
-    def eval(self, context):
-        sum = self.value[0].eval(context)
-        for op, val in self._operatorOperands(self.value[1:]):
-            val = val.eval(context)
-            if op == '+':
-                sum += val
-            if op == '-':
-                sum -= val
-        return sum
-
-class ComparisonOp(Value):
-    "Class to evaluate comparison expressions"
-    opMap = {
-        "<" : lambda a,b : a < b,
-        "<=" : lambda a,b : a <= b,
-        ">" : lambda a,b : a > b,
-        ">=" : lambda a,b : a >= b,
-        "!=" : lambda a,b : a != b,
-        "==" : lambda a,b : a == b,
-    }
-    def eval(self, context):
-        val1 = self.value[0].eval(context)
-        for op, val in self._operatorOperands(self.value[1:]):
-            fn = ComparisonOp.opMap[op]
-            val2 = val.eval(context)
-            if not fn(val1, val2):
-                break
-            val1 = val2
-        else:
-            return True
-        return False
-
-class AndBoolOp(Value):
-    def eval(self, context):
-        anded = self.value[0].eval(context)
-        for op, val in self._operatorOperands(self.value[1:]):
-            anded = anded and val.eval(context)
-
-        return anded
-
-class OrBoolOp(Value):
-    def eval(self, context):
-        ored = self.value[0].eval(context)
-        for op, val in self._operatorOperands(self.value[1:]):
-            ored = ored or val.eval(context)
-        return ored
-
-class NotBoolOp(Value):
-    def eval(self, context):
-        val = self.value[1].eval(context)
-        return not val
 
 fnct = {
     '^': operator.__pow__,
