@@ -15,14 +15,29 @@ then compiles to standard CSS.
 
 xCSS, as an extension of CSS, helps keep large stylesheets well-organized. It
 borrows concepts and functionality from projects such as OOCSS and other similar
-frameworks like as Sass. It's build on top of the original PHP xCSS codebase
-structure but it's been completely rewritten and many bugs have been fixed.
+frameworks like as Sass (Sassy CSS). It's build on top of the original PHP xCSS
+codebase structure but it's been completely rewritten and many bugs have been
+fixed. It now also implements much of the Sass functionality and even compiles
+some Compass (`http://compass-style.org/`)
 
 Usage
 =====
+    Usage example::
+
+	from xcss import xCSS
+	css = xCSS()
+	css.compile("a { color: red + green; }")
+
+    Or compile from the command line::
+
+	python xcss.py < file.css
+
+Examples
+========
 #. **Nested Rules**
     Example::
 
+	@options compress: no;
 	.selector {
 	    a {
 	        display: block;
@@ -44,6 +59,7 @@ Usage
 #. **Variables**
     Example::
 
+	@options compress: no;
 	$main-color: #ce4dd6;
 	$style: solid;
         $side: bottom;
@@ -64,6 +80,7 @@ Usage
 #. **Mixins**
     Example::
 
+	@options compress: no;
 	@mixin rounded($side, $radius: 10px) {
 	  border-#{$side}-radius: $radius;
 	  -moz-border-radius-#{$side}: $radius;
@@ -94,6 +111,7 @@ Usage
 #. **Extend** (using `@extend`)
     Example::
 
+	@options compress: no;
 	.error {
 	  border: 1px #f00;
 	  background-color: #fdd;
@@ -121,17 +139,80 @@ Usage
 		border-width: 3px;
 	}
 
-Usage
-=====
-    Usage example::
 
-	from xcss import xCSS
-	css = xCSS()
-	css.compile("a { color: red + green; }")
+#. **Sprites** (using `sprite-map()`)
+    Example::
 
+	@options compress: no;
+	$icons: sprite-map("images/sociable/*.png"); // contains icons/new.png among others.
+	
+	div {
+		background: $icons;
+	}
+	
+	div .facebook {
+		width: image-width(sprite-file($icons, facebook));
+		height: image-height(sprite-file($icons, facebook));
+		background-position: sprite-position($icons, facebook);
+	}
+	
+	div .twitter {
+		width: image-width(sprite-file($icons, twitter));
+		height: image-height(sprite-file($icons, twitter));
+		background-position: sprite-position($icons, twitter);
+	}
+	
+    ...generates a new sprite file and produces something like::
+
+	div {
+                background: url('/media/assets/eli2Rxy5MXpWj4uWPAHn5w.png?_=1297402328') 0 0 no-repeat;
+	}
+	
+	div .facebook {
+                width: 32px;
+                height: 32px;
+                background-position: -128px 0;
+	}
+	
+	div .twitter {
+		width: 32px;
+                height: 32px;
+                background-position: -224px 0;
+	}
+
+Sass Sassy CSS
+==============
+xCSS is a Sass (Scss) implementation for Python.
+Currently it implements @mixin, @include, @if, @else, @for, and @import... it
+also implements many of the Sass functions including colors function like
+hsla(), hsl(), darken(), lighten(), mix(), opacify(), transparentize(),
+saturate(), desaturate(), etc.) as well as sprite-map(), sprite-file(),
+image-width(), image-height() and the others.
+
+In the file `xcss.py`, by the top, configure the LOAD_PATHS to point to your
+Compass framework path (I have `frameworks/compass/*.scss` and
+`framework/blueprint/*.scss` files in my project directory:
+`/usr/local/www/project/`, so I have that set for that path by default)
+
+I have succesfully compiled some Compass using `python xcss.py < myfile.css` the
+following `myfile.css`::
+
+	@options compress: no;
+	
+	$blueprint-grid-columns : 24;
+	$blueprint-grid-width   : 30px;
+	$blueprint-grid-margin  : 10px;
+	$font-color             : #333;
+	
+	@import "compass/reset";
+	@import "compass/utilities";
+	@import "blueprint";
+	
+	// Stuff goes here...
+    
 Installation Notes
 ==================
-It requires the Pyparsing module from:
+It requires the Pyparsing module (a single pure python file) from:
 http://pyparsing.wikispaces.com/
 
 License
