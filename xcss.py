@@ -30,12 +30,11 @@ import re
 import sys
 import string
 
-#from snippets.utils import print_timing
-
 MEDIA_ROOT = '/usr/local/www/mdubalu/media/'
 ASSETS_ROOT = MEDIA_ROOT + 'assets/'
 MEDIA_URL = '/media/'
 ASSETS_URL = MEDIA_URL + 'assets/'
+SAAS_ROOT = '/usr/local/www/mdubalu/myapp/templates/frameworks'
 
 # units and conversions
 _units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
@@ -338,7 +337,7 @@ _reverse_default_xcss_vars_re = re.compile(r'(content.*:.*(\'|").*)(' + '|'.join
 _blocks_re = re.compile(r'[{},;()\'"]|\n+')
 
 _skip_word_re = re.compile('-?[\w\s#.,:%]*$|[\w\-#.,:%]*$', re.MULTILINE)
-_has_code_re = re.compile('''(^|(?<=[{;}]))\s*(\+|@include|@if|@else|@for)(?![^(:;}]*['"])''')
+_has_code_re = re.compile('''(^|(?<=[{;}]))\s*(?:(\+|@include|@mixin|@if|@else|@for)(?![^(:;}]*['"])|@import)''')
 
 FILEID = 0
 POSITION = 1
@@ -348,6 +347,17 @@ CONTEXT = 4
 OPTIONS = 5
 SELECTORS = 6
 PROPERTIES = 7
+PATH = 8
+
+import time, sys
+def print_timing(func):
+    def wrapper(*arg):
+        t1 = time.time()
+        res = func(*arg)
+        t2 = time.time()
+        print >>sys.stderr, '%s took %0.3f ms' % (func.func_name, (t2-t1)*1000.0)
+        return res
+    return wrapper
 
 class xCSS(object):
     # configuration:
@@ -397,6 +407,8 @@ class xCSS(object):
                 instr = str[i]
             elif str[i] == '(':
                 par += 1
+                thin = None
+                safe = i + 1
             elif str[i] == ')':
                 par -= 1
             elif not par and not instr:
@@ -517,7 +529,7 @@ class xCSS(object):
 
         return cont
 
-    #@print_timing
+    @print_timing
     def compile(self, input_xcss=None):
         # Initialize
         self.rules = []
@@ -539,15 +551,14 @@ class xCSS(object):
         for fileid, str in self.xcss_files.iteritems():
             self.parse_xcss_string(fileid, str)
 
-        if self.parts:
-            # this will manage xCSS rule: child objects inside of a node
-            self.parse_children()
+        # this will manage xCSS rule: child objects inside of a node
+        self.parse_children()
 
-            # this will manage xCSS rule: ' extends '
-            self.parse_extends()
+        # this will manage xCSS rule: ' extends '
+        self.parse_extends()
 
-            # this will manage the order of the rules
-            self.manage_order()
+        # this will manage the order of the rules
+        self.manage_order()
 
         final_cont = ''
         for fileid in self.css_files:
@@ -561,7 +572,7 @@ class xCSS(object):
 
         return final_cont
 
-    def parse_xcss_string(self, fileid, str):
+    def load_string(self, str):
         # protects content: "..." strings
         str = _reverse_default_xcss_vars_re.sub(lambda m: m.group(0) + _reverse_default_xcss_vars.get(m.group(2)) + m.group(3), str)
 
@@ -573,38 +584,20 @@ class xCSS(object):
 
         # expand the space in rules
         str = _expand_rules_space_re.sub(' {', str)
+
         # collapse the space in properties blocks
         str = _collapse_properties_space_re.sub(r'\1{', str)
+
+        return str
+
+    def parse_xcss_string(self, fileid, str):
+        str = self.load_string(str)
 
         self.process_properties(str, self.xcss_vars, self.xcss_opts)
 
         # give each rule a new copy of the context and its options
-        rule = [ fileid, len(self.rules), str, set(), self.xcss_vars, self.xcss_opts, '', None ]
+        rule = [ fileid, len(self.rules), str, set(), self.xcss_vars, self.xcss_opts, '', None, None ]
         self.rules.append(rule)
-        self.parts.setdefault('', [])
-        self.parts[''].append(rule)
-
-
-    def parse_children(self):
-        cnt = 0
-        children_left = True
-        while children_left and cnt < 10:
-            cnt += 1
-            children_left = False
-            for _selectors, rules in self.parts.items():
-                interpolated = False
-                nested = False
-                for rule in rules:
-                    if ' {' in rule[CODESTR] or _has_code_re.search(rule[CODESTR]):
-                        nested = True
-                        break
-                if nested:
-                    # remove old selector:
-                    del self.parts[_selectors]
-                    # manage children or expand children:
-                    self.manage_children(_selectors, rules)
-                    # maybe there are some children still left...
-                    children_left = True
 
     def process_properties(self, codestr, context, options, properties=None, scope=''):
         def _process_properties(codestr, scope):
@@ -640,7 +633,6 @@ class xCSS(object):
                                 context[_prop] = value
                         elif properties is not None and value:
                             properties.append((_prop, value))
-
         for p_selectors, p_codestr, lose in self.locate_blocks(codestr):
             if lose is not None:
                 codestr = lose
@@ -654,81 +646,99 @@ class xCSS(object):
             elif p_selectors[-1] == ':':
                 self.process_properties(p_codestr, context, options, properties, scope + p_selectors[:-1] + '-')
 
-    def manage_children(self, _selectors, rules):
-        _selectors, _, _parents = _selectors.partition(' extends ')
-        p_selectors = _selectors.split(',')
-        construct = self.construct
-        if _parents:
-            construct += ' extends ' + _parents # This passes the inheritance to 'self' children
+    def parse_children(self):
+        pos = 0
+        while pos < len(self.rules):
+            rule = self.rules[pos]
+            if rule[POSITION] is not None:
+                #print '-'*80
+                #for i, r in enumerate(self.rules): print '>' if i == pos else ' ', repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:100]+'...')
+                construct = self.construct
+                _selectors, _, _parents = rule[SELECTORS].partition(' extends ')
+                _selectors = _selectors.split(',')
+                if _parents:
+                    construct += ' extends ' + _parents # This passes the inheritance to 'self' children
+                # Check if the block has nested blocks and work it out:
+                if ' {' in rule[CODESTR] or _has_code_re.search(rule[CODESTR]):
+                    # manage children or expand children:
+                    self.manage_children(pos, rule, _selectors, construct)
+            pos += 1
 
-        for rule in rules:
-            fileid, position, codestr, deps, context, options, selectors, properties = rule
+        # prepare maps:
+        for pos, rule in enumerate(self.rules):
+            if rule[POSITION] is not None:
+                rule[POSITION] = pos
+                selectors = rule[SELECTORS]
+                self.parts.setdefault(selectors, [])
+                self.parts[selectors].append(rule)
 
-            # Check if the block has nested blocks and work it out:
-            if ' {' in codestr or _has_code_re.search(codestr):
-                codestr = construct + ' {}' + codestr
+    def _insert_child(self, pos, rule, p_selectors, c_selectors, c_codestr, extra_context=None, path=None):
+        better_selectors = set()
+        c_selectors, _, c_parents = c_selectors.partition(' extends ')
+        c_selectors = c_selectors.split(',')
+        for c_selector in c_selectors:
+            for p_selector in p_selectors:
+                if c_selector == self.construct:
+                    better_selectors.add(p_selector)
+                elif '&' in c_selector: # Parent References
+                    better_selectors.add(c_selector.replace('&', p_selector))
+                elif p_selector:
+                    better_selectors.add(p_selector + ' ' + c_selector)
+                else:
+                    better_selectors.add(c_selector)
+        better_selectors = ','.join(sorted(better_selectors))
+        if c_parents:
+            better_selectors += ' extends ' + c_parents
+
+        if c_selector == self.construct:
+            # Context and options for constructors ('self') are the same as the parent
+            _context = rule[CONTEXT]
+            _options = rule[OPTIONS]
+            _deps = rule[DEPS]
+        else:
+            _deps = set(rule[DEPS])
+            _context = rule[CONTEXT].copy()
+            _options = rule[OPTIONS].copy()
+            _options.pop('@extend', None)
+        _context.update(extra_context or {})
+
+        self.process_properties(c_codestr, _context, _options)
+
+        parents = _options.get('@extend')
+
+        if parents:
+            parents = parents.replace(',', '&') # @extend can come with comma separated selectors...
+            if c_parents:
+                better_selectors += '&' + parents
             else:
-                continue
+                better_selectors += ' extends ' + parents
 
-            # Find the exact position where the new children of this parent (rule) shuld be inserted
-            pos = [ len(self.rules) ]
-            for i, r in enumerate(self.rules):
-                if r[POSITION] == position:
-                    pos = [ i + 1 ]
-                    break
+        if '#{' in better_selectors or '$' in better_selectors:
+            better_selectors = self.use_vars(better_selectors, _context, _options)
+            better_selectors = self.do_math(better_selectors, _expr_simple_re)
 
-            def _create_children(c_selectors, c_codestr, extra_context=None):
-                better_selectors = set()
-                c_selectors, _, c_parents = c_selectors.partition(' extends ')
-                c_selectors = c_selectors.split(',')
-                for c_selector in c_selectors:
-                    for p_selector in p_selectors:
-                        if c_selector == self.construct:
-                            better_selectors.add(p_selector)
-                        elif '&' in c_selector: # Parent References
-                            better_selectors.add(c_selector.replace('&', p_selector))
-                        elif p_selector:
-                            better_selectors.add(p_selector + ' ' + c_selector)
-                        else:
-                            better_selectors.add(c_selector)
-                better_selectors = ','.join(sorted(better_selectors))
-                if c_parents:
-                    better_selectors += ' extends ' + c_parents
+        better_selectors = self.normalize_selectors(better_selectors)
 
-                _context = context.copy()
-                _context.update(extra_context or {})
-                _options = options.copy()
-                _options.pop('@extend', None)
+        rule[POSITION] = None # Disable this old rule (perhaps it could simply be removed instead??)...
+        # ...and insert new rule
+        self.rules.insert(pos + 1, [ rule[FILEID], len(self.rules), c_codestr, _deps, _context, _options, better_selectors, None, path or rule[PATH] ])
+        return pos + 1
 
-                self.process_properties(c_codestr, _context, _options)
+    def manage_children(self, pos, rule, p_selectors, construct):
+        fileid, position, codestr, deps, context, options, selectors, properties, path = rule
 
-                parents = _options.get('@extend')
-
-                if parents:
-                    parents = parents.replace(',', '&') # @extend can come with comma separated selectors...
-                    if c_parents:
-                        better_selectors += '&' + parents
-                    else:
-                        better_selectors += ' extends ' + parents
-
-                if '#{' in better_selectors or '$' in better_selectors:
-                    better_selectors = self.use_vars(better_selectors, _context, _options)
-                    better_selectors = self.do_math(better_selectors, _expr_simple_re)
-
-                better_selectors = self.normalize_selectors(better_selectors)
-
-                _rule = [ fileid, len(self.rules), c_codestr, set(deps), _context, _options, better_selectors, None ]
-                self.rules.insert(pos[0], _rule)
-                pos[0] += 1
-                self.parts.setdefault(better_selectors, [])
-                self.parts[better_selectors].append(_rule)
-
-                rule[POSITION] = None # Disable this old rule (perhaps it could simply be removed instead??)
-
-            def _handle_include(c_selectors, c_codestr):
-                if _has_code_re.search(codestr):
+        rewind = False
+        for c_selectors, c_codestr, lose in self.locate_blocks(codestr):
+            if rewind:
+                if lose is not None:
+                    pos = self._insert_child(pos, rule, p_selectors, construct, lose)
+                else:
+                    pos = self._insert_child(pos, rule, p_selectors, c_selectors,  c_codestr)
+            elif lose is not None:
+                # This is either a raw lose rule...
+                if '@include' in lose or '@import' in lose:
                     new_codestr = []
-                    props = [ s.strip() for s in c_codestr.split(';') if s.strip() ]
+                    props = [ s.strip() for s in lose.split(';') if s.strip() ]
                     for prop in props:
                         if prop[0] == '+': # expands a '+' at the beginning of a rule as @include
                             code = '@include'
@@ -740,10 +750,13 @@ class xCSS(object):
                                 pass
                         else:
                             code, name = (prop.split(None, 1)+[''])[:2]
-                        if code == '@include':
+                        if rewind:
+                            new_codestr.append(prop)
+                        elif code == '@include':
+                            #print '>>>>>>>>>>', name
                             # It's an @include, insert pending rules...
                             if new_codestr:
-                                _create_children(c_selectors, ';'.join(new_codestr))
+                                pos = self._insert_child(pos, rule, p_selectors, construct, ';'.join(new_codestr))
                                 new_codestr = []
                             # ...then insert the include here:
                             funct, params = (name.split('(', 1)+[''])[:2]
@@ -760,7 +773,7 @@ class xCSS(object):
                                     new_params.append(param)
                                     if default:
                                         defaults[param] = default.strip()
-                            mixin = options.get('@mixin ' + funct + ':' + str(len(new_params)))
+                            mixin = rule[OPTIONS].get('@mixin ' + funct + ':' + str(len(new_params)))
                             if mixin:
                                 m_params = mixin[0]
                                 m_vars = mixin[1].copy()
@@ -769,94 +782,115 @@ class xCSS(object):
                                     if param in defaults:
                                         m_vars[m_params[i]] = defaults[param]
                                     m_vars[m_params[i]] = param
-                                _create_children(c_selectors, m_codestr, m_vars)
+                                pos = self._insert_child(pos, rule, p_selectors, construct, m_codestr, m_vars)
+                                rewind = True
+                        elif code == '@import':
+                            i_codestr = None
+                            if name[0] in ('"', "'"):
+                                name = name[1:-1]
+                                name = unescape(name)
+                            if '..' not in name:
+                                try:
+                                    filename = os.path.basename(name)
+                                    dirname = os.path.join(rule[PATH] or SAAS_ROOT, os.path.dirname(name))
+                                    i_codestr = open(os.path.join(dirname, '_'+filename+'.scss')).read()
+                                except:
+                                    try:
+                                        dirname = os.path.join(SAAS_ROOT, os.path.dirname(name))
+                                        i_codestr = open(os.path.join(dirname, '_'+filename+'.scss')).read()
+                                    except:
+                                        pass
+                            if i_codestr:
+                                i_codestr = self.load_string(i_codestr)
+                                pos = self._insert_child(pos, rule, p_selectors, construct, i_codestr, None, dirname)
+                                rewind = True
+                            else:
+                                print 'File not found:',os.path.join(dirname, '_'+filename+'.scss')
+                                pass
+                                #new_codestr.append(prop) #FIXME: if I remove the comment, the include is added as a new rule again and it loops
                         else:
                             new_codestr.append(prop)
                     if new_codestr:
-                        _create_children(c_selectors, ';'.join(new_codestr))
+                        pos = self._insert_child(pos, rule, p_selectors, construct, ';'.join(new_codestr))
                 else:
-                    _create_children(c_selectors, c_codestr)
-
-            for c_selectors, c_codestr, lose in self.locate_blocks(codestr):
-                if lose is not None:
-                    # This is either a raw lose rule...
-                    _handle_include(construct, lose)
-                elif c_selectors[-1] == ':':
-                    # ...it was a nested property or varialble, treat as raw
-                    _create_children(construct, c_selectors + '{' + c_codestr + '}')
-                    c_selectors = None
-                elif c_selectors[0] == '@':
-                    code, name = (c_selectors.split(None, 1)+[''])[:2]
-                    if code == '@if' or c_selectors.startswith('@else if '):
-                        if code != '@if':
-                            val = options.get('@if', True)
-                            name = c_selectors[9:]
-                        else:
-                            val = True
-                        if val:
-                            name = self.use_vars(name, context, options)
-                            name = self.do_math(name)
-                            val = name and name.split()[0].lower()
-                            val = bool(False if not val or val in('0', 'false',) else val)
-                            options['@if'] = val
-                            if val:
-                                _create_children(construct, c_codestr)
-                        c_selectors = None
-                    elif code == '@else':
+                    pos = self._insert_child(pos, rule, p_selectors, construct, lose)
+            elif c_selectors[-1] == ':':
+                # ...it was a nested property or varialble, treat as raw
+                pos = self._insert_child(pos, rule, p_selectors, construct, c_selectors + '{' + c_codestr + '}')
+                c_selectors = None
+            elif c_selectors[0] == '@':
+                code, name = (c_selectors.split(None, 1)+[''])[:2]
+                if code == '@if' or c_selectors.startswith('@else if '):
+                    if code != '@if':
                         val = options.get('@if', True)
-                        if not val:
-                            _create_children(construct, c_codestr)
-                        c_selectors = None
-                    elif code == '@for':
-                        var, _, name = name.partition('from')
+                        name = c_selectors[9:]
+                    else:
+                        val = True
+                    if val:
                         name = self.use_vars(name, context, options)
                         name = self.do_math(name)
-                        start, _, end = name.partition('through')
-                        if not end:
-                            start, _, end = start.partition('to')
-                        var = var.strip()
-                        try:
-                            start = int(float(start.strip()))
-                            end = int(float(end.strip()))
-                        except ValueError:
-                            pass
-                        else:
-                            for i in range(start, end + 1):
-                                _create_children(construct, c_codestr, { var: str(i) })
-                        c_selectors = None
-                    elif code == '@mixin':
-                        if name:
-                            funct, _, params = name.partition('(')
-                            funct = funct.strip()
-                            params = params.strip('()').split(',')
-                            vars = {}
-                            defaults = {}
-                            new_params = []
-                            for param in params:
-                                param, _, default = param.partition(':')
-                                param = param.strip()
-                                default = default.strip()
-                                if param:
-                                    new_params.append(param)
-                                    if default:
-                                        defaults[param] = default.strip()
-                            if vars:
-                                rename_vars_re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, vars)) + r')(?!\w)')
-                                c_codestr = rename_vars_re.sub(lambda m: vars[m.group(0)], c_codestr)
-                            mixin = [ list(new_params), defaults, c_codestr ]
-                            # Insert as many @mixin options as the default parameters:
-                            while len(new_params):
-                                options['@mixin ' + funct + ':' + str(len(new_params))] = mixin
-                                param = new_params.pop()
-                                if param not in defaults:
-                                    break
-                            if not new_params:
-                                options['@mixin ' + funct + ':0'] = mixin
-                        c_selectors = None
-                    elif code == '@prototype':
-                        c_selectors = name # prototype keyword simply ignored (all selectors are prototypes)
-                if c_selectors:
-                    _create_children(c_selectors, c_codestr)
+                        val = name and name.split()[0].lower()
+                        val = bool(False if not val or val in('0', 'false',) else val)
+                        options['@if'] = val
+                        if val:
+                            pos = self._insert_child(pos, rule, p_selectors, construct, c_codestr)
+                    c_selectors = None
+                elif code == '@else':
+                    val = options.get('@if', True)
+                    if not val:
+                        pos = self._insert_child(pos, rule, p_selectors, construct, c_codestr)
+                    c_selectors = None
+                elif code == '@for':
+                    var, _, name = name.partition('from')
+                    name = self.use_vars(name, context, options)
+                    name = self.do_math(name)
+                    start, _, end = name.partition('through')
+                    if not end:
+                        start, _, end = start.partition('to')
+                    var = var.strip()
+                    try:
+                        start = int(float(start.strip()))
+                        end = int(float(end.strip()))
+                    except ValueError:
+                        pass
+                    else:
+                        for i in range(start, end + 1):
+                            pos = self._insert_child(pos, rule, p_selectors, construct, c_codestr, { var: str(i) })
+                    c_selectors = None
+                elif code == '@mixin':
+                    if name:
+                        #print name
+                        funct, _, params = name.partition('(')
+                        funct = funct.strip()
+                        params = params.strip('()').split(',')
+                        vars = {}
+                        defaults = {}
+                        new_params = []
+                        for param in params:
+                            param, _, default = param.partition(':')
+                            param = param.strip()
+                            default = default.strip()
+                            if param:
+                                new_params.append(param)
+                                if default:
+                                    defaults[param] = default.strip()
+                        if vars:
+                            rename_vars_re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, vars)) + r')(?!\w)')
+                            c_codestr = rename_vars_re.sub(lambda m: vars[m.group(0)], c_codestr)
+                        mixin = [ list(new_params), defaults, c_codestr ]
+                        # Insert as many @mixin options as the default parameters:
+                        while len(new_params):
+                            options['@mixin ' + funct + ':' + str(len(new_params))] = mixin
+                            param = new_params.pop()
+                            if param not in defaults:
+                                break
+                        if not new_params:
+                            options['@mixin ' + funct + ':0'] = mixin
+                    c_selectors = None
+                elif code == '@prototype':
+                    c_selectors = name # prototype keyword simply ignored (all selectors are prototypes)
+            if c_selectors:
+                pos = self._insert_child(pos, rule, p_selectors, c_selectors, c_codestr)
 
 
     def link_with_parents(self, parent, c_selectors, c_rules):
@@ -987,7 +1021,7 @@ class xCSS(object):
         css_files = set()
         old_fileid = None
         for rule in self.rules:
-            fileid, position, codestr, deps, context, options, selectors, properties = rule
+            fileid, position, codestr, deps, context, options, selectors, properties, path = rule
             #print >>sys.stderr, fileid, position, [ c for c in context if c[1] != '_' ], options.keys(), selectors, deps
             if position is not None:
                 self._rules.setdefault(fileid, [])
@@ -1030,7 +1064,7 @@ class xCSS(object):
         open = False
         old_selectors = None
         for rule in rules:
-            fileid, position, codestr, deps, context, options, selectors, properties = rule
+            fileid, position, codestr, deps, context, options, selectors, properties, path = rule
             #print >>sys.stderr, fileid, position, [ c for c in context if c[1] != '_' ], options.keys(), selectors, deps
             if position is not None and properties:
                 if old_selectors != selectors:
@@ -1095,7 +1129,7 @@ class xCSS(object):
                     better_expr_str = _base_str # leave untouched otherwise
                 except:
                     better_expr_str = _base_str # leave untouched otherwise
-                    raise
+                    #raise
 
                 self._replaces[_base_str] = better_expr_str
             return better_expr_str
@@ -1741,6 +1775,19 @@ class BooleanValue(Value):
             self.value = to_str(tokens).lower() in ('true', '1', 'on', 'yes', 't', 'y')
     def __str__(self):
         return 'true' if self.value else 'false'
+    @classmethod
+    def _do_cmps(cls, first, second, op):
+        first = BooleanValue(first)
+        second = BooleanValue(second)
+        return op(first.value, second.value)
+    @classmethod
+    def _do_op(cls, first, second, op):
+        first = BooleanValue(first)
+        second = BooleanValue(second)
+        val = op(first.value, second.value)
+        ret = BooleanValue(None).merge(first).merge(second)
+        ret.value = val
+        return ret
     def merge(self, obj):
         obj = BooleanValue(obj)
         self.value = obj.value
@@ -1909,6 +1956,11 @@ class ColorValue(Value):
             return '#%02x%02x%02x' % (c[0], c[1], c[2])
         return 'rgba(%d, %d, %d, %s)' % (c[0], c[1], c[2], to_str(c[3]))
     @classmethod
+    def _do_cmps(cls, first, second, op):
+        first = ColorValue(first)
+        second = ColorValue(second)
+        return op(first.value, second.value)
+    @classmethod
     def _do_op(cls, first, second, op):
         first = ColorValue(first)
         second = ColorValue(second)
@@ -1955,7 +2007,7 @@ class QuotedStringValue(Value):
         else:
             self.value = to_str(tokens)
     def convert_to(self, type):
-        return QuotedStringValue(self.value + unit)
+        return QuotedStringValue(self.value + type)
     def __str__(self):
         return '"%s"' % escape(self.value)
     @classmethod
