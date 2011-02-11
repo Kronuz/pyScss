@@ -43,6 +43,11 @@ ASSETS_URL = MEDIA_URL + 'assets/'
 import re
 import sys
 import string
+try:
+    # Use blist if available
+    from blist import blist
+except ImportError:
+    blist = list
 
 # units and conversions
 _units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
@@ -573,7 +578,7 @@ class xCSS(object):
     @print_timing
     def compile(self, input_xcss=None):
         # Initialize
-        self.rules = []
+        self.rules = blist()
         self._rules = {}
         self.parts = {}
         self.css_files = []
