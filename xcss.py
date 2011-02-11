@@ -386,9 +386,10 @@ class xCSS(object):
 
     def locate_blocks(self, str):
         """
-        Returns all code blocks between `open` and `close` and a proper key
-        that can be multilined as long as it's joined by `joiner`.
-        Returns the lose code that's not part of the code as a third item.
+        Returns all code blocks between `{` and `}` and a proper key
+        that can be multilined as long as it's joined by `,` or enclosed in
+        `(` and `)`.
+        Returns the "lose" code that's not part of the block as a third item.
         """
         par = 0
         instr = None
@@ -651,7 +652,7 @@ class xCSS(object):
         while pos < len(self.rules):
             rule = self.rules[pos]
             if rule[POSITION] is not None:
-                #print '-'*80
+                #print '='*80
                 #for i, r in enumerate(self.rules): print '>' if i == pos else ' ', repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:100]+'...')
                 construct = self.construct
                 _selectors, _, _parents = rule[SELECTORS].partition(' extends ')
@@ -733,7 +734,8 @@ class xCSS(object):
                 if lose is not None:
                     pos = self._insert_child(pos, rule, p_selectors, construct, lose)
                 else:
-                    pos = self._insert_child(pos, rule, p_selectors, c_selectors,  c_codestr)
+                    pos = self._insert_child(pos, rule, p_selectors, construct, c_selectors + '{' + c_codestr + '}')
+                c_selectors = None
             elif lose is not None:
                 # This is either a raw lose rule...
                 if '@include' in lose or '@import' in lose:
@@ -753,7 +755,6 @@ class xCSS(object):
                         if rewind:
                             new_codestr.append(prop)
                         elif code == '@include':
-                            #print '>>>>>>>>>>', name
                             # It's an @include, insert pending rules...
                             if new_codestr:
                                 pos = self._insert_child(pos, rule, p_selectors, construct, ';'.join(new_codestr))
@@ -1398,7 +1399,7 @@ def _sprite_map(g, *args):
     Uses the keyword-style arguments passed in to control the placement.
     """
     g = StringValue(g).value
-    
+
     if not Image:
         raise Exception("Images manipulation require PIL")
 
@@ -1411,7 +1412,7 @@ def _sprite_map(g, *args):
         repeat = 'no-repeat'
 
         files = sorted(glob.glob(MEDIA_ROOT + g))
-        
+
         if not files:
             return StringValue(None)
 
@@ -1427,7 +1428,7 @@ def _sprite_map(g, *args):
         files = tuple( file[len(MEDIA_ROOT):] for file in files )
         sizes = tuple( image.size for image in images )
         offsets = []
-        
+
         if os.path.exists(asset_path):
             filetime = int(os.path.getmtime(asset_path))
             offset = gutter
@@ -1721,9 +1722,9 @@ class Value(object):
         return self._do_cmps(other, self, operator.__cmp__)
     def __and__(self, other):
         return self._do_bitops(self, other, operator.__and__)
-    def __or__(self, other):        
+    def __or__(self, other):
         return self._do_bitops(self, other, operator.__or__)
-    def __xor__(self, other):       
+    def __xor__(self, other):
         return self._do_bitops(self, other, operator.__xor__)
     def __rand__(self, other):
         return self._do_bitops(other, self, operator.__rand__)
@@ -2243,7 +2244,7 @@ def bnf():
     _lpar_ = Suppress('(')
     _rpar_ = Suppress(')')
     _comma_ = Suppress(',')
-    
+
     _unit_ = oneOf(' '.join(_units))
     _sign_ = oneOf('+ -')
     _mul_ = oneOf('* /')
@@ -2252,13 +2253,13 @@ def bnf():
     _or_ = CaselessKeyword('or') | Literal('||')
     _and_ = CaselessKeyword('and') | Literal('&&')
     _cmp_ = oneOf('<= < >= > != ==')
-    
+
     number = Combine((
             Optional(_sign_) + Word( nums ) + Optional( '.' + Optional( Word( nums ) ) ) |
             '.' + Word( nums )
             ) + Optional(oneOf('e E')+Optional(oneOf('+ -')) +Word(nums)))\
             .setParseAction(NumberValue)
-    
+
     color  = Combine(
         '#' + (
             Word(hexnums, exact=8) |  # #RRGGBBAA
@@ -2266,27 +2267,27 @@ def bnf():
             Word(hexnums, exact=4) | # #RGBA
             Word(hexnums, exact=3))  # #RGB
         ).setParseAction(ColorValue)
-    
+
     boolean = (
             CaselessKeyword('true', '-_$' + alphanums) |
             CaselessKeyword('false', '-_$' + alphanums)
         ).setParseAction(BooleanValue)
-    
+
     qstring = QuotedString("'", escChar='\\', multiline=True)\
         .setParseAction(StringValue)
-    
+
     ustring = QuotedString('"', escChar='\\', multiline=True)\
         .setParseAction(QuotedStringValue)
-    
+
     stringliteral = qstring | ustring
     identifier = Word('-_$' + alphas, '-_' + alphanums)
     variable = Word('-_$' + alphas, '-_' + alphanums).setParseAction(StringValue)
     literal = stringliteral | number | boolean | color
-    
+
     atom = Forward()
     u_expr = Forward()
     not_test = Forward()
-    
+
     units = Group((atom + _unit_).setParseAction(unitsOperator))
     u_expr = units | atom | (_sign_ + u_expr)
     m_expr = Group((u_expr + ZeroOrMore( _mul_ + u_expr )))
