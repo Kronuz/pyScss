@@ -345,7 +345,12 @@ _reverse_default_xcss_vars_re = re.compile(r'(content.*:.*(\'|").*)(' + '|'.join
 _blocks_re = re.compile(r'[{},;()\'"]|\n+|$')
 
 _skip_word_re = re.compile('-?[\w\s#.,:%]*$|[\w\-#.,:%]*$', re.MULTILINE)
-_has_code_re = re.compile('''(^|(?<=[{;}]))\s*(?:(\+|@include|@mixin|@if|@else|@for)(?![^(:;}]*['"])|@import)''')
+_has_code_re = re.compile('''
+    (^|(?<=[{;}]))
+    \s*
+    (\+|@include|@import|@mixin|@if|@else|@for)
+    (?![^(:;}]*['"])
+''', re.VERBOSE)
 
 FILEID = 0
 POSITION = 1
@@ -759,13 +764,14 @@ class xCSS(object):
                 c_selectors = None
             elif lose is not None:
                 # This is either a raw lose rule...
-                if '@include' in lose or '@import' in lose:
+                if _has_code_re.search(lose):
                     new_codestr = []
                     props = [ s.strip() for s in lose.split(';') if s.strip() ]
                     for prop in props:
                         if prop[0] == '+': # expands a '+' at the beginning of a rule as @include
                             code = '@include'
                             name = prop[1:]
+                            print code
                             try:
                                 if '(' not in name or name.index(':') < name.index('('):
                                     name = name.replace(':', '(', 1)
