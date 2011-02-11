@@ -342,7 +342,7 @@ _collapse_properties_space_re = re.compile(r'([:#])\s*{')
 _reverse_default_xcss_vars = dict((v, k) for k, v in _default_xcss_vars.items())
 _reverse_default_xcss_vars_re = re.compile(r'(content.*:.*(\'|").*)(' + '|'.join(map(re.escape, _reverse_default_xcss_vars)) + ')(.*\2)')
 
-_blocks_re = re.compile(r'[{},;()\'"]|\n+')
+_blocks_re = re.compile(r'[{},;()\'"]|\n+|$')
 
 _skip_word_re = re.compile('-?[\w\s#.,:%]*$|[\w\-#.,:%]*$', re.MULTILINE)
 _has_code_re = re.compile('''(^|(?<=[{;}]))\s*(?:(\+|@include|@mixin|@if|@else|@for)(?![^(:;}]*['"])|@import)''')
@@ -407,8 +407,11 @@ class xCSS(object):
         i = init = safe = lose = 0
         start = end = None
         str_len = len(str)
+        
         for m in _blocks_re.finditer(str):
             i = m.end(0) - 1
+            if m.start(0) == m.end(0):
+                break
             if instr is not None:
                 if str[i] == instr:
                     instr = None
@@ -464,6 +467,14 @@ class xCSS(object):
                         elif thin is not None and str[thin:i-1].strip():
                             init = i + 1
                             thin = None
+        if depth > 0:
+            if not skip:
+                #FIXME: raise exception (block not closed!)
+                selectors = str[init:start].strip()
+                codestr = str[start+1:].strip()
+                if selectors:
+                    yield selectors, codestr, None
+                return
         yield None, None, str[lose:]
 
     def normalize_selectors(self, _selectors, extra_selectors=None, extra_parents=None):
