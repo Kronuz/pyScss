@@ -267,13 +267,13 @@ for long_k, v in _colors.items():
 _reverse_colors_re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, _reverse_colors))+r')\b', re.IGNORECASE)
 _colors_re = re.compile(r'\b(' + '|'.join(map(re.escape, _colors))+r')\b', re.IGNORECASE)
 
-_expr_simple_re = re.compile(r'''
+_expr_glob_re = re.compile(r'''
     \#\{.*?\}                   # Global Interpolation only
 ''', re.VERBOSE)
 
-#_expr_re = re.compile(r'''
-#(?<=:)[^\{;}]+
-#''', re.VERBOSE)
+_expr_prop_re = re.compile(r'''
+(?<=:)[^\{;}]+
+''', re.VERBOSE)
 
 _expr_re = re.compile(r'''
     (?:^|(?<!\w))               # Expression shouldn't have a word before it
@@ -763,7 +763,7 @@ class xCSS(object):
 
         if '#{' in better_selectors or '$' in better_selectors:
             better_selectors = self.use_vars(better_selectors, _context, _options)
-            better_selectors = self.do_math(better_selectors, _expr_simple_re)
+            better_selectors = self.do_math(better_selectors, False)
 
         better_selectors = self.normalize_selectors(better_selectors)
 
@@ -876,7 +876,7 @@ class xCSS(object):
                         val = True
                     if val:
                         name = self.use_vars(name, context, options)
-                        name = self.do_math(name)
+                        name = self.do_math(name, False)
                         val = name and name.split()[0].lower()
                         val = bool(False if not val or val in('0', 'false',) else val)
                         options['@if'] = val
@@ -891,7 +891,7 @@ class xCSS(object):
                 elif code == '@for':
                     var, _, name = name.partition('from')
                     name = self.use_vars(name, context, options)
-                    name = self.do_math(name)
+                    name = self.do_math(name, False)
                     start, _, end = name.partition('through')
                     if not end:
                         start, _, end = start.partition('to')
@@ -1075,7 +1075,7 @@ class xCSS(object):
                 self._rules[fileid].append(rule)
                 if '#{' in codestr or '$' in codestr:
                     codestr = self.use_vars(codestr, context, options)
-                    codestr = self.do_math(codestr, _expr_simple_re)
+                    codestr = self.do_math(codestr, False)
                 rule[PROPERTIES] = properties = []
                 self.process_properties(codestr, context, options, properties)
                 if properties:
@@ -1149,40 +1149,77 @@ class xCSS(object):
         return result + '\n'
 
 
-    def do_math(self, content, _expr_re=_expr_re):
-        def calculate(result):
-            _base_str = result.group(0)
+    def _calculate(self, _base_str):
+        try:
+            better_expr_str = eval_expr(_base_str)
+        except ParseException:
+            better_expr_str = _base_str # leave untouched otherwise
+        except:
+            better_expr_str = _base_str # leave untouched otherwise
+            #raise
+        return better_expr_str
 
-            if _skip_word_re.match(_base_str) or _base_str.startswith('url('):
-                if ' and ' not in _base_str and ' or ' not in _base_str and 'not ' not in _base_str:
-                    return _base_str
+    def _calculate_glob(self, result):
+        _base_str = result.group(0)
+        try:
+            better_expr_str = self._replaces[_base_str]
+        except KeyError:
+            better_expr_str = _base_str
 
-            try:
-                better_expr_str = self._replaces[_base_str]
-            except KeyError:
-                better_expr_str = _base_str
+            # If we are in a global variable, we remove
+            if better_expr_str.startswith('#{') and better_expr_str.endswith('}'):
+                better_expr_str = better_expr_str[2:-1]
 
-                # If we are in a global variable, we remove
-                if better_expr_str[:2] == '#{' and better_expr_str[-1] == '}':
-                    better_expr_str = better_expr_str[2:-1]
+            if _skip_word_re.match(better_expr_str) or better_expr_str.startswith('url('):
+                if ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
+                    return better_expr_str
+            
+            better_expr_str = self._calculate(better_expr_str)
 
-                # To do math operations, we need to get the color's hex values (for color names)
-                # ...also we change brackets to parenthesis:
-                better_expr_str = _colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_expr_str).replace('[', '(').replace(']', ')')
+            self._replaces[_base_str] = better_expr_str
+        return better_expr_str
 
-                try:
-                    better_expr_str = eval_expr(better_expr_str)
-                except ParseException:
-                    better_expr_str = _base_str # leave untouched otherwise
-                except:
-                    better_expr_str = _base_str # leave untouched otherwise
-                    #raise
+    def _calculate_expr(self, result):
+        _base_str = result.group(0)
+        try:
+            better_expr_str = self._replaces[_base_str]
+        except KeyError:
+            better_expr_str = _base_str
 
-                self._replaces[_base_str] = better_expr_str
-            return better_expr_str
+            if _skip_word_re.match(better_expr_str) or better_expr_str.startswith('url('):
+                if ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
+                    return better_expr_str
+            
+            better_expr_str = self._calculate(better_expr_str)
 
-        #print >>sys.stderr, _expr_re.findall(content)
-        content = _expr_re.sub(calculate, content)
+            self._replaces[_base_str] = better_expr_str
+        return better_expr_str
+
+    def _calculate_prop(self, result):
+        _prop_str = result.group(0)
+        try:
+            better_prop_str = self._replaces[_prop_str]
+        except KeyError:
+            better_prop_str = _prop_str
+
+            if _skip_word_re.match(better_prop_str) or better_prop_str.startswith('url('):
+                if ' and ' not in better_prop_str and ' or ' not in better_prop_str and 'not ' not in better_prop_str:
+                    return better_prop_str
+
+            # To do math operations, we need to get the color's hex values (for color names)
+            # ...also we change brackets to parenthesis:
+            better_prop_str = _colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_prop_str).replace('[', '(').replace(']', ')')
+
+            better_prop_str = _expr_re.sub(self._calculate_expr, better_prop_str)
+
+            self._replaces[_prop_str] = better_prop_str
+        return better_prop_str
+
+    def do_math(self, content, prop=True):
+        if prop:
+            content = _expr_prop_re.sub(self._calculate_prop, content)
+        else:
+            content = _expr_glob_re.sub(self._calculate_glob, content)
         return content
 
     def post_process(self, cont):
