@@ -771,7 +771,6 @@ class xCSS(object):
                         if prop[0] == '+': # expands a '+' at the beginning of a rule as @include
                             code = '@include'
                             name = prop[1:]
-                            print code
                             try:
                                 if '(' not in name or name.index(':') < name.index('('):
                                     name = name.replace(':', '(', 1)
