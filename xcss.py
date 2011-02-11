@@ -271,7 +271,7 @@ _expr_simple_re = re.compile(r'''
 #''', re.VERBOSE)
 
 _expr_re = re.compile(r'''
-    (?:^|(?<!\w))               # Expression should'nt have a word before it
+    (?:^|(?<!\w))               # Expression shouldn't have a word before it
     (?:
         (?:[\[\(\-]|\bnot\b)
         (?:[\[\(\s\-]+|\bnot\b)?
@@ -346,10 +346,26 @@ _blocks_re = re.compile(r'[{},;()\'"]|\n+|$')
 
 _skip_word_re = re.compile('-?[\w\s#.,:%]*$|[\w\-#.,:%]*$', re.MULTILINE)
 _has_code_re = re.compile('''
-    (^|(?<=[{;}]))
-    \s*
-    (\+|@include|@import|@mixin|@if|@else|@for)
-    (?![^(:;}]*['"])
+    (?:^|(?<=[{;}]))            # the character just before it should be a '{', a ';' or a '}'
+    \s*                         # ...followed by any number of spaces
+    (?:
+        (?:
+            \+
+        |
+            @include
+        |
+            @mixin
+        |
+            @if
+        |
+            @else
+        |
+            @for
+        )
+        (?![^(:;}]*['"])
+    |
+        @import
+    )
 ''', re.VERBOSE)
 
 FILEID = 0
@@ -816,7 +832,7 @@ class xCSS(object):
                             if name[0] in ('"', "'"):
                                 name = name[1:-1]
                                 name = unescape(name)
-                            if '..' not in name:
+                            if '..' not in name: # Protect against going to prohibited places...
                                 try:
                                     filename = os.path.basename(name)
                                     dirname = os.path.join(rule[PATH] or LOAD_PATHS, os.path.dirname(name))
@@ -832,7 +848,7 @@ class xCSS(object):
                                 pos = self._insert_child(pos, rule, p_selectors, construct, i_codestr, None, dirname)
                                 rewind = True
                             else:
-                                print 'File not found:',os.path.join(dirname, '_'+filename+'.scss')
+                                print >>sys.stderr, 'File not found:',os.path.join(dirname, '_'+filename+'.scss')
                                 pass
                                 #new_codestr.append(prop) #FIXME: if I remove the comment, the include is added as a new rule again and it loops
                         else:
@@ -886,7 +902,6 @@ class xCSS(object):
                     c_selectors = None
                 elif code == '@mixin':
                     if name:
-                        #print name
                         funct, _, params = name.partition('(')
                         funct = funct.strip()
                         params = params.strip('()').split(',')
@@ -1431,7 +1446,7 @@ def _sprite_map(g, *args):
 
     if g in sprite_maps:
         sprite_maps[glob]['_'] = datetime.datetime.now()
-    else:
+    elif '..' not in g: # Protect against going to prohibited places...
         gutter = 0
         offset_x = 0
         offset_y = 0
