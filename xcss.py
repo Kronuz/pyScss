@@ -43,6 +43,7 @@ ASSETS_URL = MEDIA_URL + 'assets/'
 import re
 import sys
 import string
+import textwrap
 try:
     # Use blist if available
     from blist import blist
@@ -642,7 +643,7 @@ class xCSS(object):
         self.process_properties(str, self.xcss_vars, self.xcss_opts)
 
         # give each rule a new copy of the context and its options
-        rule = [ fileid, len(self.rules), str, set(), self.xcss_vars, self.xcss_opts, '', None, None ]
+        rule = [ fileid, len(self.rules), str, set(), self.xcss_vars, self.xcss_opts, '', None, './' ]
         self.rules.append(rule)
 
     def process_properties(self, codestr, context, options, properties=None, scope=''):
@@ -1104,7 +1105,7 @@ class xCSS(object):
         else:
             sc = True
             sp = ' '
-            tb = '\t'
+            tb = '  '
             nl = '\n'
 
         scope = set()
@@ -1119,10 +1120,11 @@ class xCSS(object):
                         if not sc:
                             if result[-1] == ';':
                                 result = result [:-1]
-                        result += '}' + nl + nl
-                    # feel free to modifie the indentations the way you like it
-                    selector = (',' + nl).join(selectors.split(',')) + sp + '{' + nl
-                    result += selector
+                        result += '}' + nl
+                    # feel free to modify the indentations the way you like it
+                    selector = (',' + sp).join(selectors.split(',')) + sp + '{'
+                    if nl: selector = nl.join(textwrap.wrap(selector))
+                    result += selector + nl
                     old_selectors = selectors
                     open = True
                     scope = set()
@@ -1151,13 +1153,12 @@ class xCSS(object):
 
     def _calculate(self, _base_str):
         try:
-            better_expr_str = eval_expr(_base_str)
+            return eval_expr(_base_str)
         except ParseException:
-            better_expr_str = _base_str # leave untouched otherwise
+            pass
         except:
-            better_expr_str = _base_str # leave untouched otherwise
+            pass
             #raise
-        return better_expr_str
 
     def _calculate_glob(self, result):
         _base_str = result.group(0)
@@ -1173,8 +1174,14 @@ class xCSS(object):
             if _skip_word_re.match(better_expr_str) or better_expr_str.startswith('url('):
                 if ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
                     return better_expr_str
+
+            # To do math operations, we need to get the color's hex values (for color names)
+            # ...also we change brackets to parenthesis:
+            better_expr_str = _colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_expr_str).replace('[', '(').replace(']', ')')
             
             better_expr_str = self._calculate(better_expr_str)
+            if better_expr_str is None:
+                better_expr_str = _base_str
 
             self._replaces[_base_str] = better_expr_str
         return better_expr_str
@@ -1189,8 +1196,14 @@ class xCSS(object):
             if _skip_word_re.match(better_expr_str) or better_expr_str.startswith('url('):
                 if ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
                     return better_expr_str
+
+            # To do math operations, we need to get the color's hex values (for color names)
+            # ...also we change brackets to parenthesis:
+            better_expr_str = _colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_expr_str).replace('[', '(').replace(']', ')')
             
             better_expr_str = self._calculate(better_expr_str)
+            if better_expr_str is None:
+                better_expr_str = _base_str
 
             self._replaces[_base_str] = better_expr_str
         return better_expr_str
@@ -1205,10 +1218,6 @@ class xCSS(object):
             if _skip_word_re.match(better_prop_str) or better_prop_str.startswith('url('):
                 if ' and ' not in better_prop_str and ' or ' not in better_prop_str and 'not ' not in better_prop_str:
                     return better_prop_str
-
-            # To do math operations, we need to get the color's hex values (for color names)
-            # ...also we change brackets to parenthesis:
-            better_prop_str = _colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_prop_str).replace('[', '(').replace(']', ')')
 
             better_prop_str = _expr_re.sub(self._calculate_expr, better_prop_str)
 
