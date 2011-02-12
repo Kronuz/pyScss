@@ -44,11 +44,6 @@ import re
 import sys
 import string
 import textwrap
-try:
-    # Use blist if available
-    from blist import blist
-except ImportError:
-    blist = list
 
 # units and conversions
 _units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
@@ -273,7 +268,11 @@ _expr_glob_re = re.compile(r'''
 ''', re.VERBOSE)
 
 _expr_prop_re = re.compile(r'''
-(?<=:)[^\{;}]+
+(?:
+    \#\{.*?\}                   # Global Interpolation only
+|
+    (?<=:)[^\{;}]+              # Any properties in rules
+)
 ''', re.VERBOSE)
 
 _expr_re = re.compile(r'''
@@ -340,6 +339,7 @@ _ml_comment_re = re.compile(r'\/\*(.*?)\*\/', re.DOTALL)
 _sl_comment_re = re.compile(r'(?<!\w{2}:)\/\/.*')
 _zero_units_re = re.compile(r'\b0(' + '|'.join(map(re.escape, _units)) + r')(?!\w)', re.IGNORECASE)
 
+_interpolate_re = re.compile(r'\$[-\w]+')
 _remove_decls_re = re.compile(r'(@option\b.*?([;}]|$))', re.DOTALL | re.IGNORECASE)
 _spaces_re = re.compile(r'\s+')
 _expand_rules_space_re = re.compile(r'\s*{')
@@ -393,6 +393,19 @@ def print_timing(func):
         print >>sys.stderr, '%s took %0.3f ms' % (func.func_name, (t2-t1)*1000.0)
         return res
     return wrapper
+
+# Helper functions:
+def revars(params):
+    """
+    Returns a function instance to interpolate a map of variables (var) into a string (str)
+    """
+    _re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, params)) + r')(?!\w)')
+    def _revars(str, vars):
+        def __revars(m):
+            s = m.group(0)
+            return vars.get(s, s)
+        return _re.sub(__revars, str)
+    return _revars
 
 class xCSS(object):
     # configuration:
@@ -542,8 +555,45 @@ class xCSS(object):
             return ','.join(sorted(selectors)) + ' extends ' + '&'.join(sorted(parents))
         return ','.join(sorted(selectors))
 
+    def apply_vars(self, cont, context=None, options=None):
+        if '$' not in cont:
+            return cont
+        # Flatten the context (no variables mapping to variables)
+        flat_context = {}
+        for k, v in context.items():
+            while v in context:
+                _v = context[v]
+                if _v == v:
+                    break
+                v = _v
+            flat_context[k] = v
+        # Interpolate variables:
+        def _av(m):
+            v = m.group(0)
+            return flat_context.get(v, v)
+        # ...apply flat context:
+        cont = _interpolate_re.sub(_av, cont)
+        return cont
 
-    def use_vars(self, cont, context=None, options=None):
+    def _apply_vars(self, cont, context=None, options=None):
+        if '$' not in cont:
+            return cont
+        # Interpolate variables:
+        def _av(m):
+            v = m.group(0)
+            return context.get(v, v)
+        # ...apply recursively:
+        cnt = 0
+        old_cont = None
+        while cont != old_cont and cnt < 20:
+            cnt += 1
+            old_cont = cont
+
+            # interpolate variables:
+            cont = _interpolate_re.sub(_av, cont)
+        return cont
+
+    def _apply_vars(self, cont, context=None, options=None):
         xcss_vars = self.xcss_vars.copy()
         xcss_vars.update(context or {})
         vars = xcss_vars.keys()
@@ -564,7 +614,7 @@ class xCSS(object):
         # remove variables declarations from the rules
         cont = _remove_decls_re.sub('', cont)
         cont = remove_vars_re.sub('', cont)
-
+        
         cnt = 0
         old_cont = None
         while cont != old_cont and cnt < 5:
@@ -579,7 +629,7 @@ class xCSS(object):
     @print_timing
     def compile(self, input_xcss=None):
         # Initialize
-        self.rules = blist()
+        self.rules = []
         self._rules = {}
         self.parts = {}
         self.css_files = []
@@ -606,6 +656,8 @@ class xCSS(object):
 
         # this will manage the order of the rules
         self.manage_order()
+        
+        self.parse_properties()
 
         final_cont = ''
         for fileid in self.css_files:
@@ -639,11 +691,8 @@ class xCSS(object):
 
     def parse_xcss_string(self, fileid, str):
         str = self.load_string(str)
-
-        self.process_properties(str, self.xcss_vars, self.xcss_opts)
-
         # give each rule a new copy of the context and its options
-        rule = [ fileid, len(self.rules), str, set(), self.xcss_vars, self.xcss_opts, '', None, './' ]
+        rule = [ fileid, len(self.rules), str, set(), self.xcss_vars, self.xcss_opts, '', [], './' ]
         self.rules.append(rule)
 
     def process_properties(self, codestr, context, options, properties=None, scope=''):
@@ -666,60 +715,55 @@ class xCSS(object):
                     else:
                         options[code] = name
                 else:
-                    prop, value = (re.split(r'[:=]', code, 1) + [''])[:2]
+                    prop, value = (re.split(r'[:=]', code, 1) + [None])[:2]
                     try:
                         is_var = (code[len(prop)] == '=')
                     except IndexError:
                         is_var = False
                     prop = prop.strip()
                     if prop:
-                        value = value.strip()
+                        value = value and value.strip()
+                        value = value and self.apply_vars(value, context, options)
                         _prop = scope + prop
-                        if is_var or prop[0] == '$':
+                        if is_var or prop[0] == '$' and value is not None:
                             if value:
-                                context[_prop] = value
-                        elif properties is not None and value:
+                                if '!default' in value:
+                                    value = value.replace('!default', '').replace('  ', ' ').strip()
+                                    if _prop not in context:
+                                        context[_prop] = value
+                                else:
+                                    context[_prop] = value
+                        elif properties is not None:
+                            _prop = self.apply_vars(_prop, context, options)
                             properties.append((_prop, value))
         for p_selectors, p_codestr, lose in self.locate_blocks(codestr):
             if lose is not None:
                 codestr = lose
                 _process_properties(lose, scope)
-            elif p_selectors[0] == '@':
-                code, name = (p_selectors.split(None, 1)+[''])[:2]
-                if code in ('@variables', '@vars'):
-                    if name:
-                        name =  name + '.' # namespace
-                    _process_properties(p_codestr, scope + name)
             elif p_selectors[-1] == ':':
                 self.process_properties(p_codestr, context, options, properties, scope + p_selectors[:-1] + '-')
 
+    #@print_timing
     def parse_children(self):
-        pos = 0
-        while pos < len(self.rules):
-            rule = self.rules[pos]
-            if rule[POSITION] is not None:
-                #print >>sys.stderr, '='*80
-                #for i, r in enumerate(self.rules): print >>sys.stderr, '>' if i == pos else ' ', repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:100]+'...')
-                construct = self.construct
-                _selectors, _, _parents = rule[SELECTORS].partition(' extends ')
-                _selectors = _selectors.split(',')
-                if _parents:
-                    construct += ' extends ' + _parents # This passes the inheritance to 'self' children
-                # Check if the block has nested blocks and work it out:
-                if ' {' in rule[CODESTR] or _has_code_re.search(rule[CODESTR]):
-                    # manage children or expand children:
-                    self.manage_children(pos, rule, _selectors, construct)
-            pos += 1
-
-        # prepare maps:
-        #print >>sys.stderr, '*'*80
         for pos, rule in enumerate(self.rules):
             if rule[POSITION] is not None:
-                #if rule[CODESTR]: print >>sys.stderr, '*', repr(rule[POSITION]), repr(rule[SELECTORS]), repr(rule[CODESTR][:100]+'...')
-                rule[POSITION] = pos
-                selectors = rule[SELECTORS]
-                self.parts.setdefault(selectors, [])
-                self.parts[selectors].append(rule)
+                # Check if the block has nested blocks and work it out:
+                if ' {' in rule[CODESTR] or _has_code_re.search(rule[CODESTR]):
+                    construct = self.construct
+                    _selectors, _, _parents = rule[SELECTORS].partition(' extends ')
+                    _selectors = _selectors.split(',')
+                    if _parents:
+                        construct += ' extends ' + _parents # This passes the inheritance to 'self' children
+                    # manage children or expand children:
+                    self.manage_children(pos, rule, _selectors, construct)
+                #print >>sys.stderr, '='*80
+                #for i in range(max(pos-10, 0), min(pos+10, len(self.rules))): l=80; r = self.rules[i]; print >>sys.stderr, ('>>' if rule[POSITION] is None else ' >') if i == pos else '  ', repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:l]+('...' if len(r[CODESTR])>l else '')), repr(r[PROPERTIES])
+                # prepare maps:
+                if rule[POSITION] is not None:
+                    rule[POSITION] = pos
+                    selectors = rule[SELECTORS]
+                    self.parts.setdefault(selectors, [])
+                    self.parts[selectors].append(rule)
 
     def _insert_child(self, pos, rule, p_selectors, c_selectors, c_codestr, extra_context=None, path=None):
         better_selectors = set()
@@ -741,17 +785,20 @@ class xCSS(object):
 
         if c_selector == self.construct:
             # Context and options for constructors ('self') are the same as the parent
+            _deps = rule[DEPS]
             _context = rule[CONTEXT]
             _options = rule[OPTIONS]
-            _deps = rule[DEPS]
+            if extra_context is not None:
+                _context = rule[CONTEXT].copy()
         else:
             _deps = set(rule[DEPS])
             _context = rule[CONTEXT].copy()
             _options = rule[OPTIONS].copy()
             _options.pop('@extend', None)
         _context.update(extra_context or {})
+        _properties = []
 
-        self.process_properties(c_codestr, _context, _options)
+        self.process_properties(c_codestr, _context, _options, _properties)
 
         parents = _options.get('@extend')
 
@@ -762,15 +809,13 @@ class xCSS(object):
             else:
                 better_selectors += ' extends ' + parents
 
-        if '#{' in better_selectors or '$' in better_selectors:
-            better_selectors = self.use_vars(better_selectors, _context, _options)
-            better_selectors = self.do_math(better_selectors, False)
-
+        better_selectors = self.apply_vars(better_selectors, _context, _options)
+        better_selectors = self.do_glob_math(better_selectors)
         better_selectors = self.normalize_selectors(better_selectors)
 
         rule[POSITION] = None # Disable this old rule (perhaps it could simply be removed instead??)...
         # ...and insert new rule
-        self.rules.insert(pos + 1, [ rule[FILEID], len(self.rules), c_codestr, _deps, _context, _options, better_selectors, None, path or rule[PATH] ])
+        self.rules.insert(pos + 1, [ rule[FILEID], len(self.rules), c_codestr, _deps, _context, _options, better_selectors, _properties, path or rule[PATH] ])
         return pos + 1
 
     def manage_children(self, pos, rule, p_selectors, construct):
@@ -805,7 +850,8 @@ class xCSS(object):
                         elif code == '@include':
                             # It's an @include, insert pending rules...
                             if new_codestr:
-                                pos = self._insert_child(pos, rule, p_selectors, construct, ';'.join(new_codestr))
+                                lose = ';'.join(new_codestr)
+                                pos = self._insert_child(pos, rule, p_selectors, construct, lose)
                                 new_codestr = []
                             # ...then insert the include here:
                             funct, params = (name.split('(', 1)+[''])[:2]
@@ -824,14 +870,23 @@ class xCSS(object):
                                         defaults[param] = default.strip()
                             mixin = rule[OPTIONS].get('@mixin ' + funct + ':' + str(len(new_params)))
                             if mixin:
+                                vars = {}
                                 m_params = mixin[0]
                                 m_vars = mixin[1].copy()
                                 m_codestr = mixin[2]
                                 for i, param in enumerate(new_params):
+                                    m_param = m_params[i]
+                                    # Get the default:
                                     if param in defaults:
-                                        m_vars[m_params[i]] = defaults[param]
-                                    m_vars[m_params[i]] = param
-                                pos = self._insert_child(pos, rule, p_selectors, construct, m_codestr, m_vars)
+                                        m_vars[m_param] = defaults[param]
+                                    # Set the variable (if any):
+                                    while param in context:
+                                        _param = context[param]
+                                        if _param == param:
+                                            break
+                                        param = _param
+                                    m_vars[m_param] = param
+                                pos = self._insert_child(pos, rule, p_selectors, construct, m_codestr, extra_context=m_vars)
                                 rewind = True
                         elif code == '@import':
                             i_codestr = None
@@ -851,7 +906,7 @@ class xCSS(object):
                                         pass
                             if i_codestr:
                                 i_codestr = self.load_string(i_codestr)
-                                pos = self._insert_child(pos, rule, p_selectors, construct, i_codestr, None, dirname)
+                                pos = self._insert_child(pos, rule, p_selectors, construct, i_codestr, path=dirname)
                                 rewind = True
                             else:
                                 print >>sys.stderr, 'File not found:',os.path.join(dirname, '_'+filename+'.scss')
@@ -860,24 +915,28 @@ class xCSS(object):
                         else:
                             new_codestr.append(prop)
                     if new_codestr:
-                        pos = self._insert_child(pos, rule, p_selectors, construct, ';'.join(new_codestr))
+                        lose = ';'.join(new_codestr)
+                        pos = self._insert_child(pos, rule, p_selectors, construct, lose)
                 else:
                     pos = self._insert_child(pos, rule, p_selectors, construct, lose)
             elif c_selectors[-1] == ':':
                 # ...it was a nested property or varialble, treat as raw
-                pos = self._insert_child(pos, rule, p_selectors, construct, c_selectors + '{' + c_codestr + '}')
+                lose = c_selectors + '{' + c_codestr + '}'
+                pos = self._insert_child(pos, rule, p_selectors, construct, lose)
                 c_selectors = None
             elif c_selectors[0] == '@':
                 code, name = (c_selectors.split(None, 1)+[''])[:2]
-                if code == '@if' or c_selectors.startswith('@else if '):
+                if code in ('@variables', '@vars'):
+                    self.process_properties(c_codestr, context, options, context)
+                elif code == '@if' or c_selectors.startswith('@else if '):
                     if code != '@if':
                         val = options.get('@if', True)
                         name = c_selectors[9:]
                     else:
                         val = True
                     if val:
-                        name = self.use_vars(name, context, options)
-                        name = self.do_math(name, False)
+                        name = self.apply_vars(name, context, options)
+                        name = self._calculate(name)
                         val = name and name.split()[0].lower()
                         val = bool(False if not val or val in('0', 'false',) else val)
                         options['@if'] = val
@@ -891,8 +950,9 @@ class xCSS(object):
                     c_selectors = None
                 elif code == '@for':
                     var, _, name = name.partition('from')
-                    name = self.use_vars(name, context, options)
-                    name = self.do_math(name, False)
+                    name = self.apply_vars(name, context, options)
+                    name = self._calculate(name)
+                    
                     start, _, end = name.partition('through')
                     if not end:
                         start, _, end = start.partition('to')
@@ -911,7 +971,6 @@ class xCSS(object):
                         funct, _, params = name.partition('(')
                         funct = funct.strip()
                         params = params.strip('()').split(',')
-                        vars = {}
                         defaults = {}
                         new_params = []
                         for param in params:
@@ -922,10 +981,7 @@ class xCSS(object):
                                 new_params.append(param)
                                 if default:
                                     defaults[param] = default.strip()
-                        if vars:
-                            rename_vars_re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, vars)) + r')(?!\w)')
-                            c_codestr = rename_vars_re.sub(lambda m: vars[m.group(0)], c_codestr)
-                        mixin = [ list(new_params), defaults, c_codestr ]
+                        mixin = [ list(new_params), defaults, self.apply_vars(c_codestr, context, options) ]
                         # Insert as many @mixin options as the default parameters:
                         while len(new_params):
                             options['@mixin ' + funct + ':' + str(len(new_params))] = mixin
@@ -1001,6 +1057,7 @@ class xCSS(object):
 
         return parent_found
 
+    #@print_timing
     def parse_extends(self):
         """
         For each part, create the inheritance parts from the ' extends '
@@ -1055,6 +1112,7 @@ class xCSS(object):
                         _new_options.update(rule[OPTIONS])
                         rule[OPTIONS] = _new_options
 
+    #@print_timing
     def manage_order(self):
         # order rules according with their dependencies
         for rule in self.rules:
@@ -1064,28 +1122,26 @@ class xCSS(object):
                 rule[POSITION] = min(rule[DEPS])
         self.rules = sorted(self.rules, key=lambda o: o[POSITION])
 
+    #@print_timing
+    def parse_properties(self):
         self.css_files = []
         self._rules = {}
         css_files = set()
         old_fileid = None
         for rule in self.rules:
-            fileid, position, codestr, deps, context, options, selectors, properties, path = rule
-            #print >>sys.stderr, fileid, position, [ c for c in context if c[1] != '_' ], options.keys(), selectors, deps
-            if position is not None:
-                self._rules.setdefault(fileid, [])
-                self._rules[fileid].append(rule)
-                if '#{' in codestr or '$' in codestr:
-                    codestr = self.use_vars(codestr, context, options)
-                    codestr = self.do_math(codestr, False)
-                rule[PROPERTIES] = properties = []
-                self.process_properties(codestr, context, options, properties)
+            if rule[POSITION] is not None:
+                fileid, position, codestr, deps, context, options, selectors, properties, path = rule
+                #print >>sys.stderr, fileid, position, [ c for c in context if c[1] != '_' ], options.keys(), selectors, deps
                 if properties:
+                    self._rules.setdefault(fileid, [])
+                    self._rules[fileid].append(rule)
                     if old_fileid != fileid:
                         old_fileid = fileid
                         if fileid not in css_files:
                             css_files.add(fileid)
                             self.css_files.append(fileid)
 
+    #@print_timing
     def create_css(self, fileid=None):
         """
         Generate the final CSS string
@@ -1136,13 +1192,16 @@ class xCSS(object):
                             result += tb + tb + k + ' = ' + v + ';' + nl
                         result += tb + '*/' + nl
                 for prop, value in properties:
-                    if '!default' in value:
-                        value = value.replace('!default', '').strip()
+                    if value is not None:
+                        property = prop + ':' + sp + value
+                    else:
+                        property = prop
+                    if '!default' in property:
+                        property = property.replace('!default', '').replace('  ', ' ').strip()
                         if prop in scope:
                             continue
                     scope.add(prop)
-                    property = tb + prop + ':' + sp + value + ';' + nl
-                    result += property
+                    result += tb + property + ';' + nl
         if open:
             if not sc:
                 if result[-1] == ';':
@@ -1156,20 +1215,21 @@ class xCSS(object):
             return eval_expr(_base_str)
         except ParseException:
             pass
+            #raise
         except:
             pass
             #raise
 
     def _calculate_glob(self, result):
-        _base_str = result.group(0)
+        _group0 = result.group(0)
+        _base_str = _group0
         try:
-            better_expr_str = self._replaces[_base_str]
+            better_expr_str = self._replaces[_group0]
         except KeyError:
-            better_expr_str = _base_str
-
             # If we are in a global variable, we remove
-            if better_expr_str.startswith('#{') and better_expr_str.endswith('}'):
-                better_expr_str = better_expr_str[2:-1]
+            if _base_str.startswith('#{') and _base_str.endswith('}'):
+                _base_str = _base_str[2:-1]
+            better_expr_str = _base_str
 
             if _skip_word_re.match(better_expr_str) or better_expr_str.startswith('url('):
                 if ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
@@ -1183,13 +1243,14 @@ class xCSS(object):
             if better_expr_str is None:
                 better_expr_str = _base_str
 
-            self._replaces[_base_str] = better_expr_str
+            self._replaces[_group0] = better_expr_str
         return better_expr_str
 
     def _calculate_expr(self, result):
-        _base_str = result.group(0)
+        _group0 = result.group(0)
+        _base_str = _group0        
         try:
-            better_expr_str = self._replaces[_base_str]
+            better_expr_str = self._replaces[_group0]
         except KeyError:
             better_expr_str = _base_str
 
@@ -1205,30 +1266,49 @@ class xCSS(object):
             if better_expr_str is None:
                 better_expr_str = _base_str
 
-            self._replaces[_base_str] = better_expr_str
+            self._replaces[_group0] = better_expr_str
         return better_expr_str
 
     def _calculate_prop(self, result):
-        _prop_str = result.group(0)
+        _group0 = result.group(0)
+        _prop_str = _group0
         try:
-            better_prop_str = self._replaces[_prop_str]
+            better_prop_str = self._replaces[_group0]
         except KeyError:
-            better_prop_str = _prop_str
+            # If we are in a global variable, we remove
+            if _prop_str.startswith('#{') and _prop_str.endswith('}'):
+                _prop_str = _prop_str[2:-1]
 
-            if _skip_word_re.match(better_prop_str) or better_prop_str.startswith('url('):
-                if ' and ' not in better_prop_str and ' or ' not in better_prop_str and 'not ' not in better_prop_str:
-                    return better_prop_str
+                better_prop_str = _prop_str
+                if _skip_word_re.match(better_prop_str) or better_prop_str.startswith('url('):
+                    if ' and ' not in better_prop_str and ' or ' not in better_prop_str and 'not ' not in better_prop_str:
+                        return better_prop_str
 
-            better_prop_str = _expr_re.sub(self._calculate_expr, better_prop_str)
+                # To do math operations, we need to get the color's hex values (for color names)
+                # ...also we change brackets to parenthesis:
+                better_prop_str = _colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_prop_str).replace('[', '(').replace(']', ')')
+                
+                better_prop_str = self._calculate(better_prop_str)
+                if better_prop_str is None:
+                    better_prop_str = _prop_str
+            else:
+                better_prop_str = _prop_str
+                if _skip_word_re.match(better_prop_str) or better_prop_str.startswith('url('):
+                    if ' and ' not in better_prop_str and ' or ' not in better_prop_str and 'not ' not in better_prop_str:
+                        return better_prop_str
+    
+                better_prop_str = _expr_re.sub(self._calculate_expr, better_prop_str)
 
-            self._replaces[_prop_str] = better_prop_str
+            self._replaces[_group0] = better_prop_str
         return better_prop_str
 
-    def do_math(self, content, prop=True):
-        if prop:
-            content = _expr_prop_re.sub(self._calculate_prop, content)
-        else:
-            content = _expr_glob_re.sub(self._calculate_glob, content)
+    def do_glob_math(self, content):
+        content = _expr_glob_re.sub(self._calculate_glob, content)
+        return content
+
+    #@print_timing
+    def do_math(self, content):
+        content = _expr_prop_re.sub(self._calculate_prop, content)
         return content
 
     def post_process(self, cont):
@@ -1480,8 +1560,45 @@ def _lightness(color):
     h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
     ret = NumberValue(l)
     ret.units['%'] = 1
-    return ret
+    return ret    
+def _color_stops(*args):
+    colors = []
+    stops = []
+    prev_color = False
+    for c in args:
+        if isinstance(c, ColorValue):
+            if prev_color:
+                stops.append(None)
+            colors.append(c)
+            prev_color = True
+        else:
+            stops.append(NumberValue(c))
+            prev_color = False
+    if prev_color:
+        stops.append(None)
+    stops = stops[:len(colors)]
+    max_stops = max(s and s.value for s in stops)
+    stops = [ s and (s.value / max_stops if s.unit != '%' else s.value) for s in stops ] 
+    
+    init = 0
+    start = None
+    for i, s in enumerate(stops+[1.0]):
+        if s is None:
+            if start is None:
+                start = i
+            end = i
+        else:
+            final = s
+            if start is not None:
+                stride = init + (final - init) / (end - start + 1 + (1 if i < len(stops) else 0))
+                for j in range(start, end + 1):
+                    stops[j] = stride
+            init = final
+            start = None
 
+    ret = ', '.join([ 'color-stop(%s, %s)' % (to_str(s), c) for s,c in zip(stops, colors) ])
+    
+    return ret
 ################################################################################
 # Compass like functionality for sprites and images:
 sprite_maps = {}
@@ -1697,6 +1814,24 @@ def _image_height(image):
     return ret
 
 ################################################################################
+def _opposite_position(*p):
+    pos = []
+    new_pos = set()
+    for _p in p:
+        pos.extend(StringValue(_p).value.split())
+    pos = set(pos)
+    if 'center' in pos:
+        new_pos.add('center')
+    if 'left' in pos:
+        new_pos.add('right')
+    elif 'right' in pos:
+        new_pos.add('right')
+    if 'top' in pos:
+        new_pos.add('bottom')
+    elif 'bottom' in pos:
+        new_pos.add('top')
+    val = ' '.join(new_pos)
+    return StringValue(val)
 
 def _nth(s, n=None):
     """
@@ -1910,7 +2045,7 @@ class NumberValue(Value):
                 self.value = to_float(to_str(tokens))
             except ValueError:
                 self.value = 0.0
-    def q__repr__(self):
+    def __repr__(self):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.units))
     def __str__(self):
         unit = self.unit
@@ -1940,15 +2075,19 @@ class NumberValue(Value):
             first.units['%'] = 1
             first.value /= 100.0
         val = op(first.value, second.value)
-        ret = NumberValue(None).merge(first).merge(second)
-        ret. value = val
+        ret = NumberValue(None).merge(first)
+        ret = ret.merge(second)
+        ret.value = val
         return ret
     def merge(self, obj):
         obj = NumberValue(obj)
         self.value = obj.value
         for unit, val in obj.units.items():
-            self.units.setdefault(unit, 0)
-            self.units[unit] += val
+            if unit != '_':
+                self.units.setdefault(unit, 0)
+                self.units[unit] += val
+        if '_' not in self.units:
+            self.units['_'] = obj.unit
         return self
     def convert_to(self, type):
         val = self.value
@@ -1956,18 +2095,28 @@ class NumberValue(Value):
             val *= _conv_factor.get(type, 1.0)
         ret = NumberValue(val)
         ret.units[type] = 1
+        ret.units['_'] = type
         return ret
     @property
     def unit(self):
         unit = ''
         if self.units:
-            units = sorted(self.units, key=self.units.get)
-            while len(units):
-                unit = units.pop()
-                if unit and unit != '%':
-                    break
-            if not unit and '%' in self.units:
+            if '%' in self.units:
                 unit = '%'
+            else:
+                if '_'in self.units:
+                    units = self.units.copy()
+                    _unit = units.pop('_')
+                    units.setdefault(_unit, 0)
+                    units[_unit] += 1 # Give more weight to the first unit ever set
+                    units[_unit] *= 2
+                else:
+                    units = self.units
+                units = sorted(units, key=units.get)
+                while len(units):
+                    unit = units.pop()
+                    if unit and unit != '%':
+                        break
         return unit
 
 class ColorValue(Value):
@@ -1988,7 +2137,10 @@ class ColorValue(Value):
             val = tokens.value
             self.value = (val, val, val, 1)
         elif isinstance(tokens, (list, tuple)):
-            self.value = tuple(tokens[:4])
+            c = tokens[:4]
+            r = 255.0, 255.0, 255.0, 1.0
+            c = [ 0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4) ]
+            self.value = tuple(c)
             type = tokens[-1]
             if type in ('rgb', 'rgba', 'hsl', 'hsla'):
                 self.types = { type: 1 }
@@ -2166,6 +2318,8 @@ fnct = {
     'image-url:1': _image_url,
     'image-width:1': _image_width,
     'image-height:1': _image_height,
+    
+    'opposite-position:n': _opposite_position,
 
     'opacify:2': _opacify,
     'fadein:2': _opacify,
@@ -2181,6 +2335,7 @@ fnct = {
     'adjust-hue:2': _adjust_hue,
     'spin:2': _adjust_hue,
     'complement:1': _complement,
+    'color-stops:n': _color_stops,
     'mix:2': _mix,
     'mix:3': _mix,
     'hsl:3': _hsl,
@@ -2215,7 +2370,7 @@ fnct = {
     'ceil:1': Value._wrap(math.ceil),
     'floor:1': Value._wrap(math.floor),
     'pi:0': _pi,
-    'not:1': _inv,
+    'not:1': _not,
     '!:1': _inv,
 }
 for u in _units:
@@ -2285,16 +2440,16 @@ def bnf():
     not_test = Forward()
 
     units = Group((atom + _unit_).setParseAction(unitsOperator))
-    u_expr = units | atom | (_sign_ + u_expr)
+    u_expr = (_sign_ + u_expr) | units | atom
     m_expr = Group((u_expr + ZeroOrMore( _mul_ + u_expr )))
     a_expr = Group((m_expr + ZeroOrMore( _add_ + m_expr )))
     and_expr = Group((a_expr + ZeroOrMore( _and_ + a_expr )))
     or_expr = Group((and_expr + ZeroOrMore( _or_ + and_expr )))
     comparison = Group((or_expr + ZeroOrMore( _cmp_ + or_expr )))
-    not_test << (comparison | Group(OneOrMore(( _not_ + not_test ))))
+    not_test << (Group(OneOrMore(( _not_ + not_test ))) | comparison)
     and_test = Group((not_test + ZeroOrMore( _and_ + not_test )))
     expression = Group((and_test + ZeroOrMore( _or_ + and_test )))
-    expression_list = expression + ZeroOrMore( _comma_ + expression )
+    expression_list = expression + ZeroOrMore( Optional(_comma_) + expression )
     call = Group((identifier + _lpar_ + expression_list + _rpar_))
     enclosure = Group((_lpar_ + expression + _rpar_))
     atom << (enclosure | call | literal | variable)
@@ -2308,7 +2463,7 @@ def eval_tree(node):
         elif isinstance(node[0], basestring):
             # Function call:
             fn_name = '%s:%d' % (node[0], len(node) - 1)
-            fn = fnct.get(fn_name)
+            fn = fnct.get(fn_name) or fnct.get('%s:n' % node[0])
             if not fn: raise ParseException("Function not found: "+ fn_name)
             args = [ eval_tree(n) for n in node[1:] ]
             node = fn(*args)
@@ -2334,6 +2489,7 @@ def eval_expr(expr):
     exprs = []
 
     #print >>sys.stderr, '>>',expr,'<<'
+
     results = bnf.parseString( expr, parseAll=True)
     for r in results:
         #print >>sys.stderr, r
