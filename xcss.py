@@ -344,7 +344,7 @@ def print_timing(func):
         t1 = time.time()
         res = func(*arg)
         t2 = time.time()
-        print >>sys.stderr, '%s took %0.3f ms' % (func.func_name, (t2-t1)*1000.0)
+        print >>sys.stderr, '%s took %0.3fs' % (func.func_name, (t2-t1))
         return res
     return wrapper
 
@@ -548,7 +548,7 @@ class xCSS(object):
         return cont
 
     @print_timing
-    def compile(self, input_xcss=None):
+    def Compilation(self, input_xcss=None):
         # Initialize
         self.rules = []
         self._rules = {}
@@ -592,6 +592,7 @@ class xCSS(object):
         final_cont = self.post_process(final_cont)
 
         return final_cont
+    compile = Compilation
 
     def load_string(self, str):
         # protects content: "..." strings
