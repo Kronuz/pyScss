@@ -1510,7 +1510,6 @@ def __color_stops(*args):
         colors = split_params(args[0].value)
         for color in colors:
             color = color.strip()
-            print color
             if color.startswith('color-stop('):
                 s, c = split_params(color[11:].rstrip(')'))
                 s = s.strip()
