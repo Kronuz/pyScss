@@ -936,7 +936,7 @@ class xCSS(object):
                         val = True
                     if val:
                         name = self.apply_vars(name, context, options)
-                        name = self._calculate(name)
+                        name = self.calculate(name)
                         val = name and name.split()[0].lower()
                         val = bool(False if not val or val in('0', 'false',) else val)
                         options['@if'] = val
@@ -951,7 +951,7 @@ class xCSS(object):
                 elif code == '@for':
                     var, _, name = name.partition('from')
                     name = self.apply_vars(name, context, options)
-                    name = self._calculate(name)
+                    name = self.calculate(name)
                     
                     start, _, end = name.partition('through')
                     if not end:
@@ -1219,6 +1219,23 @@ class xCSS(object):
         except:
             pass
             #raise
+
+    def calculate(self, _base_str):
+        try:
+            better_expr_str = self._replaces[_base_str]
+        except KeyError:
+            better_expr_str = _base_str
+            
+            if _skip_word_re.match(better_expr_str):
+                if ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
+                    return better_expr_str
+
+            better_expr_str = self._calculate(better_expr_str)
+            if better_expr_str is None:
+                better_expr_str = _base_str
+
+            self._replaces[_base_str] = better_expr_str
+        return better_expr_str
 
     def _calculate_glob(self, result):
         _group0 = result.group(0)
