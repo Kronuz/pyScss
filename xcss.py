@@ -5,7 +5,7 @@ xCSS Framework for Python
 
 @author    German M. Bravo (Kronuz)
            Based on some code from the original xCSS project by Anton Pawlik
-@version   0.6
+@version   0.5
 @see       http://xcss.antpaw.org/docs/
            http://sass-lang.com/
            http://oocss.org/spec/css-object-model.html
@@ -267,30 +267,25 @@ _expr_glob_re = re.compile(r'''
     \#\{.*?\}                   # Global Interpolation only
 ''', re.VERBOSE)
 
-_expr_prop_re = re.compile(r'''
+_expr_re = re.compile(r'''
 (?:
     \#\{.*?\}                   # Global Interpolation only
 |
-    (?<=:)[^\{;}]+              # Any properties in rules
+    (?<=:\s)[^\{;}]+            # Any properties in rules
 )
 ''', re.VERBOSE)
 
-_expr_re = re.compile(r'''
+__expr_re__ = re.compile(r'''
+    (\#\{)?
     (?:^|(?<!\w))               # Expression shouldn't have a word before it
     (?:
         (?:[\[\(\-]|\bnot\b)
         (?:[\[\(\s\-]+|\bnot\b)?
     )?                          # ...then any number of opening parenthesis or spaces
     (?:
-        (['"]).*?\1             # If a string, consume the whole thing...
+        (['"]).*?\2             # If a string, consume the whole thing...
     |
-        (?:
-            \#[0-9a-fA-F]{6}    # Get an hex RGB
-        |
-            \#[0-9a-fA-F]{3}    # Get an hex RRGGBB
-        |
-            [\w.%$]+             # ...otherwise get the word, variable or number
-        )
+        \#?[\w.%$]+             # ...otherwise get the word, variable or number
         (?:
             [\[\(]              # optionally, then start with a parenthesis
             .*?                 # followed by anything...
@@ -313,15 +308,9 @@ _expr_re = re.compile(r'''
         )
         (?:[\[\(\s\-]+|\bnot\b)?
         (?:
-            (['"]).*?\2         # If a string, consume the whole thing...
+            (['"]).*?\3         # If a string, consume the whole thing...
         |
-            (?:
-                \#[0-9a-fA-F]{6} # Get an hex RGB
-            |
-                \#[0-9a-fA-F]{3} # Get an hex RRGGBB
-            |
-                [\w.%$]+         # ...otherwise get the word, variable or number
-            )
+            \#?[\w.%$]+         # ...otherwise get the word, variable or number
             (?:
                 [\[\(]          # optionally, then  start with a parenthesis
                 .*?             # followed by anything...
@@ -332,12 +321,15 @@ _expr_re = re.compile(r'''
     )*
     [\]\)\s\,]*?                # ...keep closing parenthesis
     (?:[\]\)\,]+[\w%]*)?        # and then try to get any units afterwards
+    (?=[^:{]*[;}])
+    (?(1)\}?)
 ''', re.VERBOSE)
 
 #_expr_re = re.compile(r'(\[.*?\])([\s;}]|$|.+?\S)') # <- This is the old method, required parenthesis around the expression
 _ml_comment_re = re.compile(r'\/\*(.*?)\*\/', re.DOTALL)
 _sl_comment_re = re.compile(r'(?<!\w{2}:)\/\/.*')
 _zero_units_re = re.compile(r'\b0(' + '|'.join(map(re.escape, _units)) + r')(?!\w)', re.IGNORECASE)
+_zero_re = re.compile(r'\b0\.(?=\d)')
 
 _interpolate_re = re.compile(r'(?:\#\{)?(\$[-\w]+)\}?')
 _spaces_re = re.compile(r'\s+')
@@ -393,8 +385,24 @@ def print_timing(func):
         return res
     return wrapper
 
+def split_params(params):
+    params = params.split(',') or []
+    if params:
+        final_params = []
+        param = params.pop(0)
+        try:
+            while True:
+                while param.count('(') != param.count(')'):
+                    param = param + ',' + params.pop(0)
+                final_params.append(param)
+                param = params.pop(0)
+        except IndexError:
+            pass
+        params = final_params
+    return params
+
 def dequote(str):
-    if str[0] in ('"', "'"):
+    if str and str[0] in ('"', "'"):
         str = str[1:-1]
         str = unescape(str)
     return str
@@ -613,6 +621,7 @@ class xCSS(object):
             fcont = self.create_css(fileid)
             final_cont += fcont
 
+        final_cont = self.pre_process(final_cont)
         final_cont = self.do_math(final_cont)
         final_cont = self.post_process(final_cont)
 
@@ -801,21 +810,10 @@ class xCSS(object):
                                 pos = self._insert_child(pos, rule, p_selectors, construct, lose)
                                 new_codestr = []
                             # ...then insert the include here:
+                            
                             funct, params = (name.split('(', 1)+[''])[:2]
                             params = params.rstrip(')')
-                            params = params.split(',') or []
-                            if params:
-                                final_params = []
-                                param = params.pop(0)
-                                try:
-                                    while True:
-                                        while param.count('(') != param.count(')'):
-                                            param = param + ',' + params.pop(0)
-                                        final_params.append(param)
-                                        param = params.pop(0)
-                                except IndexError:
-                                    pass
-                                params = final_params
+                            params = split_params(params)
                             vars = {}
                             defaults = {}
                             new_params = []
@@ -1193,48 +1191,21 @@ class xCSS(object):
             self._replaces[_base_str] = better_expr_str
         return better_expr_str
 
-    def _calculate_glob(self, result):
-        _group0 = result.group(0)
-        _base_str = _group0
-        try:
-            better_expr_str = self._replaces[_group0]
-        except KeyError:
-            # If we are in a global variable, we remove
-            if _base_str.startswith('#{') and _base_str.endswith('}'):
-                _base_str = _base_str[2:-1]
-            better_expr_str = _base_str
-
-            if _skip_word_re.match(better_expr_str) or better_expr_str.startswith('url('):
-                if ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
-                    return better_expr_str
-
-            # To do math operations, we need to get the color's hex values (for color names)
-            # ...also we change brackets to parenthesis:
-            better_expr_str = _colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_expr_str)
-            
-            better_expr_str = self._calculate(better_expr_str)
-            if better_expr_str is None:
-                better_expr_str = _base_str
-
-            self._replaces[_group0] = better_expr_str
-        return better_expr_str
-
     def _calculate_expr(self, result):
         _group0 = result.group(0)
         _base_str = _group0        
         try:
             better_expr_str = self._replaces[_group0]
         except KeyError:
+            # If we are in a global variable, we remove '#{' and '}'
+            if _base_str.startswith('#{') and _base_str.endswith('}'):
+                _base_str = _base_str[2:-1]
+
             better_expr_str = _base_str
 
             if _skip_word_re.match(better_expr_str) or better_expr_str.startswith('url('):
-                if ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
-                    return better_expr_str
+                return better_expr_str
 
-            # To do math operations, we need to get the color's hex values (for color names)
-            # ...also we change brackets to parenthesis:
-            better_expr_str = _colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_expr_str)
-            
             better_expr_str = self._calculate(better_expr_str)
             if better_expr_str is None:
                 better_expr_str = _base_str
@@ -1242,48 +1213,26 @@ class xCSS(object):
             self._replaces[_group0] = better_expr_str
         return better_expr_str
 
-    def _calculate_prop(self, result):
-        _group0 = result.group(0)
-        _prop_str = _group0
-        try:
-            better_prop_str = self._replaces[_group0]
-        except KeyError:
-            # If we are in a global variable, we remove
-            if _prop_str.startswith('#{') and _prop_str.endswith('}'):
-                _prop_str = _prop_str[2:-1]
-
-                better_prop_str = _prop_str
-                if _skip_word_re.match(better_prop_str) or better_prop_str.startswith('url('):
-                    if ' and ' not in better_prop_str and ' or ' not in better_prop_str and 'not ' not in better_prop_str:
-                        return better_prop_str
-
-                # To do math operations, we need to get the color's hex values (for color names)
-                # ...also we change brackets to parenthesis:
-                better_prop_str = _colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_prop_str)
-                
-                better_prop_str = self._calculate(better_prop_str)
-                if better_prop_str is None:
-                    better_prop_str = _prop_str
-            else:
-                better_prop_str = _prop_str
-                if _skip_word_re.match(better_prop_str) or better_prop_str.startswith('url('):
-                    if ' and ' not in better_prop_str and ' or ' not in better_prop_str and 'not ' not in better_prop_str:
-                        return better_prop_str
-    
-                better_prop_str = _expr_re.sub(self._calculate_expr, better_prop_str)
-
-            self._replaces[_group0] = better_prop_str
-        return better_prop_str
-
     def do_glob_math(self, content):
-        content = _expr_glob_re.sub(self._calculate_glob, content)
+        content = _expr_glob_re.sub(self._calculate_expr, content)
         return content
 
     #@print_timing
     def do_math(self, content):
-        content = _expr_prop_re.sub(self._calculate_prop, content)
+        content = _expr_re.sub(self._calculate_expr, content)
         return content
 
+    #@print_timing
+    def pre_process(self, cont):
+        # To do math operations, we need to get the color's hex values (for color names)
+        # ...also we change brackets to parenthesis:
+        def _pp(m):
+            v = m.group(0)
+            return _colors.get(v, v)
+        cont = _colors_re.sub(_pp, cont)
+        return cont
+
+    #@print_timing
     def post_process(self, cont):
         # short colors:
         if self.xcss_opts.get('short_colors', 1):
@@ -1293,6 +1242,8 @@ class xCSS(object):
             cont = _reverse_colors_re.sub(lambda m: _reverse_colors[m.group(0).lower()], cont)
         # zero units out (i.e. 0px or 0em -> 0):
         cont = _zero_units_re.sub('0', cont)
+        # remove zeros before decimal point (i.e. 0.3 -> .3)
+        cont = _zero_re.sub('.', cont)
         return cont
 
 import os
@@ -1317,7 +1268,10 @@ except ImportError:
 
 def to_str(num):
     if isinstance(num, float):
-        return ('%0.03f' % num).rstrip('0').rstrip('.')
+        num = ('%0.03f' % num).rstrip('0').rstrip('.')
+        if '.' in num:
+            num = num.lstrip('0')
+        return num
     elif isinstance(num, bool):
         return 'true' if num else 'false'
     elif num is None:
@@ -1542,8 +1496,24 @@ def _lightness(color):
     h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
     ret = NumberValue(l)
     ret.units['%'] = 1
-    return ret    
-def _color_stops(*args):
+    return ret
+
+def __color_stops(*args):
+    if isinstance(args[0], StringValue):
+        color_stops = []
+        colors = split_params(args[0].value)
+        for color in colors:
+            color = color.strip()
+            print color
+            if color.startswith('color-stop('):
+                s, c = split_params(color[11:].rstrip(')'))
+                s = s.strip()
+                c = c.strip()
+            else:
+                c, s = color.split()
+            color_stops.append((float(s),c))
+        return color_stops
+
     colors = []
     stops = []
     prev_color = False
@@ -1572,15 +1542,24 @@ def _color_stops(*args):
         else:
             final = s
             if start is not None:
-                stride = init + (final - init) / (end - start + 1 + (1 if i < len(stops) else 0))
+                stride = (final - init) / (end - start + 1 + (1 if i < len(stops) else 0))
                 for j in range(start, end + 1):
-                    stops[j] = stride
+                    stops[j] = init + stride * (j - start + 1)
             init = final
             start = None
 
-    ret = ', '.join([ 'color-stop(%s, %s)' % (to_str(s), c) for s,c in zip(stops, colors) ])
-    
-    return ret
+    return zip(stops, colors)
+
+def _grad_color_stops(*args):
+    color_stops = __color_stops(*args)
+    ret = ', '.join([ 'color-stop(%s, %s)' % (to_str(s), c) for s,c in color_stops ])
+    return StringValue(ret)
+
+def _color_stops(*args):
+    color_stops = __color_stops(*args)
+    ret = ', '.join([ '%s %s%%' % (c, to_str(s*100.0)) for s,c in color_stops ])
+    return StringValue(ret)
+
 ################################################################################
 # Compass like functionality for sprites and images:
 sprite_maps = {}
@@ -1797,11 +1776,10 @@ def _image_height(image):
 
 ################################################################################
 def _opposite_position(*p):
-    pos = []
+    pos = set()
     new_pos = set()
     for _p in p:
-        pos.extend(StringValue(_p).value.split())
-    pos = set(pos)
+        pos.update(StringValue(_p).value.split())
     if 'center' in pos:
         new_pos.add('center')
     if 'left' in pos:
@@ -1814,6 +1792,22 @@ def _opposite_position(*p):
         new_pos.add('top')
     val = ' '.join(new_pos)
     return StringValue(val)
+
+def _grad_point(*p):
+    pos = set()
+    hrz = vrt = 50
+    for _p in p:
+        pos.update(StringValue(_p).value.split())
+    if 'left' in pos:
+        hrz = 0
+    elif 'right' in pos:
+        hrz = 100
+    if 'top' in pos:
+        vrt = 0
+    elif 'bottom' in pos:
+        vrt = 100
+    val = '%s%% %s%%' % (hrz, vrt)
+    return val
 
 def _nth(s, n=None):
     """
@@ -1854,7 +1848,11 @@ def _convert_to(value, type):
 def _inv(value):
     if isinstance(value, NumberValue):
         return value * -1
-    return '-' + StringValue(value)
+    elif isinstance(value, BooleanValue):
+        return not value
+    val = StringValue(value)
+    val.value = '!' + val.value
+    return val
 
 def _and(a, b):
     return a and b
@@ -2308,6 +2306,9 @@ fnct = {
     'image-height:1': _image_height,
     
     'opposite-position:n': _opposite_position,
+    'grad-point:n': _grad_point,
+    'color-stops:n': _color_stops,
+    'grad-color-stops:n': _grad_color_stops,
 
     'opacify:2': _opacify,
     'fadein:2': _opacify,
@@ -2323,7 +2324,6 @@ fnct = {
     'adjust-hue:2': _adjust_hue,
     'spin:2': _adjust_hue,
     'complement:1': _complement,
-    'color-stops:n': _color_stops,
     'mix:2': _mix,
     'mix:3': _mix,
     'hsl:3': _hsl,
@@ -2383,11 +2383,13 @@ def bnf():
     _lpar_ = oneOf('[ (').suppress()
     _rpar_ = oneOf('] )').suppress()
     _comma_ = Suppress(',')
+    _white_ = White().suppress()
 
-    _unit_ = oneOf(' '.join(_units))
+    _unit_ = oneOf(_units)
     _sign_ = oneOf('+ -')
     _mul_ = oneOf('* /')
-    _add_ = oneOf('+ -')
+    _add_ = '+'
+    _sub_ = '-'
     _not_ = CaselessKeyword('not') | Literal('!')
     _or_ = CaselessKeyword('or') | Literal('||')
     _and_ = CaselessKeyword('and') | Literal('&&')
@@ -2428,9 +2430,9 @@ def bnf():
     not_test = Forward()
 
     units = Group((atom + _unit_).setParseAction(unitsOperator))
-    u_expr = (_sign_ + u_expr) | units | atom
-    m_expr = Group((u_expr + ZeroOrMore( _mul_ + u_expr )))
-    a_expr = Group((m_expr + ZeroOrMore( _add_ + m_expr )))
+    u_expr = units | atom | (_sign_ + u_expr)
+    m_expr = Group((u_expr + ZeroOrMore(Optional(_white_) + _mul_ + u_expr )))
+    a_expr = Group((m_expr + ZeroOrMore( (Optional(_white_) + _sub_ + _white_ + m_expr).leaveWhitespace() | (_add_ + m_expr) )))
     and_expr = Group((a_expr + ZeroOrMore( _and_ + a_expr )))
     or_expr = Group((and_expr + ZeroOrMore( _or_ + and_expr )))
     comparison = Group((or_expr + ZeroOrMore( _cmp_ + or_expr )))
@@ -2451,11 +2453,13 @@ def eval_tree(node):
         elif isinstance(node[0], basestring):
             # Function call:
             fn_name = '%s:%d' % (node[0], len(node) - 1)
-            fn = fnct.get(fn_name) or fnct.get('%s:n' % node[0])
             args = [ eval_tree(n) for n in node[1:] ]
-            if fn:
+            try:
+                fn = fnct.get(fn_name) or fnct['%s:n' % node[0]]
                 node = fn(*args)
-            else:
+            except Exception, e:
+                #import traceback
+                #traceback.print_exc()
                 node = StringValue(node[0]+'(' + ', '.join(str(a) for a in args) + ')')
         elif isinstance(node[1], basestring):
             # Operator:
@@ -3291,10 +3295,10 @@ a {
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .functions {
-    opacify: rgba(0, 0, 0, 0.6);
+    opacify: rgba(0, 0, 0, .6);
     opacify: #001;
-    transparentize: rgba(0, 0, 0, 0.4);
-    transparentize: rgba(0, 0, 0, 0.6);
+    transparentize: rgba(0, 0, 0, .4);
+    transparentize: rgba(0, 0, 0, .6);
     lighten: hsl(0, 0, 30%);
     lighten: #e00;
     darken: hsl(25, 100%, 50%);
@@ -3308,7 +3312,7 @@ a {
     adjust: #886a10;
     mix: #7f007f;
     mix: #3f00bf;
-    mix: rgba(63, 0, 191, 0.75);
+    mix: rgba(63, 0, 191, .75);
     percentage: 200%;
     round: 10px;
     round: 11px;
