@@ -242,8 +242,8 @@ _default_xcss_vars = {
 _default_xcss_opts = {
     'verbosity': 0,
     'compress': 1,
-    'short_colors': 0,
-    'reverse_colors': 0,
+    'short_colors': 1, # Converts things like #RRGGBB to #RGB
+    'reverse_colors': 1, # Gets the shortest name of all for colors
 }
 
 _short_color_re = re.compile(r'(?<!\w)#([a-f0-9])\1([a-f0-9])\2([a-f0-9])\3\b', re.IGNORECASE)
@@ -260,8 +260,8 @@ for long_k, v in _colors.items():
     _reverse_colors[short_k] = k
     _reverse_colors[rgb_k] = k
     _reverse_colors[rgba_k] = k
-_reverse_colors_re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, _reverse_colors))+r')\b', re.IGNORECASE)
-_colors_re = re.compile(r'\b(' + '|'.join(map(re.escape, _colors))+r')\b', re.IGNORECASE)
+_reverse_colors_re = re.compile(r'(?<![-\w])(' + '|'.join(map(re.escape, _reverse_colors))+r')(?![-\w])', re.IGNORECASE)
+_colors_re = re.compile(r'(?<![-\w])(' + '|'.join(map(re.escape, _colors))+r')(?![-\w])', re.IGNORECASE)
 
 _expr_glob_re = re.compile(r'''
     \#\{.*?\}                   # Global Interpolation only
@@ -305,7 +305,7 @@ _expr_re = re.compile(r'''
         |
             (?<=\s)-(?=\s)      # ...minus operator needs spaces
         |
-            (?<!\s)-            # or be preceded by a non-space
+            (?<=[-\w.%$])-      # or be preceded by something that makes it not a variable
         |
             and | or
         |
@@ -339,8 +339,7 @@ _ml_comment_re = re.compile(r'\/\*(.*?)\*\/', re.DOTALL)
 _sl_comment_re = re.compile(r'(?<!\w{2}:)\/\/.*')
 _zero_units_re = re.compile(r'\b0(' + '|'.join(map(re.escape, _units)) + r')(?!\w)', re.IGNORECASE)
 
-_interpolate_re = re.compile(r'\$[-\w]+')
-_remove_decls_re = re.compile(r'(@option\b.*?([;}]|$))', re.DOTALL | re.IGNORECASE)
+_interpolate_re = re.compile(r'(?:\#\{)?(\$[-\w]+)\}?')
 _spaces_re = re.compile(r'\s+')
 _expand_rules_space_re = re.compile(r'\s*{')
 _collapse_properties_space_re = re.compile(r'([:#])\s*{')
@@ -394,24 +393,15 @@ def print_timing(func):
         return res
     return wrapper
 
-# Helper functions:
-def revars(params):
-    """
-    Returns a function instance to interpolate a map of variables (var) into a string (str)
-    """
-    _re = re.compile(r'(?<!\w)(' + '|'.join(map(re.escape, params)) + r')(?!\w)')
-    def _revars(str, vars):
-        def __revars(m):
-            s = m.group(0)
-            return vars.get(s, s)
-        return _re.sub(__revars, str)
-    return _revars
+def dequote(str):
+    if str[0] in ('"', "'"):
+        str = str[1:-1]
+        str = unescape(str)
+    return str
 
 class xCSS(object):
     # configuration:
     construct = 'self'
-    short_colors = True
-    reverse_colors = True
 
     def __init__(self):
         pass
@@ -555,8 +545,15 @@ class xCSS(object):
             return ','.join(sorted(selectors)) + ' extends ' + '&'.join(sorted(parents))
         return ','.join(sorted(selectors))
 
-    def apply_vars(self, cont, context=None, options=None):
+    def apply_vars(self, cont, context, _dequote=False):
         if '$' not in cont:
+            return cont
+        if cont in context:
+            while cont in context:
+                _cont = context[cont]
+                if _cont == cont:
+                    break
+                cont = _cont
             return cont
         # Flatten the context (no variables mapping to variables)
         flat_context = {}
@@ -569,61 +566,11 @@ class xCSS(object):
             flat_context[k] = v
         # Interpolate variables:
         def _av(m):
-            v = m.group(0)
-            return flat_context.get(v, v)
-        # ...apply flat context:
+            v = flat_context.get(m.group(1))
+            if v and _dequote:
+                v = dequote(v)
+            return v if v is not None else m.group(0)
         cont = _interpolate_re.sub(_av, cont)
-        return cont
-
-    def _apply_vars(self, cont, context=None, options=None):
-        if '$' not in cont:
-            return cont
-        # Interpolate variables:
-        def _av(m):
-            v = m.group(0)
-            return context.get(v, v)
-        # ...apply recursively:
-        cnt = 0
-        old_cont = None
-        while cont != old_cont and cnt < 20:
-            cnt += 1
-            old_cont = cont
-
-            # interpolate variables:
-            cont = _interpolate_re.sub(_av, cont)
-        return cont
-
-    def _apply_vars(self, cont, context=None, options=None):
-        xcss_vars = self.xcss_vars.copy()
-        xcss_vars.update(context or {})
-        vars = xcss_vars.keys()
-        try:
-            remove_vars_re, interpolate_re = self._contexts[tuple(vars)]
-        except KeyError:
-            vars1 = []
-            vars2 = []
-            for var in vars:
-                if var[0] == '$':
-                    vars1.append(re.escape(var))
-                else:
-                    vars2.append(re.escape(var))
-            remove_vars_re = re.compile(r'(?<![-\w])(((' + '|'.join(vars1) + r')\s*[:=]|(' + '|'.join(vars2) + r')\s*=).*?([;}]|$))')
-            interpolate_re = re.compile(r'(?<![-\w])(' + '|'.join(map(re.escape, vars)) + r')(?![-\w])')
-            self._contexts[tuple(vars)] = remove_vars_re, interpolate_re
-
-        # remove variables declarations from the rules
-        cont = _remove_decls_re.sub('', cont)
-        cont = remove_vars_re.sub('', cont)
-        
-        cnt = 0
-        old_cont = None
-        while cont != old_cont and cnt < 5:
-            cnt += 1
-            old_cont = cont
-
-            # interpolate variables:
-            cont = interpolate_re.sub(lambda m: xcss_vars[m.group(0)], cont)
-
         return cont
 
     @print_timing
@@ -723,7 +670,7 @@ class xCSS(object):
                     prop = prop.strip()
                     if prop:
                         value = value and value.strip()
-                        value = value and self.apply_vars(value, context, options)
+                        value = value and self.apply_vars(value, context)
                         _prop = scope + prop
                         if is_var or prop[0] == '$' and value is not None:
                             if value:
@@ -734,7 +681,7 @@ class xCSS(object):
                                 else:
                                     context[_prop] = value
                         elif properties is not None:
-                            _prop = self.apply_vars(_prop, context, options)
+                            _prop = self.apply_vars(_prop, context, True)
                             properties.append((_prop, value))
         for p_selectors, p_codestr, lose in self.locate_blocks(codestr):
             if lose is not None:
@@ -809,7 +756,7 @@ class xCSS(object):
             else:
                 better_selectors += ' extends ' + parents
 
-        better_selectors = self.apply_vars(better_selectors, _context, _options)
+        better_selectors = self.apply_vars(better_selectors, _context, True)
         better_selectors = self.do_glob_math(better_selectors)
         better_selectors = self.normalize_selectors(better_selectors)
 
@@ -856,7 +803,19 @@ class xCSS(object):
                             # ...then insert the include here:
                             funct, params = (name.split('(', 1)+[''])[:2]
                             params = params.rstrip(')')
-                            params = params and params.split(',') or []
+                            params = params.split(',') or []
+                            if params:
+                                final_params = []
+                                param = params.pop(0)
+                                try:
+                                    while True:
+                                        while param.count('(') != param.count(')'):
+                                            param = param + ',' + params.pop(0)
+                                        final_params.append(param)
+                                        param = params.pop(0)
+                                except IndexError:
+                                    pass
+                                params = final_params
                             vars = {}
                             defaults = {}
                             new_params = []
@@ -876,23 +835,15 @@ class xCSS(object):
                                 m_codestr = mixin[2]
                                 for i, param in enumerate(new_params):
                                     m_param = m_params[i]
-                                    # Get the default:
-                                    if param in defaults:
-                                        m_vars[m_param] = defaults[param]
-                                    # Set the variable (if any):
-                                    while param in context:
-                                        _param = context[param]
-                                        if _param == param:
-                                            break
-                                        param = _param
-                                    m_vars[m_param] = param
+                                    m_vars[m_param] = self.apply_vars(param, context)
+                                for p in m_vars:
+                                    if p not in new_params:
+                                        m_vars[p] = self.apply_vars(m_vars[p], m_vars)
                                 pos = self._insert_child(pos, rule, p_selectors, construct, m_codestr, extra_context=m_vars)
                                 rewind = True
                         elif code == '@import':
                             i_codestr = None
-                            if name[0] in ('"', "'"):
-                                name = name[1:-1]
-                                name = unescape(name)
+                            name = dequote(name)
                             if '..' not in name: # Protect against going to prohibited places...
                                 try:
                                     filename = os.path.basename(name)
@@ -935,7 +886,7 @@ class xCSS(object):
                     else:
                         val = True
                     if val:
-                        name = self.apply_vars(name, context, options)
+                        name = self.apply_vars(name, context)
                         name = self.calculate(name)
                         val = name and name.split()[0].lower()
                         val = bool(False if not val or val in('0', 'false',) else val)
@@ -950,7 +901,7 @@ class xCSS(object):
                     c_selectors = None
                 elif code == '@for':
                     var, _, name = name.partition('from')
-                    name = self.apply_vars(name, context, options)
+                    name = self.apply_vars(name, context)
                     name = self.calculate(name)
                     
                     start, _, end = name.partition('through')
@@ -980,8 +931,9 @@ class xCSS(object):
                             if param:
                                 new_params.append(param)
                                 if default:
-                                    defaults[param] = default.strip()
-                        mixin = [ list(new_params), defaults, self.apply_vars(c_codestr, context, options) ]
+                                    default = self.apply_vars(default, context)
+                                    defaults[param] = default
+                        mixin = [ list(new_params), defaults, self.apply_vars(c_codestr, context) ]
                         # Insert as many @mixin options as the default parameters:
                         while len(new_params):
                             options['@mixin ' + funct + ':' + str(len(new_params))] = mixin
@@ -1254,7 +1206,7 @@ class xCSS(object):
 
             # To do math operations, we need to get the color's hex values (for color names)
             # ...also we change brackets to parenthesis:
-            better_expr_str = _colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_expr_str).replace('[', '(').replace(']', ')')
+            better_expr_str = _colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_expr_str)
             
             better_expr_str = self._calculate(better_expr_str)
             if better_expr_str is None:
@@ -1277,7 +1229,7 @@ class xCSS(object):
 
             # To do math operations, we need to get the color's hex values (for color names)
             # ...also we change brackets to parenthesis:
-            better_expr_str = _colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_expr_str).replace('[', '(').replace(']', ')')
+            better_expr_str = _colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_expr_str)
             
             better_expr_str = self._calculate(better_expr_str)
             if better_expr_str is None:
@@ -1303,7 +1255,7 @@ class xCSS(object):
 
                 # To do math operations, we need to get the color's hex values (for color names)
                 # ...also we change brackets to parenthesis:
-                better_prop_str = _colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_prop_str).replace('[', '(').replace(']', ')')
+                better_prop_str = _colors_re.sub(lambda m: _colors.get(m.group(0), m.group(0)), better_prop_str)
                 
                 better_prop_str = self._calculate(better_prop_str)
                 if better_prop_str is None:
@@ -1330,10 +1282,10 @@ class xCSS(object):
 
     def post_process(self, cont):
         # short colors:
-        if self.xcss_opts.get('short_colors', 0):
+        if self.xcss_opts.get('short_colors', 1):
             cont = _short_color_re.sub(r'#\1\2\3', cont)
         # color names:
-        if self.xcss_opts.get('reverse_colors', 0):
+        if self.xcss_opts.get('reverse_colors', 1):
             cont = _reverse_colors_re.sub(lambda m: _reverse_colors[m.group(0).lower()], cont)
         # zero units out (i.e. 0px or 0em -> 0):
         cont = _zero_units_re.sub('0', cont)
@@ -1388,10 +1340,10 @@ hex2rgba = {
 }
 
 def escape(str):
-    return re.sub(r'(["\'\\])', '\\\\\g<1>', str)
+    return re.sub(r'''(["'\\])''', '\\\\\1', str)
 
 def unescape(str):
-    return re.sub(re.escape('\\')+'(.)', "\g<1>", str)
+    return re.sub(r'''\\(['"])''', '\1', str)
 
 
 def _rgb(r, g, b, type='rgb'):
@@ -1430,8 +1382,10 @@ def __rgba_add(color, r, g, b, a):
     color = ColorValue(color)
     c = color.value
     a = r, g, b, a
-    r = 255.0, 255.0, 255.0, 1.0
+    # Do the additions:
     c = [ c[i] + a[i] for i in range(4) ]
+    # Validations:
+    r = 255.0, 255.0, 255.0, 1.0
     c = [ 0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4) ]
     color.value = tuple(c)
     return color
@@ -1448,10 +1402,17 @@ def __hsl_add(color, h, s, l):
     color = ColorValue(color)
     c = color.value
     a = h / 360.0, s, l
+    # Convert to HSL:
     h, l, s = list(colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0))
     c = h, s, l
+    # Do the additions:
     c = [ 0.0 if c[i] < 0 else 1.0 if c[i] > 1 else c[i] + a[i] for i in range(3) ]
-    c = colorsys.hls_to_rgb(((c[0] * 360.0) % 360) / 360.0, c[2], c[1])
+    # Validations:
+    c[0] = (c[0] * 360.0) % 360
+    r = 360.0, 1.0, 1.0
+    c = [ 0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(3) ]
+    # Convert back to RGB:
+    c = colorsys.hls_to_rgb(c[0] / 360.0, c[2], c[1])
     color.value = (c[0] * 255.0, c[1] * 255.0, c[2] * 255.0, color.value[3])
     return color
 
@@ -2126,7 +2087,7 @@ class NumberValue(Value):
                     _unit = units.pop('_')
                     units.setdefault(_unit, 0)
                     units[_unit] += 1 # Give more weight to the first unit ever set
-                    units[_unit] *= 2
+                    units[_unit] *= 5
                 else:
                     units = self.units
                 units = sorted(units, key=units.get)
@@ -2261,7 +2222,7 @@ class QuotedStringValue(Value):
         if tokens is None:
             self.value = ''
         elif isinstance(tokens, ParseResults):
-            self.value = tokens[0]
+            self.value = dequote(tokens[0])
         elif isinstance(tokens, QuotedStringValue):
             self.value = tokens.value
         else:
@@ -2292,9 +2253,15 @@ class StringValue(QuotedStringValue):
     def __str__(self):
         return self.value
     def __add__(self, other):
+        if self.__class__ == QuotedStringValue or other.__class__ == QuotedStringValue:
+            other = QuotedStringValue(other)
+            return QuotedStringValue(self.value + other.value)
         other = StringValue(other)
         return StringValue(self.value + '+' + other.value)
     def __radd__(self, other):
+        if self.__class__ == QuotedStringValue or other.__class__ == QuotedStringValue:
+            other = QuotedStringValue(other)
+            return QuotedStringValue(other.value + self.value)
         other = StringValue(other)
         return StringValue(other.value + '+' + self.value)
 
@@ -2409,8 +2376,8 @@ def callOperator(token):
         print 'c',token
 
 def bnf():
-    _lpar_ = Suppress('(')
-    _rpar_ = Suppress(')')
+    _lpar_ = oneOf('[ (').suppress()
+    _rpar_ = oneOf('] )').suppress()
     _comma_ = Suppress(',')
 
     _unit_ = oneOf(' '.join(_units))
@@ -2441,11 +2408,11 @@ def bnf():
             CaselessKeyword('false', '-_$' + alphanums)
         ).setParseAction(BooleanValue)
 
-    qstring = QuotedString("'", escChar='\\', multiline=True)\
-        .setParseAction(StringValue)
-
-    ustring = QuotedString('"', escChar='\\', multiline=True)\
+    qstring = QuotedString('"', escChar='\\', multiline=True)\
         .setParseAction(QuotedStringValue)
+
+    ustring = QuotedString("'", escChar='\\', multiline=True)\
+        .setParseAction(StringValue)
 
     stringliteral = qstring | ustring
     identifier = Word('-_$' + alphas, '-_' + alphanums)
@@ -2481,21 +2448,22 @@ def eval_tree(node):
             # Function call:
             fn_name = '%s:%d' % (node[0], len(node) - 1)
             fn = fnct.get(fn_name) or fnct.get('%s:n' % node[0])
-            if not fn: raise ParseException("Function not found: "+ fn_name)
             args = [ eval_tree(n) for n in node[1:] ]
-            node = fn(*args)
+            if fn:
+                node = fn(*args)
+            else:
+                node = StringValue(node[0]+'(' + ', '.join(str(a) for a in args) + ')')
         elif isinstance(node[1], basestring):
             # Operator:
             args = [ eval_tree(n) for n in node ]
-            args.reverse()
             fns = args[1::2]
             args = args[::2]
-            arg1 = args.pop()
+            arg1 = args.pop(0)
             while len(args):
-                arg2 = args.pop()
-                fn_name = fns.pop()
+                arg2 = args.pop(0)
+                fn_name = fns.pop(0)
                 fn = fnct.get(fn_name)
-                if not fn: raise ParseException("Function not found: "+ fn_name)
+                if not fn: raise ParseException("Invalid operator: "+ fn_name)
                 arg1 = fn(arg1, arg2)
             node = arg1
         else:
