@@ -1119,6 +1119,7 @@ class xCSS(object):
         scope = set()
         open = False
         old_selectors = None
+        old_property = None
         for rule in rules:
             fileid, position, codestr, deps, context, options, selectors, properties, path = rule
             #print >>sys.stderr, fileid, position, [ c for c in context if c[1] != '_' ], options.keys(), selectors, deps
@@ -1152,8 +1153,11 @@ class xCSS(object):
                         property = property.replace('!default', '').replace('  ', ' ').strip()
                         if prop in scope:
                             continue
-                    scope.add(prop)
-                    result += tb + property + ';' + nl
+                    if old_property != property:
+                        old_property = property
+                        scope.add(prop)
+                        old_property = property
+                        result += tb + property + ';' + nl
         if open:
             if not sc:
                 if result[-1] == ';':
