@@ -48,6 +48,13 @@ import textwrap
 # units and conversions
 _units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
           'grad', 'ms', 's', 'hz', 'khz', '%']
+_units_weights = {
+    'em': 10,
+    'mm': 10,
+    'ms': 10,
+    'hz': 10,
+    '%': 100,
+}
 _conv = {
     'size': {
         'em': 13.0,
@@ -242,8 +249,10 @@ _default_xcss_vars = {
 _default_xcss_opts = {
     'verbosity': 0,
     'compress': 1,
-    'short_colors': 1, # Converts things like #RRGGBB to #RGB
-    'reverse_colors': 1, # Gets the shortest name of all for colors
+    'compress_short_colors': 1, # Converts things like #RRGGBB to #RGB
+    'compress_reverse_colors': 1, # Gets the shortest name of all for colors
+    'short_colors': 0, # Converts things like #RRGGBB to #RGB
+    'reverse_colors': 0, # Gets the shortest name of all for colors
 }
 
 _short_color_re = re.compile(r'(?<!\w)#([a-f0-9])\1([a-f0-9])\2([a-f0-9])\3\b', re.IGNORECASE)
@@ -529,8 +538,11 @@ class xCSS(object):
         # Interpolate variables:
         def _av(m):
             v = flat_context.get(m.group(1))
-            if v and _dequote:
-                v = dequote(v)
+            if v:
+                if _dequote:
+                    v = dequote(v)
+                if ' ' in v:
+                    v = '(' + v + ')'
             return v if v is not None else m.group(0)
         cont = _interpolate_re.sub(_av, cont)
         return cont
@@ -1227,16 +1239,18 @@ class xCSS(object):
 
     #@print_timing
     def post_process(self, cont):
+        compress = self.xcss_opts.get('compress', 1) and 'compress_' or ''
         # short colors:
-        if self.xcss_opts.get('short_colors', 1):
+        if self.xcss_opts.get(compress+'short_colors', 1):
             cont = _short_color_re.sub(r'#\1\2\3', cont)
         # color names:
-        if self.xcss_opts.get('reverse_colors', 1):
+        if self.xcss_opts.get(compress+'reverse_colors', 1):
             cont = _reverse_colors_re.sub(lambda m: _reverse_colors[m.group(0).lower()], cont)
-        # zero units out (i.e. 0px or 0em -> 0):
-        cont = _zero_units_re.sub('0', cont)
-        # remove zeros before decimal point (i.e. 0.3 -> .3)
-        cont = _zero_re.sub('.', cont)
+        if compress:
+            # zero units out (i.e. 0px or 0em -> 0):
+            cont = _zero_units_re.sub('0', cont)
+            # remove zeros before decimal point (i.e. 0.3 -> .3)
+            cont = _zero_re.sub('.', cont)
         return cont
 
 import os
@@ -1262,8 +1276,6 @@ except ImportError:
 def to_str(num):
     if isinstance(num, float):
         num = ('%0.03f' % num).rstrip('0').rstrip('.')
-        if '.' in num:
-            num = num.lstrip('0')
         return num
     elif isinstance(num, bool):
         return 'true' if num else 'false'
@@ -1482,13 +1494,13 @@ def _saturation(color):
     c = ColorValue(color).value
     h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
     ret = NumberValue(s)
-    ret.units['%'] = 1
+    ret.units = { '%': _units_weights.get('%', 1), '_': '%' }
     return ret
 def _lightness(color):
     c = ColorValue(color).value
     h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
     ret = NumberValue(l)
-    ret.units['%'] = 1
+    ret.units = { '%': _units_weights.get('%', 1), '_': '%' }
     return ret
 
 def __color_stops(*args):
@@ -1742,10 +1754,10 @@ def _image_width(image):
         image = Image.open(path)
         width = image.size[0]
         ret = NumberValue(width)
-        ret.units['px'] = 1
+        ret.units = { 'px': _units_weights.get('px', 1), '_': 'px' }
         return ret
     ret = NumberValue(0)
-    ret.units['px'] = 1
+    ret.units = { 'px': _units_weights.get('px', 1), '_': 'px' }
     return ret
 
 def _image_height(image):
@@ -1761,10 +1773,10 @@ def _image_height(image):
         image = Image.open(path)
         height = image.size[1]
         ret = NumberValue(height)
-        ret.units['px'] = 1
+        ret.units['px'] = _units_weights.get('px', 1)
         return ret
     ret = NumberValue(0)
-    ret.units['px'] = 1
+    ret.units['px'] = _units_weights.get('px', 1)
     return ret
 
 ################################################################################
@@ -1817,8 +1829,7 @@ def _nth(s, n=None):
 
 def _percentage(value):
     value = NumberValue(value)
-    value.units.clear()
-    value.units['%'] = 1
+    value.units = { '%': _units_weights.get('%', 1), '_': '%' }
     return value
 
 def _unitless(value):
@@ -1826,11 +1837,11 @@ def _unitless(value):
     value.units.clear()
     return value
 
-def _unquote(s):
-    return StringValue(s)
+def _unquote(*args):
+    return StringValue(' '.join([ StringValue(s).value for s in args ]))
 
-def _quote(s):
-    return QuotedStringValue(s)
+def _quote(*args):
+    return QuotedStringValue(' '.join([ StringValue(s).value for s in args ]))
 
 def _pi():
     return NumberValue(math.pi)
@@ -1838,14 +1849,16 @@ def _pi():
 def _convert_to(value, type):
     return value.convert_to(type)
 
-def _inv(value):
-    if isinstance(value, NumberValue):
-        return value * -1
-    elif isinstance(value, BooleanValue):
-        return not value
-    val = StringValue(value)
-    val.value = '!' + val.value
-    return val
+def _inv(sign):
+    def __inv(value):
+        if isinstance(value, NumberValue):
+            return value * -1
+        elif isinstance(value, BooleanValue):
+            return not value
+        val = StringValue(value)
+        val.value = sign + val.value
+        return val
+    return __inv
 
 def _and(a, b):
     return a and b
@@ -2007,6 +2020,7 @@ class NumberValue(Value):
             try:
                 if tokens.value and tokens.value[-1] == '%':
                     self.value = to_float(tokens.value[:-1]) / 100.0
+                    self.units = { '%': _units_weights.get('%', 1), '_': '%' }
                 else:
                     self.value = to_float(tokens.value)
             except ValueError:
@@ -2041,12 +2055,13 @@ class NumberValue(Value):
         second = NumberValue(second)
         first_unit = first.unit
         second_unit = second.unit
-        if first_unit == '%' and not second_unit:
-            second.units['%'] = 1
-            second.value /= 100.0
-        elif second_unit == '%' and not first_unit:
-            first.units['%'] = 1
-            first.value /= 100.0
+        if op == operator.__add__ or op == operator.__sub__:
+            if first_unit == '%' and not second_unit:
+                second.units = { '%': _units_weights.get('%', 1), '_': '%' }
+                second.value /= 100.0
+            elif second_unit == '%' and not first_unit:
+                first.units = { '%': _units_weights.get('%', 1), '_': '%' }
+                first.value /= 100.0
         val = op(first.value, second.value)
         ret = NumberValue(None).merge(first)
         ret = ret.merge(second)
@@ -2067,29 +2082,24 @@ class NumberValue(Value):
         if not self.unit:
             val *= _conv_factor.get(type, 1.0)
         ret = NumberValue(val)
-        ret.units[type] = 1
-        ret.units['_'] = type
+        ret.units = { type: _units_weights.get(type, 1), '_': type }
         return ret
     @property
     def unit(self):
         unit = ''
         if self.units:
-            if '%' in self.units:
-                unit = '%'
+            if '_'in self.units:
+                units = self.units.copy()
+                _unit = units.pop('_')
+                units.setdefault(_unit, 0)
+                units[_unit] += _units_weights.get(_unit, 1) # Give more weight to the first unit ever set
             else:
-                if '_'in self.units:
-                    units = self.units.copy()
-                    _unit = units.pop('_')
-                    units.setdefault(_unit, 0)
-                    units[_unit] += 1 # Give more weight to the first unit ever set
-                    units[_unit] *= 5
-                else:
-                    units = self.units
-                units = sorted(units, key=units.get)
-                while len(units):
-                    unit = units.pop()
-                    if unit and unit != '%':
-                        break
+                units = self.units
+            units = sorted(units, key=units.get)
+            while len(units):
+                unit = units.pop()
+                if unit:
+                    break
         return unit
 
 class ColorValue(Value):
@@ -2338,8 +2348,8 @@ fnct = {
 
     'percentage:1': _percentage,
     'unitless:1': _unitless,
-    'quote:1': _quote,
-    'unquote:1': _unquote,
+    'quote:n': _quote,
+    'unquote:n': _unquote,
     'escape:1': _unquote,
     'e:1': _unquote,
 
@@ -2352,7 +2362,8 @@ fnct = {
     'floor:1': Value._wrap(math.floor),
     'pi:0': _pi,
     'not:1': _not,
-    '!:1': _inv,
+    '!:1': _inv('!'),
+    '-:1': _inv('-'),
 }
 for u in _units:
     fnct[u+':2'] = _convert_to
@@ -3325,11 +3336,11 @@ a {
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .functions {
-    opacify: rgba(0, 0, 0, .6);
+    opacify: rgba(0, 0, 0, 0.6);
     opacify: #001;
-    transparentize: rgba(0, 0, 0, .4);
-    transparentize: rgba(0, 0, 0, .6);
-    lighten: hsl(0, 0, 30%);
+    transparentize: rgba(0, 0, 0, 0.4);
+    transparentize: rgba(0, 0, 0, 0.6);
+    lighten: hsl(0, 0%, 30%);
     lighten: #e00;
     darken: hsl(25, 100%, 50%);
     darken: #210000;
@@ -3342,7 +3353,7 @@ a {
     adjust: #886a10;
     mix: #7f007f;
     mix: #3f00bf;
-    mix: rgba(63, 0, 191, .75);
+    mix: rgba(63, 0, 191, 0.75);
     percentage: 200%;
     round: 10px;
     round: 11px;
