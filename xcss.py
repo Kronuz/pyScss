@@ -5,7 +5,7 @@ xCSS Framework for Python
 
 @author    German M. Bravo (Kronuz)
            Based on some code from the original xCSS project by Anton Pawlik
-@version   0.5
+@version   0.7
 @see       http://xcss.antpaw.org/docs/
            http://sass-lang.com/
            http://oocss.org/spec/css-object-model.html
@@ -275,57 +275,6 @@ _expr_re = re.compile(r'''
 )
 ''', re.VERBOSE)
 
-__expr_re__ = re.compile(r'''
-    (\#\{)?
-    (?:^|(?<!\w))               # Expression shouldn't have a word before it
-    (?:
-        (?:[\[\(\-]|\bnot\b)
-        (?:[\[\(\s\-]+|\bnot\b)?
-    )?                          # ...then any number of opening parenthesis or spaces
-    (?:
-        (['"]).*?\2             # If a string, consume the whole thing...
-    |
-        \#?[\w.%$]+             # ...otherwise get the word, variable or number
-        (?:
-            [\[\(]              # optionally, then start with a parenthesis
-            .*?                 # followed by anything...
-            [\]\)][\w%]*        # until it closes, then try to get any units
-            [\]\)\s\,]*?        # ...and keep closing other parenthesis and parameters
-        )?
-    )
-    (?:                         # Here comes the other expressions (0..n)
-        [\]\)\s\,]*?
-        (?:
-            [+*/^,]             # Get accepted operators
-        |
-            (?<=\s)-(?=\s)      # ...minus operator needs spaces
-        |
-            (?<=[-\w.%$])-      # or be preceded by something that makes it not a variable
-        |
-            and | or
-        |
-            == | != | [<>]=?    # Other operators for comparisons
-        )
-        (?:[\[\(\s\-]+|\bnot\b)?
-        (?:
-            (['"]).*?\3         # If a string, consume the whole thing...
-        |
-            \#?[\w.%$]+         # ...otherwise get the word, variable or number
-            (?:
-                [\[\(]          # optionally, then  start with a parenthesis
-                .*?             # followed by anything...
-                [\]\)][\w%]*    # until it closes, then try to get any units
-                [\]\)\s\,]*?    # ...and keep closing other parenthesis and parameters
-            )?
-        )
-    )*
-    [\]\)\s\,]*?                # ...keep closing parenthesis
-    (?:[\]\)\,]+[\w%]*)?        # and then try to get any units afterwards
-    (?=[^:{]*[;}])
-    (?(1)\}?)
-''', re.VERBOSE)
-
-#_expr_re = re.compile(r'(\[.*?\])([\s;}]|$|.+?\S)') # <- This is the old method, required parenthesis around the expression
 _ml_comment_re = re.compile(r'\/\*(.*?)\*\/', re.DOTALL)
 _sl_comment_re = re.compile(r'(?<!\w{2}:)\/\/.*')
 _zero_units_re = re.compile(r'\b0(' + '|'.join(map(re.escape, _units)) + r')(?!\w)', re.IGNORECASE)
@@ -341,7 +290,12 @@ _reverse_default_xcss_vars_re = re.compile(r'(content.*:.*(\'|").*)(' + '|'.join
 
 _blocks_re = re.compile(r'[{},;()\'"]|\n+|$')
 
-_skip_word_re = re.compile('-?[\w\s#.,:%]*$|[\w\-#.,:%]*$', re.MULTILINE)
+_skip_word_re = re.compile(r'-?[\w\s#.,:%]*$|[\w\-#.,:%]*$', re.MULTILINE)
+_skip_re = re.compile(r'''
+    (?:url|alpha)\([^)]*\)$
+|
+    [\w\-#.,:%]+(?:\s+[\w\-#.,:%]+)*$
+''', re.MULTILINE | re.IGNORECASE | re.VERBOSE)
 _has_code_re = re.compile('''
     (?:^|(?<=[{;}]))            # the character just before it should be a '{', a ';' or a '}'
     \s*                         # ...followed by any number of spaces
@@ -668,6 +622,10 @@ class xCSS(object):
                                 elif value.lower() in ('0', 'false', 'f', 'no', 'n', 'off'):
                                     value = 0
                                 options[option] = value
+                    elif code == '@extend':
+                        options.setdefault(code, set())
+                        options[code].update(p.strip() for p in name.replace(',', '&').split('&'))
+                        options[code].discard('')
                     else:
                         options[code] = name
                 else:
@@ -722,52 +680,63 @@ class xCSS(object):
                     self.parts[selectors].append(rule)
 
     def _insert_child(self, pos, rule, p_selectors, c_selectors, c_codestr, extra_context=None, path=None):
-        better_selectors = set()
         c_selectors, _, c_parents = c_selectors.partition(' extends ')
-        c_selectors = c_selectors.split(',')
-        for c_selector in c_selectors:
-            for p_selector in p_selectors:
-                if c_selector == self.construct:
-                    better_selectors.add(p_selector)
-                elif '&' in c_selector: # Parent References
-                    better_selectors.add(c_selector.replace('&', p_selector))
-                elif p_selector:
-                    better_selectors.add(p_selector + ' ' + c_selector)
-                else:
-                    better_selectors.add(c_selector)
-        better_selectors = ','.join(sorted(better_selectors))
-        if c_parents:
-            better_selectors += ' extends ' + c_parents
-
-        if c_selector == self.construct:
+        if c_selectors == self.construct:
             # Context and options for constructors ('self') are the same as the parent
             _deps = rule[DEPS]
             _context = rule[CONTEXT]
             _options = rule[OPTIONS]
-            if extra_context is not None:
+            if extra_context is not None: # Nested contexts like @import of mixins:
                 _context = rule[CONTEXT].copy()
+            _context.update(extra_context or {})
+            _properties = []
+
+            better_selectors = ','.join(sorted(p_selectors))
         else:
             _deps = set(rule[DEPS])
             _context = rule[CONTEXT].copy()
             _options = rule[OPTIONS].copy()
             _options.pop('@extend', None)
-        _context.update(extra_context or {})
-        _properties = []
+            _context.update(extra_context or {})
+            _properties = []
+
+            better_selectors = set()
+            c_selectors = c_selectors.split(',')
+            for c_selector in c_selectors:
+                c_selector = c_selector.strip()
+                for p_selector in p_selectors:
+                    if c_selector == self.construct:
+                        better_selectors.add(p_selector)
+                    elif '&' in c_selector: # Parent References
+                        better_selectors.add(c_selector.replace('&', p_selector))
+                    elif p_selector:
+                        better_selectors.add(p_selector + ' ' + c_selector)
+                    else:
+                        better_selectors.add(c_selector)
+            better_selectors = ','.join(sorted(better_selectors))
 
         self.process_properties(c_codestr, _context, _options, _properties)
+        p_parents = _options.get('@extend')
 
-        parents = _options.get('@extend')
-
-        if parents:
-            parents = parents.replace(',', '&') # @extend can come with comma separated selectors...
+        if p_parents or c_parents:
             if c_parents:
-                better_selectors += '&' + parents
+                parents = set(p.strip() for p in c_parents.split('&'))
+                parents.update(p_parents or [])
+                parents.discard('')
             else:
-                better_selectors += ' extends ' + parents
-
+                parents = p_parents
+            if parents:
+                better_selectors += ' extends ' + '&'.join(sorted(parents))
+        
+        _better_selectors = better_selectors
         better_selectors = self.apply_vars(better_selectors, _context, True)
         better_selectors = self.do_glob_math(better_selectors)
-        better_selectors = self.normalize_selectors(better_selectors)
+        if _better_selectors != better_selectors:
+            # Normalize the whole thing:
+            better_selectors = self.normalize_selectors(better_selectors)
+        else:
+            # ...or only fix tabs and spaces in selectors:
+            better_selectors = _spaces_re.sub(' ', better_selectors) 
 
         rule[POSITION] = None # Disable this old rule (perhaps it could simply be removed instead??)...
         # ...and insert new rule
@@ -841,26 +810,48 @@ class xCSS(object):
                                 rewind = True
                         elif code == '@import':
                             i_codestr = None
-                            name = dequote(name)
-                            if '..' not in name: # Protect against going to prohibited places...
-                                try:
+                            if '..' not in name and '://' not in name and 'url(' not in name: # Protect against going to prohibited places...
+                                names = name.split(',')
+                                for name in names:
+                                    name = dequote(name.strip())
                                     filename = os.path.basename(name)
-                                    dirname = os.path.join(rule[PATH] or LOAD_PATHS, os.path.dirname(name))
-                                    i_codestr = open(os.path.join(dirname, '_'+filename+'.scss')).read()
-                                except:
-                                    try:
-                                        dirname = os.path.join(LOAD_PATHS, os.path.dirname(name))
-                                        i_codestr = open(os.path.join(dirname, '_'+filename+'.scss')).read()
-                                    except:
-                                        pass
-                            if i_codestr:
-                                i_codestr = self.load_string(i_codestr)
-                                pos = self._insert_child(pos, rule, p_selectors, construct, i_codestr, path=dirname)
-                                rewind = True
+                                    dirname = os.path.dirname(name)
+                                    load_paths = []
+                                    i_codestr = None
+                                    for path in [ './' ] + LOAD_PATHS.split(','):
+                                        for basepath in [ './', rule[PATH] ]:
+                                            i_codestr = None
+                                            full_path = os.path.realpath(os.path.join(path, basepath, dirname))
+                                            if full_path not in load_paths:
+                                                try:
+                                                    i_codestr = open(os.path.join(full_path, '_'+filename+'.scss')).read()
+                                                except:
+                                                    try:
+                                                        i_codestr = open(os.path.join(full_path, filename+'.scss')).read()
+                                                    except:
+                                                        try:
+                                                            i_codestr = open(os.path.join(full_path, '_'+filename)).read()
+                                                        except:
+                                                            try:
+                                                                i_codestr = open(os.path.join(full_path, filename)).read()
+                                                            except:
+                                                                pass
+                                                if i_codestr is not None:
+                                                    break
+                                                else:
+                                                    load_paths.append(full_path)
+                                        if i_codestr is not None:
+                                            break
+                                    if i_codestr is None:
+                                        err = "File to import not found or unreadable: '" + filename + "'\nLoad paths:\n\t" + "\n\t".join(load_paths)
+                                        print >>sys.stderr, err
+                                    else:
+                                        i_codestr = self.load_string(i_codestr)
+                                        pos = self._insert_child(pos, rule, p_selectors, construct, i_codestr, path=full_path)
+                                        rewind = True
                             else:
-                                print >>sys.stderr, 'File not found:',os.path.join(dirname, '_'+filename+'.scss')
-                                pass
                                 #new_codestr.append(prop) #FIXME: if I remove the comment, the include is added as a new rule again and it loops
+                                pass
                         else:
                             new_codestr.append(prop)
                     if new_codestr:
@@ -1180,8 +1171,8 @@ class xCSS(object):
         except KeyError:
             better_expr_str = _base_str
             
-            if _skip_word_re.match(better_expr_str):
-                if ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
+            if _skip_word_re.match(better_expr_str) and  ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
+                    self._replaces[_base_str] = better_expr_str
                     return better_expr_str
 
             better_expr_str = self._calculate(better_expr_str)
@@ -1203,7 +1194,8 @@ class xCSS(object):
 
             better_expr_str = _base_str
 
-            if _skip_word_re.match(better_expr_str) or better_expr_str.startswith('url('):
+            if _skip_re.match(better_expr_str) and ' - ' not in better_expr_str:
+                self._replaces[_group0] = better_expr_str
                 return better_expr_str
 
             better_expr_str = self._calculate(better_expr_str)
@@ -1211,6 +1203,7 @@ class xCSS(object):
                 better_expr_str = _base_str
 
             self._replaces[_group0] = better_expr_str
+            
         return better_expr_str
 
     def do_glob_math(self, content):
@@ -2478,16 +2471,19 @@ def eval_tree(node):
             node = [ eval_tree(n) for n in node ]
     return node
 
-def eval_expr(expr):
+def eval_results(results):
     exprs = []
-
-    #print >>sys.stderr, '>>',expr,'<<'
-
-    results = bnf.parseString( expr, parseAll=True)
     for r in results:
         #print >>sys.stderr, r
         exprs.append(eval_tree(r))
     val = ' '.join(str(v) for v in exprs)
+    return val
+    
+def eval_expr(expr):
+    #print >>sys.stderr, '>>',expr,'<<'
+
+    results = bnf.parseString( expr, parseAll=True)
+    val = eval_results(results)
 
     #print >>sys.stderr, '--',val,'--', repr(val)
     return val
@@ -3060,6 +3056,40 @@ Multiple Extends
 	border-width: 3px;
 }
 
+Multiple Extends
+>>> print css.compile('''
+... @options compress:false, short_colors:true, reverse_colors:true;
+... .bad {
+...     color: red !important;
+... }
+... .error {
+...   border: 1px #f00;
+...   background-color: #fdd;
+... }
+... .attention {
+...   font-size: 3em;
+...   background-color: #ff0;
+... }
+... .seriousError {
+...   @extend .error, .attention;
+...   @extend .bad;
+...   border-width: 3px;
+... }
+... ''') #doctest: +NORMALIZE_WHITESPACE
+.bad, .seriousError {
+	color: red !important;
+}
+.error, .seriousError {
+	border: 1px red;
+	background-color: #fdd;
+}
+.attention, .seriousError {
+	font-size: 3em;
+	background-color: #ff0;
+}
+.seriousError {
+	border-width: 3px;
+}
 
 
 
