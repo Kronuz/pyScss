@@ -7,7 +7,7 @@ About
 =====
 pyScss compiles Scss, a superset of CSS that is more powerful, elegant and
 easier to maintain than plain-vanilla CSS. The library acts as a CSS source code
-preprocesor which allows you to use variables, nested rules, mixins, andhave
+preprocesor which allows you to use variables, nested rules, mixins, and have
 inheritance of rules, all with a CSS-compatible syntax which the preprocessor
 then compiles to standard CSS.
 
