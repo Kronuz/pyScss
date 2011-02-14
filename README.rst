@@ -1,36 +1,47 @@
-xCSS for Python
-===============
-:Authors:
+pyScss, a Scss compiler for Python
+==================================
+:Author:
     German M. Bravo (Kronuz) <german.mb@gmail.com>
-    Based on some code from the original xCSS project by Anton Pawlik
-    http://xcss.antpaw.org/about
+
+:Copyright:
+	copyright (c) 2011 German M. Bravo (Kronuz)
+	*Bits of code in pyScss come from various projects:*
+	Compass:
+	    (c) 2009 Christopher M. Eppstein
+	    http://compass-style.org/
+	Sass:
+	    (c) 2006-2009 Hampton Catlin and Nathan Weizenbaum
+	    http://sass-lang.com/
+	xCSS:
+	    (c) 2010 Anton Pawlik
+	    http://xcss.antpaw.org/docs/
 
 About
 =====
-xCSS for Python is a superset of CSS that is more powerful, elegant and easier
-to maintain than plain-vanilla CSS. The library works as a CSS source code
-preprocesor which allows you to use variables, nested rules, mixins, and have
+pyScss compiles Scss, a superset of CSS that is more powerful, elegant and
+easier to maintain than plain-vanilla CSS. The library acts as a CSS source code
+preprocesor which allows you to use variables, nested rules, mixins, andhave
 inheritance of rules, all with a CSS-compatible syntax which the preprocessor
 then compiles to standard CSS.
 
-xCSS, as an extension of CSS, helps keep large stylesheets well-organized. It
+Scss, as an extension of CSS, helps keep large stylesheets well-organized. It
 borrows concepts and functionality from projects such as OOCSS and other similar
-frameworks like as Sass (Sassy CSS). It's build on top of the original PHP xCSS
-codebase structure but it's been completely rewritten and many bugs have been
-fixed. It now also implements much of the Sass functionality and even compiles
-some Compass (`http://compass-style.org/`)
+frameworks like as Sass. It's build on top of the original PHP xCSS codebase
+structure but it's been completely rewritten, many bugs have been fixed and it
+has been extensively extended to support almost the full range of Sass' Scss
+syntax and functionality.
 
 Usage
 =====
     Usage example::
 
-	from xcss import xCSS
-	css = xCSS()
+	from scss import Scss
+	css = Scss()
 	css.compile("a { color: red + green; }")
 
     Or compile from the command line::
 
-	python xcss.py < file.css
+	python scss.py < file.css
 
 Examples
 ========
@@ -145,35 +156,35 @@ Examples
 
 	@options compress: no;
 	$icons: sprite-map("images/sociable/*.png"); // contains icons/new.png among others.
-	
+
 	div {
 		background: $icons;
 	}
-	
+
 	div .facebook {
 		width: image-width(sprite-file($icons, facebook));
 		height: image-height(sprite-file($icons, facebook));
 		background-position: sprite-position($icons, facebook);
 	}
-	
+
 	div .twitter {
 		width: image-width(sprite-file($icons, twitter));
 		height: image-height(sprite-file($icons, twitter));
 		background-position: sprite-position($icons, twitter);
 	}
-	
+
     ...generates a new sprite file and produces something like::
 
 	div {
                 background: url('/media/assets/eli2Rxy5MXpWj4uWPAHn5w.png?_=1297402328') 0 0 no-repeat;
 	}
-	
+
 	div .facebook {
                 width: 32px;
                 height: 32px;
                 background-position: -128px 0;
 	}
-	
+
 	div .twitter {
 		width: 32px;
                 height: 32px;
@@ -182,34 +193,34 @@ Examples
 
 Sass Sassy CSS
 ==============
-xCSS is a Sass (Scss) implementation for Python.
+pyScss is a Scss (Sass) implementation for Python.
 Currently it implements @mixin, @include, @if, @else, @for, and @import... it
 also implements many of the Sass functions including colors function like
 hsla(), hsl(), darken(), lighten(), mix(), opacify(), transparentize(),
 saturate(), desaturate(), etc.) as well as sprite-map(), sprite-file(),
 image-width(), image-height() and the others.
 
-In the file `xcss.py`, by the top, configure the LOAD_PATHS to point to your
+In the file `scss.py`, by the top, configure the LOAD_PATHS to point to your
 Compass framework path (I have `frameworks/compass/*.scss` and
 `framework/blueprint/*.scss` files in my project directory:
 `/usr/local/www/project/`, so I have that set for that path by default)
 
-I have succesfully compiled some Compass using `python xcss.py < myfile.css` the
+I have succesfully compiled some Compass using `python scss.py < myfile.css` the
 following `myfile.css`::
 
 	@options compress: no;
-	
+
 	$blueprint-grid-columns : 24;
 	$blueprint-grid-width   : 30px;
 	$blueprint-grid-margin  : 10px;
 	$font-color             : #333;
-	
+
 	@import "compass/reset";
 	@import "compass/utilities";
 	@import "blueprint";
-	
+
 	// Stuff goes here...
-    
+
 Installation Notes
 ==================
 It requires the Pyparsing module (a single pure python file) from:
