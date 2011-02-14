@@ -1,29 +1,37 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
 """
-xCSS Framework for Python
+pyScss, a Scss compiler for Python
 
-@author    German M. Bravo (Kronuz)
-           Based on some code from the original xCSS project by Anton Pawlik
-@version   0.8
-@see       http://xcss.antpaw.org/docs/
-           http://sass-lang.com/
-           http://oocss.org/spec/css-object-model.html
-@copyright (c) 2011 German M. Bravo (Kronuz)
-           (c) 2010 Anton Pawlik
-@license   MIT License
-           http://www.opensource.org/licenses/mit-license.php
+@author     German M. Bravo (Kronuz)
+@version    1.0 alpha
+@see        https://github.com/Kronuz/pyScss
+@copyright  (c) 2011 German M. Bravo (Kronuz)
+@license    MIT License
+            http://www.opensource.org/licenses/mit-license.php
 
-xCSS for Python is a superset of CSS that is more powerful, elegant and easier
+pyScss for Python is a superset of CSS that is more powerful, elegant and easier
 to maintain than plain-vanilla CSS. The library works as a CSS source code
 preprocesor which allows you to use variables, nested rules, mixins, and have
 inheritance of rules, all with a CSS-compatible syntax which the preprocessor
 then compiles to standard CSS.
 
-xCSS, as an extension of CSS, helps keep large stylesheets well-organized. It
+pyScss, as an extension of CSS, helps keep large stylesheets well-organized. It
 borrows concepts and functionality from projects such as OOCSS and other similar
 frameworks like as Sass. It's build on top of the original PHP xCSS codebase
-structure but it's been completely rewritten and many bugs have been fixed.
+structure but it's been completely rewritten, many bugs have been fixed and it
+has been extensively extended to support Scss (Sass) syntax and functionality.
+
+Bits of code in pyScss come from various projects:
+Compass:
+    (c) 2009 Christopher M. Eppstein
+    http://compass-style.org/
+Sass:
+    (c) 2006-2009 Hampton Catlin and Nathan Weizenbaum
+    http://sass-lang.com/
+xCSS:
+    (c) 2010 Anton Pawlik
+    http://xcss.antpaw.org/docs/
 
 """
 ################################################################################
@@ -42,7 +50,7 @@ ASSETS_URL = MEDIA_URL + 'assets/'
 ################################################################################
 import re
 import sys
-import string
+import time
 import textwrap
 
 # units and conversions
@@ -338,7 +346,6 @@ SELECTORS = 6
 PROPERTIES = 7
 PATH = 8
 
-import time, sys
 def print_timing(func):
     def wrapper(*arg):
         t1 = time.time()
@@ -370,7 +377,7 @@ def dequote(str):
         str = unescape(str)
     return str
 
-class xCSS(object):
+class Scss(object):
     # configuration:
     construct = 'self'
 
@@ -407,8 +414,7 @@ class xCSS(object):
         thin = None
         i = init = safe = lose = 0
         start = end = None
-        str_len = len(str)
-        
+
         for m in _blocks_re.finditer(str):
             i = m.end(0) - 1
             if m.start(0) == m.end(0):
@@ -569,15 +575,15 @@ class xCSS(object):
         for fileid, str in self.xcss_files.iteritems():
             self.parse_xcss_string(fileid, str)
 
-        # this will manage xCSS rule: child objects inside of a node
+        # this will manage rule: child objects inside of a node
         self.parse_children()
 
-        # this will manage xCSS rule: ' extends '
+        # this will manage rule: ' extends '
         self.parse_extends()
 
         # this will manage the order of the rules
         self.manage_order()
-        
+
         self.parse_properties()
 
         final_cont = ''
@@ -740,7 +746,7 @@ class xCSS(object):
                 parents = p_parents
             if parents:
                 better_selectors += ' extends ' + '&'.join(sorted(parents))
-        
+
         _better_selectors = better_selectors
         better_selectors = self.apply_vars(better_selectors, _context, True)
         better_selectors = self.do_glob_math(better_selectors)
@@ -749,7 +755,7 @@ class xCSS(object):
             better_selectors = self.normalize_selectors(better_selectors)
         else:
             # ...or only fix tabs and spaces in selectors:
-            better_selectors = _spaces_re.sub(' ', better_selectors) 
+            better_selectors = _spaces_re.sub(' ', better_selectors)
 
         rule[POSITION] = None # Disable this old rule (perhaps it could simply be removed instead??)...
         # ...and insert new rule
@@ -792,11 +798,10 @@ class xCSS(object):
                                 pos = self._insert_child(pos, rule, p_selectors, construct, lose)
                                 new_codestr = []
                             # ...then insert the include here:
-                            
+
                             funct, params = (name.split('(', 1)+[''])[:2]
                             params = params.rstrip(')')
                             params = split_params(params)
-                            vars = {}
                             defaults = {}
                             new_params = []
                             for param in params:
@@ -809,7 +814,6 @@ class xCSS(object):
                                         defaults[param] = default.strip()
                             mixin = rule[OPTIONS].get('@mixin ' + funct + ':' + str(len(new_params)))
                             if mixin:
-                                vars = {}
                                 m_params = mixin[0]
                                 m_vars = mixin[1].copy()
                                 m_codestr = mixin[2]
@@ -905,7 +909,7 @@ class xCSS(object):
                     var, _, name = name.partition('from')
                     name = self.apply_vars(name, context)
                     name = self.calculate(name)
-                    
+
                     start, _, end = name.partition('through')
                     if not end:
                         start, _, end = start.partition('to')
@@ -1183,7 +1187,7 @@ class xCSS(object):
             better_expr_str = self._replaces[_base_str]
         except KeyError:
             better_expr_str = _base_str
-            
+
             if _skip_word_re.match(better_expr_str) and  ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
                     self._replaces[_base_str] = better_expr_str
                     return better_expr_str
@@ -1197,7 +1201,7 @@ class xCSS(object):
 
     def _calculate_expr(self, result):
         _group0 = result.group(0)
-        _base_str = _group0        
+        _base_str = _group0
         try:
             better_expr_str = self._replaces[_group0]
         except KeyError:
@@ -1216,7 +1220,7 @@ class xCSS(object):
                 better_expr_str = _base_str
 
             self._replaces[_group0] = better_expr_str
-            
+
         return better_expr_str
 
     def do_glob_math(self, content):
@@ -1257,7 +1261,6 @@ class xCSS(object):
 import os
 import hashlib
 import base64
-import time
 import datetime
 import mimetypes
 import glob
@@ -1309,6 +1312,8 @@ def escape(str):
 def unescape(str):
     return re.sub(r'''\\(['"])''', '\1', str)
 
+################################################################################
+# Sass/Compass Library Functions:
 
 def _rgb(r, g, b, type='rgb'):
     return _rgba(r, g, b, 1.0, type)
@@ -1535,8 +1540,8 @@ def __color_stops(*args):
         stops.append(None)
     stops = stops[:len(colors)]
     max_stops = max(s and s.value for s in stops)
-    stops = [ s and (s.value / max_stops if s.unit != '%' else s.value) for s in stops ] 
-    
+    stops = [ s and (s.value / max_stops if s.unit != '%' else s.value) for s in stops ]
+
     init = 0
     start = None
     for i, s in enumerate(stops+[1.0]):
@@ -1846,6 +1851,9 @@ def _quote(*args):
 def _pi():
     return NumberValue(math.pi)
 
+################################################################################
+# Specific to pyScss parser functions:
+
 def _convert_to(value, type):
     return value.convert_to(type)
 
@@ -1862,11 +1870,14 @@ def _inv(sign):
 
 def _and(a, b):
     return a and b
+
 def _or(a, b):
     return a or b
+
 def _not(a):
     return not a
 
+# pyScss data types:
 class Value(object):
     def __init__(self, tokens):
         self.value = tokens[0]
@@ -1906,7 +1917,7 @@ class Value(object):
                 if isinstance(arg, Value):
                     arg = arg.value
                 _args.append(arg)
-            ret = merged.value = fn(*_args)
+            merged.value = fn(*_args)
             return merged
         return _func
     @classmethod
@@ -2164,10 +2175,7 @@ class ColorValue(Value):
                                 pass
                     except:
                         pass
-
-    def convert_to(self, type):
-        return self
-    def q__repr__(self):
+    def __repr__(self):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.types))
     def __str__(self):
         type = self.type
@@ -2270,6 +2278,7 @@ class StringValue(QuotedStringValue):
         other = StringValue(other)
         return StringValue(other.value + '+' + self.value)
 
+# Parser/functions map:
 fnct = {
     '^': operator.__pow__,
     '+': operator.__add__,
@@ -2307,7 +2316,7 @@ fnct = {
     'image-url:1': _image_url,
     'image-width:1': _image_width,
     'image-height:1': _image_height,
-    
+
     'opposite-position:n': _opposite_position,
     'grad-point:n': _grad_point,
     'color-stops:n': _color_stops,
@@ -2368,20 +2377,9 @@ fnct = {
 for u in _units:
     fnct[u+':2'] = _convert_to
 
+# Math Parser:
 def unitsOperator(token):
     token.insert(0, token[-1])
-
-def unaryOperator(token):
-    if isinstance(token[0], basestring):
-        print 'u',token
-
-def binaryOperator(token):
-    if isinstance(token[0], basestring):
-        print 'b',token
-
-def callOperator(token):
-    if isinstance(token[0], basestring):
-        print 'c',token
 
 def bnf():
     _lpar_ = oneOf('[ (').suppress()
@@ -2461,9 +2459,8 @@ def eval_tree(node):
             try:
                 fn = fnct.get(fn_name) or fnct['%s:n' % node[0]]
                 node = fn(*args)
-            except Exception, e:
-                #import traceback
-                #traceback.print_exc()
+            except:
+                # Function not found, simply write it as a string:
                 node = StringValue(node[0]+'(' + ', '.join(str(a) for a in args) + ')')
         elif isinstance(node[1], basestring):
             # Operator:
@@ -2489,7 +2486,7 @@ def eval_results(results):
         exprs.append(eval_tree(r))
     val = ' '.join(str(v) for v in exprs)
     return val
-    
+
 def eval_expr(expr):
     #print >>sys.stderr, '>>',expr,'<<'
 
@@ -2501,7 +2498,7 @@ def eval_expr(expr):
 
 
 __doc__ += """
->>> css = xCSS()
+>>> css = Scss()
 
 VARIABLES
 --------------------------------------------------------------------------------
@@ -3005,10 +3002,6 @@ SASS EXTEND COMPATIBILITY
 --------------------------------------------------------------------------------
 http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html#extend
 
->>> from xcss import *
->>> css = xCSS()
->>>
->>>
 >>> print css.compile('''
 ... @options compress:false, short_colors:true, reverse_colors:true;
 ... .error {
@@ -3533,5 +3526,5 @@ if __name__ == "__main__":
         import doctest
         doctest.testmod()
     else:
-        css = xCSS()
+        css = Scss()
         sys.stdout.write(css.compile(sys.stdin.read()))
