@@ -631,7 +631,7 @@ class Scss(object):
             for code in codes:
                 if code[0] == '@':
                     code, name = (code.split(None, 1)+[''])[:2]
-                    if code == '@options':
+                    if code == '@option':
                         for option in name.split(','):
                             option, value = (option.split(':', 1)+[''])[:2]
                             option = option.strip().lower()
@@ -2506,7 +2506,7 @@ VARIABLES
 http://xcss.antpaw.org/docs/syntax/variables
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... @variables {
 ...     $path = ../img/tmpl1/png;
 ...     $color1 = #FF00FF;
@@ -2530,7 +2530,7 @@ NESTING CHILD OBJECTS
 http://xcss.antpaw.org/docs/syntax/children
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .selector {
 ...     a {
 ...         display: block;
@@ -2549,7 +2549,7 @@ http://xcss.antpaw.org/docs/syntax/children
 
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .selector {
 ...     self {
 ...         margin: 20px;
@@ -2574,7 +2574,7 @@ http://xcss.antpaw.org/docs/syntax/children
 
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .selector {
 ...     self {
 ...         margin: 20px;
@@ -2619,7 +2619,7 @@ EXTENDING OBJECTS
 http://xcss.antpaw.org/docs/syntax/extends
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .basicClass {
 ...     padding: 20px;
 ...     background-color: #FF0000;
@@ -2634,7 +2634,7 @@ http://xcss.antpaw.org/docs/syntax/extends
 
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .basicClass {
 ...     padding: 20px;
 ...     background-color: #FF0000;
@@ -2655,7 +2655,7 @@ http://xcss.antpaw.org/docs/syntax/extends
 }
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .specialClass extends .basicClass {
 ...     padding: 10px;
 ...     font-size: 14px;
@@ -2687,7 +2687,7 @@ http://xcss.antpaw.org/docs/syntax/extends
 }
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .basicList {
 ...     li {
 ...         padding: 5px 10px;
@@ -2724,7 +2724,7 @@ http://xcss.antpaw.org/docs/syntax/extends
 }
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .basicList {
 ...     li {
 ...         padding: 5px 10px;
@@ -2758,7 +2758,7 @@ MATH OPERATIONS
 http://xcss.antpaw.org/docs/syntax/math
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... @variables {
 ...     $color = #FFF555;
 ... }
@@ -2777,7 +2777,7 @@ http://xcss.antpaw.org/docs/syntax/math
 
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .selector {
 ...     padding: [(5px - 3) * (5px - 3)];
 ... }
@@ -2788,7 +2788,7 @@ http://xcss.antpaw.org/docs/syntax/math
 
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .selector {
 ...     padding: [5em - 3em + 5px]px;
 ...     margin: [20 - 10] [30% - 10];
@@ -2805,7 +2805,7 @@ SASS NESTING COMPATIBILITY
 http://sass-lang.com/tutorial.html
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... /* style.scss */
 ... #navbar {
 ...   width: 80%;
@@ -2834,7 +2834,7 @@ http://sass-lang.com/tutorial.html
 
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... /* style.scss */
 ... .fakeshadow {
 ...   border: {
@@ -2860,7 +2860,7 @@ http://sass-lang.com/tutorial.html
 
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... /* style.scss */
 ... a {
 ...   color: #ce4dd6;
@@ -2884,7 +2884,7 @@ SASS VARIABLES COMPATIBILITY
 http://sass-lang.com/tutorial.html
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... /* style.scss */
 ... $main-color: #ce4dd6;
 ... $style: solid;
@@ -2918,7 +2918,7 @@ SASS INTERPOLATION COMPATIBILITY
 http://sass-lang.com/tutorial.html
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... /* style.scss */
 ... $side: top;
 ... $radius: 10px;
@@ -2941,7 +2941,7 @@ SASS MIXINS COMPATIBILITY
 http://sass-lang.com/tutorial.html
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... /* style.scss */
 ...
 ... @mixin rounded-top {
@@ -2969,7 +2969,7 @@ http://sass-lang.com/tutorial.html
 
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... /* style.scss */
 ...
 ... @mixin rounded($side, $radius: 10px) {
@@ -3004,7 +3004,7 @@ SASS EXTEND COMPATIBILITY
 http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html#extend
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .error {
 ...   border: 1px #f00;
 ...   background-color: #fdd;
@@ -3033,7 +3033,7 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html#extend
 
 Multiple Extends
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .error {
 ...   border: 1px #f00;
 ...   background-color: #fdd;
@@ -3063,7 +3063,7 @@ Multiple Extends
 
 Multiple Extends
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .bad {
 ...     color: red !important;
 ... }
@@ -3103,7 +3103,7 @@ FROM THE FORUM
 
 http://groups.google.com/group/xcss/browse_thread/thread/6989243973938362#
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... body {
 ...     _width: expression(document.body.clientWidth > 1440? "1440px" : "auto");
 ... }
@@ -3115,7 +3115,7 @@ body {
 
 http://groups.google.com/group/xcss/browse_thread/thread/2d27ddec3c15c385#
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... @variables {
 ...     $ie6 = *html;
 ...     $ie7 = *:first-child+html;
@@ -3145,7 +3145,7 @@ http://groups.google.com/group/xcss/browse_thread/thread/2d27ddec3c15c385#
 
 http://groups.google.com/group/xcss/browse_thread/thread/04faafb4ef178984#
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .basicClass {
 ...     padding: 20px;
 ...     background-color: #FF0000;
@@ -3171,7 +3171,7 @@ ERRORS
 
 http://groups.google.com/group/xcss/browse_thread/thread/5f4f3af046883c3b#
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .some-selector { some:prop; }
 ... .some-selector-more { some:proop; }
 ... .parent {
@@ -3203,7 +3203,7 @@ http://groups.google.com/group/xcss/browse_thread/thread/5f4f3af046883c3b#
 
 http://groups.google.com/group/xcss/browse_thread/thread/540f8ad0771c053b#
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .noticeBox {
 ...     self {
 ...         background-color:red;
@@ -3227,7 +3227,7 @@ http://groups.google.com/group/xcss/browse_thread/thread/540f8ad0771c053b#
 
 http://groups.google.com/group/xcss/browse_thread/thread/b5757c24586c1519#
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .mod {
 ...     self {
 ...         margin: 10px;
@@ -3267,7 +3267,7 @@ TESTS
 --------------------------------------------------------------------------------
 http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... a {
 ...     $color: rgba(0.872536*255, 0.48481984*255, 0.375464*255, 1);
 ...     color: $color;
@@ -3286,7 +3286,7 @@ a {
 }
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .functions {
 ...     opacify: opacify(rgba(0, 0, 0, 0.5), 0.1); // rgba(0, 0, 0, 0.6)
 ...     opacify: opacify(rgba(0, 0, 17, 0.8), 0.2); // #001
@@ -3360,7 +3360,7 @@ a {
 }
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .coloredClass {
 ...     $mycolor: green;
 ...     padding: 20px;
@@ -3375,14 +3375,14 @@ a {
 
 >>> css.xcss_files = {}
 >>> css.xcss_files['first.css'] = '''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .specialClass extends .basicClass {
 ...     padding: 10px;
 ...     font-size: 14px;
 ... }
 ... '''
 >>> css.xcss_files['second.css'] = '''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .basicClass {
 ...     padding: 20px;
 ...     background-color: #FF0000;
@@ -3403,7 +3403,7 @@ a {
 
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... a, button {
 ...     color: blue;
 ...     &:hover, .some & {
@@ -3425,7 +3425,7 @@ button:hover {
 
 All styles defined for a:hover are also applied to .hoverlink:
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... a:hover { text-decoration: underline }
 ... .hoverlink { @extend a:hover }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
@@ -3437,7 +3437,7 @@ a:hover {
 
 http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... #fake-links .link {@extend a}
 ...
 ... a {
@@ -3456,7 +3456,7 @@ a:hover {
 
 
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .mod {
 ... 	margin: 10px;
 ... }
@@ -3488,7 +3488,7 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 
 Any rule that uses a:hover will also work for .hoverlink, even if they have other selectors as well
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .comment a.user:hover { font-weight: bold }
 ... .hoverlink { @extend a:hover }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
@@ -3505,7 +3505,7 @@ possibly match either sequence, this would make the stylesheet far too large.
 The simple example above, for instance, would require ten selectors. Instead,
 Sass generates only selectors that are likely to be useful.
 >>> print css.compile('''
-... @options compress:false, short_colors:true, reverse_colors:true;
+... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... #admin .tabbar a { font-weight: bold }
 ... #demo .overview .fakelink { @extend a }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
