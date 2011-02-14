@@ -3,20 +3,6 @@ pyScss, a Scss compiler for Python
 :Author:
     German M. Bravo (Kronuz) <german.mb@gmail.com>
 
-:Copyright:
-	copyright (c) 2011 German M. Bravo (Kronuz)
-	*Bits of code in pyScss come from various projects:*
-
-	Compass:
-	    (c) 2009 Christopher M. Eppstein
-	    http://compass-style.org/
-	Sass:
-	    (c) 2006-2009 Hampton Catlin and Nathan Weizenbaum
-	    http://sass-lang.com/
-	xCSS:
-	    (c) 2010 Anton Pawlik
-	    http://xcss.antpaw.org/docs/
-
 About
 =====
 pyScss compiles Scss, a superset of CSS that is more powerful, elegant and
@@ -231,3 +217,18 @@ License
 =======
 MIT License. See *LICENSE* for details.
 http://www.opensource.org/licenses/mit-license.php
+
+Copyright
+=========
+	Copyright (c) 2011 German M. Bravo (Kronuz)
+	*Bits of code in pyScss come from various projects:*
+
+	Compass:
+	    (c) 2009 Christopher M. Eppstein
+	    http://compass-style.org/
+	Sass:
+	    (c) 2006-2009 Hampton Catlin and Nathan Weizenbaum
+	    http://sass-lang.com/
+	xCSS:
+	    (c) 2010 Anton Pawlik
+	    http://xcss.antpaw.org/docs/
