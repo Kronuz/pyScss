@@ -6,6 +6,7 @@ pyScss, a Scss compiler for Python
 :Copyright:
 	copyright (c) 2011 German M. Bravo (Kronuz)
 	*Bits of code in pyScss come from various projects:*
+
 	Compass:
 	    (c) 2009 Christopher M. Eppstein
 	    http://compass-style.org/
