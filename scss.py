@@ -364,7 +364,10 @@ def split_params(params):
         try:
             while True:
                 while param.count('(') != param.count(')'):
-                    param = param + ',' + params.pop(0)
+                    try:
+                        param = param + ',' + params.pop(0)
+                    except IndexError:
+                        break
                 final_params.append(param)
                 param = params.pop(0)
         except IndexError:
@@ -785,7 +788,7 @@ class Scss(object):
                             name = prop[1:]
                             try:
                                 if '(' not in name or name.index(':') < name.index('('):
-                                    name = name.replace(':', '(', 1)
+                                    name = name.replace(':', '(', 1) + ')'
                             except ValueError:
                                 pass
                         else:
@@ -801,8 +804,9 @@ class Scss(object):
                             # ...then insert the include here:
 
                             funct, params = (name.split('(', 1)+[''])[:2]
-                            params = params.rstrip(')')
+                            params = params[:-1]
                             params = split_params(params)
+
                             defaults = {}
                             new_params = []
                             for param in params:
@@ -1522,7 +1526,7 @@ def __color_stops(*args):
                 c = c.strip()
             else:
                 c, s = color.split()
-            color_stops.append((float(s),c))
+            color_stops.append((to_float(s), c))
         return color_stops
 
     colors = []
