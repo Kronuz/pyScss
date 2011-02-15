@@ -240,7 +240,7 @@ _colors = {
     'yellowgreen': '#9acd32'
 }
 
-_default_xcss_vars = {
+_default_scss_vars = {
     # unsafe chars will be hidden as vars
     '$__doubleslash': '//',
     '$__bigcopen': '/*',
@@ -255,7 +255,7 @@ _default_xcss_vars = {
     'bgc:': 'background-color:',
 }
 
-_default_xcss_opts = {
+_default_scss_opts = {
     'verbosity': 0,
     'compress': 1,
     'compress_short_colors': 1, # Converts things like #RRGGBB to #RGB
@@ -303,8 +303,8 @@ _spaces_re = re.compile(r'\s+')
 _expand_rules_space_re = re.compile(r'\s*{')
 _collapse_properties_space_re = re.compile(r'([:#])\s*{')
 
-_reverse_default_xcss_vars = dict((v, k) for k, v in _default_xcss_vars.items())
-_reverse_default_xcss_vars_re = re.compile(r'(content.*:.*(\'|").*)(' + '|'.join(map(re.escape, _reverse_default_xcss_vars)) + ')(.*\2)')
+_reverse_default_scss_vars = dict((v, k) for k, v in _default_scss_vars.items())
+_reverse_default_scss_vars_re = re.compile(r'(content.*:.*(\'|").*)(' + '|'.join(map(re.escape, _reverse_default_scss_vars)) + ')(.*\2)')
 
 _blocks_re = re.compile(r'[{},;()\'"]|\n+|$')
 
@@ -555,26 +555,26 @@ class Scss(object):
         return cont
 
     @print_timing
-    def Compilation(self, input_xcss=None):
+    def Compilation(self, input_scss=None):
         # Initialize
         self.rules = []
         self._rules = {}
         self.parts = {}
         self.css_files = []
-        self.xcss_vars = _default_xcss_vars.copy()
-        self.xcss_opts = _default_xcss_opts.copy()
+        self.scss_vars = _default_scss_vars.copy()
+        self.scss_opts = _default_scss_opts.copy()
 
         self._contexts = {}
         self._replaces = {}
 
-        if input_xcss is not None:
-            self.xcss_files = {}
-            self.xcss_files['string'] = input_xcss + '\n'
-        self.xcss_files = self.xcss_files or {}
+        if input_scss is not None:
+            self.scss_files = {}
+            self.scss_files['string'] = input_scss + '\n'
+        self.scss_files = self.scss_files or {}
 
         # Compile
-        for fileid, str in self.xcss_files.iteritems():
-            self.parse_xcss_string(fileid, str)
+        for fileid, str in self.scss_files.iteritems():
+            self.parse_scss_string(fileid, str)
 
         # this will manage rule: child objects inside of a node
         self.parse_children()
@@ -603,7 +603,7 @@ class Scss(object):
 
     def load_string(self, str):
         # protects content: "..." strings
-        str = _reverse_default_xcss_vars_re.sub(lambda m: m.group(0) + _reverse_default_xcss_vars.get(m.group(2)) + m.group(3), str)
+        str = _reverse_default_scss_vars_re.sub(lambda m: m.group(0) + _reverse_default_scss_vars.get(m.group(2)) + m.group(3), str)
 
         # removes multiple line comments
         str = _ml_comment_re.sub('', str)
@@ -619,10 +619,10 @@ class Scss(object):
 
         return str
 
-    def parse_xcss_string(self, fileid, str):
+    def parse_scss_string(self, fileid, str):
         str = self.load_string(str)
         # give each rule a new copy of the context and its options
-        rule = [ fileid, len(self.rules), str, set(), self.xcss_vars, self.xcss_opts, '', [], './' ]
+        rule = [ fileid, len(self.rules), str, set(), self.scss_vars, self.scss_opts, '', [], './' ]
         self.rules.append(rule)
 
     def process_properties(self, codestr, context, options, properties=None, scope=''):
@@ -1111,7 +1111,7 @@ class Scss(object):
         else:
             rules = self.rules
 
-        compress = self.xcss_opts.get('compress', 1)
+        compress = self.scss_opts.get('compress', 1)
         if compress:
             sc = False
             sp = ''
@@ -1245,12 +1245,12 @@ class Scss(object):
 
     #@print_timing
     def post_process(self, cont):
-        compress = self.xcss_opts.get('compress', 1) and 'compress_' or ''
+        compress = self.scss_opts.get('compress', 1) and 'compress_' or ''
         # short colors:
-        if self.xcss_opts.get(compress+'short_colors', 1):
+        if self.scss_opts.get(compress+'short_colors', 1):
             cont = _short_color_re.sub(r'#\1\2\3', cont)
         # color names:
-        if self.xcss_opts.get(compress+'reverse_colors', 1):
+        if self.scss_opts.get(compress+'reverse_colors', 1):
             cont = _reverse_colors_re.sub(lambda m: _reverse_colors[m.group(0).lower()], cont)
         if compress:
             # zero units out (i.e. 0px or 0em -> 0):
@@ -3373,15 +3373,15 @@ a {
     }
 
 
->>> css.xcss_files = {}
->>> css.xcss_files['first.css'] = '''
+>>> css.scss_files = {}
+>>> css.scss_files['first.css'] = '''
 ... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .specialClass extends .basicClass {
 ...     padding: 10px;
 ...     font-size: 14px;
 ... }
 ... '''
->>> css.xcss_files['second.css'] = '''
+>>> css.scss_files['second.css'] = '''
 ... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .basicClass {
 ...     padding: 20px;
