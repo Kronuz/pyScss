@@ -1145,7 +1145,7 @@ class Scss(object):
                         result += '}' + nl
                     # feel free to modify the indentations the way you like it
                     selector = (',' + sp).join(selectors.split(',')) + sp + '{'
-                    if nl: selector = nl.join(textwrap.wrap(selector))
+                    if nl: selector = nl.join(textwrap.wrap(selector, break_long_words=False, break_on_hyphens=False))
                     result += selector + nl
                     old_selectors = selectors
                     open = True
@@ -1208,7 +1208,7 @@ class Scss(object):
 
             better_expr_str = _base_str
 
-            if _skip_re.match(better_expr_str) and ' - ' not in better_expr_str:
+            if _skip_re.match(better_expr_str) and '- ' not in better_expr_str:
                 self._replaces[_group0] = better_expr_str
                 return better_expr_str
 
@@ -1557,7 +1557,7 @@ def __color_stops(*args):
 
 def _grad_color_stops(*args):
     color_stops = __color_stops(*args)
-    ret = ', '.join([ 'color-stop(%s, %s)' % (to_str(s), c) for s,c in color_stops ])
+    ret = ', '.join([ 'color-stop(%s%%, %s)' % (to_str(s*100.0), c) for s,c in color_stops ])
     return StringValue(ret)
 
 def _color_stops(*args):
@@ -2342,9 +2342,9 @@ for u in _units:
 
 def call(name, args, function=True):
     # Function call:
-    fn_name = '%s:%d' % (name, len(args))
+    _name = name.replace('_', '-')
     try:
-        fn = fnct.get(fn_name) or fnct['%s:n' % name]
+        fn = fnct.get('%s:%d' % (_name, len(args))) or fnct['%s:n' % _name]
         node = fn(*args)
     except:
         if function:
