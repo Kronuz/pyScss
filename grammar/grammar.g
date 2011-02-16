@@ -8,7 +8,7 @@ QuotedStringValue = lambda s: s
 BooleanValue = lambda s: bool(s)
 ColorValue = lambda s: s
 
-def call(fn, args):
+def call(fn, args, function=True):
     print 'call: ',fn, args
     return args
 
@@ -119,7 +119,7 @@ parser Calculator:
                         |
                         atom                    {{ v = atom }}
                         [
-                            UNITS               {{ v = call(UNITS, [v, UNITS]) }}
+                            UNITS               {{ v = call(UNITS, [v, UNITS], False) }}
                         ]                       {{ return v }}
 
     rule atom:          LPAR expr RPAR          {{ return expr }}

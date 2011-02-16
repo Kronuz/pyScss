@@ -2340,15 +2340,18 @@ fnct = {
 for u in _units:
     fnct[u+':2'] = _convert_to
 
-def call(name, args):
+def call(name, args, function=True):
     # Function call:
     fn_name = '%s:%d' % (name, len(args))
     try:
         fn = fnct.get(fn_name) or fnct['%s:n' % name]
         node = fn(*args)
     except:
-        # Function not found, simply write it as a string:
-        node = StringValue(name + '(' + ', '.join(str(a) for a in args) + ')')
+        if function:
+            # Function not found, simply write it as a string:
+            node = StringValue(name + '(' + ', '.join(str(a) for a in args) + ')')
+        else:
+            node = StringValue(''.join(str(a) for a in args))
     return node
 
 class SyntaxError(Exception):
@@ -2674,7 +2677,7 @@ class Calculator(Parser):
             v = atom
             if self._peek() == 'UNITS':
                 UNITS = self._scan('UNITS')
-                v = call(UNITS, [v, UNITS])
+                v = call(UNITS, [v, UNITS], False)
             return v
 
     def atom(self):
