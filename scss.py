@@ -39,7 +39,7 @@ xCSS:
 # Configuration:
 
 # Sass @import load_paths:
-LOAD_PATHS = '/usr/local/www/project/frameworks/'
+LOAD_PATHS = '/usr/local/www/project/sass/frameworks/'
 # Media base root path where images, fonts and other resources are located:
 MEDIA_ROOT = '/usr/local/www/project/media/'
 # Assets path, where new sprite files are created:
