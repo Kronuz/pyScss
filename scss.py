@@ -2734,7 +2734,7 @@ def eval_expr(expr):
         #raise
     except:
         pass
-        raise
+        #raise
     return val
 
 
