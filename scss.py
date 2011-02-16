@@ -4,7 +4,7 @@
 pyScss, a Scss compiler for Python
 
 @author     German M. Bravo (Kronuz)
-@version    1.0 alpha
+@version    1.0 beta
 @see        https://github.com/Kronuz/pyScss
 @copyright  (c) 2011 German M. Bravo (Kronuz)
 @license    MIT License
@@ -788,9 +788,11 @@ class Scss(object):
                             name = prop[1:]
                             try:
                                 if '(' not in name or name.index(':') < name.index('('):
-                                    name = name.replace(':', '(', 1) + ')'
+                                    name = name.replace(':', '(', 1)
+                                    if '(' in name: name += ')'
                             except ValueError:
                                 pass
+                            
                         else:
                             code, name = (prop.split(None, 1)+[''])[:2]
                         if rewind:
@@ -1177,16 +1179,6 @@ class Scss(object):
         return result + '\n'
 
 
-    def _calculate(self, _base_str):
-        try:
-            return eval_expr(_base_str)
-        except ParseException:
-            pass
-            #raise
-        except:
-            pass
-            #raise
-
     def calculate(self, _base_str):
         try:
             better_expr_str = self._replaces[_base_str]
@@ -1197,7 +1189,7 @@ class Scss(object):
                     self._replaces[_base_str] = better_expr_str
                     return better_expr_str
 
-            better_expr_str = self._calculate(better_expr_str)
+            better_expr_str = eval_expr(better_expr_str)
             if better_expr_str is None:
                 better_expr_str = _base_str
 
@@ -1220,7 +1212,7 @@ class Scss(object):
                 self._replaces[_group0] = better_expr_str
                 return better_expr_str
 
-            better_expr_str = self._calculate(better_expr_str)
+            better_expr_str = eval_expr(better_expr_str)
             if better_expr_str is None:
                 better_expr_str = _base_str
 
@@ -1272,8 +1264,6 @@ import glob
 import math
 import operator
 import colorsys
-from pyparsing import *
-ParserElement.enablePackrat()
 
 try:
     from PIL import Image
@@ -1312,10 +1302,10 @@ hex2rgba = {
 }
 
 def escape(str):
-    return re.sub(r'''(["'\\])''', '\\\\\1', str)
+    return re.sub(r'''(["'])''', r'\\\1', str)
 
 def unescape(str):
-    return re.sub(r'''\\(['"])''', '\1', str)
+    return re.sub(r'''\\(['"])''', r'\1', str)
 
 ################################################################################
 # Sass/Compass Library Functions:
@@ -1862,31 +1852,22 @@ def _pi():
 def _convert_to(value, type):
     return value.convert_to(type)
 
-def _inv(sign):
-    def __inv(value):
-        if isinstance(value, NumberValue):
-            return value * -1
-        elif isinstance(value, BooleanValue):
-            return not value
-        val = StringValue(value)
-        val.value = sign + val.value
-        return val
-    return __inv
-
-def _and(a, b):
-    return a and b
-
-def _or(a, b):
-    return a or b
-
-def _not(a):
-    return not a
+def _inv(sign, value):
+    if isinstance(value, NumberValue):
+        return value * -1
+    elif isinstance(value, BooleanValue):
+        return not value
+    val = StringValue(value)
+    val.value = sign + val.value
+    return val
 
 # pyScss data types:
+
+class ParserValue(object):
+    def __init__(self, value):
+        self.value = value
+
 class Value(object):
-    def __init__(self, tokens):
-        self.value = tokens[0]
-        self.tokens = tokens
     @staticmethod
     def _operatorOperands(tokenlist):
         "generator to extract operators and operands in pairs"
@@ -1991,8 +1972,8 @@ class BooleanValue(Value):
         self.tokens = tokens
         if tokens is None:
             self.value = False
-        elif isinstance(tokens, ParseResults):
-            self.value = tokens[0].lower() in ('true', '1', 'on', 'yes', 't', 'y')
+        elif isinstance(tokens, ParserValue):
+            self.value = tokens.value.lower() in ('true', '1', 'on', 'yes', 't', 'y')
         elif isinstance(tokens, BooleanValue):
             self.value = tokens.value
         elif isinstance(tokens, NumberValue):
@@ -2027,8 +2008,8 @@ class NumberValue(Value):
         self.units = {}
         if tokens is None:
             self.value = 0.0
-        elif isinstance(tokens, ParseResults):
-            self.value = float(tokens[0])
+        elif isinstance(tokens, ParserValue):
+            self.value = float(tokens.value)
         elif isinstance(tokens, NumberValue):
             self.value = tokens.value
             self.units = tokens.units.copy()
@@ -2125,8 +2106,8 @@ class ColorValue(Value):
         self.value = (0, 0, 0, 1)
         if tokens is None:
             self.value = (0, 0, 0, 1)
-        elif isinstance(tokens, ParseResults):
-            hex = tokens[0]
+        elif isinstance(tokens, ParserValue):
+            hex = tokens.value
             self.value = hex2rgba[len(hex)](hex)
             self.types = { 'rgba': 1 }
         elif isinstance(tokens, ColorValue):
@@ -2239,8 +2220,8 @@ class QuotedStringValue(Value):
         self.tokens = tokens
         if tokens is None:
             self.value = ''
-        elif isinstance(tokens, ParseResults):
-            self.value = dequote(tokens[0])
+        elif isinstance(tokens, ParserValue):
+            self.value = dequote(tokens.value)
         elif isinstance(tokens, QuotedStringValue):
             self.value = tokens.value
         else:
@@ -2285,26 +2266,6 @@ class StringValue(QuotedStringValue):
 
 # Parser/functions map:
 fnct = {
-    '^': operator.__pow__,
-    '+': operator.__add__,
-    '-': operator.__sub__,
-    '*': operator.__mul__,
-    '/': operator.__div__,
-    '!': operator.__neg__,
-    'not': _not,
-    '&&': _and,
-    'and': _and,
-    '||': _or,
-    'or': _or,
-    '&': operator.__and__,
-    '|': operator.__or__,
-    '==': operator.__eq__,
-    '!=': operator.__ne__,
-    '<=': operator.__le__,
-    '>=': operator.__ge__,
-    '>=': operator.__lt__,
-    '>': operator.__gt__,
-
     'sprite-map:1': _sprite_map,
     'sprite:2': _sprite,
     'sprite:3': _sprite,
@@ -2375,130 +2336,405 @@ fnct = {
     'ceil:1': Value._wrap(math.ceil),
     'floor:1': Value._wrap(math.floor),
     'pi:0': _pi,
-    'not:1': _not,
-    '!:1': _inv('!'),
-    '-:1': _inv('-'),
 }
 for u in _units:
     fnct[u+':2'] = _convert_to
 
-# Math Parser:
-def unitsOperator(token):
-    token.insert(0, token[-1])
-
-def bnf():
-    _lpar_ = oneOf('[ (').suppress()
-    _rpar_ = oneOf('] )').suppress()
-    _comma_ = Suppress(',')
-    _white_ = White().suppress()
-
-    _unit_ = oneOf(_units)
-    _sign_ = oneOf('+ -')
-    _mul_ = oneOf('* /')
-    _add_ = '+'
-    _sub_ = '-'
-    _not_ = CaselessKeyword('not') | Literal('!')
-    _or_ = CaselessKeyword('or') | Literal('||')
-    _and_ = CaselessKeyword('and') | Literal('&&')
-    _cmp_ = oneOf('<= < >= > != ==')
-
-    number = Combine((
-            Optional(_sign_) + Word( nums ) + Optional( '.' + Optional( Word( nums ) ) ) |
-            '.' + Word( nums )
-            ) + Optional(oneOf('e E')+Optional(oneOf('+ -')) +Word(nums)))\
-            .setParseAction(NumberValue)
-
-    color  = Combine(
-        '#' + (
-            Word(hexnums, exact=8) |  # #RRGGBBAA
-            Word(hexnums, exact=6) | # #RRGGBB
-            Word(hexnums, exact=4) | # #RGBA
-            Word(hexnums, exact=3))  # #RGB
-        ).setParseAction(ColorValue)
-
-    boolean = (
-            CaselessKeyword('true', '-_$' + alphanums) |
-            CaselessKeyword('false', '-_$' + alphanums)
-        ).setParseAction(BooleanValue)
-
-    qstring = QuotedString('"', escChar='\\', multiline=True)\
-        .setParseAction(QuotedStringValue)
-
-    ustring = QuotedString("'", escChar='\\', multiline=True)\
-        .setParseAction(StringValue)
-
-    stringliteral = qstring | ustring
-    identifier = Word('-_$' + alphas, '-_' + alphanums)
-    variable = Word('-_$' + alphas, '-_' + alphanums).setParseAction(StringValue)
-    literal = stringliteral | number | boolean | color
-
-    atom = Forward()
-    u_expr = Forward()
-    not_test = Forward()
-
-    units = Group((atom + _unit_).setParseAction(unitsOperator))
-    u_expr = units | atom | (_sign_ + u_expr)
-    m_expr = Group((u_expr + ZeroOrMore(Optional(_white_) + _mul_ + u_expr )))
-    a_expr = Group((m_expr + ZeroOrMore( (Optional(_white_) + _sub_ + _white_ + m_expr).leaveWhitespace() | (_add_ + m_expr) )))
-    and_expr = Group((a_expr + ZeroOrMore( _and_ + a_expr )))
-    or_expr = Group((and_expr + ZeroOrMore( _or_ + and_expr )))
-    comparison = Group((or_expr + ZeroOrMore( _cmp_ + or_expr )))
-    not_test << (Group(OneOrMore(( _not_ + not_test ))) | comparison)
-    and_test = Group((not_test + ZeroOrMore( _and_ + not_test )))
-    expression = Group((and_test + ZeroOrMore( _or_ + and_test )))
-    expression_list = expression + ZeroOrMore( Optional(_comma_) + expression )
-    call = Group((identifier + _lpar_ + expression_list + _rpar_))
-    enclosure = Group((_lpar_ + expression + _rpar_))
-    atom << (enclosure | call | literal | variable)
-    return OneOrMore(expression)
-bnf = bnf()
-
-def eval_tree(node):
-    if isinstance(node, ParseResults):
-        if len(node) == 1:
-            node = eval_tree(node[0])
-        elif isinstance(node[0], basestring):
-            # Function call:
-            fn_name = '%s:%d' % (node[0], len(node) - 1)
-            args = [ eval_tree(n) for n in node[1:] ]
-            try:
-                fn = fnct.get(fn_name) or fnct['%s:n' % node[0]]
-                node = fn(*args)
-            except:
-                # Function not found, simply write it as a string:
-                node = StringValue(node[0]+'(' + ', '.join(str(a) for a in args) + ')')
-        elif isinstance(node[1], basestring):
-            # Operator:
-            args = [ eval_tree(n) for n in node ]
-            fns = args[1::2]
-            args = args[::2]
-            arg1 = args.pop(0)
-            while len(args):
-                arg2 = args.pop(0)
-                fn_name = fns.pop(0)
-                fn = fnct.get(fn_name)
-                if not fn: raise ParseException("Invalid operator: "+ fn_name)
-                arg1 = fn(arg1, arg2)
-            node = arg1
-        else:
-            node = [ eval_tree(n) for n in node ]
+def call(name, args):
+    # Function call:
+    fn_name = '%s:%d' % (name, len(args))
+    try:
+        fn = fnct.get(fn_name) or fnct['%s:n' % name]
+        node = fn(*args)
+    except:
+        # Function not found, simply write it as a string:
+        node = StringValue(name + '(' + ', '.join(str(a) for a in args) + ')')
     return node
 
-def eval_results(results):
-    exprs = []
-    for r in results:
-        #print >>sys.stderr, r
-        exprs.append(eval_tree(r))
-    val = ' '.join(str(v) for v in exprs)
-    return val
+class SyntaxError(Exception):
+    """
+    When we run into an unexpected token, this is the exception to use
+    """
+    def __init__(self, pos=-1, msg="Bad Token"):
+        Exception.__init__(self)
+        self.pos = pos
+        self.msg = msg
+    def __repr__(self):
+        if self.pos < 0: return "#<syntax-error>"
+        else: return "SyntaxError[@ char %s: %s]" % (repr(self.pos), self.msg)
 
+class NoMoreTokens(Exception):
+    """
+    Another exception object, for when we run out of tokens
+    """
+    pass
+
+class Scanner(object):
+    def __init__(self, patterns, ignore, input=None):
+        """
+        Patterns is [(terminal,regex)...]
+        Ignore is [terminal,...];
+        Input is a string
+        """
+        self.tokens = []
+        self.restrictions = []
+        self.input = input
+        self.pos = 0
+        self.ignore = ignore
+        # The stored patterns are a pair (compiled regex,source
+        # regex).  If the patterns variable passed in to the
+        # constructor is None, we assume that the class already has a
+        # proper .patterns list constructed
+        if patterns is not None:
+            self.patterns = []
+            for k, r in patterns:
+                self.patterns.append( (k, re.compile(r)) )
+
+    def reset(self, input):
+        self.tokens = []
+        self.restrictions = []
+        self.input = input
+        self.pos = 0
+        
+    def token(self, i, restrict=None):
+        """
+        Get the i'th token, and if i is one past the end, then scan
+        for another token; restrict is a list of tokens that
+        are allowed, or 0 for any token.
+        """
+        if i == len(self.tokens):
+            self.scan(restrict)
+        if i < len(self.tokens):
+            # Make sure the restriction is more restricted
+            if restrict and self.restrictions[i]:
+                for r in restrict:
+                    if r not in self.restrictions[i]:
+                        raise NotImplementedError("Unimplemented: restriction set changed")
+            return self.tokens[i]
+        raise NoMoreTokens()
+    
+    def __repr__(self):
+        """
+        Print the last 10 tokens that have been scanned in
+        """
+        output = ''
+        for t in self.tokens[-10:]:
+            output = "%s\n  (@%s)  %s  =  %s" % (output, t[0], t[2], repr(t[3]))
+        return output
+    
+    def scan(self, restrict):
+        """
+        Should scan another token and add it to the list, self.tokens,
+        and add the restriction to self.restrictions
+        """
+        # Keep looking for a token, ignoring any in self.ignore
+        while True:
+            # Search the patterns for the longest match, with earlier
+            # tokens in the list having preference
+            best_match = -1
+            best_pat = '(error)'
+            for p, regexp in self.patterns:
+                # First check to see if we're ignoring this token
+                if restrict and p not in restrict and p not in self.ignore:
+                    continue
+                m = regexp.match(self.input, self.pos)
+                if m and len(m.group(0)) > best_match:
+                    # We got a match that's better than the previous one
+                    best_pat = p
+                    best_match = len(m.group(0))
+                    break
+                    
+            # If we didn't find anything, raise an error
+            if best_pat == '(error)' and best_match < 0:
+                msg = "Bad Token"
+                if restrict:
+                    msg = "Trying to find one of " + ", ".join(restrict)
+                raise SyntaxError(self.pos, msg)
+
+            # If we found something that isn't to be ignored, return it
+            if best_pat not in self.ignore or restrict and best_pat in restrict:
+                # Create a token with this data
+                token = (
+                    self.pos,
+                    self.pos + best_match,
+                    best_pat,
+                    self.input[self.pos:self.pos + best_match]
+                )
+                self.pos = self.pos + best_match
+                # Only add this token if it's not in the list
+                # (to prevent looping)
+                if not self.tokens or token != self.tokens[-1]:
+                    self.tokens.append(token)
+                    self.restrictions.append(restrict)
+                break
+            else:
+                # This token should be ignored ..
+                self.pos += best_match
+
+class Parser(object):
+    def __init__(self, scanner):
+        self._scanner = scanner
+        self._pos = 0
+
+    def reset(self, input):
+        self._scanner.reset(input)
+        self._pos = 0
+
+    def _peek(self, *types):
+        """
+        Returns the token type for lookahead; if there are any args
+        then the list of args is the set of token types to allow
+        """
+        tok = self._scanner.token(self._pos, types)
+        return tok[2]
+        
+    def _scan(self, type):
+        """
+        Returns the matched text, and moves to the next token
+        """
+        tok = self._scanner.token(self._pos, [type])
+        if tok[2] != type:
+            raise SyntaxError(tok[0], "Trying to find " + type)
+        self._pos += 1
+        return tok[3]
+
+#'|'.join(_units)
+## Grammar compiled using Yapps:
+class CalculatorScanner(Scanner):
+    patterns = [
+        ('[ \r\t\n]+', re.compile('[ \r\t\n]+')),
+        ('COMMA', re.compile(',')),
+        ('LPAR', re.compile('\\(|\\[')),
+        ('RPAR', re.compile('\\)|\\]')),
+        ('END', re.compile('$')),
+        ('MUL', re.compile('[*]')),
+        ('DIV', re.compile('/')),
+        ('ADD', re.compile('[+]')),
+        ('SUB', re.compile('-\\s')),
+        ('SIGN', re.compile('-')),
+        ('AND', re.compile('and')),
+        ('OR', re.compile('or')),
+        ('NOT', re.compile('not')),
+        ('INV', re.compile('!')),
+        ('EQ', re.compile('==')),
+        ('NE', re.compile('!=')),
+        ('LT', re.compile('<')),
+        ('GT', re.compile('>')),
+        ('LE', re.compile('<=')),
+        ('GE', re.compile('>=')),
+        ('STR', re.compile("'[^']*'")),
+        ('QSTR', re.compile('"[^"]*"')),
+        ('UNITS', re.compile('|'.join(_units))),
+        ('NUM', re.compile('(?:\\d+(?:\\.\\d*)?|\\.\\d+)')),
+        ('BOOL', re.compile('(?:true|false)')),
+        ('COLOR', re.compile('#(?:[a-fA-F0-9]{8}|[a-fA-F0-9]{6}|[a-fA-F0-9]{3,4})')),
+        ('ID', re.compile('[-a-zA-Z_][-a-zA-Z0-9_]*')),
+    ]
+    def __init__(self):
+        Scanner.__init__(self,None,['[ \r\t\n]+'])
+
+class Calculator(Parser):
+    def goal(self):
+        expr = self.expr()
+        v = [ str(expr) ]
+        while self._peek('END', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') != 'END':
+            expr = self.expr()
+            v.append(str(expr))
+        END = self._scan('END')
+        return v
+
+    def expr(self):
+        and_test = self.and_test()
+        v = and_test
+        while self._peek('OR', 'RPAR', 'COMMA', 'END', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'OR':
+            OR = self._scan('OR')
+            and_test = self.and_test()
+            v = v or and_test
+        return v
+
+    def and_test(self):
+        not_test = self.not_test()
+        v = not_test
+        while self._peek('AND', 'OR', 'RPAR', 'COMMA', 'END', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'AND':
+            AND = self._scan('AND')
+            not_test = self.not_test()
+            v = v and not_test
+        return v
+
+    def not_test(self):
+        _token_ = self._peek('NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR')
+        if _token_ not in ['NOT', 'INV']:
+            comparison = self.comparison()
+            return comparison
+        else:# in ['NOT', 'INV']
+            while 1:
+                _token_ = self._peek('NOT', 'INV')
+                if _token_ == 'NOT':
+                    NOT = self._scan('NOT')
+                    not_test = self.not_test()
+                    v = not not_test
+                else:# == 'INV'
+                    INV = self._scan('INV')
+                    not_test = self.not_test()
+                    v = _inv('!', not_test)
+                if self._peek('NOT', 'INV', 'AND', 'OR', 'RPAR', 'COMMA', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') not in ['NOT', 'INV']: break
+            return v
+
+    def comparison(self):
+        or_expr = self.or_expr()
+        v = or_expr
+        while self._peek('LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'OR', 'RPAR', 'COMMA', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['LT', 'GT', 'LE', 'GE', 'EQ', 'NE']:
+            _token_ = self._peek('LT', 'GT', 'LE', 'GE', 'EQ', 'NE')
+            if _token_ == 'LT':
+                LT = self._scan('LT')
+                or_expr = self.or_expr()
+                v = v < or_expr
+            elif _token_ == 'GT':
+                GT = self._scan('GT')
+                or_expr = self.or_expr()
+                v = v > or_expr
+            elif _token_ == 'LE':
+                LE = self._scan('LE')
+                or_expr = self.or_expr()
+                v = v <= or_expr
+            elif _token_ == 'GE':
+                GE = self._scan('GE')
+                or_expr = self.or_expr()
+                v = v >= or_expr
+            elif _token_ == 'EQ':
+                EQ = self._scan('EQ')
+                or_expr = self.or_expr()
+                v = v == or_expr
+            else:# == 'NE'
+                NE = self._scan('NE')
+                or_expr = self.or_expr()
+                v = v != or_expr
+        return v
+
+    def or_expr(self):
+        and_expr = self.and_expr()
+        v = and_expr
+        while self._peek('OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'RPAR', 'COMMA', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'OR':
+            OR = self._scan('OR')
+            and_expr = self.and_expr()
+            v = v or and_expr
+        return v
+
+    def and_expr(self):
+        a_expr = self.a_expr()
+        v = a_expr
+        while self._peek('AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'RPAR', 'COMMA', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'AND':
+            AND = self._scan('AND')
+            a_expr = self.a_expr()
+            v = v and a_expr
+        return v
+
+    def a_expr(self):
+        m_expr = self.m_expr()
+        v = m_expr
+        while self._peek('ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'RPAR', 'COMMA', 'END', 'SIGN', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['ADD', 'SUB']:
+            _token_ = self._peek('ADD', 'SUB')
+            if _token_ == 'ADD':
+                ADD = self._scan('ADD')
+                m_expr = self.m_expr()
+                v = v + m_expr
+            else:# == 'SUB'
+                SUB = self._scan('SUB')
+                m_expr = self.m_expr()
+                v = v - m_expr
+        return v
+
+    def m_expr(self):
+        u_expr = self.u_expr()
+        v = u_expr
+        while self._peek('MUL', 'DIV', 'ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'RPAR', 'COMMA', 'END', 'SIGN', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['MUL', 'DIV']:
+            _token_ = self._peek('MUL', 'DIV')
+            if _token_ == 'MUL':
+                MUL = self._scan('MUL')
+                u_expr = self.u_expr()
+                v = v * u_expr
+            else:# == 'DIV'
+                DIV = self._scan('DIV')
+                u_expr = self.u_expr()
+                v = v / u_expr
+        return v
+
+    def u_expr(self):
+        _token_ = self._peek('SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR')
+        if _token_ == 'SIGN':
+            SIGN = self._scan('SIGN')
+            u_expr = self.u_expr()
+            return _inv('-', u_expr)
+        elif _token_ == 'ADD':
+            ADD = self._scan('ADD')
+            u_expr = self.u_expr()
+            return u_expr
+        else:# in ['LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR']
+            atom = self.atom()
+            v = atom
+            if self._peek() == 'UNITS':
+                UNITS = self._scan('UNITS')
+                v = call(UNITS, [v, UNITS])
+            return v
+
+    def atom(self):
+        _token_ = self._peek('LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR')
+        if _token_ == 'LPAR':
+            LPAR = self._scan('LPAR')
+            expr = self.expr()
+            RPAR = self._scan('RPAR')
+            return expr
+        elif _token_ == 'ID':
+            ID = self._scan('ID')
+            v = ID
+            if self._peek() == 'LPAR':
+                LPAR = self._scan('LPAR')
+                expr_lst = self.expr_lst()
+                RPAR = self._scan('RPAR')
+                return call(v, expr_lst)
+            return v
+        elif _token_ == 'NUM':
+            NUM = self._scan('NUM')
+            return NumberValue(ParserValue(NUM))
+        elif _token_ == 'STR':
+            STR = self._scan('STR')
+            return StringValue(ParserValue(STR))
+        elif _token_ == 'QSTR':
+            QSTR = self._scan('QSTR')
+            return QuotedStringValue(ParserValue(QSTR))
+        elif _token_ == 'BOOL':
+            BOOL = self._scan('BOOL')
+            return BooleanValue(ParserValue(BOOL))
+        else:# == 'COLOR'
+            COLOR = self._scan('COLOR')
+            return ColorValue(ParserValue(COLOR))
+
+    def expr_lst(self):
+        expr = self.expr()
+        v = [expr]
+        while self._peek('COMMA', 'NOT', 'INV', 'RPAR', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') != 'RPAR':
+            if self._peek('COMMA', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'COMMA':
+                COMMA = self._scan('COMMA')
+            expr = self.expr()
+            v.append(expr)
+        return v
+### Grammar ends.
+
+P = Calculator(CalculatorScanner())
 def eval_expr(expr):
     #print >>sys.stderr, '>>',expr,'<<'
-
-    results = bnf.parseString( expr, parseAll=True)
-    val = eval_results(results)
-
-    #print >>sys.stderr, '--',val,'--', repr(val)
+    val = None
+    try:
+        P.reset(expr)
+        results = P.goal()
+        val = results and ' '.join(e for e in results if e != '')
+        #print >>sys.stderr, '--',val,'--'
+    except SyntaxError:
+        pass
+        #raise
+    except:
+        pass
+        raise
     return val
 
 

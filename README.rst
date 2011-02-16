@@ -5,11 +5,11 @@ pyScss, a Scss compiler for Python
 
 About
 =====
-pyScss compiles Scss, a superset of CSS that is more powerful, elegant and
-easier to maintain than plain-vanilla CSS. The library acts as a CSS source code
-preprocesor which allows you to use variables, nested rules, mixins, and have
-inheritance of rules, all with a CSS-compatible syntax which the preprocessor
-then compiles to standard CSS.
+pyScss compiles Scss (Sass), a superset of CSS that is more powerful, elegant
+and easier to maintain than plain-vanilla CSS. The library acts as a CSS source
+code preprocesor which allows you to use variables, nested rules, mixins, and
+have inheritance of rules, all with a CSS-compatible syntax which the
+preprocessor then compiles to standard CSS.
 
 Scss, as an extension of CSS, helps keep large stylesheets well-organized. It
 borrows concepts and functionality from projects such as OOCSS and other similar
@@ -17,6 +17,19 @@ frameworks like as Sass. It's build on top of the original PHP xCSS codebase
 structure but it's been completely rewritten, many bugs have been fixed and it
 has been extensively extended to support almost the full range of Sass' Scss
 syntax and functionality.
+
+Benchmarks
+==========
+    pyScss has been optimized for speed. Compiling **Compass 0.11.beta.2**
+    (`compass/doc-src/content/stylesheets/screen.scss`)
+    ...using **Sass 3.1.0.alpha.221**::
+
+	Compilation took 2.683s (w/o cache)
+	Compilation took 1.35s  (cached)
+
+    ...using **pyScss 1.0 beta**::
+
+	Compilation took 0.614s
 
 Usage
 =====
@@ -28,7 +41,7 @@ Usage
 
     Or compile from the command line::
 
-	python scss.py < file.css
+	python scss.py < file.scss
 
 Examples
 ========
@@ -207,11 +220,6 @@ following `myfile.css`::
 	@import "blueprint";
 
 	// Stuff goes here...
-
-Installation Notes
-==================
-It requires the Pyparsing module (a single pure python file) from:
-http://pyparsing.wikispaces.com/
 
 License
 =======
