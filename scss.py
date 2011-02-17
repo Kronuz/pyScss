@@ -323,6 +323,8 @@ _has_code_re = re.compile('''
         |
             @include
         |
+            @warn
+        |
             @mixin
         |
             @if
@@ -346,6 +348,7 @@ OPTIONS = 5
 SELECTORS = 6
 PROPERTIES = 7
 PATH = 8
+FINAL = 9
 
 def print_timing(func):
     def wrapper(*arg):
@@ -376,9 +379,14 @@ def split_params(params):
     return params
 
 def dequote(str):
-    if str and str[0] in ('"', "'"):
+    if str and str[0] in ('"', "'") and str[-1] == str[0]:
         str = str[1:-1]
         str = unescape(str)
+    return str
+
+def depar(str):
+    while str and str[0] == '(' and str[-1] == ')':
+        str = str[1:-1]
     return str
 
 class Scss(object):
@@ -552,7 +560,13 @@ class Scss(object):
                 if _dequote:
                     v = dequote(v)
                 if ' ' in v:
-                    v = '(' + v + ')'
+                    try:
+                        if cont[m.start()-1] != '(' or cont[m.end()] != ')':
+                            v = '(' + depar(v) + ')'
+                        else:
+                            v = depar(v)
+                    except IndexError:
+                        v = '(' + depar(v) + ')'
             return v if v is not None else m.group(0)
         cont = _interpolate_re.sub(_av, cont)
         return cont
@@ -625,7 +639,7 @@ class Scss(object):
     def parse_scss_string(self, fileid, str):
         str = self.load_string(str)
         # give each rule a new copy of the context and its options
-        rule = [ fileid, len(self.rules), str, set(), self.scss_vars, self.scss_opts, '', [], './' ]
+        rule = [ fileid, len(self.rules), str, set(), self.scss_vars, self.scss_opts, '', [], './', False ]
         self.rules.append(rule)
 
     def process_properties(self, codestr, context, options, properties=None, scope=''):
@@ -658,12 +672,12 @@ class Scss(object):
                     except IndexError:
                         is_var = False
                     prop = prop.strip()
-                    if prop:
+                    if prop and (properties is not None or context is not None):
                         value = value and value.strip()
                         value = value and self.apply_vars(value, context)
                         _prop = scope + prop
                         if is_var or prop[0] == '$' and value is not None:
-                            if value:
+                            if value and context is not None:
                                 if '!default' in value:
                                     value = value.replace('!default', '').replace('  ', ' ').strip()
                                     if _prop not in context:
@@ -685,7 +699,7 @@ class Scss(object):
         for pos, rule in enumerate(self.rules):
             if rule[POSITION] is not None:
                 # Check if the block has nested blocks and work it out:
-                if ' {' in rule[CODESTR] or _has_code_re.search(rule[CODESTR]):
+                if not rule[FINAL]:
                     construct = self.construct
                     _selectors, _, _parents = rule[SELECTORS].partition(' extends ')
                     _selectors = _selectors.split(',')
@@ -694,7 +708,7 @@ class Scss(object):
                     # manage children or expand children:
                     self.manage_children(pos, rule, _selectors, construct)
                 #print >>sys.stderr, '='*80
-                #for i in range(max(pos-10, 0), min(pos+10, len(self.rules))): l=80; r = self.rules[i]; print >>sys.stderr, ('>>' if rule[POSITION] is None else ' >') if i == pos else '  ', repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:l]+('...' if len(r[CODESTR])>l else '')), repr(r[PROPERTIES])
+                #for i in range(max(pos-10, 0), min(pos+10, len(self.rules))): l=80; r = self.rules[i]; print >>sys.stderr, ('>>' if rule[POSITION] is None else ' >') if i == pos else '  ', repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:l]+('...' if len(r[CODESTR])>l else '')), ['%s: %s' % (k, v) for k, v in r[CONTEXT].items() if not k.startswith('$__')]
                 # prepare maps:
                 if rule[POSITION] is not None:
                     rule[POSITION] = pos
@@ -703,6 +717,8 @@ class Scss(object):
                     self.parts[selectors].append(rule)
 
     def _insert_child(self, pos, rule, p_selectors, c_selectors, c_codestr, extra_context=None, path=None):
+        final = ' {' not in c_codestr and not _has_code_re.search(c_codestr)
+        
         c_selectors, _, c_parents = c_selectors.partition(' extends ')
         if c_selectors == self.construct:
             # Context and options for constructors ('self') are the same as the parent
@@ -717,8 +733,12 @@ class Scss(object):
             better_selectors = ','.join(sorted(p_selectors))
         else:
             _deps = set(rule[DEPS])
-            _context = rule[CONTEXT].copy()
-            _options = rule[OPTIONS].copy()
+            if final:
+                _context = rule[CONTEXT].copy()
+                _options = rule[OPTIONS].copy()
+            else:
+                _context = rule[CONTEXT]
+                _options = rule[OPTIONS]
             _options.pop('@extend', None)
             _context.update(extra_context or {})
             _properties = []
@@ -738,7 +758,11 @@ class Scss(object):
                         better_selectors.add(c_selector)
             better_selectors = ','.join(sorted(better_selectors))
 
-        self.process_properties(c_codestr, _context, _options, _properties)
+        if final:
+            final = True
+            self.process_properties(c_codestr, _context, _options, _properties)
+        elif '@extend' in c_codestr: # it's a middle rule (don't process properties jsut yet) ...only get @extends:
+            self.process_properties(c_codestr, None, _options, None)
         p_parents = _options.get('@extend')
 
         if p_parents or c_parents:
@@ -763,11 +787,11 @@ class Scss(object):
 
         rule[POSITION] = None # Disable this old rule (perhaps it could simply be removed instead??)...
         # ...and insert new rule
-        self.rules.insert(pos + 1, [ rule[FILEID], len(self.rules), c_codestr, _deps, _context, _options, better_selectors, _properties, path or rule[PATH] ])
+        self.rules.insert(pos + 1, [ rule[FILEID], len(self.rules), c_codestr, _deps, _context, _options, better_selectors, _properties, path or rule[PATH], final ])
         return pos + 1
 
     def manage_children(self, pos, rule, p_selectors, construct):
-        fileid, position, codestr, deps, context, options, selectors, properties, path = rule
+        fileid, position, codestr, deps, context, options, selectors, properties, path, final = rule
 
         rewind = False
         for c_selectors, c_codestr, lose in self.locate_blocks(codestr):
@@ -792,11 +816,12 @@ class Scss(object):
                                     if '(' in name: name += ')'
                             except ValueError:
                                 pass
-                            
                         else:
                             code, name = (prop.split(None, 1)+[''])[:2]
                         if rewind:
                             new_codestr.append(prop)
+                        elif code == '@warn':
+                            print >>sys.stderr, self.apply_vars(dequote(name), context)
                         elif code == '@include':
                             # It's an @include, insert pending rules...
                             if new_codestr:
@@ -907,11 +932,13 @@ class Scss(object):
                         if val:
                             pos = self._insert_child(pos, rule, p_selectors, construct, c_codestr)
                     c_selectors = None
+                    rewind = True
                 elif code == '@else':
                     val = options.get('@if', True)
                     if not val:
                         pos = self._insert_child(pos, rule, p_selectors, construct, c_codestr)
                     c_selectors = None
+                    rewind = True
                 elif code == '@for':
                     var, _, name = name.partition('from')
                     name = self.apply_vars(name, context)
@@ -930,6 +957,7 @@ class Scss(object):
                         for i in range(start, end + 1):
                             pos = self._insert_child(pos, rule, p_selectors, construct, c_codestr, { var: str(i) })
                     c_selectors = None
+                    rewind = True
                 elif code == '@mixin':
                     if name:
                         funct, _, params = name.partition('(')
@@ -956,6 +984,7 @@ class Scss(object):
                         if not new_params:
                             options['@mixin ' + funct + ':0'] = mixin
                     c_selectors = None
+                    rewind = True
                 elif code == '@prototype':
                     c_selectors = name # prototype keyword simply ignored (all selectors are prototypes)
             if c_selectors:
@@ -1095,7 +1124,7 @@ class Scss(object):
         old_fileid = None
         for rule in self.rules:
             if rule[POSITION] is not None:
-                fileid, position, codestr, deps, context, options, selectors, properties, path = rule
+                fileid, position, codestr, deps, context, options, selectors, properties, path, final = rule
                 #print >>sys.stderr, fileid, position, [ c for c in context if c[1] != '_' ], options.keys(), selectors, deps
                 if properties:
                     self._rules.setdefault(fileid, [])
@@ -1133,8 +1162,12 @@ class Scss(object):
         open = False
         old_selectors = None
         old_property = None
+        
+        wrap = textwrap.TextWrapper(break_long_words=False, break_on_hyphens=False)
+        wrap.wordsep_simple_re = re.compile(r'(,\s*)')
+        wrap = wrap.wrap
         for rule in rules:
-            fileid, position, codestr, deps, context, options, selectors, properties, path = rule
+            fileid, position, codestr, deps, context, options, selectors, properties, path, final = rule
             #print >>sys.stderr, fileid, position, [ c for c in context if c[1] != '_' ], options.keys(), selectors, deps
             if position is not None and properties:
                 if old_selectors != selectors:
@@ -1145,7 +1178,7 @@ class Scss(object):
                         result += '}' + nl
                     # feel free to modify the indentations the way you like it
                     selector = (',' + sp).join(selectors.split(',')) + sp + '{'
-                    if nl: selector = nl.join(textwrap.wrap(selector, break_long_words=False, break_on_hyphens=False))
+                    if nl: selector = nl.join(wrap(selector)).replace('\n,', ',')
                     result += selector + nl
                     old_selectors = selectors
                     open = True
@@ -1274,7 +1307,7 @@ except ImportError:
 
 def to_str(num):
     if isinstance(num, float):
-        num = ('%0.03f' % num).rstrip('0').rstrip('.')
+        num = ('%0.03f' % round(num, 3)).rstrip('0').rstrip('.')
         return num
     elif isinstance(num, bool):
         return 'true' if num else 'false'
