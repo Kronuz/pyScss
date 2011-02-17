@@ -53,6 +53,7 @@ import re
 import sys
 import time
 import textwrap
+from collections import deque
 
 # units and conversions
 _units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
@@ -327,11 +328,15 @@ _has_code_re = re.compile('''
         |
             @mixin
         |
+            @function
+        |
             @if
         |
             @else
         |
             @for
+        |
+            @each
         )
         (?![^(:;}]*['"])
     |
@@ -452,9 +457,11 @@ class Scss(object):
                             if thin is not None and str[thin:i-1].strip():
                                 init = thin
                             if lose < init:
-                                losestr = str[lose:init].strip()
-                                if losestr:
-                                    yield None, None, str[lose:init]
+                                losestr = str[lose:init]
+                                for _property in losestr.split(';'):
+                                    _property = _property.strip();
+                                    if _property:
+                                        yield _property, None
                                 lose = init
                             thin = None
                     depth += 1
@@ -464,10 +471,10 @@ class Scss(object):
                         if depth == 0:
                             if not skip:
                                 end = i
-                                selectors = str[init:start].strip()
-                                codestr = str[start+1:end].strip()
-                                if selectors:
-                                    yield selectors, codestr, None
+                                _selectors = str[init:start].strip()
+                                _codestr = str[start+1:end].strip()
+                                if _selectors:
+                                    yield _selectors, _codestr
                                 init = safe = lose = end + 1
                                 thin = None
                             skip = False
@@ -489,12 +496,16 @@ class Scss(object):
         if depth > 0:
             if not skip:
                 #FIXME: raise exception (block not closed!)
-                selectors = str[init:start].strip()
-                codestr = str[start+1:].strip()
-                if selectors:
-                    yield selectors, codestr, None
+                _selectors = str[init:start].strip()
+                _codestr = str[start+1:].strip()
+                if _selectors:
+                    yield _selectors, _codestr
                 return
-        yield None, None, str[lose:]
+        losestr = str[lose:]
+        for _property in losestr.split(';'):
+            _property = _property.strip();
+            if _property:
+                yield _property, None
 
     def normalize_selectors(self, _selectors, extra_selectors=None, extra_parents=None):
         """
@@ -574,6 +585,7 @@ class Scss(object):
     @print_timing
     def Compilation(self, input_scss=None):
         # Initialize
+        self.qrules = deque()
         self.rules = []
         self._rules = {}
         self.parts = {}
@@ -612,7 +624,6 @@ class Scss(object):
             final_cont += fcont
 
         final_cont = self.pre_process(final_cont)
-        final_cont = self.do_math(final_cont)
         final_cont = self.post_process(final_cont)
 
         return final_cont
@@ -638,289 +649,188 @@ class Scss(object):
 
     def parse_scss_string(self, fileid, str):
         str = self.load_string(str)
-        # give each rule a new copy of the context and its options
-        rule = [ fileid, len(self.rules), str, set(), self.scss_vars, self.scss_opts, '', [], './', False ]
-        self.rules.append(rule)
-
-    def process_properties(self, codestr, context, options, properties=None, scope=''):
-        def _process_properties(codestr, scope):
-            codes = [ s.strip() for s in codestr.split(';') if s.strip() ]
-            for code in codes:
-                if code[0] == '@':
-                    code, name = (code.split(None, 1)+[''])[:2]
-                    if code == '@option':
-                        for option in name.split(','):
-                            option, value = (option.split(':', 1)+[''])[:2]
-                            option = option.strip().lower()
-                            value = value.strip()
-                            if option:
-                                if value.lower() in ('1', 'true', 't', 'yes', 'y', 'on'):
-                                    value = 1
-                                elif value.lower() in ('0', 'false', 'f', 'no', 'n', 'off'):
-                                    value = 0
-                                options[option] = value
-                    elif code == '@extend':
-                        options.setdefault(code, set())
-                        options[code].update(p.strip() for p in name.replace(',', '&').split('&'))
-                        options[code].discard('')
-                    else:
-                        options[code] = name
-                else:
-                    prop, value = (re.split(r'[:=]', code, 1) + [None])[:2]
-                    try:
-                        is_var = (code[len(prop)] == '=')
-                    except IndexError:
-                        is_var = False
-                    prop = prop.strip()
-                    if prop and (properties is not None or context is not None):
-                        value = value and value.strip()
-                        value = value and self.apply_vars(value, context)
-                        _prop = scope + prop
-                        if is_var or prop[0] == '$' and value is not None:
-                            if value and context is not None:
-                                if '!default' in value:
-                                    value = value.replace('!default', '').replace('  ', ' ').strip()
-                                    if _prop not in context:
-                                        context[_prop] = value
-                                else:
-                                    context[_prop] = value
-                        elif properties is not None:
-                            _prop = self.apply_vars(_prop, context, True)
-                            properties.append((_prop, value))
-        for p_selectors, p_codestr, lose in self.locate_blocks(codestr):
-            if lose is not None:
-                codestr = lose
-                _process_properties(lose, scope)
-            elif p_selectors[-1] == ':':
-                self.process_properties(p_codestr, context, options, properties, scope + p_selectors[:-1] + '-')
+        rule = [ fileid, None, str, set(), self.scss_vars, self.scss_opts, '', [], './', False ]
+        self.qrules.append(rule)
 
     #@print_timing
     def parse_children(self):
-        for pos, rule in enumerate(self.rules):
-            if rule[POSITION] is not None:
-                # Check if the block has nested blocks and work it out:
-                if not rule[FINAL]:
-                    construct = self.construct
-                    _selectors, _, _parents = rule[SELECTORS].partition(' extends ')
-                    _selectors = _selectors.split(',')
-                    if _parents:
-                        construct += ' extends ' + _parents # This passes the inheritance to 'self' children
-                    # manage children or expand children:
-                    self.manage_children(pos, rule, _selectors, construct)
-                #print >>sys.stderr, '='*80
-                #for i in range(max(pos-10, 0), min(pos+10, len(self.rules))): l=80; r = self.rules[i]; print >>sys.stderr, ('>>' if rule[POSITION] is None else ' >') if i == pos else '  ', repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:l]+('...' if len(r[CODESTR])>l else '')), ['%s: %s' % (k, v) for k, v in r[CONTEXT].items() if not k.startswith('$__')]
-                # prepare maps:
-                if rule[POSITION] is not None:
-                    rule[POSITION] = pos
-                    selectors = rule[SELECTORS]
-                    self.parts.setdefault(selectors, [])
-                    self.parts[selectors].append(rule)
+        pos = 0
+        while True:
+            try:
+                rule = self.qrules.popleft()
+            except:
+                break
+            # Check if the block has nested blocks and work it out:
+            _selectors, _, _parents = rule[SELECTORS].partition(' extends ')
+            _selectors = _selectors.split(',')
+            _parents = set(_parents.split('&'))
+            _parents.discard('')
 
-    def _insert_child(self, pos, rule, p_selectors, c_selectors, c_codestr, extra_context=None, path=None):
-        final = ' {' not in c_codestr and not _has_code_re.search(c_codestr)
+            # manage children or expand children:
+            _children = deque()
+            self.manage_children(rule, _selectors, _parents, _children)
+            self.qrules.extendleft(_children)
+
+            # prepare maps:
+            if _parents:
+                rule[SELECTORS] = ','.join(_selectors) + ' extends ' + '&'.join(_parents)
+            rule[POSITION] = pos
+            selectors = rule[SELECTORS]
+            self.parts.setdefault(selectors, [])
+            self.parts[selectors].append(rule)
+            self.rules.append(rule)
+            pos += 1
+
+            #print >>sys.stderr, '='*80
+            #for r in [rule]+list(self.qrules)[:5]: print >>sys.stderr, repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:80]+('...' if len(r[CODESTR])>80 else '')), dict((k, v) for k, v in r[CONTEXT].items() if k.startswith('$') and not k.startswith('$__')), dict(r[PROPERTIES]).keys()
         
-        c_selectors, _, c_parents = c_selectors.partition(' extends ')
-        if c_selectors == self.construct:
-            # Context and options for constructors ('self') are the same as the parent
-            _deps = rule[DEPS]
-            _context = rule[CONTEXT]
-            _options = rule[OPTIONS]
-            if extra_context is not None: # Nested contexts like @import of mixins:
-                _context = rule[CONTEXT].copy()
-            _context.update(extra_context or {})
-            _properties = []
-
-            better_selectors = ','.join(sorted(p_selectors))
-        else:
-            _deps = set(rule[DEPS])
-            if final:
-                _context = rule[CONTEXT].copy()
-                _options = rule[OPTIONS].copy()
-            else:
-                _context = rule[CONTEXT]
-                _options = rule[OPTIONS]
-            _options.pop('@extend', None)
-            _context.update(extra_context or {})
-            _properties = []
-
-            better_selectors = set()
-            c_selectors = c_selectors.split(',')
-            for c_selector in c_selectors:
-                c_selector = c_selector.strip()
-                for p_selector in p_selectors:
-                    if c_selector == self.construct:
-                        better_selectors.add(p_selector)
-                    elif '&' in c_selector: # Parent References
-                        better_selectors.add(c_selector.replace('&', p_selector))
-                    elif p_selector:
-                        better_selectors.add(p_selector + ' ' + c_selector)
-                    else:
-                        better_selectors.add(c_selector)
-            better_selectors = ','.join(sorted(better_selectors))
-
-        if final:
-            final = True
-            self.process_properties(c_codestr, _context, _options, _properties)
-        elif '@extend' in c_codestr: # it's a middle rule (don't process properties jsut yet) ...only get @extends:
-            self.process_properties(c_codestr, None, _options, None)
-        p_parents = _options.get('@extend')
-
-        if p_parents or c_parents:
-            if c_parents:
-                parents = set(p.strip() for p in c_parents.split('&'))
-                parents.update(p_parents or [])
-                parents.discard('')
-            else:
-                parents = p_parents
-            if parents:
-                better_selectors += ' extends ' + '&'.join(sorted(parents))
-
-        _better_selectors = better_selectors
-        better_selectors = self.apply_vars(better_selectors, _context, True)
-        better_selectors = self.do_glob_math(better_selectors)
-        if _better_selectors != better_selectors:
-            # Normalize the whole thing:
-            better_selectors = self.normalize_selectors(better_selectors)
-        else:
-            # ...or only fix tabs and spaces in selectors:
-            better_selectors = _spaces_re.sub(' ', better_selectors)
-
-        rule[POSITION] = None # Disable this old rule (perhaps it could simply be removed instead??)...
-        # ...and insert new rule
-        self.rules.insert(pos + 1, [ rule[FILEID], len(self.rules), c_codestr, _deps, _context, _options, better_selectors, _properties, path or rule[PATH], final ])
-        return pos + 1
-
-    def manage_children(self, pos, rule, p_selectors, construct):
-        fileid, position, codestr, deps, context, options, selectors, properties, path, final = rule
-
-        rewind = False
-        for c_selectors, c_codestr, lose in self.locate_blocks(codestr):
-            if rewind:
-                if lose is not None:
-                    pos = self._insert_child(pos, rule, p_selectors, construct, lose)
-                else:
-                    pos = self._insert_child(pos, rule, p_selectors, construct, c_selectors + ' {' + c_codestr + '}')
-                c_selectors = None
-            elif lose is not None:
-                # This is either a raw lose rule...
-                if _has_code_re.search(lose):
-                    new_codestr = []
-                    props = [ s.strip() for s in lose.split(';') if s.strip() ]
-                    for prop in props:
-                        if prop[0] == '+': # expands a '+' at the beginning of a rule as @include
-                            code = '@include'
-                            name = prop[1:]
-                            try:
-                                if '(' not in name or name.index(':') < name.index('('):
-                                    name = name.replace(':', '(', 1)
-                                    if '(' in name: name += ')'
-                            except ValueError:
-                                pass
+    def manage_children(self, rule, p_selectors, p_parents, p_children, scope=''):
+        for c_property, c_codestr in self.locate_blocks(rule[CODESTR]):
+            if c_property.startswith('+'): # expands a '+' at the beginning of a rule as @include
+                c_property = '@include ' + c_property[1:]
+                try:
+                    if '(' not in c_property or c_property.index(':') < c_property.index('('):
+                        c_property = c_property.replace(':', '(', 1)
+                        if '(' in c_property: c_property += ')'
+                except ValueError:
+                    pass
+            elif c_property.startswith('='): # expands a '=' at the beginning of a rule as @mixin
+                c_property = '@mixin' + c_property[1:]
+            elif c_property == '@prototype ':
+                c_property = c_property[11:]
+            if c_property.startswith('@'):
+                code, name = (c_property.split(None, 1)+[''])[:2]
+                if code == '@warn':
+                    print >>sys.stderr, self.apply_vars(dequote(name), rule[CONTEXT])
+                elif code == '@option':
+                    for option in name.split(','):
+                        option, value = (option.split(':', 1)+[''])[:2]
+                        option = option.strip().lower()
+                        value = value.strip()
+                        if option:
+                            if value.lower() in ('1', 'true', 't', 'yes', 'y', 'on'):
+                                value = 1
+                            elif value.lower() in ('0', 'false', 'f', 'no', 'n', 'off'):
+                                value = 0
+                            rule[OPTIONS][option] = value
+                elif code == '@extend':
+                    p_parents.update(p.strip() for p in name.replace(',', '&').split('&'))
+                    p_parents.discard('')
+                elif code in ('@mixin', '@function'):
+                    if name:
+                        funct, params, _ = name.partition('(')
+                        funct = funct.strip()
+                        params = split_params(depar(params + _))
+                        defaults = {}
+                        new_params = []
+                        for param in params:
+                            param, _, default = param.partition(':')
+                            param = param.strip()
+                            default = default.strip()
+                            if param:
+                                new_params.append(param)
+                                if default:
+                                    default = self.apply_vars(default, rule[CONTEXT])
+                                    defaults[param] = default
+                        mixin = [ list(new_params), defaults, self.apply_vars(c_codestr, rule[CONTEXT]) ]
+                        # Insert as many @mixin options as the default parameters:
+                        while len(new_params):
+                            rule[OPTIONS][code + ' ' + funct + ':' + str(len(new_params))] = mixin
+                            param = new_params.pop()
+                            if param not in defaults:
+                                break
+                        if not new_params:
+                            rule[OPTIONS][code + ' ' + funct + ':0'] = mixin
+                elif code == '@return':
+                    rule[OPTIONS]['@return'] = self.calculate(name)
+                    return
+                elif code == '@include':
+                    funct, params, _ = name.partition('(')
+                    funct = funct.strip()
+                    params = split_params(depar(params + _))
+                    new_params = {}
+                    num_args = 0
+                    for param in params:
+                        varname, _, param = param.partition(':')
+                        if param:
+                            param = param.strip()
+                            varname = varname.strip()
                         else:
-                            code, name = (prop.split(None, 1)+[''])[:2]
-                        if rewind:
-                            new_codestr.append(prop)
-                        elif code == '@warn':
-                            print >>sys.stderr, self.apply_vars(dequote(name), context)
-                        elif code == '@include':
-                            # It's an @include, insert pending rules...
-                            if new_codestr:
-                                lose = ';'.join(new_codestr)
-                                pos = self._insert_child(pos, rule, p_selectors, construct, lose)
-                                new_codestr = []
-                            # ...then insert the include here:
-
-                            funct, params = (name.split('(', 1)+[''])[:2]
-                            params = params[:-1]
-                            params = split_params(params)
-
-                            defaults = {}
-                            new_params = []
-                            for param in params:
-                                param, _, default = param.partition(':')
-                                param = param.strip()
-                                default = default.strip()
-                                if param:
-                                    new_params.append(param)
-                                    if default:
-                                        defaults[param] = default.strip()
-                            mixin = rule[OPTIONS].get('@mixin ' + funct + ':' + str(len(new_params)))
-                            if mixin:
-                                m_params = mixin[0]
-                                m_vars = mixin[1].copy()
-                                m_codestr = mixin[2]
-                                for i, param in enumerate(new_params):
-                                    m_param = m_params[i]
-                                    m_vars[m_param] = self.apply_vars(param, context)
-                                for p in m_vars:
-                                    if p not in new_params:
-                                        m_vars[p] = self.apply_vars(m_vars[p], m_vars)
-                                pos = self._insert_child(pos, rule, p_selectors, construct, m_codestr, extra_context=m_vars)
-                                rewind = True
-                        elif code == '@import':
-                            i_codestr = None
-                            if '..' not in name and '://' not in name and 'url(' not in name: # Protect against going to prohibited places...
-                                names = name.split(',')
-                                for name in names:
-                                    name = dequote(name.strip())
-                                    filename = os.path.basename(name)
-                                    dirname = os.path.dirname(name)
-                                    load_paths = []
-                                    i_codestr = None
-                                    for path in [ './' ] + LOAD_PATHS.split(','):
-                                        for basepath in [ './', rule[PATH] ]:
-                                            i_codestr = None
-                                            full_path = os.path.realpath(os.path.join(path, basepath, dirname))
-                                            if full_path not in load_paths:
+                            param = varname.strip()
+                            varname = num_args
+                            if param:
+                                num_args += 1
+                        if param:
+                            new_params[varname] = param
+                    mixin = rule[OPTIONS].get('@mixin ' + funct + ':' + str(num_args))
+                    if mixin:
+                        m_params = mixin[0]
+                        m_vars = mixin[1].copy()
+                        m_codestr = mixin[2]
+                        for varname, param in new_params.items():
+                            try:
+                                m_param = m_params[varname]
+                            except:
+                                m_param = varname
+                            m_vars[m_param] = self.apply_vars(param, rule[CONTEXT])
+                        for p in m_vars:
+                            if p not in new_params:
+                                m_vars[p] = self.apply_vars(m_vars[p], m_vars)
+                        _rule = list(rule)
+                        _rule[CODESTR] = m_codestr
+                        _rule[CONTEXT] = rule[CONTEXT].copy()
+                        _rule[CONTEXT].update(m_vars)
+                        self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
+                elif code == '@import':
+                    i_codestr = None
+                    if '..' not in name and '://' not in name and 'url(' not in name: # Protect against going to prohibited places...
+                        names = name.split(',')
+                        for name in names:
+                            name = dequote(name.strip())
+                            try:
+                                i_codestr = self.scss_files[name]
+                            except KeyError:
+                                filename = os.path.basename(name)
+                                dirname = os.path.dirname(name)
+                                load_paths = []
+                                i_codestr = None
+                                for path in [ './' ] + LOAD_PATHS.split(','):
+                                    for basepath in [ './', rule[PATH] ]:
+                                        i_codestr = None
+                                        full_path = os.path.realpath(os.path.join(path, basepath, dirname))
+                                        if full_path not in load_paths:
+                                            try:
+                                                i_codestr = open(os.path.join(full_path, '_'+filename+'.scss')).read()
+                                            except:
                                                 try:
-                                                    i_codestr = open(os.path.join(full_path, '_'+filename+'.scss')).read()
+                                                    i_codestr = open(os.path.join(full_path, filename+'.scss')).read()
                                                 except:
                                                     try:
-                                                        i_codestr = open(os.path.join(full_path, filename+'.scss')).read()
+                                                        i_codestr = open(os.path.join(full_path, '_'+filename)).read()
                                                     except:
                                                         try:
-                                                            i_codestr = open(os.path.join(full_path, '_'+filename)).read()
+                                                            i_codestr = open(os.path.join(full_path, filename)).read()
                                                         except:
-                                                            try:
-                                                                i_codestr = open(os.path.join(full_path, filename)).read()
-                                                            except:
-                                                                pass
-                                                if i_codestr is not None:
-                                                    break
-                                                else:
-                                                    load_paths.append(full_path)
-                                        if i_codestr is not None:
-                                            break
-                                    if i_codestr is None:
-                                        err = "File to import not found or unreadable: '" + filename + "'\nLoad paths:\n\t" + "\n\t".join(load_paths)
-                                        print >>sys.stderr, err
-                                    else:
-                                        i_codestr = self.load_string(i_codestr)
-                                        pos = self._insert_child(pos, rule, p_selectors, construct, i_codestr, path=full_path)
-                                        rewind = True
+                                                            pass
+                                            if i_codestr is not None:
+                                                break
+                                            else:
+                                                load_paths.append(full_path)
+                                    if i_codestr is not None:
+                                        break
+                                self.scss_files[name] = i_codestr and self.load_string(i_codestr)
+                            if i_codestr is None:
+                                err = "File to import not found or unreadable: '" + filename + "'\nLoad paths:\n\t" + "\n\t".join(load_paths)
+                                print >>sys.stderr, err
                             else:
-                                #new_codestr.append(prop) #FIXME: if I remove the comment, the include is added as a new rule again and it loops
-                                pass
-                        else:
-                            new_codestr.append(prop)
-                    if new_codestr:
-                        lose = ';'.join(new_codestr)
-                        pos = self._insert_child(pos, rule, p_selectors, construct, lose)
-                else:
-                    pos = self._insert_child(pos, rule, p_selectors, construct, lose)
-            elif c_selectors[-1] == ':':
-                # ...it was a nested property or varialble, treat as raw
-                lose = c_selectors + '{' + c_codestr + '}'
-                pos = self._insert_child(pos, rule, p_selectors, construct, lose)
-                c_selectors = None
-            elif c_selectors[0] == '@':
-                code, name = (c_selectors.split(None, 1)+[''])[:2]
-                if code in ('@variables', '@vars'):
-                    self.process_properties(c_codestr, context, options, context)
-                elif code == '@if' or c_selectors.startswith('@else if '):
+                                rule[CODESTR] = i_codestr
+                                self.manage_children(rule, p_selectors, p_parents, p_children, scope)
+                    else:
+                        rule[PROPERTIES].append((c_property, None))
+                elif code == '@if' or c_property.startswith('@else if '):
                     if code != '@if':
-                        val = options.get('@if', True)
-                        name = c_selectors[9:]
+                        val = rule[OPTIONS].get('@if', True)
+                        name = c_property[9:].strip()
                     else:
                         val = True
                     if val:
@@ -928,22 +838,19 @@ class Scss(object):
                         name = self.calculate(name)
                         val = name and name.split()[0].lower()
                         val = bool(False if not val or val in('0', 'false',) else val)
-                        options['@if'] = val
+                        rule[OPTIONS]['@if'] = val
                         if val:
-                            pos = self._insert_child(pos, rule, p_selectors, construct, c_codestr)
-                    c_selectors = None
-                    rewind = True
+                            rule[CODESTR] = c_codestr
+                            self.manage_children(rule, p_selectors, p_parents, p_children, scope)
                 elif code == '@else':
                     val = options.get('@if', True)
                     if not val:
-                        pos = self._insert_child(pos, rule, p_selectors, construct, c_codestr)
-                    c_selectors = None
-                    rewind = True
+                        rule[CODESTR] = c_codestr
+                        self.manage_children(rule, p_selectors, p_parents, p_children, scope)
                 elif code == '@for':
                     var, _, name = name.partition('from')
                     name = self.apply_vars(name, context)
                     name = self.calculate(name)
-
                     start, _, end = name.partition('through')
                     if not end:
                         start, _, end = start.partition('to')
@@ -955,41 +862,83 @@ class Scss(object):
                         pass
                     else:
                         for i in range(start, end + 1):
-                            pos = self._insert_child(pos, rule, p_selectors, construct, c_codestr, { var: str(i) })
-                    c_selectors = None
-                    rewind = True
-                elif code == '@mixin':
-                    if name:
-                        funct, _, params = name.partition('(')
-                        funct = funct.strip()
-                        params = params.strip('()').split(',')
-                        defaults = {}
-                        new_params = []
-                        for param in params:
-                            param, _, default = param.partition(':')
-                            param = param.strip()
-                            default = default.strip()
-                            if param:
-                                new_params.append(param)
-                                if default:
-                                    default = self.apply_vars(default, context)
-                                    defaults[param] = default
-                        mixin = [ list(new_params), defaults, self.apply_vars(c_codestr, context) ]
-                        # Insert as many @mixin options as the default parameters:
-                        while len(new_params):
-                            options['@mixin ' + funct + ':' + str(len(new_params))] = mixin
-                            param = new_params.pop()
-                            if param not in defaults:
-                                break
-                        if not new_params:
-                            options['@mixin ' + funct + ':0'] = mixin
-                    c_selectors = None
-                    rewind = True
-                elif code == '@prototype':
-                    c_selectors = name # prototype keyword simply ignored (all selectors are prototypes)
-            if c_selectors:
-                pos = self._insert_child(pos, rule, p_selectors, c_selectors, c_codestr)
+                            _rule = list(rule)
+                            _rule[CODESTR] = m_codestr
+                            _rule[CONTEXT] = rule[CONTEXT].copy()
+                            _rule[CONTEXT].update({ var: str(i) })
+                            self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
+                elif code == '@each':
+                    pass
+                elif code in ('@variables', '@vars'):
+                    _rule = list(rule)
+                    _rule[CODESTR] = c_codestr
+                    _rule[PROPERTIES] = rule[CONTEXT]
+                    self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
+                else:
+                    rule[PROPERTIES].append((c_property, None))
+            elif c_codestr is None:
+                prop, value = (re.split(r'[:=]', c_property, 1)+[None])[:2]
+                try:
+                    is_var = (c_property[len(prop)] == '=')
+                except IndexError:
+                    is_var = False
+                prop = prop.strip()
+                if prop:
+                    if value:
+                        value = value.strip()
+                        value = self.apply_vars(value, rule[CONTEXT])
+                        value = self.calculate(value)
+                    _prop = scope + prop
+                    if is_var or prop.startswith('$') and value is not None:
+                        if value:
+                            if '!default' in value:
+                                value = value.replace('!default', '').replace('  ', ' ').strip()
+                                if _prop not in rule[CONTEXT]:
+                                    rule[CONTEXT][_prop] = value
+                            else:
+                                rule[CONTEXT][_prop] = value
+                    else:
+                        _prop = self.apply_vars(_prop, rule[CONTEXT], True)
+                        rule[PROPERTIES].append((_prop, value))
+            elif c_property.endswith(':'):
+                rule[CODESTR] = c_codestr
+                self.manage_children(rule, p_selectors, p_parents, p_children, scope + c_property[:-1] + '-')
+            elif not scope:
+                if c_property == self.construct:
+                    rule[CODESTR] = c_codestr
+                    self.manage_children(rule, p_selectors, p_parents, p_children, scope)
+                else:
+                    c_selectors = self.normalize_selectors(c_property)
+                    c_selectors, _, c_parents = c_selectors.partition(' extends ')
+                    better_selectors = set()
+                    c_selectors = c_selectors.split(',')
+                    for c_selector in c_selectors:
+                        for p_selector in p_selectors:
+                            if c_selector == self.construct:
+                                better_selectors.add(p_selector)
+                            elif '&' in c_selector: # Parent References
+                                better_selectors.add(c_selector.replace('&', p_selector))
+                            elif p_selector:
+                                better_selectors.add(p_selector + ' ' + c_selector)
+                            else:
+                                better_selectors.add(c_selector)
+                    better_selectors = ','.join(sorted(better_selectors))
 
+                    if c_parents:
+                        parents = set(p.strip() for p in c_parents.split('&'))
+                        parents.discard('')
+                        if parents:
+                            better_selectors += ' extends ' + '&'.join(sorted(parents))
+            
+                    _better_selectors = better_selectors
+                    better_selectors = self.apply_vars(better_selectors, rule[CONTEXT], True)
+                    better_selectors = self.do_glob_math(better_selectors)
+                    if _better_selectors != better_selectors:
+                        # Normalize the whole thing:
+                        better_selectors = self.normalize_selectors(better_selectors)
+                    
+                    _rule = [ rule[FILEID], None, c_codestr, set(), rule[CONTEXT].copy(), rule[OPTIONS].copy(), better_selectors, [], rule[PATH], False ]
+                    p_children.appendleft(_rule)
 
     def link_with_parents(self, parent, c_selectors, c_rules):
         """
@@ -1218,7 +1167,7 @@ class Scss(object):
         except KeyError:
             better_expr_str = _base_str
 
-            if _skip_word_re.match(better_expr_str) and  ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
+            if _skip_word_re.match(better_expr_str) and ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
                     self._replaces[_base_str] = better_expr_str
                     return better_expr_str
 
@@ -1255,11 +1204,6 @@ class Scss(object):
 
     def do_glob_math(self, content):
         content = _expr_glob_re.sub(self._calculate_expr, content)
-        return content
-
-    #@print_timing
-    def do_math(self, content):
-        content = _expr_re.sub(self._calculate_expr, content)
         return content
 
     #@print_timing
@@ -2205,8 +2149,16 @@ class ColorValue(Value):
         if type == 'hsla':
             h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
             return 'hsla(%s, %s%%, %s%%, %s)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0), to_str(a))
+        r, g, b = to_str(c[0]), to_str(c[1]), to_str(c[2])
+        _, _, r = r.partition('.')
+        _, _, g = g.partition('.')
+        _, _, b = b.partition('.')
         if c[3] == 1:
+            if len(r) > 2 or len(g) > 2 or len(b) > 2:
+                return 'rgb(%s%%, %s%%, %s%%)' % (to_str(c[0]*100.0/255.0), to_str(c[1]*100.0/255.0), to_str(c[2]*100.0/255.0))
             return '#%02x%02x%02x' % (c[0], c[1], c[2])
+        if len(r) > 2 or len(g) > 2 or len(b) > 2:
+            return 'rgba(%s%%, %s%%, %s%%, %s)' % (to_str(c[0]*100.0/255.0), to_str(c[1]*100.0/255.0), to_str(c[2]*100.0/255.0), to_str(c[3]))
         return 'rgba(%d, %d, %d, %s)' % (c[0], c[1], c[2], to_str(c[3]))
     @classmethod
     def _do_cmps(cls, first, second, op):
@@ -3554,85 +3506,85 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 a {
-	color: #de7b5f;
+	color: rgb(87.254%, 48.482%, 37.546%);
 	color: hsl(13.2, 66.1%, 62.4%);
 	color-hue: 13.2;
-	color-saturation: 66.1%;
+	color-saturation: 66.101%;
 	color-lightness: 62.4%;
 }
 
 >>> print css.compile('''
 ... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .functions {
-...     opacify: opacify(rgba(0, 0, 0, 0.5), 0.1); // rgba(0, 0, 0, 0.6)
-...     opacify: opacify(rgba(0, 0, 17, 0.8), 0.2); // #001
+...     opacify1: opacify(rgba(0, 0, 0, 0.5), 0.1); // rgba(0, 0, 0, 0.6)
+...     opacify2: opacify(rgba(0, 0, 17, 0.8), 0.2); // #001
 ...
-...     transparentize: transparentize(rgba(0, 0, 0, 0.5), 0.1); // rgba(0, 0, 0, 0.4)
-...     transparentize: transparentize(rgba(0, 0, 0, 0.8), 0.2); // rgba(0, 0, 0, 0.6)
+...     transparentize1: transparentize(rgba(0, 0, 0, 0.5), 0.1); // rgba(0, 0, 0, 0.4)
+...     transparentize2: transparentize(rgba(0, 0, 0, 0.8), 0.2); // rgba(0, 0, 0, 0.6)
 ...
-...     lighten: lighten(hsl(0, 0%, 0%), 30%); // hsl(0, 0, 30)
-...     lighten: lighten(#800, 20%); // #e00
+...     lighten1: lighten(hsl(0, 0%, 0%), 30%); // hsl(0, 0, 30)
+...     lighten2: lighten(#800, 20%); // #e00
 ...
-...     darken: darken(hsl(25, 100%, 80%), 30%); // hsl(25, 100%, 50%)
-...     darken: darken(#800, 20%); // #200
+...     darken1: darken(hsl(25, 100%, 80%), 30%); // hsl(25, 100%, 50%)
+...     darken2: darken(#800, 20%); // #200
 ...
-...     saturate: saturate(hsl(120, 30%, 90%), 20%); // hsl(120, 50%, 90%)
-...     saturate: saturate(#855, 20%); // #9e3f3f
+...     saturate1: saturate(hsl(120, 30%, 90%), 20%); // hsl(120, 50%, 90%)
+...     saturate2: saturate(#855, 20%); // #9e3f3f
 ...
-...     desaturate: desaturate(hsl(120, 30%, 90%), 20%); // hsl(120, 10%, 90%)
-...     desaturate: desaturate(#855, 20%); // #726b6b
+...     desaturate1: desaturate(hsl(120, 30%, 90%), 20%); // hsl(120, 10%, 90%)
+...     desaturate2: desaturate(#855, 20%); // #726b6b
 ...
-...     adjust: adjust-hue(hsl(120, 30%, 90%), 60deg); // hsl(180, 30%, 90%)
-...     adjust: adjust-hue(hsl(120, 30%, 90%), -60deg); // hsl(60, 30%, 90%)
-...     adjust: adjust-hue(#811, 45deg); // #886a11
+...     adjust1: adjust-hue(hsl(120, 30%, 90%), 60deg); // hsl(180, 30%, 90%)
+...     adjust2: adjust-hue(hsl(120, 30%, 90%), -60deg); // hsl(60, 30%, 90%)
+...     adjust3: adjust-hue(#811, 45deg); // #886a11
 ...
-...     mix: mix(#f00, #00f, 50%); // #7f007f
-...     mix: mix(#f00, #00f, 25%); // #3f00bf
-...     mix: mix(rgba(255, 0, 0, 0.5), #00f, 50%); // rgba(64, 0, 191, 0.75)
+...     mix1: mix(#f00, #00f, 50%); // #7f007f
+...     mix2: mix(#f00, #00f, 25%); // #3f00bf
+...     mix3: mix(rgba(255, 0, 0, 0.5), #00f, 50%); // rgba(64, 0, 191, 0.75)
 ...
-...     percentage: percentage(100px / 50px); // 200%
+...     percentage1: percentage(100px / 50px); // 200%
 ...
-...     round: round(10.4px); // 10px
-...     round: round(10.6px); // 11px
+...     round1: round(10.4px); // 10px
+...     round2: round(10.6px); // 11px
 ...
-...     ceil: ceil(10.4px); // 11px
-...     ceil: ceil(10.6px); // 11px
+...     ceil1: ceil(10.4px); // 11px
+...     ceil2: ceil(10.6px); // 11px
 ...
-...     floor: floor(10.4px); // 10px
-...     floor: floor(10.6px); // 10px
+...     floor1: floor(10.4px); // 10px
+...     floor2: floor(10.6px); // 10px
 ...
-...     abs: abs(10px); // 10px
-...     abs: abs(-10px); // 10px
+...     abs1: abs(10px); // 10px
+...     abs2: abs(-10px); // 10px
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .functions {
-    opacify: rgba(0, 0, 0, 0.6);
-    opacify: #001;
-    transparentize: rgba(0, 0, 0, 0.4);
-    transparentize: rgba(0, 0, 0, 0.6);
-    lighten: hsl(0, 0%, 30%);
-    lighten: #e00;
-    darken: hsl(25, 100%, 50%);
-    darken: #210000;
-    saturate: hsl(120, 50%, 90%);
-    saturate: #9e3e3e;
-    desaturate: hsl(120, 10%, 90%);
-    desaturate: #716b6b;
-    adjust: hsl(180, 30%, 90%);
-    adjust: hsl(60, 30%, 90%);
-    adjust: #886a10;
-    mix: #7f007f;
-    mix: #3f00bf;
-    mix: rgba(63, 0, 191, 0.75);
-    percentage: 200%;
-    round: 10px;
-    round: 11px;
-    ceil: 11px;
-    ceil: 11px;
-    floor: 10px;
-    floor: 10px;
-    abs: 10px;
-    abs: 10px;
+    opacify1: rgba(0, 0, 0, 0.6);
+    opacify2: #001;
+    transparentize1: rgba(0, 0, 0, 0.4);
+    transparentize2: rgba(0, 0, 0, 0.6);
+    lighten1: hsl(0, 0%, 30%);
+    lighten2: #e00;
+    darken1: hsl(25, 100%, 50%);
+    darken2: #210000;
+    saturate1: hsl(120, 50%, 90%);
+    saturate2: #9e3e3e;
+    desaturate1: hsl(120, 10%, 90%);
+    desaturate2: #716b6b;
+    adjust1: hsl(180, 30%, 90%);
+    adjust2: hsl(60, 30%, 90%);
+    adjust3: #886a10;
+    mix1: #7f007f;
+    mix2: #3f00bf;
+    mix3: rgba(63, 0, 191, 0.75);
+    percentage1: 200%;
+    round1: 10px;
+    round2: 11px;
+    ceil1: 11px;
+    ceil2: 11px;
+    floor1: 10px;
+    floor2: 10px;
+    abs1: 10px;
+    abs2: 10px;
 }
 
 >>> print css.compile('''
