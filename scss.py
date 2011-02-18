@@ -1910,14 +1910,29 @@ def _nth(s, n=None):
     """
     Return the Nth item in the string
     """
-    s = StringValue(s)
-    n = NumberValue(n).value
-    val = s.value
+    n = StringValue(n).value
     try:
-        s.value = val.split()[int(n) - 1]
-    except IndexError:
+        n = int(n)
+    except:
         pass
+    if isinstance(s, dict):
+        try:
+            s = s[n]
+        except:
+            s = StringValue('')
+    else:
+        s = StringValue(s)
+        val = s.value
+        try:
+            s.value = val.split()[int(n) - 1]
+        except IndexError:
+            s.value = ''
     return s
+
+def _length(l):
+    if isinstance(l, dict):
+        return NumberValue(len(l))
+    return NumberValue(1)
 
 def _percentage(value):
     value = NumberValue(value)
@@ -2473,6 +2488,7 @@ fnct = {
     'first-value-of:1': _nth,
 
     'percentage:1': _percentage,
+    'length:1': _length,
     'unitless:1': _unitless,
     'unit:1': _unit,
     'if:3': _if,
