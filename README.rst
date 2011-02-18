@@ -40,6 +40,7 @@ pyScss has most of the funcitonality in Sass 3.2, it supports:
     * Inheritance (@extend)
     * Mixins (@mixin, @include)
     * Functions (@function, @return)
+    * Keyword arguments
     * Conditions (@if, @else if, @else)
     * Loops (@for, @each)
     * Variables ($, @variables, @vars)
