@@ -692,6 +692,7 @@ class Scss(object):
         
     def manage_children(self, rule, p_selectors, p_parents, p_children, scope=None):
         for c_property, c_codestr in self.locate_blocks(rule[CODESTR]):
+            # Rules preprocessing...
             if c_property.startswith('+'): # expands a '+' at the beginning of a rule as @include
                 c_property = '@include ' + c_property[1:]
                 try:
@@ -702,12 +703,18 @@ class Scss(object):
                     pass
             elif c_property.startswith('='): # expands a '=' at the beginning of a rule as @mixin
                 c_property = '@mixin' + c_property[1:]
-            elif c_property == '@prototype ':
+            elif c_property == '@prototype ': # Remove '@prototype '
                 c_property = c_property[11:]
+
+            ####################################################################
             if c_property.startswith('@'):
                 code, name = (c_property.split(None, 1)+[''])[:2]
+                ################################################################
+                # @warn
                 if code == '@warn':
                     print >>sys.stderr, self.apply_vars(dequote(name), rule[CONTEXT])
+                ################################################################
+                # @option
                 elif code == '@option':
                     for option in name.split(','):
                         option, value = (option.split(':', 1)+[''])[:2]
@@ -719,9 +726,13 @@ class Scss(object):
                             elif value.lower() in ('0', 'false', 'f', 'no', 'n', 'off'):
                                 value = 0
                             rule[OPTIONS][option] = value
+                ################################################################
+                # @extend
                 elif code == '@extend':
                     p_parents.update(p.strip() for p in name.replace(',', '&').split('&'))
                     p_parents.discard('')
+                ################################################################
+                # @mixin, @function
                 elif c_codestr is not None and code in ('@mixin', '@function'):
                     if name:
                         funct, params, _ = name.partition('(')
@@ -764,9 +775,13 @@ class Scss(object):
                                 break
                         if not new_params:
                             rule[OPTIONS][code + ' ' + funct + ':0'] = mixin
+                ################################################################
+                # @return
                 elif code == '@return':
                     rule[OPTIONS]['@return'] = self.apply_vars(name, rule[CONTEXT])
                     return
+                ################################################################
+                # @include
                 elif code == '@include':
                     funct, params, _ = name.partition('(')
                     funct = funct.strip()
@@ -804,6 +819,8 @@ class Scss(object):
                         _rule[CONTEXT] = rule[CONTEXT].copy()
                         _rule[CONTEXT].update(m_vars)
                         self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
+                ################################################################
+                # @import
                 elif code == '@import':
                     i_codestr = None
                     if '..' not in name and '://' not in name and 'url(' not in name: # Protect against going to prohibited places...
@@ -853,6 +870,8 @@ class Scss(object):
                                 self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
                     else:
                         rule[PROPERTIES].append((c_property, None))
+                ################################################################
+                # @if, @else if
                 elif c_codestr is not None and (code == '@if' or c_property.startswith('@else if ')):
                     if code != '@if':
                         val = rule[OPTIONS].get('@if', True)
@@ -868,11 +887,15 @@ class Scss(object):
                         if val:
                             rule[CODESTR] = c_codestr
                             self.manage_children(rule, p_selectors, p_parents, p_children, scope)
+                ################################################################
+                # @else
                 elif c_codestr is not None and code == '@else':
                     val = rule[OPTIONS].get('@if', True)
                     if not val:
                         rule[CODESTR] = c_codestr
                         self.manage_children(rule, p_selectors, p_parents, p_children, scope)
+                ################################################################
+                # @for
                 elif c_codestr is not None and code == '@for':
                     var, _, name = name.partition('from')
                     name = self.apply_vars(name, rule[CONTEXT])
@@ -891,6 +914,8 @@ class Scss(object):
                             rule[CODESTR] = c_codestr
                             rule[CONTEXT][var] = str(i)
                             self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
+                ################################################################
+                # @each
                 elif c_codestr is not None and code == '@each':
                     var, _, name = name.partition('in')
                     name = self.apply_vars(name, rule[CONTEXT])
@@ -901,13 +926,20 @@ class Scss(object):
                             rule[CODESTR] = c_codestr
                             rule[CONTEXT][var] = to_str(v)
                             self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
+                ################################################################
+                # @variables, @vars
                 elif c_codestr is not None and code in ('@variables', '@vars'):
                     _rule = list(rule)
                     _rule[CODESTR] = c_codestr
                     _rule[PROPERTIES] = rule[CONTEXT]
                     self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
+                ################################################################
+                # Any other rule simply adds the property
+                # TODO: add @media here (and c_codestr is nested to it)
                 else:
                     rule[PROPERTIES].append((c_property, None))
+            ####################################################################
+            # Properties
             elif c_codestr is None:
                 prop, value = (re.split(r'[:=]', c_property, 1)+[None])[:2]
                 try:
@@ -932,10 +964,13 @@ class Scss(object):
                         _prop = self.apply_vars(_prop, rule[CONTEXT], True)
                         _prop = self.do_glob_math(_prop, rule[CONTEXT], rule[OPTIONS])
                         rule[PROPERTIES].append((_prop, value))
+            # Nested properties
             elif c_property.endswith(':'):
                 rule[CODESTR] = c_codestr
                 self.manage_children(rule, p_selectors, p_parents, p_children, (scope or '') + c_property[:-1] + '-')
-            elif scope is None:
+            ####################################################################
+            # Nested rules
+            elif scope is None: # needs to have no scope to crawl down the nested rules
                 if c_property == self.construct:
                     rule[CODESTR] = c_codestr
                     self.manage_children(rule, p_selectors, p_parents, p_children, scope)
@@ -3635,6 +3670,24 @@ http://groups.google.com/group/xcss/browse_thread/thread/b5757c24586c1519#
 
 TESTS
 --------------------------------------------------------------------------------
+>>> print css.compile('''
+... @option compress:no, short_colors:yes, reverse_colors:yes;
+... @function percent-width(
+...   $t,
+...   $c
+... ) {
+...   $perc: ($t / $c) * 100%;
+...   @return $perc;
+... }
+... 
+... a {
+...   width: percent-width(12, 80);
+... }
+... ''') #doctest: +NORMALIZE_WHITESPACE
+a {
+  width: 15%;
+}
+
 http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 >>> print css.compile('''
 ... @option compress:no, short_colors:yes, reverse_colors:yes;
