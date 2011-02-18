@@ -1459,6 +1459,18 @@ def _adjust_hue(color, degrees):
 def _complement(color):
     return __hsl_op(operator.__add__, color, 180.0, 0, 0)
 
+def _invert(color):
+    """
+    Returns the inverse (negative) of a color.
+    The red, green, and blue values are inverted, while the opacity is left alone.
+    """
+    col = ColorValue(color)
+    c = col.value
+    c[0] = 255.0 - c[0]
+    c[1] = 255.0 - c[1]
+    c[2] = 255.0 - c[2]
+    return col
+
 def _adjust_lightness(color, amount):
     return __hsl_op(operator.__add__, color, 0, 0, amount)
 
@@ -2439,6 +2451,7 @@ fnct = {
     'change-color:n': _change_color,
     'spin:2': _adjust_hue,
     'complement:1': _complement,
+    'invert:1': _invert,
     'mix:2': _mix,
     'mix:3': _mix,
     'hsl:3': _hsl,
