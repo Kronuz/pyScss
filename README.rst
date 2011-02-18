@@ -34,28 +34,27 @@ Benchmarks
 
 Support
 ========
-    pyScss has most of the funcitonality in Sass 3.2, it supports:
+pyScss has most of the funcitonality in Sass 3.2, it supports:
 
-        * Nested rules
-        * Inheritance (@extend)
-        * Mixins (@mixin)
-        * Mixin includes (@include)
-        * Functions (@function, @return)
-        * Conditions (@if, @else if, @else)
-        * Loops (@for, @each)
-        * Variables ($, @variables, @vars)
+    * Nested rules
+    * Inheritance (@extend)
+    * Mixins (@mixin, @include)
+    * Functions (@function, @return)
+    * Conditions (@if, @else if, @else)
+    * Loops (@for, @each)
+    * Variables ($, @variables, @vars)
 
 Usage
 =====
-    Usage example::
+Usage example::
 
-	from scss import Scss
-	css = Scss()
-	css.compile("a { color: red + green; }")
+    from scss import Scss
+    css = Scss()
+    css.compile("a { color: red + green; }")
 
-    Or compile from the command line::
+Or compile from the command line::
 
-	python scss.py < file.scss
+    python scss.py < file.scss
 
 Examples
 ========
