@@ -1933,10 +1933,21 @@ def _comparable(number1, number2):
     return BooleanValue(type1 == type2)
 
 def _type_of(obj): # -> bool, number, string, color, list
-    unit = NumberValue(obj).unit
-    type = _conv_type.get(unit)
-    return StringValue(type)
+    if isinstance(obj, BooleanValue):
+        return StringValue('bool')
+    if isinstance(obj, NumberValue):
+        return StringValue('number')
+    if isinstance(obj, QuotedStringValue):
+        return StringValue('string')
+    if isinstance(obj, ColorValue):
+        return StringValue('color')
+    if isinstance(obj, dict):
+        return StringValue('list')
+    return 'unknown'
 
+def _if(condition, if_true, if_false):
+    return if_true if bool(BooleanValue(condition)) else if_false
+    
 def _unit(number): # -> px, em, cm, etc.
     unit = NumberValue(number).unit
     return StringValue(unit)
@@ -2451,6 +2462,7 @@ fnct = {
     'percentage:1': _percentage,
     'unitless:1': _unitless,
     'unit:1': _unit,
+    'if:3': _if,
     'type-of:1': _type_of,
     'comparable:2': _comparable,
     'elements-of-type:1': _elements_of_type,
