@@ -36,14 +36,20 @@ Support
 ========
 pyScss has most of the funcitonality in Sass 3.2, it supports:
 
-    * Nested rules
-    * Inheritance (@extend)
-    * Mixins (@mixin, @include)
-    * Functions (@function, @return)
-    * Keyword arguments
-    * Conditions (@if, @else if, @else)
-    * Loops (@for, @each)
-    * Variables ($, @variables, @vars)
+    * **Nested rules**
+    * **Inheritance**: @extend
+    * **Mixins**: @mixin, @include
+    * **Functions**: @function, @return
+    * **Keyword arguments**
+    * **Conditions**: @if, @else if, @else
+    * **Loops**: @for, @each
+    * **Variables**: $, @variables, @vars
+    * **Compass**: Compass 0.11
+    * **Sprites**: sprite-map(), sprite(), sprite-position(), sprite-url(), ...
+    * **Images**: image-url(), image-width(), image-height(), ...
+    * **Embedded (inline) images**: inline-image()
+    * **Colors handling**: adjust-color(), scale-color(), opacify()/transparentize(), lighten()/darken(), mix(), ...
+    * **Math functions**: sin(), cos(), tan(), round(), ceil(), floor(), pi(), ...
 
 Usage
 =====
