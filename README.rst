@@ -32,6 +32,19 @@ Benchmarks
 
 	Compilation took 0.614s
 
+Support
+========
+    pyScss has most of the funcitonality in Sass 3.2, it supports:
+
+        * Nested rules
+        * Inheritance (@extend)
+        * Mixins (@mixin)
+        * Mixin includes (@include)
+        * Functions (@function, @return)
+        * Conditions (@if, @else if, @else)
+        * Loops (@for, @each)
+        * Variables ($, @variables, @vars)
+
 Usage
 =====
     Usage example::

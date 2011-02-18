@@ -880,19 +880,27 @@ class Scss(object):
                     start, _, end = name.partition('through')
                     if not end:
                         start, _, end = start.partition('to')
-                    var = var.strip()
                     try:
                         start = int(float(start.strip()))
                         end = int(float(end.strip()))
                     except ValueError:
                         pass
                     else:
+                        var = var.strip()
                         for i in range(start, end + 1):
                             rule[CODESTR] = c_codestr
                             rule[CONTEXT][var] = str(i)
                             self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
                 elif c_codestr is not None and code == '@each':
-                    pass
+                    var, _, name = name.partition('in')
+                    name = self.apply_vars(name, rule[CONTEXT])
+                    name = eval_expr(name, rule[CONTEXT], rule[OPTIONS], True)
+                    if isinstance(name, dict):
+                        var = var.strip()
+                        for n, v in sorted(name.items()):
+                            rule[CODESTR] = c_codestr
+                            rule[CONTEXT][var] = to_str(v)
+                            self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
                 elif c_codestr is not None and code in ('@variables', '@vars'):
                     _rule = list(rule)
                     _rule[CODESTR] = c_codestr
