@@ -1335,6 +1335,13 @@ def _rgba(r, g, b, a, type='rgba'):
     col += [ type ]
     return ColorValue(col)
 
+def _rgba2(color, a, type='rgba'):
+    a = NumberValue(a).value
+    col = ColorValue(color).value[:3]
+    col += [ 0.0 if a < 0 else 1.0 if a > 1 else a ]
+    col += [ type ]
+    return ColorValue(col)
+
 def _hsl(h, s, l, type='hsl'):
     return _hsla(h, s, l, 1.0, type)
 
@@ -1369,12 +1376,10 @@ def __rgba_op(op, color, r, g, b, a):
     return color
 
 def _opacify(color, amount):
-    a = NumberValue(amount).value
-    return __rgba_op(operator.__add__, color, 0, 0, 0, a)
+    return __rgba_op(operator.__add__, color, 0, 0, 0, amount)
 
 def _transparentize(color, amount):
-    a = NumberValue(amount).value
-    return __rgba_op(operator.__add__, color, 0, 0, 0, -a)
+    return __rgba_op(operator.__sub__, color, 0, 0, 0, amount)
 
 def __hsl_op(op, color, h, s, l):
     color = ColorValue(color)
@@ -1399,30 +1404,37 @@ def __hsl_op(op, color, h, s, l):
     return color
 
 def _lighten(color, amount):
-    a = NumberValue(amount).value
-    return __hsl_op(operator.__add__, color, 0, 0, a)
+    return __hsl_op(operator.__add__, color, 0, 0, amount)
 
 def _darken(color, amount):
-    a = NumberValue(amount).value
-    return __hsl_op(operator.__add__, color, 0, 0, -a)
+    return __hsl_op(operator.__sub__, color, 0, 0, amount)
 
 def _saturate(color, amount):
-    a = NumberValue(amount).value
-    return __hsl_op(operator.__add__, color, 0, a, 0)
+    return __hsl_op(operator.__add__, color, 0, amount, 0)
 
 def _desaturate(color, amount):
-    a = NumberValue(amount).value
-    return __hsl_op(operator.__add__, color, 0, -a, 0)
+    return __hsl_op(operator.__sub__, color, 0, amount, 0)
 
 def _grayscale(color):
-    return __hsl_op(operator.__add__, color, 0, -1.0, 0)
+    return __hsl_op(operator.__sub__, color, 0, 1.0, 0)
 
 def _adjust_hue(color, degrees):
-    d = NumberValue(degrees).value
-    return __hsl_op(operator.__add__, color, d, 0, 0)
+    return __hsl_op(operator.__add__, color, degrees, 0, 0)
 
 def _complement(color):
     return __hsl_op(operator.__add__, color, 180.0, 0, 0)
+
+def _adjust_lightness(color, amount):
+    return __hsl_op(operator.__add__, color, 0, 0, amount)
+
+def _adjust_saturation(color, amount):
+    return __hsl_op(operator.__add__, color, 0, amount, 0)
+
+def _scale_lightness(color, amount):
+    return __hsl_op(operator.__mul__, color, 0, 0, amount)
+    
+def _scale_saturation(color, amount):
+    return __hsl_op(operator.__mul__, color, 0, amount, 0)
 
 def _asc_color(op, color, saturation=None, lightness=None, red=None, green=None, blue=None, alpha=None):
     if lightness or saturation:
@@ -1878,6 +1890,37 @@ def _quote(*args):
 
 def _pi():
     return NumberValue(math.pi)
+
+def _comparable(number1, number2):
+    n1, n2 = NumberValue(number1), NumberValue(number2)
+    type1 = _conv_type.get(n1.unit)
+    type2 = _conv_type.get(n2.unit)
+    return BooleanValue(type1 == type2)
+
+def _type_of(obj): # -> bool, number, string, color, list
+    unit = NumberValue(obj).unit
+    type = _conv_type.get(unit)
+    return StringValue(type)
+
+def _unit(number): # -> px, em, cm, etc.
+    unit = NumberValue(number).unit
+    return StringValue(unit)
+
+def _elements_of_type(display):
+    d = StringValue(display)
+    ret = {
+        'block': 'address, article, aside, blockquote, center, dd, dialog, dir, div, dl, dt, fieldset, figure, footer, form, frameset, h1, h2, h3, h4, h5, h6, header, hgroup, hr, isindex, menu, nav, noframes, noscript, ol, p, pre, section, ul',
+        'inline': 'a, abbr, acronym, b, basefont, bdo, big, br, cite, code, dfn, em, font, i, img, input, kbd, label, q, s, samp, select, small, span, strike, strong, sub, sup, textarea, tt, u, var',
+        'table': 'table',
+        'list-item': 'li',
+        'table-row-group': 'tbody',
+        'table-header-group': 'thead',
+        'table-footer-group': 'tfoot',
+        'table-row': 'tr',
+        'table-cell': 'td, th',
+        'html5': 'article, aside, dialog, figure, footer, header, hgroup, nav, section',
+    }.get(d.value, '')
+    return StringValue(ret)
 
 ################################################################################
 # Specific to pyScss parser functions:
@@ -2341,6 +2384,10 @@ fnct = {
     'desaturate:2': _desaturate,
     'grayscale:1': _grayscale,
     'adjust-hue:2': _adjust_hue,
+    'adjust-lightness:2': _adjust_lightness,
+    'adjust-saturation:2': _adjust_saturation,
+    'scale-lightness:2': _scale_lightness,
+    'scale-saturation:2': _scale_saturation,
     'adjust-color:n': _adjust_color,
     'scale-color:n': _scale_color,
     'change-color:n': _change_color,
@@ -2351,6 +2398,7 @@ fnct = {
     'hsl:3': _hsl,
     'hsla:4': _hsla,
     'rgb:3': _rgb,
+    'rgba:2': _rgba2,
     'rgba:4': _rgba,
 
     'red:1': _red,
@@ -2367,6 +2415,10 @@ fnct = {
 
     'percentage:1': _percentage,
     'unitless:1': _unitless,
+    'unit:1': _unit,
+    'type-of:1': _type_of,
+    'comparable:2': _comparable,
+    'elements-of-type:1': _elements_of_type,
     'quote:n': _quote,
     'unquote:n': _unquote,
     'escape:1': _unquote,
