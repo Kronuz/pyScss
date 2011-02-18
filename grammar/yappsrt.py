@@ -189,13 +189,14 @@ def print_error(input, err, scanner):
     print '> ',' '*p + '^'
     print 'List of nearby tokens:', scanner
 
-def wrap_error_reporter(parser, rule):
+def wrap_error_reporter(parser, rule, *args):
     try:
-        return getattr(parser, rule)()
+        return getattr(parser, rule)(*args)
     except SyntaxError, s:
         input = parser._scanner.input
         try:
             print_error(input, s, parser._scanner)
+            raise
         except ImportError:
             print "Syntax Error %s on line %d" % (s.msg, input[:s.pos].count('\n') + 1)
     except NoMoreTokens:

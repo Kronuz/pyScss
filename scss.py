@@ -279,8 +279,8 @@ for long_k, v in _colors.items():
     _reverse_colors[short_k] = k
     _reverse_colors[rgb_k] = k
     _reverse_colors[rgba_k] = k
-_reverse_colors_re = re.compile(r'(?<![-\w])(' + '|'.join(map(re.escape, _reverse_colors))+r')(?![-\w])', re.IGNORECASE)
-_colors_re = re.compile(r'(?<![-\w])(' + '|'.join(map(re.escape, _colors))+r')(?![-\w])', re.IGNORECASE)
+_reverse_colors_re = re.compile(r'(?<![-\w$])(' + '|'.join(map(re.escape, _reverse_colors))+r')(?![-\w])', re.IGNORECASE)
+_colors_re = re.compile(r'(?<![-\w$])(' + '|'.join(map(re.escape, _colors))+r')(?![-\w])', re.IGNORECASE)
 
 _expr_glob_re = re.compile(r'''
     \#\{.*?\}                   # Global Interpolation only
@@ -603,7 +603,7 @@ class Scss(object):
 
         # Compile
         for fileid, str in self.scss_files.iteritems():
-            self.parse_scss_string(fileid, str)
+            self.scss_files[fileid] = self.parse_scss_string(fileid, str)
 
         # this will manage rule: child objects inside of a node
         self.parse_children()
@@ -623,7 +623,6 @@ class Scss(object):
             fcont = self.create_css(fileid)
             final_cont += fcont
 
-        final_cont = self.pre_process(final_cont)
         final_cont = self.post_process(final_cont)
 
         return final_cont
@@ -645,12 +644,19 @@ class Scss(object):
         # collapse the space in properties blocks
         str = _collapse_properties_space_re.sub(r'\1{', str)
 
+        # to do math operations, we need to get the color's hex values (for color names):
+        def _pp(m):
+            v = m.group(0)
+            return _colors.get(v, v)
+        str = _colors_re.sub(_pp, str)
+
         return str
 
     def parse_scss_string(self, fileid, str):
         str = self.load_string(str)
         rule = [ fileid, None, str, set(), self.scss_vars, self.scss_opts, '', [], './', False ]
         self.qrules.append(rule)
+        return str
 
     #@print_timing
     def parse_children(self):
@@ -684,7 +690,7 @@ class Scss(object):
             #print >>sys.stderr, '='*80
             #for r in [rule]+list(self.qrules)[:5]: print >>sys.stderr, repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:80]+('...' if len(r[CODESTR])>80 else '')), dict((k, v) for k, v in r[CONTEXT].items() if k.startswith('$') and not k.startswith('$__')), dict(r[PROPERTIES]).keys()
         
-    def manage_children(self, rule, p_selectors, p_parents, p_children, scope=''):
+    def manage_children(self, rule, p_selectors, p_parents, p_children, scope=None):
         for c_property, c_codestr in self.locate_blocks(rule[CODESTR]):
             if c_property.startswith('+'): # expands a '+' at the beginning of a rule as @include
                 c_property = '@include ' + c_property[1:]
@@ -716,7 +722,7 @@ class Scss(object):
                 elif code == '@extend':
                     p_parents.update(p.strip() for p in name.replace(',', '&').split('&'))
                     p_parents.discard('')
-                elif code in ('@mixin', '@function'):
+                elif c_codestr is not None and code in ('@mixin', '@function'):
                     if name:
                         funct, params, _ = name.partition('(')
                         funct = funct.strip()
@@ -733,6 +739,23 @@ class Scss(object):
                                     default = self.apply_vars(default, rule[CONTEXT])
                                     defaults[param] = default
                         mixin = [ list(new_params), defaults, self.apply_vars(c_codestr, rule[CONTEXT]) ]
+                        if code == '@function':
+                            def _call(mixin):
+                                def __call(*args, **kwargs):
+                                    m_params = mixin[0]
+                                    m_vars = mixin[1].copy()
+                                    m_codestr = mixin[2]
+                                    for i, a in enumerate(args):
+                                        m_vars[m_params[i]] = str(a)
+                                    m_vars.update(kwargs)
+                                    _rule = [ '', None, m_codestr, set(), m_vars, {}, '', [], './', False ]
+                                    self.manage_children(_rule, p_selectors, p_parents, p_children, (scope or '') + '')
+                                    ret = _rule[OPTIONS].get('@return', '')
+                                    ret = eval_expr(ret, _rule[CONTEXT], _rule[OPTIONS], True)
+                                    ret = ret.get(0, ret) if len(ret) == 1 else ret
+                                    return ret
+                                return __call
+                            mixin = _call(mixin)
                         # Insert as many @mixin options as the default parameters:
                         while len(new_params):
                             rule[OPTIONS][code + ' ' + funct + ':' + str(len(new_params))] = mixin
@@ -742,7 +765,7 @@ class Scss(object):
                         if not new_params:
                             rule[OPTIONS][code + ' ' + funct + ':0'] = mixin
                 elif code == '@return':
-                    rule[OPTIONS]['@return'] = self.calculate(name)
+                    rule[OPTIONS]['@return'] = self.apply_vars(name, rule[CONTEXT])
                     return
                 elif code == '@include':
                     funct, params, _ = name.partition('(')
@@ -788,6 +811,7 @@ class Scss(object):
                         for name in names:
                             name = dequote(name.strip())
                             try:
+                                raise KeyError
                                 i_codestr = self.scss_files[name]
                             except KeyError:
                                 filename = os.path.basename(name)
@@ -818,39 +842,41 @@ class Scss(object):
                                                 load_paths.append(full_path)
                                     if i_codestr is not None:
                                         break
-                                self.scss_files[name] = i_codestr and self.load_string(i_codestr)
+                                i_codestr = self.scss_files[name] = i_codestr and self.load_string(i_codestr)
                             if i_codestr is None:
                                 err = "File to import not found or unreadable: '" + filename + "'\nLoad paths:\n\t" + "\n\t".join(load_paths)
                                 print >>sys.stderr, err
                             else:
-                                rule[CODESTR] = i_codestr
-                                self.manage_children(rule, p_selectors, p_parents, p_children, scope)
+                                _rule = list(rule)
+                                _rule[CODESTR] = i_codestr
+                                _rule[PATH] = full_path
+                                self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
                     else:
                         rule[PROPERTIES].append((c_property, None))
-                elif code == '@if' or c_property.startswith('@else if '):
+                elif c_codestr is not None and (code == '@if' or c_property.startswith('@else if ')):
                     if code != '@if':
                         val = rule[OPTIONS].get('@if', True)
                         name = c_property[9:].strip()
                     else:
                         val = True
                     if val:
-                        name = self.apply_vars(name, context)
-                        name = self.calculate(name)
+                        name = self.apply_vars(name, rule[CONTEXT])
+                        name = self.calculate(name, rule[CONTEXT], rule[OPTIONS])
                         val = name and name.split()[0].lower()
                         val = bool(False if not val or val in('0', 'false',) else val)
                         rule[OPTIONS]['@if'] = val
                         if val:
                             rule[CODESTR] = c_codestr
                             self.manage_children(rule, p_selectors, p_parents, p_children, scope)
-                elif code == '@else':
-                    val = options.get('@if', True)
+                elif c_codestr is not None and code == '@else':
+                    val = rule[OPTIONS].get('@if', True)
                     if not val:
                         rule[CODESTR] = c_codestr
                         self.manage_children(rule, p_selectors, p_parents, p_children, scope)
-                elif code == '@for':
+                elif c_codestr is not None and code == '@for':
                     var, _, name = name.partition('from')
-                    name = self.apply_vars(name, context)
-                    name = self.calculate(name)
+                    name = self.apply_vars(name, rule[CONTEXT])
+                    name = self.calculate(name, rule[CONTEXT], rule[OPTIONS])
                     start, _, end = name.partition('through')
                     if not end:
                         start, _, end = start.partition('to')
@@ -862,14 +888,12 @@ class Scss(object):
                         pass
                     else:
                         for i in range(start, end + 1):
-                            _rule = list(rule)
-                            _rule[CODESTR] = m_codestr
-                            _rule[CONTEXT] = rule[CONTEXT].copy()
-                            _rule[CONTEXT].update({ var: str(i) })
+                            rule[CODESTR] = c_codestr
+                            rule[CONTEXT][var] = str(i)
                             self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
-                elif code == '@each':
+                elif c_codestr is not None and code == '@each':
                     pass
-                elif code in ('@variables', '@vars'):
+                elif c_codestr is not None and code in ('@variables', '@vars'):
                     _rule = list(rule)
                     _rule[CODESTR] = c_codestr
                     _rule[PROPERTIES] = rule[CONTEXT]
@@ -887,23 +911,23 @@ class Scss(object):
                     if value:
                         value = value.strip()
                         value = self.apply_vars(value, rule[CONTEXT])
-                        value = self.calculate(value)
-                    _prop = scope + prop
+                        value = self.calculate(value, rule[CONTEXT], rule[OPTIONS])
+                    _prop = (scope or '') + prop
                     if is_var or prop.startswith('$') and value is not None:
-                        if value:
-                            if '!default' in value:
-                                value = value.replace('!default', '').replace('  ', ' ').strip()
-                                if _prop not in rule[CONTEXT]:
-                                    rule[CONTEXT][_prop] = value
-                            else:
+                        if value and '!default' in value:
+                            value = value.replace('!default', '').replace('  ', ' ').strip()
+                            if _prop not in rule[CONTEXT]:
                                 rule[CONTEXT][_prop] = value
+                        else:
+                            rule[CONTEXT][_prop] = value
                     else:
                         _prop = self.apply_vars(_prop, rule[CONTEXT], True)
+                        _prop = self.do_glob_math(_prop, rule[CONTEXT], rule[OPTIONS])
                         rule[PROPERTIES].append((_prop, value))
             elif c_property.endswith(':'):
                 rule[CODESTR] = c_codestr
-                self.manage_children(rule, p_selectors, p_parents, p_children, scope + c_property[:-1] + '-')
-            elif not scope:
+                self.manage_children(rule, p_selectors, p_parents, p_children, (scope or '') + c_property[:-1] + '-')
+            elif scope is None:
                 if c_property == self.construct:
                     rule[CODESTR] = c_codestr
                     self.manage_children(rule, p_selectors, p_parents, p_children, scope)
@@ -932,7 +956,7 @@ class Scss(object):
             
                     _better_selectors = better_selectors
                     better_selectors = self.apply_vars(better_selectors, rule[CONTEXT], True)
-                    better_selectors = self.do_glob_math(better_selectors)
+                    better_selectors = self.do_glob_math(better_selectors, rule[CONTEXT], rule[OPTIONS])
                     if _better_selectors != better_selectors:
                         # Normalize the whole thing:
                         better_selectors = self.normalize_selectors(better_selectors)
@@ -1119,7 +1143,7 @@ class Scss(object):
             fileid, position, codestr, deps, context, options, selectors, properties, path, final = rule
             #print >>sys.stderr, fileid, position, [ c for c in context if c[1] != '_' ], options.keys(), selectors, deps
             if position is not None and properties:
-                if old_selectors != selectors:
+                if old_selectors != selectors and selectors:
                     if open:
                         if not sc:
                             if result[-1] == ';':
@@ -1132,13 +1156,17 @@ class Scss(object):
                     old_selectors = selectors
                     open = True
                     scope = set()
+                if selectors:
+                    _tb = tb
+                else:
+                    _tb = ''
                 if not compress and options.get('verbosity', 0) > 0:
-                    result += tb + '/* file: ' + fileid + ' */' + nl
+                    result += _tb + '/* file: ' + fileid + ' */' + nl
                     if context:
-                        result += tb + '/* vars:' + nl
+                        result += _tb + '/* vars:' + nl
                         for k, v in context.items():
-                            result += tb + tb + k + ' = ' + v + ';' + nl
-                        result += tb + '*/' + nl
+                            result += _tb + _tb + k + ' = ' + v + ';' + nl
+                        result += _tb + '*/' + nl
                 for prop, value in properties:
                     if value is not None:
                         property = prop + ':' + sp + value
@@ -1152,7 +1180,7 @@ class Scss(object):
                         old_property = property
                         scope.add(prop)
                         old_property = property
-                        result += tb + property + ';' + nl
+                        result += _tb + property + ';' + nl
         if open:
             if not sc:
                 if result[-1] == ';':
@@ -1161,60 +1189,52 @@ class Scss(object):
         return result + '\n'
 
 
-    def calculate(self, _base_str):
+    def calculate(self, _base_str, context, options):
         try:
             better_expr_str = self._replaces[_base_str]
         except KeyError:
             better_expr_str = _base_str
 
-            if _skip_word_re.match(better_expr_str) and ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
+            if _skip_word_re.match(better_expr_str) and '- ' not in better_expr_str and ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
                     self._replaces[_base_str] = better_expr_str
                     return better_expr_str
 
-            better_expr_str = eval_expr(better_expr_str)
+            better_expr_str = eval_expr(better_expr_str, context, options)
             if better_expr_str is None:
                 better_expr_str = _base_str
 
             self._replaces[_base_str] = better_expr_str
         return better_expr_str
 
-    def _calculate_expr(self, result):
-        _group0 = result.group(0)
-        _base_str = _group0
-        try:
-            better_expr_str = self._replaces[_group0]
-        except KeyError:
-            # If we are in a global variable, we remove '#{' and '}'
-            if _base_str.startswith('#{') and _base_str.endswith('}'):
-                _base_str = _base_str[2:-1]
-
-            better_expr_str = _base_str
-
-            if _skip_re.match(better_expr_str) and '- ' not in better_expr_str:
-                self._replaces[_group0] = better_expr_str
-                return better_expr_str
-
-            better_expr_str = eval_expr(better_expr_str)
-            if better_expr_str is None:
+    def _calculate_expr(self, context, options):
+        def __calculate_expr(result):
+            _group0 = result.group(0)
+            _base_str = _group0
+            try:
+                better_expr_str = self._replaces[_group0]
+            except KeyError:
+                # If we are in a global variable, we remove '#{' and '}'
+                if _base_str.startswith('#{') and _base_str.endswith('}'):
+                    _base_str = _base_str[2:-1]
+    
                 better_expr_str = _base_str
+    
+                if _skip_re.match(better_expr_str) and '- ' not in better_expr_str:
+                    self._replaces[_group0] = better_expr_str
+                    return better_expr_str
+    
+                better_expr_str = eval_expr(better_expr_str, context, options)
+                if better_expr_str is None:
+                    better_expr_str = _base_str
+    
+                self._replaces[_group0] = better_expr_str
+    
+            return better_expr_str
+        return __calculate_expr
 
-            self._replaces[_group0] = better_expr_str
-
-        return better_expr_str
-
-    def do_glob_math(self, content):
-        content = _expr_glob_re.sub(self._calculate_expr, content)
+    def do_glob_math(self, content, context, options):
+        content = _expr_glob_re.sub(self._calculate_expr(context, options), content)
         return content
-
-    #@print_timing
-    def pre_process(self, cont):
-        # To do math operations, we need to get the color's hex values (for color names)
-        # ...also we change brackets to parenthesis:
-        def _pp(m):
-            v = m.group(0)
-            return _colors.get(v, v)
-        cont = _colors_re.sub(_pp, cont)
-        return cont
 
     #@print_timing
     def post_process(self, cont):
@@ -1250,7 +1270,11 @@ except ImportError:
 ################################################################################
 
 def to_str(num):
-    if isinstance(num, float):
+    if isinstance(num, dict):
+        s = sorted(num.items())
+        sp = num.get('_', '')
+        return (sp + ' ').join( to_str(v) for n,v in s if n != '_' )
+    elif isinstance(num, float):
         num = ('%0.03f' % round(num, 3)).rstrip('0').rstrip('.')
         return num
     elif isinstance(num, bool):
@@ -1319,12 +1343,17 @@ def _hsla(h, s, l, a, type='hsla'):
     col = ColorValue(tuple([ c * 255.0 for c in colorsys.hls_to_rgb(col[0], col[2], col[1]) ] + [ col[3], type ]))
     return col
 
-def __rgba_add(color, r, g, b, a):
+def __rgba_op(op, color, r, g, b, a):
     color = ColorValue(color)
     c = color.value
-    a = r, g, b, a
+    a = (
+        NumberValue(r).value if r is not None else None,
+        NumberValue(g).value if g is not None else None,
+        NumberValue(b).value if b is not None else None,
+        NumberValue(a).value if a is not None else None,
+    )
     # Do the additions:
-    c = [ c[i] + a[i] for i in range(4) ]
+    c = [ op(c[i], a[i]) if op is not None and a[i] is not None else a[i] if a[i] is not None else c[i] for i in range(4) ]
     # Validations:
     r = 255.0, 255.0, 255.0, 1.0
     c = [ 0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4) ]
@@ -1333,21 +1362,25 @@ def __rgba_add(color, r, g, b, a):
 
 def _opacify(color, amount):
     a = NumberValue(amount).value
-    return __rgba_add(color, 0, 0, 0, a)
+    return __rgba_op(operator.__add__, color, 0, 0, 0, a)
 
 def _transparentize(color, amount):
     a = NumberValue(amount).value
-    return __rgba_add(color, 0, 0, 0, -a)
+    return __rgba_op(operator.__add__, color, 0, 0, 0, -a)
 
-def __hsl_add(color, h, s, l):
+def __hsl_op(op, color, h, s, l):
     color = ColorValue(color)
     c = color.value
-    a = h / 360.0, s, l
+    a = (
+        NumberValue(h).value / 360.0 if h is not None else None,
+        NumberValue(s).value if s is not None else None,
+        NumberValue(l).value if l is not None else None,
+    )
     # Convert to HSL:
     h, l, s = list(colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0))
     c = h, s, l
     # Do the additions:
-    c = [ 0.0 if c[i] < 0 else 1.0 if c[i] > 1 else c[i] + a[i] for i in range(3) ]
+    c = [ 0.0 if c[i] < 0 else 1.0 if c[i] > 1 else op(c[i], a[i]) if op is not None and a[i] is not None else a[i] if a[i] is not None else c[i] for i in range(3) ]
     # Validations:
     c[0] = (c[0] * 360.0) % 360
     r = 360.0, 1.0, 1.0
@@ -1359,30 +1392,45 @@ def __hsl_add(color, h, s, l):
 
 def _lighten(color, amount):
     a = NumberValue(amount).value
-    return __hsl_add(color, 0, 0, a)
+    return __hsl_op(operator.__add__, color, 0, 0, a)
 
 def _darken(color, amount):
     a = NumberValue(amount).value
-    return __hsl_add(color, 0, 0, -a)
+    return __hsl_op(operator.__add__, color, 0, 0, -a)
 
 def _saturate(color, amount):
     a = NumberValue(amount).value
-    return __hsl_add(color, 0, a, 0)
+    return __hsl_op(operator.__add__, color, 0, a, 0)
 
 def _desaturate(color, amount):
     a = NumberValue(amount).value
-    return __hsl_add(color, 0, -a, 0)
+    return __hsl_op(operator.__add__, color, 0, -a, 0)
 
 def _grayscale(color):
-    return __hsl_add(color, 0, -1.0, 0)
+    return __hsl_op(operator.__add__, color, 0, -1.0, 0)
 
 def _adjust_hue(color, degrees):
     d = NumberValue(degrees).value
-    return __hsl_add(color, d, 0, 0)
+    return __hsl_op(operator.__add__, color, d, 0, 0)
 
 def _complement(color):
-    return __hsl_add(color, 180.0, 0, 0)
+    return __hsl_op(operator.__add__, color, 180.0, 0, 0)
 
+def _asc_color(op, color, saturation=None, lightness=None, red=None, green=None, blue=None, alpha=None):
+    if lightness or saturation:
+        color = __hsl_op(op, color, 0, saturation, lightness)
+    if red or green or blue or alpha:
+        color = __rgba_op(op, color, red, green, blue, alpha)
+    return color
+
+def _adjust_color(color, saturation=None, lightness=None, red=None, green=None, blue=None, alpha=None):
+    return _asc_color(operator.__add__, color, saturation, lightness, red, green, blue, alpha)
+
+def _scale_color(color, saturation=None, lightness=None, red=None, green=None, blue=None, alpha=None):
+    return _asc_color(operator.__mul__, color, saturation, lightness, red, green, blue, alpha)
+
+def _change_color(color, saturation=None, lightness=None, red=None, green=None, blue=None, alpha=None):
+    return _asc_color(None, color, saturation, lightness, red, green, blue, alpha)
 
 def _mix(color1, color2, weight=None):
     """
@@ -1890,7 +1938,7 @@ class Value(object):
         k = op(first.value, second.value)
         return first if first.value == k else second
     def __repr__(self):
-        return '<%s: %s: %s>' % (self.__class__.__name__, repr(self.value), repr(self.tokens))
+        return '<%s: %s>' % (self.__class__.__name__, repr(self.value))
     def __lt__(self, other):
         return self._do_cmps(self, other, operator.__lt__)
     def __le__(self, other):
@@ -2285,6 +2333,9 @@ fnct = {
     'desaturate:2': _desaturate,
     'grayscale:1': _grayscale,
     'adjust-hue:2': _adjust_hue,
+    'adjust-color:n': _adjust_color,
+    'scale-color:n': _scale_color,
+    'change-color:n': _change_color,
     'spin:2': _adjust_hue,
     'complement:1': _complement,
     'mix:2': _mix,
@@ -2325,18 +2376,29 @@ fnct = {
 for u in _units:
     fnct[u+':2'] = _convert_to
 
-def call(name, args, function=True):
+def call(name, args, C, O, function=True):
     # Function call:
     _name = name.replace('_', '-')
+    s = sorted(args.items())
     try:
-        fn = fnct.get('%s:%d' % (_name, len(args))) or fnct['%s:n' % _name]
-        node = fn(*args)
+        _args = [ v for n,v in s if isinstance(n, int) ]
+        _kwargs = dict( (n[1:],v) for n,v in s if not isinstance(n, int) and n != '_' )
+        _fn_a = '%s:%d' % (_name, len(_args))
+        _fn_n = '%s:n' % _name
+        fn = O and O.get('@function ' + _fn_a) or fnct.get(_fn_a) or fnct[_fn_n]
+        node = fn(*_args, **_kwargs)
     except:
         if function:
+            sp = args.get('_', '')
+            _args = (sp + ' ').join( to_str(v) for n,v in s if isinstance(n, int) )
+            _kwargs = (sp + ' ').join( '%s: %s' % (n, to_str(v)) for n,v in s if not isinstance(n, int) and n != '_' )
+            if _args and _kwargs:
+                _args += (sp + ' ')
             # Function not found, simply write it as a string:
-            node = StringValue(name + '(' + ', '.join(str(a) for a in args) + ')')
+            node = StringValue(name + '(' + _args + _kwargs + ')')
         else:
-            node = StringValue(''.join(str(a) for a in args))
+            sp = args.get('_', '')
+            node = StringValue((sp + ' ').join( str(v) for n,v in s if n != '_' ))
     return node
 
 class SyntaxError(Exception):
@@ -2490,6 +2552,7 @@ class Parser(object):
 ## Grammar compiled using Yapps:
 class CalculatorScanner(Scanner):
     patterns = [
+        ('":"', re.compile(':')),
         ('[ \r\t\n]+', re.compile('[ \r\t\n]+')),
         ('COMMA', re.compile(',')),
         ('LPAR', re.compile('\\(|\\[')),
@@ -2516,170 +2579,171 @@ class CalculatorScanner(Scanner):
         ('NUM', re.compile('(?:\\d+(?:\\.\\d*)?|\\.\\d+)')),
         ('BOOL', re.compile('(?:true|false)')),
         ('COLOR', re.compile('#(?:[a-fA-F0-9]{8}|[a-fA-F0-9]{6}|[a-fA-F0-9]{3,4})')),
+        ('VAR', re.compile('\\$[-a-zA-Z0-9_]+')),
         ('ID', re.compile('[-a-zA-Z_][-a-zA-Z0-9_]*')),
     ]
     def __init__(self):
         Scanner.__init__(self,None,['[ \r\t\n]+'])
 
 class Calculator(Parser):
-    def goal(self):
-        expr = self.expr()
-        v = [ str(expr) ]
-        while self._peek('END', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') != 'END':
-            expr = self.expr()
-            v.append(str(expr))
+    def goal(self, C,O):
+        expr_lst = self.expr_lst(C,O)
+        v = expr_lst
         END = self._scan('END')
         return v
 
-    def expr(self):
-        and_test = self.and_test()
+    def expr(self, C,O):
+        and_test = self.and_test(C,O)
         v = and_test
-        while self._peek('OR', 'RPAR', 'COMMA', 'END', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'OR':
+        while self._peek('OR', 'COMMA', 'VAR', 'NOT', 'INV', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'OR':
             OR = self._scan('OR')
-            and_test = self.and_test()
+            and_test = self.and_test(C,O)
             v = v or and_test
         return v
 
-    def and_test(self):
-        not_test = self.not_test()
+    def and_test(self, C,O):
+        not_test = self.not_test(C,O)
         v = not_test
-        while self._peek('AND', 'OR', 'RPAR', 'COMMA', 'END', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'AND':
+        while self._peek('AND', 'OR', 'COMMA', 'VAR', 'NOT', 'INV', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'AND':
             AND = self._scan('AND')
-            not_test = self.not_test()
+            not_test = self.not_test(C,O)
             v = v and not_test
         return v
 
-    def not_test(self):
+    def not_test(self, C,O):
         _token_ = self._peek('NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR')
         if _token_ not in ['NOT', 'INV']:
-            comparison = self.comparison()
+            comparison = self.comparison(C,O)
             return comparison
         else:# in ['NOT', 'INV']
             while 1:
                 _token_ = self._peek('NOT', 'INV')
                 if _token_ == 'NOT':
                     NOT = self._scan('NOT')
-                    not_test = self.not_test()
+                    not_test = self.not_test(C,O)
                     v = not not_test
                 else:# == 'INV'
                     INV = self._scan('INV')
-                    not_test = self.not_test()
+                    not_test = self.not_test(C,O)
                     v = _inv('!', not_test)
-                if self._peek('NOT', 'INV', 'AND', 'OR', 'RPAR', 'COMMA', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') not in ['NOT', 'INV']: break
+                if self._peek('NOT', 'INV', 'AND', 'OR', 'COMMA', 'VAR', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') not in ['NOT', 'INV']: break
             return v
 
-    def comparison(self):
-        or_expr = self.or_expr()
+    def comparison(self, C,O):
+        or_expr = self.or_expr(C,O)
         v = or_expr
-        while self._peek('LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'OR', 'RPAR', 'COMMA', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['LT', 'GT', 'LE', 'GE', 'EQ', 'NE']:
+        while self._peek('LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'OR', 'COMMA', 'VAR', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['LT', 'GT', 'LE', 'GE', 'EQ', 'NE']:
             _token_ = self._peek('LT', 'GT', 'LE', 'GE', 'EQ', 'NE')
             if _token_ == 'LT':
                 LT = self._scan('LT')
-                or_expr = self.or_expr()
+                or_expr = self.or_expr(C,O)
                 v = v < or_expr
             elif _token_ == 'GT':
                 GT = self._scan('GT')
-                or_expr = self.or_expr()
+                or_expr = self.or_expr(C,O)
                 v = v > or_expr
             elif _token_ == 'LE':
                 LE = self._scan('LE')
-                or_expr = self.or_expr()
+                or_expr = self.or_expr(C,O)
                 v = v <= or_expr
             elif _token_ == 'GE':
                 GE = self._scan('GE')
-                or_expr = self.or_expr()
+                or_expr = self.or_expr(C,O)
                 v = v >= or_expr
             elif _token_ == 'EQ':
                 EQ = self._scan('EQ')
-                or_expr = self.or_expr()
+                or_expr = self.or_expr(C,O)
                 v = v == or_expr
             else:# == 'NE'
                 NE = self._scan('NE')
-                or_expr = self.or_expr()
+                or_expr = self.or_expr(C,O)
                 v = v != or_expr
         return v
 
-    def or_expr(self):
-        and_expr = self.and_expr()
+    def or_expr(self, C,O):
+        and_expr = self.and_expr(C,O)
         v = and_expr
-        while self._peek('OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'RPAR', 'COMMA', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'OR':
+        while self._peek('OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'COMMA', 'VAR', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'OR':
             OR = self._scan('OR')
-            and_expr = self.and_expr()
+            and_expr = self.and_expr(C,O)
             v = v or and_expr
         return v
 
-    def and_expr(self):
-        a_expr = self.a_expr()
+    def and_expr(self, C,O):
+        a_expr = self.a_expr(C,O)
         v = a_expr
-        while self._peek('AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'RPAR', 'COMMA', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'AND':
+        while self._peek('AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'VAR', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'AND':
             AND = self._scan('AND')
-            a_expr = self.a_expr()
+            a_expr = self.a_expr(C,O)
             v = v and a_expr
         return v
 
-    def a_expr(self):
-        m_expr = self.m_expr()
+    def a_expr(self, C,O):
+        m_expr = self.m_expr(C,O)
         v = m_expr
-        while self._peek('ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'RPAR', 'COMMA', 'END', 'SIGN', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['ADD', 'SUB']:
+        while self._peek('ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'VAR', 'RPAR', 'END', 'SIGN', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['ADD', 'SUB']:
             _token_ = self._peek('ADD', 'SUB')
             if _token_ == 'ADD':
                 ADD = self._scan('ADD')
-                m_expr = self.m_expr()
+                m_expr = self.m_expr(C,O)
                 v = v + m_expr
             else:# == 'SUB'
                 SUB = self._scan('SUB')
-                m_expr = self.m_expr()
+                m_expr = self.m_expr(C,O)
                 v = v - m_expr
         return v
 
-    def m_expr(self):
-        u_expr = self.u_expr()
+    def m_expr(self, C,O):
+        u_expr = self.u_expr(C,O)
         v = u_expr
-        while self._peek('MUL', 'DIV', 'ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'RPAR', 'COMMA', 'END', 'SIGN', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['MUL', 'DIV']:
+        while self._peek('MUL', 'DIV', 'ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'VAR', 'RPAR', 'END', 'SIGN', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['MUL', 'DIV']:
             _token_ = self._peek('MUL', 'DIV')
             if _token_ == 'MUL':
                 MUL = self._scan('MUL')
-                u_expr = self.u_expr()
+                u_expr = self.u_expr(C,O)
                 v = v * u_expr
             else:# == 'DIV'
                 DIV = self._scan('DIV')
-                u_expr = self.u_expr()
+                u_expr = self.u_expr(C,O)
                 v = v / u_expr
         return v
 
-    def u_expr(self):
+    def u_expr(self, C,O):
         _token_ = self._peek('SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR')
         if _token_ == 'SIGN':
             SIGN = self._scan('SIGN')
-            u_expr = self.u_expr()
+            u_expr = self.u_expr(C,O)
             return _inv('-', u_expr)
         elif _token_ == 'ADD':
             ADD = self._scan('ADD')
-            u_expr = self.u_expr()
+            u_expr = self.u_expr(C,O)
             return u_expr
         else:# in ['LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR']
-            atom = self.atom()
+            atom = self.atom(C,O)
             v = atom
-            if self._peek() == 'UNITS':
+            if self._peek('UNITS', 'MUL', 'DIV', 'ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'VAR', 'RPAR', 'END', 'SIGN', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'UNITS':
                 UNITS = self._scan('UNITS')
-                v = call(UNITS, [v, UNITS], False)
+                v = call(UNITS, { 0: v, 1: UNITS }, C, O, False)
             return v
 
-    def atom(self):
+    def atom(self, C,O):
         _token_ = self._peek('LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR')
         if _token_ == 'LPAR':
             LPAR = self._scan('LPAR')
-            expr = self.expr()
+            expr_lst = self.expr_lst(C,O)
             RPAR = self._scan('RPAR')
-            return expr
+            return expr_lst.get(0, expr_lst) if len(expr_lst) == 1 else expr_lst
         elif _token_ == 'ID':
             ID = self._scan('ID')
             v = ID
-            if self._peek() == 'LPAR':
+            if self._peek('LPAR', 'UNITS', 'MUL', 'DIV', 'ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'VAR', 'RPAR', 'END', 'SIGN', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'LPAR':
+                v = {}
                 LPAR = self._scan('LPAR')
-                expr_lst = self.expr_lst()
+                if self._peek('RPAR', 'VAR', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') != 'RPAR':
+                    expr_lst = self.expr_lst(C,O)
+                    v = expr_lst
                 RPAR = self._scan('RPAR')
-                return call(v, expr_lst)
+                return call(ID, v, C, O)
             return v
         elif _token_ == 'NUM':
             NUM = self._scan('NUM')
@@ -2697,33 +2761,51 @@ class Calculator(Parser):
             COLOR = self._scan('COLOR')
             return ColorValue(ParserValue(COLOR))
 
-    def expr_lst(self):
-        expr = self.expr()
-        v = [expr]
-        while self._peek('COMMA', 'NOT', 'INV', 'RPAR', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') != 'RPAR':
-            if self._peek('COMMA', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'COMMA':
+    def expr_lst(self, C,O):
+        n = None
+        if self._peek('VAR', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'VAR':
+            VAR = self._scan('VAR')
+            self._scan('":"')
+            n = VAR
+        expr = self.expr(C,O)
+        v = { n or 0: expr }
+        while self._peek('COMMA', 'VAR', 'NOT', 'INV', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') not in ['RPAR', 'END']:
+            n = None
+            if self._peek('COMMA', 'VAR', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'COMMA':
                 COMMA = self._scan('COMMA')
-            expr = self.expr()
-            v.append(expr)
+                v['_'] = COMMA
+            if self._peek('VAR', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'VAR':
+                VAR = self._scan('VAR')
+                self._scan('":"')
+                n = VAR
+            expr = self.expr(C,O)
+            v[n or len(v)] = expr
         return v
 ### Grammar ends.
 
-P = Calculator(CalculatorScanner())
-def eval_expr(expr):
+def eval_expr(expr, context, options, raw=False):
     #print >>sys.stderr, '>>',expr,'<<'
     val = None
     try:
+        P = Calculator(CalculatorScanner())
         P.reset(expr)
-        results = P.goal()
-        val = results and ' '.join(e for e in results if e != '')
-        #print >>sys.stderr, '--',val,'--'
+        results = P.goal(context, options)
+        #print >>sys.stderr, '%%',results,'%%'
+        if raw:
+            return results
+        if results:
+            val = to_str(results)
+            #print >>sys.stderr, '==',val,'=='
+            return val
     except SyntaxError:
-        pass
-        #raise
+        return
+        print >>sys.stderr, '>>',expr,'<<'
+        raise
     except:
-        pass
-        #raise
-    return val
+        return
+        print >>sys.stderr, '>>',expr,'<<'
+        raise
+    
 
 
 __doc__ += """

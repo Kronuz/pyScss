@@ -192,9 +192,9 @@ class Generator:
 
         self.write("\n")
         self.write("P = ", self.name, "(", self.name, "Scanner())\n")
-        self.write("def parse(rule, text):\n")
+        self.write("def parse(rule, text, *args):\n")
         self.write("    P.reset(text)\n")
-        self.write("    return wrap_error_reporter(P, rule)\n")
+        self.write("    return wrap_error_reporter(P, rule, *args)\n")
         self.write("\n")
         if self.postparser is not None:
             self.write(self.postparser)
