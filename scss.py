@@ -4101,15 +4101,17 @@ def main():
     else:
         global LOAD_PATHS, VERBOSITY, MEDIA_ROOT, ASSETS_ROOT
         VERBOSITY = 0
-        load_paths = [ LOAD_PATHS ]
+        load_paths = [ p.strip() for p in LOAD_PATHS.split(',') ]
         for o, a in opts:
             if o in ('-M', '--media-root'):
                 MEDIA_ROOT = a
             elif o in ('-A', '--assets-root'):
                 ASSETS_ROOT = a
             elif o in ('-I', '--load-path'):
-                if a not in load_paths:
-                    load_paths.append(a)
+                for p in a.split(','):
+                    p = p.strip()
+                    if p and p not in load_paths:
+                        load_paths.append(p)
             elif o == '--time':
                 VERBOSITY = 1
         LOAD_PATHS = ';'.join(load_paths)
