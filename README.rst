@@ -52,7 +52,7 @@ Or compile from the command line::
 
 Interactive mode::
 
-    python scss.py -i
+    python scss.py --interactive
 
 Examples
 ========
@@ -205,7 +205,7 @@ Examples
 #. **Interactive mode**
     Example::
 
-	$ python scss.py -i
+	$ python scss.py --interactive
 	>>> @import compass/css
 	>>> show()
         ['functions', 'mixins', 'options', 'vars']

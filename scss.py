@@ -4210,5 +4210,6 @@ def main():
             css = Scss()
             sys.stdout.write(css.compile(sys.stdin.read()))
         print 'Bye!'
+
 if __name__ == "__main__":
     main()
