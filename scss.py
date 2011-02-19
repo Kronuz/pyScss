@@ -4,7 +4,7 @@
 pyScss, a Scss compiler for Python
 
 @author     German M. Bravo (Kronuz)
-@version    1.0 beta 2
+@version    1.0 beta 3
 @see        https://github.com/Kronuz/pyScss
 @copyright  (c) 2011 German M. Bravo (Kronuz)
 @license    MIT License
@@ -35,21 +35,25 @@ xCSS:
     http://xcss.antpaw.org/docs/
 
 """
+
+VERSION = "pyScss v1.0 beta 3 (20110219)"
+
 ################################################################################
 # Configuration:
-verbosity = 1
-
+import os
+PROJECT_ROOT = os.path.normpath(os.path.dirname(os.path.abspath(__file__)))
 # Sass @import load_paths:
-LOAD_PATHS = '/usr/local/www/project/sass/frameworks/'
+LOAD_PATHS = os.path.join(PROJECT_ROOT, 'sass', 'frameworks')
 # Media base root path where images, fonts and other resources are located:
-MEDIA_ROOT = '/usr/local/www/project/media/'
+MEDIA_ROOT = os.path.join(PROJECT_ROOT, 'media')
 # Assets path, where new sprite files are created:
-ASSETS_ROOT = MEDIA_ROOT + 'assets/'
+ASSETS_ROOT = os.path.join(PROJECT_ROOT, 'media', 'assets')
 # Urls for the media and assets:
 MEDIA_URL = '/media/'
-ASSETS_URL = MEDIA_URL + 'assets/'
-
+ASSETS_URL = '/media/assets/'
+VERBOSITY = 1
 ################################################################################
+
 import re
 import sys
 import time
@@ -258,7 +262,7 @@ _default_scss_vars = {
 }
 
 _default_scss_opts = {
-    'verbosity': 0,
+    'verbosity': VERBOSITY,
     'compress': 1,
     'compress_short_colors': 1, # Converts things like #RRGGBB to #RGB
     'compress_reverse_colors': 1, # Gets the shortest name of all for colors
@@ -359,9 +363,9 @@ FINAL = 9
 
 def print_timing(level=0):
     def _print_timing(func):
-        if verbosity >= level:
+        if VERBOSITY >= level:
             def wrapper(*arg):
-                if verbosity >= level:
+                if VERBOSITY >= level:
                     t1 = time.time()
                     res = func(*arg)
                     t2 = time.time()
@@ -1358,7 +1362,6 @@ class Scss(object):
             cont = _zero_re.sub('.', cont)
         return cont
 
-import os
 import hashlib
 import base64
 import datetime
@@ -4072,81 +4075,125 @@ Sass generates only selectors that are likely to be useful.
 --------------------------------------------------------------------------------
 """
 
-if __name__ == "__main__":
-    import getopt
-    # parse options for module imports
-    opts, args = getopt.getopt(sys.argv[1:], 'ti')
-    opts = dict(opts)
-    if '-t' in opts or '--test' in opts:
-        verbosity = 0
-        import doctest
-        doctest.testmod()
-    elif '-i' in opts or '--interactive' in opts:
-        from pprint import pprint
-        css = Scss()
-        context = css.scss_vars
-        options = css.scss_opts
-        while True:
-            try: s = raw_input('>>> ').strip()
-            except EOFError: break
-            if not s: break
-            for s in s.split(';'):
-                s = s.strip()
-                if not s:
-                    continue
-                if s.startswith('@'):
-                    properties = []
-                    rule = [ 'string', None, s, set(), context, options, '', properties, './', False ]
-                    code, name = (s.split(None, 1)+[''])[:2]
-                    if code == '@option':
-                        css._settle_options(rule, [], set(), deque(), None, s, None, code, name)
-                    elif code == '@import':
-                        css._do_import(rule, [], set(), deque(), None, s, None, code, name)
-                    elif code == '@include':
-                        css._do_include(rule, [], set(), deque(), None, s, None, code, name)
-                        print css._print_properties(properties).rstrip('\n')
-                    else:
-                        eval_expr(s, context, options)
-                elif s.startswith('dir('): 
-                    m = re.match(r'dir\(([^,)]+)(?:,([^,)]+))*\)', s, re.IGNORECASE)
-                    if m:
-                        name = m.group(1).strip()
-                        code = m.group(2)
-                        code = code and code.strip()
-                        if name == 'vars' and code =='*':
-                            d = dict((k, v) for k, v in context.items())
-                            pprint(d)
-                        if name == 'vars':
-                            d = dict((k, v) for k, v in context.items() if k.startswith('$') and not k.startswith('$__'))
-                            pprint(d)
-                        elif name == 'options' and code =='*':
-                            d = dict((k, v) for k, v in options.items())
-                            pprint(d)
-                        elif name == 'options':
-                            d = dict((k, v) for k, v in options.items() if not k.startswith('@'))
-                            pprint(d)
-                        elif name in ('mixins', 'functions'):
-                            name = name[:-1]
-                            if code == '*':
-                                d = dict((k[len(name)+2:], v) for k, v in options.items() if k.startswith('@' + name + ' '))
-                                pprint(sorted(d))
-                            elif code:
-                                d = dict((k, v) for k, v in options.items() if k.startswith('@' + name + ' ' + code + ':'))
-                                mixin = d.popitem()[1]
-                                mixin = getattr(mixin, 'mixin', mixin)
-                                print '@' + name + ' ' + code + '(' + ', '.join( p + (': ' + mixin[1].get(p) if p in mixin[1] else '') for p in mixin[0] ) + ') {'
-                                print '  ' + '\n  '.join(l.strip() for l in mixin[2].split('\n'))
-                                print '}'
-                            else:
-                                d = dict((k[len(name)+2:].split(':')[0], v) for k, v in options.items() if k.startswith('@' + name + ' '))
-                                pprint(sorted(d))
-                elif s.startswith('$') and (':' in s or '=' in s):
-                    prop, value = [ a.strip() for a in _prop_split_re.split(s, 1) ]
-                    value = css.apply_vars(value, context)
-                    context[prop] = value
-                else:
-                    s = css.apply_vars(s, context)
-                    print eval_expr(s, context, options)
+def usage():
+    print "Usage: ",sys.argv[0]," [options]\n"
+    print "Description:"
+    print "Converts Scss files to CSS.\n"
+    print "Options:"
+    print "        --time                       Display compilation times."
+    print "    -i, --interactive                Run an interactive Scss shell."
+    print "    -I, --load-path PATH             Add a scss import path."
+    print "    -?, -h, --help                   Show this message"
+    print "    -v, --version                    Print version"
+    sys.exit(2)
+
+import getopt
+def main():
+    try:
+        # parse options
+        opts, args = getopt.getopt(sys.argv[1:], '?htiI:M:A:', ['help', 'version', 'time', 'test', 'interactive', 'load-path=', 'media-root=', 'assets-root='])
+    except getopt.GetoptError, err:
+        # print help information and exit:
+        print str(err) # will print something like "option -a not recognized"
+        usage()
     else:
-        css = Scss()
-        sys.stdout.write(css.compile(sys.stdin.read()))
+        global LOAD_PATHS, VERBOSITY, MEDIA_ROOT, ASSETS_ROOT
+        VERBOSITY = 0
+        load_paths = [ LOAD_PATHS ]
+        for o, a in opts:
+            if o in ('-M', '--media-root'):
+                MEDIA_ROOT = a
+            elif o in ('-A', '--assets-root'):
+                ASSETS_ROOT = a
+            elif o in ('-I', '--load-path'):
+                if a not in load_paths:
+                    load_paths.append(a)
+            elif '--time' in opts:
+                VERBOSITY = 1
+        LOAD_PATHS = ';'.join(load_paths)
+        opts = dict(opts)
+        if '-t' in opts or '--test' in opts:
+            import doctest
+            doctest.testmod()
+        elif '-h' in opts or '--help' in opts:
+            usage()
+        elif '-v' in opts or '--version' in opts:
+            print VERSION
+            sys.exit(2)
+        elif '-i' in opts or '--interactive' in opts:
+            from pprint import pprint
+            css = Scss()
+            context = css.scss_vars
+            options = css.scss_opts
+            print 'Welcome to ' + VERSION + " interactive shell"
+            while True:
+                try: s = raw_input('>>> ').strip()
+                except EOFError: print ''; break
+                except KeyboardInterrupt: print''; break
+                if s in ('exit', 'quit'): break
+                for s in s.split(';'):
+                    s = s.strip()
+                    if not s:
+                        continue
+                    elif s.startswith('@'):
+                        properties = []
+                        rule = [ 'string', None, s, set(), context, options, '', properties, './', False ]
+                        code, name = (s.split(None, 1)+[''])[:2]
+                        if code == '@option':
+                            css._settle_options(rule, [], set(), deque(), None, s, None, code, name)
+                        elif code == '@import':
+                            css._do_import(rule, [], set(), deque(), None, s, None, code, name)
+                        elif code == '@include':
+                            css._do_include(rule, [], set(), deque(), None, s, None, code, name)
+                            print css._print_properties(properties).rstrip('\n')
+                        else:
+                            eval_expr(s, context, options)
+                    elif s.startswith('show('): 
+                        m = re.match(r'show\(([^,)]*)(?:,([^,)]+))*\)', s, re.IGNORECASE)
+                        if m:
+                            name = m.group(1)
+                            code = m.group(2)
+                            name = name and name.strip()
+                            code = code and code.strip()
+                            if not name:
+                                pprint(sorted(['vars', 'options', 'mixins', 'functions']))
+                            elif name == 'vars' and code =='*':
+                                d = dict((k, v) for k, v in context.items())
+                                pprint(d)
+                            elif name == 'vars':
+                                d = dict((k, v) for k, v in context.items() if k.startswith('$') and not k.startswith('$__'))
+                                pprint(d)
+                            elif name == 'options' and code =='*':
+                                d = dict((k, v) for k, v in options.items())
+                                pprint(d)
+                            elif name == 'options':
+                                d = dict((k, v) for k, v in options.items() if not k.startswith('@'))
+                                pprint(d)
+                            elif name in ('mixins', 'functions'):
+                                name = name[:-1]
+                                if code == '*':
+                                    d = dict((k[len(name)+2:], v) for k, v in options.items() if k.startswith('@' + name + ' '))
+                                    pprint(sorted(d))
+                                elif code:
+                                    d = dict((k, v) for k, v in options.items() if k.startswith('@' + name + ' ' + code + ':'))
+                                    mixin = d.popitem()[1]
+                                    mixin = getattr(mixin, 'mixin', mixin)
+                                    print '@' + name + ' ' + code + '(' + ', '.join( p + (': ' + mixin[1].get(p) if p in mixin[1] else '') for p in mixin[0] ) + ') {'
+                                    print '  ' + '\n  '.join(l.strip() for l in mixin[2].split('\n'))
+                                    print '}'
+                                else:
+                                    d = dict((k[len(name)+2:].split(':')[0], v) for k, v in options.items() if k.startswith('@' + name + ' '))
+                                    pprint(sorted(d))
+                    elif s.startswith('$') and (':' in s or '=' in s):
+                        prop, value = [ a.strip() for a in _prop_split_re.split(s, 1) ]
+                        value = css.apply_vars(value, context)
+                        context[prop] = value
+                    else:
+                        s = css.apply_vars(s, context)
+                        print eval_expr(s, context, options)
+        else:
+            css = Scss()
+            sys.stdout.write(css.compile(sys.stdin.read()))
+        print 'Bye!'
+if __name__ == "__main__":
+    main()

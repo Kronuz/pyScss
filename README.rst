@@ -207,12 +207,13 @@ Examples
 
 	$ python scss.py -i
 	>>> @import compass/css
-	>>> dir(mixins)
+	>>> show()
+	>>> show(mixins)
 	['apply-origin',
 	 'apply-transform',
 	 ...
 	 'transparent']
-	>>> dir(mixins, transparent)
+	>>> show(mixins, transparent)
 	@mixin transparent() {
 	  @include opacity(0);
 	}
