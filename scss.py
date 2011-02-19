@@ -4148,7 +4148,7 @@ def main():
                             print css._print_properties(properties).rstrip('\n')
                         else:
                             eval_expr(s, context, options)
-                    elif s.startswith('show(') or s.startswith('show ') or s.startswith('ls(') or s.startswith('ls '):
+                    elif s == 'ls' or s.startswith('show(') or s.startswith('show ') or s.startswith('ls(') or s.startswith('ls '):
                         m = re.match(r'(?:show|ls)(\()?([^,/\\)]*)(?:[,/\\]([^,/\\)]+))*(?(1)\))', s, re.IGNORECASE)
                         if m:
                             name = m.group(2)
@@ -4178,16 +4178,22 @@ def main():
                                     d = dict((k, v) for k, v in options.items() if not k.startswith('@'))
                                     pprint(d)
                             elif name in ('m', 'mix', 'mixin', 'f', 'func', 'funct', 'function'):
+                                if name.startswith('m'): name = 'mixin'
+                                elif name.startswith('f'): name = 'function'
                                 if code == '*':
                                     d = dict((k[len(name)+2:], v) for k, v in options.items() if k.startswith('@' + name + ' '))
                                     pprint(sorted(d))
                                 elif code:
                                     d = dict((k, v) for k, v in options.items() if k.startswith('@' + name + ' ') and code in k)
+                                    seen = set()
                                     for k, mixin in d.items():
                                         mixin = getattr(mixin, 'mixin', mixin)
-                                        print '@' + name + ' ' + code + '(' + ', '.join( p + (': ' + mixin[1].get(p) if p in mixin[1] else '') for p in mixin[0] ) + ') {'
-                                        print '  ' + '\n  '.join(l.strip() for l in mixin[2].split('\n'))
-                                        print '}'
+                                        fn_name, _, _ = k.partition(':')
+                                        if fn_name not in seen:
+                                            seen.add(fn_name)
+                                            print fn_name + '(' + ', '.join( p + (': ' + mixin[1].get(p) if p in mixin[1] else '') for p in mixin[0] ) + ') {'
+                                            print '  ' + '\n  '.join(l for l in mixin[2].split('\n'))
+                                            print '}'
                                 else:
                                     d = dict((k[len(name)+2:].split(':')[0], v) for k, v in options.items() if k.startswith('@' + name + ' '))
                                     pprint(sorted(d))
