@@ -18,20 +18,6 @@ structure but it's been completely rewritten, many bugs have been fixed and it
 has been extensively extended to support almost the full range of Sass' Scss
 syntax and functionality.
 
-Benchmarks
-==========
-    pyScss has been optimized for speed. Compiling **Compass 0.11.beta.2**
-    (`compass/doc-src/content/stylesheets/screen.scss`)
-    
-    ...using **Sass 3.1.0.alpha.221**::
-
-	Compilation took 2.683s (w/o cache)
-	Compilation took 1.35s  (cached)
-    
-    ...using **pyScss 1.0 beta**::
-
-	Compilation took 0.614s
-
 Support
 ========
 pyScss has most of the funcitonality in Sass 3.2 ...it supports:
@@ -64,6 +50,10 @@ Or compile from the command line::
 
     python scss.py < file.scss
 
+Interactive mode::
+
+    python scss.py -i
+
 Examples
 ========
 #. **Nested Rules**
@@ -72,10 +62,10 @@ Examples
 	@options compress: no;
 	.selector {
 	    a {
-	        display: block;
+		display: block;
 	    }
 	    strong {
-	        color: blue;
+		color: blue;
 	    }
 	}
 
@@ -94,7 +84,7 @@ Examples
 	@options compress: no;
 	$main-color: #ce4dd6;
 	$style: solid;
-        $side: bottom;
+	$side: bottom;
 	#navbar {
 	  border-#{$side}: {
 	    color: $main-color;
@@ -197,20 +187,37 @@ Examples
     ...generates a new sprite file and produces something like::
 
 	div {
-                background: url('/media/assets/eli2Rxy5MXpWj4uWPAHn5w.png?_=1297402328') 0 0 no-repeat;
+		background: url('/media/assets/eli2Rxy5MXpWj4uWPAHn5w.png?_=1297402328') 0 0 no-repeat;
 	}
 
 	div .facebook {
-                width: 32px;
-                height: 32px;
-                background-position: -128px 0;
+		width: 32px;
+		height: 32px;
+		background-position: -128px 0;
 	}
 
 	div .twitter {
 		width: 32px;
-                height: 32px;
-                background-position: -224px 0;
+		height: 32px;
+		background-position: -224px 0;
 	}
+
+::
+#. **Interactive mode**
+    Example::
+
+	$ python scss.py -i
+	>>> @import compass/css
+	>>> dir(mixins)
+	['apply-origin',
+	 'apply-transform',
+	 ...
+	 'transparent']
+	>>> dir(mixins, transparent)
+	@mixin transparent() {
+	  @include opacity(0);
+	}
+	>>> _
 
 Sass Sassy CSS
 ==============
@@ -234,13 +241,27 @@ following `myfile.css`::
 	$blueprint-grid-columns : 24;
 	$blueprint-grid-width   : 30px;
 	$blueprint-grid-margin  : 10px;
-	$font-color             : #333;
+	$font-color	     : #333;
 
 	@import "compass/reset";
 	@import "compass/utilities";
 	@import "blueprint";
 
 	// Stuff goes here...
+
+Benchmarks
+==========
+    pyScss has been optimized for speed. Compiling **Compass 0.11.beta.2**
+    (`compass/doc-src/content/stylesheets/screen.scss`)
+    
+    ...using **Sass 3.1.0.alpha.221**::
+
+	Compilation took 2.683s (w/o cache)
+	Compilation took 1.35s  (cached)
+    
+    ...using **pyScss 1.0 beta**::
+
+	Compilation took 0.614s
 
 License
 =======

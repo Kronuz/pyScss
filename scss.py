@@ -4,7 +4,7 @@
 pyScss, a Scss compiler for Python
 
 @author     German M. Bravo (Kronuz)
-@version    1.0 beta
+@version    1.0 beta 2
 @see        https://github.com/Kronuz/pyScss
 @copyright  (c) 2011 German M. Bravo (Kronuz)
 @license    MIT License
@@ -821,18 +821,19 @@ class Scss(object):
             mixin = [ list(new_params), defaults, self.apply_vars(c_codestr, rule[CONTEXT]) ]
             if code == '@function':
                 def _call(mixin):
-                    def __call(C, O, *args, **kwargs):
+                    def __call(*args, **kwargs):
                         m_params = mixin[0]
-                        m_vars = C.copy()
+                        m_vars = rule[CONTEXT].copy()
                         m_vars.update(mixin[1])
                         m_codestr = mixin[2]
                         for i, a in enumerate(args):
                             m_vars[m_params[i]] = str(a)
                         m_vars.update(kwargs)
-                        _rule = [ '', None, m_codestr, set(), m_vars, O, '', [], './', False ]
+                        _options = rule[OPTIONS].copy()
+                        _rule = [ '', None, m_codestr, set(), m_vars, _options, '', [], './', False ]
                         self.manage_children(_rule, p_selectors, p_parents, p_children, (scope or '') + '')
-                        ret = _rule[OPTIONS].get('@return', '')
-                        ret = eval_expr(ret, m_vars, O, True)
+                        ret = _options.pop('@return', '')
+                        ret = eval_expr(ret, m_vars, _options, True)
                         ret = ret.get(0, ret) if len(ret) == 1 else ret
                         return ret
                     return __call
@@ -2610,12 +2611,8 @@ def call(name, args, C, O, function=True):
         _kwargs = dict( (n[1:],v) for n,v in s if not isinstance(n, int) and n != '_' )
         _fn_a = '%s:%d' % (_name, len(_args))
         _fn_n = '%s:n' % _name
-        if O and '@function ' + _fn_a in O:
-            fn = O['@function ' + _fn_a]
-            node = fn(C, O, *_args, **_kwargs)
-        else:
-            fn = fnct.get(_fn_a) or fnct[_fn_n]
-            node = fn(*_args, **_kwargs)
+        fn = O and O.get('@function ' + _fn_a) or fnct.get(_fn_a) or fnct[_fn_n]
+        node = fn(*_args, **_kwargs)
     except:
         #raise#@@@#
         if function:
@@ -4126,7 +4123,7 @@ if __name__ == "__main__":
                             pprint(d)
                         elif name == 'options':
                             d = dict((k, v) for k, v in options.items() if not k.startswith('@'))
-                            pprint(sorted(d))
+                            pprint(d)
                         elif name in ('mixins', 'functions'):
                             name = name[:-1]
                             if code == '*':
