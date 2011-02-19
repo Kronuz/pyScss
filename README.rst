@@ -218,6 +218,8 @@ Examples
 	@mixin transparent() {
 	  @include opacity(0);
 	}
+	>>> 1px + 5px
+	6px
 	>>> _
 
 Sass Sassy CSS
