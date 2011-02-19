@@ -4083,6 +4083,8 @@ def usage():
     print "        --time                       Display compilation times."
     print "    -i, --interactive                Run an interactive Scss shell."
     print "    -I, --load-path PATH             Add a scss import path."
+    print "    -M, --media-root PATH            Media root path (Where images and media resources are located)"
+    print "    -A, --assets-root PATH           Assets root path (Sprite images will be created here)"
     print "    -?, -h, --help                   Show this message"
     print "    -v, --version                    Print version"
     sys.exit(2)
@@ -4091,7 +4093,7 @@ import getopt
 def main():
     try:
         # parse options
-        opts, args = getopt.getopt(sys.argv[1:], '?htiI:M:A:', ['help', 'version', 'time', 'test', 'interactive', 'load-path=', 'media-root=', 'assets-root='])
+        opts, args = getopt.getopt(sys.argv[1:], '?hvtiI:M:A:', ['help', 'version', 'time', 'test', 'interactive', 'load-path=', 'media-root=', 'assets-root='])
     except getopt.GetoptError, err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
