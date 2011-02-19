@@ -1264,7 +1264,7 @@ class Scss(object):
                     _tb = tb
                 else:
                     _tb = ''
-                if not compress and options.get('verbosity', 0) > 0:
+                if not compress and options.get('verbosity', 0) > 1:
                     result += _tb + '/* file: ' + fileid + ' */' + nl
                     if context:
                         result += _tb + '/* vars:' + nl
@@ -4110,7 +4110,7 @@ def main():
             elif o in ('-I', '--load-path'):
                 if a not in load_paths:
                     load_paths.append(a)
-            elif '--time' in opts:
+            elif o == '--time':
                 VERBOSITY = 1
         LOAD_PATHS = ';'.join(load_paths)
         opts = dict(opts)
@@ -4206,10 +4206,9 @@ def main():
                     else:
                         s = css.apply_vars(s, context)
                         print eval_expr(s, context, options)
+            print 'Bye!'
         else:
             css = Scss()
             sys.stdout.write(css.compile(sys.stdin.read()))
-        print 'Bye!'
-
 if __name__ == "__main__":
     main()
