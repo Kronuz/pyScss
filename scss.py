@@ -310,6 +310,7 @@ _reverse_default_scss_vars_re = re.compile(r'(content.*:.*(\'|").*)(' + '|'.join
 
 _blocks_re = re.compile(r'[{},;()\'"]|\n+|$')
 
+_prop_split_re = re.compile(r'[:=]')
 _skip_word_re = re.compile(r'-?[\w\s#.,:%]*$|[\w\-#.,:%]*$', re.MULTILINE)
 _skip_re = re.compile(r'''
     (?:url|alpha)\([^)]*\)$
@@ -1002,7 +1003,7 @@ class Scss(object):
         self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
 
     def _get_properties(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr):
-        prop, value = (re.split(r'[:=]', c_property, 1)+[None])[:2]
+        prop, value = (_prop_split_re.split(c_property, 1)+[None])[:2]
         try:
             is_var = (c_property[len(prop)] == '=')
         except IndexError:
@@ -4140,7 +4141,7 @@ if __name__ == "__main__":
                                 d = dict((k[len(name)+2:].split(':')[0], v) for k, v in options.items() if k.startswith('@' + name + ' '))
                                 pprint(sorted(d))
                 elif s.startswith('$') and (':' in s or '=' in s):
-                    prop, value = [ a.strip() for a in re.split(r'[:=]', s, 1) ]
+                    prop, value = [ a.strip() for a in _prop_split_re.split(s, 1) ]
                     value = css.apply_vars(value, context)
                     context[prop] = value
                 else:
