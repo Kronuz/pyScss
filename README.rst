@@ -202,7 +202,6 @@ Examples
 		background-position: -224px 0;
 	}
 
-::
 #. **Interactive mode**
     Example::
 
