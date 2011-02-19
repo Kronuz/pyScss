@@ -4108,13 +4108,13 @@ def main():
             elif o in ('-A', '--assets-root'):
                 ASSETS_ROOT = a
             elif o in ('-I', '--load-path'):
-                for p in a.split(','):
+                for p in a.replace(';', ',').split(','):
                     p = p.strip()
                     if p and p not in load_paths:
                         load_paths.append(p)
             elif o == '--time':
                 VERBOSITY = 1
-        LOAD_PATHS = ';'.join(load_paths)
+        LOAD_PATHS = ','.join(load_paths)
         opts = dict(opts)
         if '-t' in opts or '--test' in opts:
             import doctest
