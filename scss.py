@@ -4148,39 +4148,46 @@ def main():
                             print css._print_properties(properties).rstrip('\n')
                         else:
                             eval_expr(s, context, options)
-                    elif s.startswith('show('): 
-                        m = re.match(r'show\(([^,)]*)(?:,([^,)]+))*\)', s, re.IGNORECASE)
+                    elif s.startswith('show(') or s.startswith('show ') or s.startswith('ls(') or s.startswith('ls '):
+                        m = re.match(r'(?:show|ls)(\()?([^,/\\)]*)(?:[,/\\]([^,/\\)]+))*(?(1)\))', s, re.IGNORECASE)
                         if m:
-                            name = m.group(1)
-                            code = m.group(2)
-                            name = name and name.strip()
+                            name = m.group(2)
+                            code = m.group(3)
+                            name = name and name.strip().rstrip('s') # remove last 's' as in functions
                             code = code and code.strip()
                             if not name:
                                 pprint(sorted(['vars', 'options', 'mixins', 'functions']))
-                            elif name == 'vars' and code =='*':
-                                d = dict((k, v) for k, v in context.items())
-                                pprint(d)
-                            elif name == 'vars':
-                                d = dict((k, v) for k, v in context.items() if k.startswith('$') and not k.startswith('$__'))
-                                pprint(d)
-                            elif name == 'options' and code =='*':
-                                d = dict((k, v) for k, v in options.items())
-                                pprint(d)
-                            elif name == 'options':
-                                d = dict((k, v) for k, v in options.items() if not k.startswith('@'))
-                                pprint(d)
-                            elif name in ('mixins', 'functions'):
-                                name = name[:-1]
+                            elif name in ('v', 'var', 'variable'):
+                                if code == '*':
+                                    d = dict((k, v) for k, v in context.items())
+                                    pprint(d)
+                                elif code:
+                                    d = dict((k, v) for k, v in context.items() if code in k)
+                                    pprint(d)
+                                else:
+                                    d = dict((k, v) for k, v in context.items() if k.startswith('$') and not k.startswith('$__'))
+                                    pprint(d)
+                            elif name in ('o', 'opt', 'option'):
+                                if code == '*':
+                                    d = dict((k, v) for k, v in options.items())
+                                    pprint(d)
+                                elif code:
+                                    d = dict((k, v) for k, v in options.items() if code in k)
+                                    pprint(d)
+                                else:
+                                    d = dict((k, v) for k, v in options.items() if not k.startswith('@'))
+                                    pprint(d)
+                            elif name in ('m', 'mix', 'mixin', 'f', 'func', 'funct', 'function'):
                                 if code == '*':
                                     d = dict((k[len(name)+2:], v) for k, v in options.items() if k.startswith('@' + name + ' '))
                                     pprint(sorted(d))
                                 elif code:
-                                    d = dict((k, v) for k, v in options.items() if k.startswith('@' + name + ' ' + code + ':'))
-                                    mixin = d.popitem()[1]
-                                    mixin = getattr(mixin, 'mixin', mixin)
-                                    print '@' + name + ' ' + code + '(' + ', '.join( p + (': ' + mixin[1].get(p) if p in mixin[1] else '') for p in mixin[0] ) + ') {'
-                                    print '  ' + '\n  '.join(l.strip() for l in mixin[2].split('\n'))
-                                    print '}'
+                                    d = dict((k, v) for k, v in options.items() if k.startswith('@' + name + ' ') and code in k)
+                                    for k, mixin in d.items():
+                                        mixin = getattr(mixin, 'mixin', mixin)
+                                        print '@' + name + ' ' + code + '(' + ', '.join( p + (': ' + mixin[1].get(p) if p in mixin[1] else '') for p in mixin[0] ) + ') {'
+                                        print '  ' + '\n  '.join(l.strip() for l in mixin[2].split('\n'))
+                                        print '}'
                                 else:
                                     d = dict((k[len(name)+2:].split(':')[0], v) for k, v in options.items() if k.startswith('@' + name + ' '))
                                     pprint(sorted(d))
