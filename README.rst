@@ -208,6 +208,7 @@ Examples
 	$ python scss.py -i
 	>>> @import compass/css
 	>>> show()
+        ['functions', 'mixins', 'options', 'vars']
 	>>> show(mixins)
 	['apply-origin',
 	 'apply-transform',
