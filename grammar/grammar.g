@@ -159,9 +159,9 @@ parser Calculator:
 
 
 if __name__ == '__main__':
-    while 1:
+    while True:
         try: s = raw_input('>>> ')
         except EOFError: break
-        if not strip(s): break
+        if not s.strip(): break
         print parse('goal', s, {}, {})
     print 'Bye.'
