@@ -4334,14 +4334,17 @@ def usage():
 
 def main():
     import getopt
-    import atexit
-    import readline
-    histfile = os.path.join(os.environ["HOME"], ".scss-history")
     try:
-        readline.read_history_file(histfile)
-    except IOError:
+        import atexit
+        import readline
+        histfile = os.path.join(os.environ["HOME"], ".scss-history")
+        try:
+            readline.read_history_file(histfile)
+        except IOError:
+            pass
+        atexit.register(readline.write_history_file, histfile)
+    except ImportError:
         pass
-    atexit.register(readline.write_history_file, histfile)
     try:
         # parse options
         opts, args = getopt.getopt(sys.argv[1:], '?hvtiI:M:A:', ['help', 'version', 'time', 'test', 'interactive', 'load-path=', 'media-root=', 'assets-root='])
