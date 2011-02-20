@@ -2086,6 +2086,45 @@ def _elements_of_type(display):
     }.get(d.value, '')
     return StringValue(ret)
 
+def _nest(*arguments):
+    selectors = [ s.strip() for s in StringValue(arguments[0]).value.split(',') if s.strip() ]
+    for arg in arguments[1:]:
+        new_selectors = []
+        for s in StringValue(arg).value.split(','):
+            s = s.strip()
+            if s:
+                for r in selectors:
+                    new_selectors.append(r + ' ' + s)
+        selectors = new_selectors
+    selectors = sorted(set(selectors))
+    selectors = dict(enumerate(selectors))
+    selectors['_'] = ','
+    return selectors
+
+def _append_selector(selector, to_append):
+    selector = StringValue(selector)
+    to_append = StringValue(to_append).value.strip()
+    selectors = sorted(set(s.strip()+to_append for s in selector.value.split(',') if s.strip()))
+    selectors = dict(enumerate(selectors))
+    selectors['_'] = ','
+    return selectors
+
+def _headers(frm=None, to=None):
+    if frm and to is None:
+        if isinstance(frm, StringValue) and frm.value.lower() == 'all':
+            frm = 1
+            to = 6
+        else:
+            to = int(getattr(frm, 'value', frm))
+            frm = 1
+    else:
+        frm = 1 if frm is None else int(getattr(frm, 'value', frm))
+        to = 6 if to is None else int(getattr(to, 'value', to))
+    headers = [ 'h' + str(i) for i in range(frm, to+1) ]
+    headers = dict(enumerate(headers))
+    headers['_'] = ','
+    return headers
+
 ################################################################################
 # Specific to pyScss parser functions:
 
@@ -2581,6 +2620,11 @@ fnct = {
     'join:3': _join,
     'append:2': _append,
     'append:3': _append,
+    'nest:n': _nest,
+    'append-selector:2': _append_selector,
+    'headers:0': _headers,
+    'headers:1': _headers,
+    'headers:2': _headers,
 
     'percentage:1': _percentage,
     'unitless:1': _unitless,
@@ -2618,7 +2662,7 @@ def call(name, args, C, O, function=True):
         fn = O and O.get('@function ' + _fn_a) or fnct.get(_fn_a) or fnct[_fn_n]
         node = fn(*_args, **_kwargs)
     except:
-        #raise#@@@#
+        raise#@@@#
         if function:
             sp = args.get('_', '')
             _args = (sp + ' ').join( to_str(v) for n,v in s if isinstance(n, int) )
@@ -3029,11 +3073,11 @@ def eval_expr(expr, context={}, options={}, raw=False):
             #print >>sys.stderr, '==',val,'=='
             return val
     except SyntaxError:
-        return#@@@#
+        #return#@@@#
         print >>sys.stderr, '>>',expr,'<<'
         raise
     except:
-        return#@@@#
+        #return#@@@#
         print >>sys.stderr, '>>',expr,'<<'
         raise
 
