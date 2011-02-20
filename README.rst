@@ -59,7 +59,7 @@ Examples
 #. **Nested Rules**
     Example::
 
-	@options compress: no;
+	@option compress: no;
 	.selector {
 	    a {
 		display: block;
@@ -81,7 +81,7 @@ Examples
 #. **Variables**
     Example::
 
-	@options compress: no;
+	@option compress: no;
 	$main-color: #ce4dd6;
 	$style: solid;
 	$side: bottom;
@@ -102,7 +102,7 @@ Examples
 #. **Mixins**
     Example::
 
-	@options compress: no;
+	@option compress: no;
 	@mixin rounded($side, $radius: 10px) {
 	  border-#{$side}-radius: $radius;
 	  -moz-border-radius-#{$side}: $radius;
@@ -133,7 +133,7 @@ Examples
 #. **Extend** (using `@extend`)
     Example::
 
-	@options compress: no;
+	@option compress: no;
 	.error {
 	  border: 1px #f00;
 	  background-color: #fdd;
@@ -165,42 +165,35 @@ Examples
 #. **Sprites** (using `sprite-map()`)
     Example::
 
-	@options compress: no;
-	$icons: sprite-map("images/sociable/*.png"); // contains images/sociable/facebook.png among others.
-
+	@option compress: no;
+	$icons: sprite-map("sociable/*.png"); // contains sociable/facebook.png among others.
 	div {
 		background: $icons;
 	}
-
-	div .facebook {
-		width: image-width(sprite-file($icons, facebook));
-		height: image-height(sprite-file($icons, facebook));
-		background-position: sprite-position($icons, facebook);
-	}
-
-	div .twitter {
-		width: image-width(sprite-file($icons, twitter));
-		height: image-height(sprite-file($icons, twitter));
-		background-position: sprite-position($icons, twitter);
+	@each $icon in sprites($icons) {
+		div .$icon {
+			width: image-width(sprite-file($icons, $icon));
+			height: image-height(sprite-file($icons, $icon));
+			background-position: sprite-position($icons, $icon);
+		}
 	}
 
     ...generates a new sprite file and produces something like::
 
 	div {
-		background: url('/media/assets/eli2Rxy5MXpWj4uWPAHn5w.png?_=1297402328') 0 0 no-repeat;
+		background: url("/media/assets/u8Y7yEQL0UffAVw5rX7yhw.png?_=1298240989") 0px 0px no-repeat;
 	}
-
 	div .facebook {
 		width: 32px;
 		height: 32px;
-		background-position: -128px 0;
+		background-position: 0px 0px;
 	}
-
 	div .twitter {
 		width: 32px;
 		height: 32px;
-		background-position: -224px 0;
+		background-position: 0px -32px;
 	}
+	...
 
 #. **Interactive mode**
     Example::
@@ -208,7 +201,7 @@ Examples
 	$ python scss.py --interactive
 	>>> @import "compass/css3"
 	>>> show()
-        ['functions', 'mixins', 'options', 'vars']
+	['functions', 'mixins', 'options', 'vars']
 	>>> show(mixins)
 	['apply-origin',
 	 'apply-transform',
@@ -239,7 +232,7 @@ Compass framework path (I have `frameworks/compass/*.scss` and
 I have succesfully compiled some Compass using `python scss.py < myfile.css` the
 following `myfile.css`::
 
-	@options compress: no;
+	@option compress: no;
 
 	$blueprint-grid-columns : 24;
 	$blueprint-grid-width   : 30px;

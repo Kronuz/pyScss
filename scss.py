@@ -43,11 +43,11 @@ VERSION = "pyScss v1.0 beta 3 (20110219)"
 import os
 PROJECT_ROOT = os.path.normpath(os.path.dirname(os.path.abspath(__file__)))
 # Sass @import load_paths:
-LOAD_PATHS = os.path.join(PROJECT_ROOT, 'sass', 'frameworks')
+LOAD_PATHS = os.path.join(PROJECT_ROOT, 'sass', 'frameworks/')
 # Media base root path where images, fonts and other resources are located:
-MEDIA_ROOT = os.path.join(PROJECT_ROOT, 'media')
+MEDIA_ROOT = os.path.join(PROJECT_ROOT, 'media/')
 # Assets path, where new sprite files are created:
-ASSETS_ROOT = os.path.join(PROJECT_ROOT, 'media', 'assets')
+ASSETS_ROOT = os.path.join(PROJECT_ROOT, 'media', 'assets/')
 # Urls for the media and assets:
 MEDIA_URL = '/media/'
 ASSETS_URL = '/media/assets/'
@@ -1733,7 +1733,7 @@ def _color_stops(*args):
 ################################################################################
 # Compass like functionality for sprites and images:
 sprite_maps = {}
-def _sprite_map(g, *args):
+def _sprite_map(g, **kwargs):
     """
     Generates a sprite map from the files matching the glob pattern.
     Uses the keyword-style arguments passed in to control the placement.
@@ -1744,41 +1744,52 @@ def _sprite_map(g, *args):
         raise Exception("Images manipulation require PIL")
 
     if g in sprite_maps:
-        sprite_maps[glob]['_'] = datetime.datetime.now()
+        sprite_maps[glob]['*'] = datetime.datetime.now()
     elif '..' not in g: # Protect against going to prohibited places...
-        gutter = 0
-        offset_x = 0
-        offset_y = 0
-        repeat = 'no-repeat'
+        gutter = kwargs.get('$gutter', 0)
+        offset_x = kwargs.get('$offset-x', 0)
+        offset_y = kwargs.get('$offset-y', 0)
+        repeat = kwargs.get('$repeat', 'no-repeat')
+        vertical = (kwargs.get('$direction', 'vertical') == 'vertical')
 
-        files = sorted(glob.glob(MEDIA_ROOT + g))
+        files = sorted(glob.glob(os.path.join(MEDIA_ROOT, g)))
 
         if not files:
             return StringValue(None)
 
         times = [ int(os.path.getmtime(file)) for file in files ]
 
-        key = files + times + [ gutter, offset_x, offset_y, repeat ]
+        key = files + times + [ gutter, offset_x, offset_y, repeat, vertical ]
         key = base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
-        asset_path = ASSETS_ROOT + asset_file
+        asset_path = os.path.join(ASSETS_ROOT, asset_file)
 
         images = tuple( Image.open(file) for file in files )
         names = tuple( os.path.splitext(os.path.basename(file))[0] for file in files )
         files = tuple( file[len(MEDIA_ROOT):] for file in files )
         sizes = tuple( image.size for image in images )
-        offsets = []
+        offsets_x = []
+        offsets_y = []
 
         if os.path.exists(asset_path):
             filetime = int(os.path.getmtime(asset_path))
             offset = gutter
             for i, image in enumerate(images):
-                offsets.append(offset - gutter)
-                offset += sizes[i][0] + gutter * 2
+                if vertical:
+                    offsets_x.append(0 - gutter)
+                    offsets_y.append(offset - gutter)
+                    offset += sizes[i][1] + gutter * 2
+                else:
+                    offsets_x.append(offset - gutter)
+                    offsets_y.append(0 - gutter)
+                    offset += sizes[i][0] + gutter * 2
         else:
-
-            width = sum(zip(*sizes)[0]) + gutter * len(files) * 2
-            height = max(zip(*sizes)[1]) + gutter * 2
+            if vertical:
+                width = max(zip(*sizes)[0]) + gutter * 2
+                height = sum(zip(*sizes)[1]) + gutter * len(files) * 2
+            else:
+                width = sum(zip(*sizes)[0]) + gutter * len(files) * 2
+                height = max(zip(*sizes)[1]) + gutter * 2
 
             new_image = Image.new(
                 mode = 'RGBA',
@@ -1788,25 +1799,35 @@ def _sprite_map(g, *args):
 
             offset = gutter
             for i, image in enumerate(images):
-                new_image.paste(image, (offset, gutter))
-                offsets.append(offset - gutter)
-                offset += sizes[i][0] + gutter * 2
+                if vertical:
+                    new_image.paste(image, (gutter, offset))
+                    offsets_x.append(0 - gutter)
+                    offsets_y.append(offset - gutter)
+                    offset += sizes[i][1] + gutter * 2
+                else:
+                    new_image.paste(image, (offset, gutter))
+                    offsets_x.append(offset - gutter)
+                    offsets_y.append(0 - gutter)
+                    offset += sizes[i][0] + gutter * 2
 
-            new_image.save(asset_path)
+            try:
+                new_image.save(asset_path)
+            except IOError, e:
+                print >>sys.stderr, str(e)
             filetime = int(time.mktime(datetime.datetime.now().timetuple()))
 
         url = '%s%s?_=%s' % (ASSETS_URL, asset_file, filetime)
-        asset = "url('%s') %dpx %dpx %s" % (escape(url), int(offset_x), int(offset_y), repeat)
+        asset = 'url("%s") %dpx %dpx %s' % (escape(url), int(offset_x), int(offset_y), repeat)
         # Use the sorted list to remove older elements (keep only 500 objects):
         if len(sprite_maps) > 1000:
-            for a in sorted(sprite_maps, key=lambda a: sprite_maps[a]['_'], reverse=True)[500:]:
+            for a in sorted(sprite_maps, key=lambda a: sprite_maps[a]['*'], reverse=True)[500:]:
                 del sprite_maps[a]
         # Add the new object:
-        sprite_maps[asset] = dict(zip(names, zip(sizes, files, offsets)))
-        sprite_maps[asset]['_'] = datetime.datetime.now()
-        sprite_maps[asset]['_f_'] = asset_file
-        sprite_maps[asset]['_k_'] = key
-        sprite_maps[asset]['_t_'] = filetime
+        sprite_maps[asset] = dict(zip(names, zip(sizes, files, offsets_x, offsets_y)))
+        sprite_maps[asset]['*'] = datetime.datetime.now()
+        sprite_maps[asset]['*f*'] = asset_file
+        sprite_maps[asset]['*k*'] = key
+        sprite_maps[asset]['*t*'] = filetime
     return StringValue(asset)
 
 def _sprite_map_name(_map):
@@ -1817,7 +1838,7 @@ def _sprite_map_name(_map):
     map = StringValue(map).value
     sprite_map = sprite_maps.get(map, {})
     if sprite_map:
-        return StringValue(sprite_map['_k_'])
+        return StringValue(sprite_map['*k*'])
     return StringValue(None)
 
 def _sprite_file(map, sprite):
@@ -1833,6 +1854,11 @@ def _sprite_file(map, sprite):
         return StringValue(sprite[1])
     return StringValue(None)
 
+def _sprites(map):
+    map = StringValue(map).value
+    sprite_map = sprite_maps.get(map, {})
+    return ListValue(sorted(s for s in sprite_map if not s.startswith('*')))
+
 def _sprite(map, sprite, offset_x=None, offset_y=None):
     """
     Returns the image and background position for use in a single shorthand
@@ -1843,10 +1869,10 @@ def _sprite(map, sprite, offset_x=None, offset_y=None):
     sprite_map = sprite_maps.get(map, {})
     sprite = sprite_map.get(sprite)
     if sprite:
-        url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['_f_'], sprite_map['_t_'])
+        url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
         offset_x = NumberValue(offset_x).value or 0
         offset_y = NumberValue(offset_y).value or 0
-        pos = "url('%s') %dpx %dpx" % (escape(url), int(offset_x - sprite[2]), int(offset_y))
+        pos = "url('%s') %dpx %dpx" % (escape(url), int(offset_x - sprite[2]), int(offset_y - sprite[3]))
         return StringValue(pos)
     return StringValue('0 0')
 
@@ -1857,7 +1883,7 @@ def _sprite_url(map):
     map = StringValue(map).value
     if map in sprite_maps:
         sprite_map = sprite_maps[map]
-        url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['_f_'], sprite_map['_t_'])
+        url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
         return StringValue(url)
     return StringValue(None)
 
@@ -1872,7 +1898,7 @@ def _sprite_position(map, sprite, offset_x=None, offset_y=None):
     if sprite:
         offset_x = NumberValue(offset_x).value or 0
         offset_y = NumberValue(offset_y).value or 0
-        pos = '%dpx %dpx' % (int(offset_x - sprite[2]), int(offset_y))
+        pos = '%dpx %dpx' % (int(offset_x - sprite[2]), int(offset_y - sprite[3]))
         return StringValue(pos)
     return StringValue('0 0')
 
@@ -2482,7 +2508,24 @@ class ListValue(Value):
     def __str__(self):
         return to_str(self.value)
     def items(self):
-        return sorted((k, v) for k, v in self.value.items() if k != '_')
+        if len(self) == 1:
+            value = self.value
+            while isinstance(value, dict):
+                for k, v in value.items():
+                    if k != '_':
+                        key = k
+                        value = v
+                        break
+                value = ListValue(value)
+                if len(value) != 1:
+                    value = value.value
+                    break
+                value = value.value
+            if not isinstance(value, dict):
+                value = { key: value }
+            return sorted((k, v) for k, v in value.items() if k != '_')
+        else:
+            return sorted((k, v) for k, v in self.value.items() if k != '_')
     def first(self):
         try:
             return sorted(self.value.items())[0][1]
@@ -2665,6 +2708,7 @@ class StringValue(QuotedStringValue):
 # Parser/functions map:
 fnct = {
     'sprite-map:1': _sprite_map,
+    'sprites:1': _sprites,
     'sprite:2': _sprite,
     'sprite:3': _sprite,
     'sprite:4': _sprite,
