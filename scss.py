@@ -894,7 +894,7 @@ class Scss(object):
 
     def _do_import(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
         """
-        Handle @import
+        Implements @import
         Load and import mixins and functions and rules
         """
         i_codestr = None
@@ -990,10 +990,15 @@ class Scss(object):
                 self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
 
     def _do_each(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
+        """
+        Implements @each
+        """
         var, _, name = name.partition('in')
         name = self.apply_vars(name, rule[CONTEXT])
         name = eval_expr(name, rule[CONTEXT], rule[OPTIONS], True)
-        if isinstance(name, dict):
+        if name:
+            if not isinstance(name, dict):
+                name = { 0: name }
             var = var.strip()
             for n, v in sorted(name.items()):
                 rule[CODESTR] = c_codestr
@@ -2070,21 +2075,23 @@ def _unit(number): # -> px, em, cm, etc.
     unit = NumberValue(number).unit
     return StringValue(unit)
 
+__elements_of_type = {
+    'block': dict(enumerate(sorted(['address', 'article', 'aside', 'blockquote', 'center', 'dd', 'dialog', 'dir', 'div', 'dl', 'dt', 'fieldset', 'figure', 'footer', 'form', 'frameset', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'isindex', 'menu', 'nav', 'noframes', 'noscript', 'ol', 'p', 'pre', 'section', 'ul']))),
+    'inline': dict(enumerate(sorted(['a', 'abbr', 'acronym', 'b', 'basefont', 'bdo', 'big', 'br', 'cite', 'code', 'dfn', 'em', 'font', 'i', 'img', 'input', 'kbd', 'label', 'q', 's', 'samp', 'select', 'small', 'span', 'strike', 'strong', 'sub', 'sup', 'textarea', 'tt', 'u', 'var']))),
+    'table': dict(enumerate(sorted(['table']))),
+    'list-item': dict(enumerate(sorted(['li']))),
+    'table-row-group': dict(enumerate(sorted(['tbody']))),
+    'table-header-group': dict(enumerate(sorted(['thead']))),
+    'table-footer-group': dict(enumerate(sorted(['tfoot']))),
+    'table-row': dict(enumerate(sorted(['tr']))),
+    'table-cell': dict(enumerate(sorted(['td', 'th']))),
+    'html5': dict(enumerate(sorted(['article', 'aside', 'dialog', 'figure', 'footer', 'header', 'hgroup', 'nav', 'section']))),
+}
 def _elements_of_type(display):
     d = StringValue(display)
-    ret = {
-        'block': 'address, article, aside, blockquote, center, dd, dialog, dir, div, dl, dt, fieldset, figure, footer, form, frameset, h1, h2, h3, h4, h5, h6, header, hgroup, hr, isindex, menu, nav, noframes, noscript, ol, p, pre, section, ul',
-        'inline': 'a, abbr, acronym, b, basefont, bdo, big, br, cite, code, dfn, em, font, i, img, input, kbd, label, q, s, samp, select, small, span, strike, strong, sub, sup, textarea, tt, u, var',
-        'table': 'table',
-        'list-item': 'li',
-        'table-row-group': 'tbody',
-        'table-header-group': 'thead',
-        'table-footer-group': 'tfoot',
-        'table-row': 'tr',
-        'table-cell': 'td, th',
-        'html5': 'article, aside, dialog, figure, footer, header, hgroup, nav, section',
-    }.get(d.value, '')
-    return StringValue(ret)
+    ret = __elements_of_type.get(d.value, [])
+    ret['_'] = ','
+    return ret
 
 def _nest(*arguments):
     ret = [ s.strip() for s in StringValue(arguments[0]).value.split(',') if s.strip() ]
