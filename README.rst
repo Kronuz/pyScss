@@ -206,7 +206,7 @@ Examples
     Example::
 
 	$ python scss.py --interactive
-	>>> @import compass/css
+	>>> @import "compass/css3"
 	>>> show()
         ['functions', 'mixins', 'options', 'vars']
 	>>> show(mixins)
