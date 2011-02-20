@@ -839,7 +839,7 @@ class Scss(object):
                         self.manage_children(_rule, p_selectors, p_parents, p_children, (scope or '') + '')
                         ret = _options.pop('@return', '')
                         ret = eval_expr(ret, m_vars, _options, True)
-                        ret = ret.get(0, ret) if len(ret) == 1 else ret
+                        ret = ret.first() if len(ret) == 1 else ret
                         return ret
                     return __call
                 _mixin = _call(mixin)
@@ -997,13 +997,15 @@ class Scss(object):
         name = self.apply_vars(name, rule[CONTEXT])
         name = eval_expr(name, rule[CONTEXT], rule[OPTIONS], True)
         if name:
-            if not isinstance(name, dict):
-                name = { 0: name }
             var = var.strip()
-            for n, v in sorted(name.items()):
+            name = ListValue(name)
+            for n, v in name.items():
+                v = to_str(v)
                 rule[CODESTR] = c_codestr
-                rule[CONTEXT][var] = to_str(v)
-                self.manage_children(_rule, p_selectors, p_parents, p_children, (scope or '') + '')
+                rule[CONTEXT][var] = v
+                if not isinstance(n, int):
+                    rule[CONTEXT][n] = v
+                self.manage_children(rule, p_selectors, p_parents, p_children)
 
     def _get_variables(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr):
         _rule = list(rule)
@@ -1979,23 +1981,35 @@ def _grad_point(*p):
 
 ################################################################################
 
-def _reorder_list(list):
-    return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(list.items())))
+def __compass_list(*args):
+    if len(args) == 1:
+        return ListValue(args[0])
+    else:
+        return ListValue(args)
 
-def _blank(*obj):
+def __compass_space_list(*lst):
+    """
+    If the argument is a list, it will return a new list that is space delimited
+    Otherwise it returns a new, single element, space-delimited list.
+    """
+    ret = __compass_list(*lst)
+    ret.pop('_', None)
+    return ret
+
+def _blank(*objs):
     """Returns true when the object is false, an empty string, or an empty list"""
-    for l in obj:
-        if isinstance(l, dict) and len(l) == 1 and '_' in l:
-            continue # A list only with the "separator" item is a blank list
-        if bool(l):
+    for o in objs:
+        if bool(o):
             return BooleanValue(False)
     return BooleanValue(True)
 
 def _compact(*args):
     """Returns a new list after removing any non-true values"""
     ret = {}
-    print '###',repr(args)
     if len(args) == 1:
+        args = args[0]
+        if isinstance(args, ListValue):
+            args = args.value
         if isinstance(args, dict):
             for i, item in args.items():
                 if bool(item):
@@ -2006,115 +2020,70 @@ def _compact(*args):
         for i, item in enumerate(args):
             if bool(item):
                 ret[i] = item
-    return _reorder_list(ret)
+    return ListValue(ret)
 
-def _compass_list(args):
-    if len(args) == 1:
-        if isinstance(args, dict):
-            ret = args.copy()
-        else:
-            ret = dict(enumerate(StringValue(args).value.split()))
-    else:
-        ret = dict(enumerate(args))
-    return _reorder_list(ret)
-
-def _compass_slice(list, start_index, end_index=None):
+def __compass_slice(lst, start_index, end_index=None):
     start_index = NumberValue(start_index).value
     end_index = NumberValue(end_index).value if end_index is not None else None
     ret = {}
-    for i, item in list.items():
+    lst = ListValue(lst).value
+    for i, item in lst.items():
         if not isinstance(i, int):
-            ret[i] = item
+            if i == '_':
+                ret[i] = item
         elif i > start_index and end_index is None or i <= end_index:
             ret[i] = item
-    if '_' in list:
-        ret['_'] = list['_']
-    return _reorder_list(ret)
+    return ListValue(ret)
 
-def _compass_space_list(list):
-    """
-    If the argument is a list, it will return a new list that is space delimited
-    Otherwise it returns a new, single element, space-delimited list.
-    """
-    if len(args) == 1:
-        if isinstance(args, dict):
-            ret = args.copy()
-            ret.pop('_', None)
-        else:
-            ret = { 0: args }
-    else:
-        ret = dict(enumerate(args))
-    if len(ret) == 1:
-        k,v = ret.popitem()
-        return v
-    return _reorder_list(ret)
+def _first_value_of(*lst):
+    return _nth(lst)
 
-def _join(list1, list2, separator=None):
-    if not isinstance(list1, dict):
-        list1 = { 0: list1 }
-    if not isinstance(list2, dict):
-        list2 = { 0: list2 }
-    ret = list1.copy()
-    list_len = len(ret)
-    ret.update((k+list_len, v) for k,v in list2.items() if isinstance(k, int) )
-    ret.update((k, v) for k,v in list2.items() if not isinstance(k, int) )
-    if separator:
-        separator = StringValue(separator).value
-        if separator in (',', ' '):
-            ret['_'] = separator
-    return ret
-
-def _nthn(*list):
-    if len(list) <= 2:
-        raise SyntaxError
-    return _nth(dict(enumerate(list[:-1])), list[-1])
-
-def _nth(list, n=1):
+def _nth(lst, n=1):
     """
     Return the Nth item in the string
     """
     n = StringValue(n).value
-    if n.lower() == 'first':
-        n = 1
-    elif n.lower() == 'last':
-        n = -1
     try:
-        n = int(n) - 1
+        n = int(float(n)) - 1
     except:
-        pass
-    if isinstance(list, dict):
-        if n == -1:
-            n = len(list) - 1
+        if n.lower() == 'first':
+            n = 0
+        elif n.lower() == 'last':
+            n = -1
+    lst = ListValue(lst).value
+    try:
+        ret = lst[n]
+    except KeyError:
+        lst = [ v for k,v in sorted(lst.items()) if isinstance(k, int) ]
         try:
-            list = list[n]
-        except KeyError:
-            list = StringValue('')
-    else:
-        list = StringValue(list)
-        l = list.value.split()
-        if len(l) == 1:
-            l = l.split(',')
-        try:
-            list.value = l[n].strip()
-        except IndexError:
-            list.value = ''
-    return list
+            ret = lst[n]
+        except:
+            ret = ''
+    return StringValue(ret)
 
-def _length(l):
-    if isinstance(l, dict):
-        return NumberValue(len(l) - (1 if '_' in l else 0))
-    return NumberValue(1)
-
-def _append(list, val, separator=None):
-    if not isinstance(list, dict):
-        list = { 0: list }
-    ret = list.copy()
-    ret[len(ret)] = val
-    if separator:
+def _join(lst1, lst2, separator=None):
+    ret = ListValue(lst1)
+    lst2 = ListValue(lst2).value
+    lst_len = len(ret.value)
+    ret.value.update((k + lst_len if isinstance(k, int) else k, v) for k,v in lst2.items())
+    if separator is not None:
         separator = StringValue(separator).value
-        if separator in (',', ' '):
-            ret['_'] = separator
-    return _reorder_list(ret)
+        if separator:
+            ret.value['_'] = separator
+    return ret
+
+def _length(*lst):
+    lst = ListValue(lst)
+    return NumberValue(len(lst))
+
+def _append(lst, val, separator=None):
+    ret = ListValue(lst)
+    ret.value[len(ret.value)] = val
+    if separator is not None:
+        separator = StringValue(separator).value
+        if separator:
+            ret.value['_'] = separator
+    return ret
     
 ################################################################################
 
@@ -2148,13 +2117,11 @@ def _type_of(obj): # -> bool, number, string, color, list
         return StringValue('bool')
     if isinstance(obj, NumberValue):
         return StringValue('number')
-    if isinstance(obj, QuotedStringValue):
-        return StringValue('string')
     if isinstance(obj, ColorValue):
         return StringValue('color')
-    if isinstance(obj, dict):
+    if isinstance(obj, ListValue):
         return StringValue('list')
-    return 'unknown'
+    return 'string'
 
 def _if(condition, if_true, if_false):
     return if_true if bool(BooleanValue(condition)) else if_false
@@ -2229,7 +2196,7 @@ def _enumerate(prefix, frm, through, separator='-'):
     ret = dict(enumerate(ret))
     ret['_'] = ','
     return ret
-    
+
 ################################################################################
 # Specific to pyScss parser functions:
 
@@ -2357,7 +2324,7 @@ class BooleanValue(Value):
         if tokens is None:
             self.value = False
         elif isinstance(tokens, ParserValue):
-            self.value = tokens.value.lower() in ('true', '1', 'on', 'yes', 't', 'y')
+            self.value = (tokens.value.lower() == 'true')
         elif isinstance(tokens, BooleanValue):
             self.value = tokens.value
         elif isinstance(tokens, NumberValue):
@@ -2365,7 +2332,7 @@ class BooleanValue(Value):
         elif isinstance(tokens, (float, int)):
             self.value = bool(tokens)
         else:
-            self.value = to_str(tokens).lower() in ('true', '1', 'on', 'yes', 't', 'y')
+            self.value = to_str(tokens).lower() in ('true', '1', 'on', 'yes', 't', 'y') or bool(tokens)
     def __str__(self):
         return 'true' if self.value else 'false'
     @classmethod
@@ -2482,6 +2449,45 @@ class NumberValue(Value):
                 if unit:
                     break
         return unit
+
+class ListValue(Value):
+    def __init__(self, tokens):
+        self.tokens = tokens
+        if tokens is None:
+            self.value = {}
+        elif isinstance(tokens, ParserValue):
+            self.value = self._reorder_list(tokens.value)
+        elif isinstance(tokens, ListValue):
+            self.value = tokens.value.copy()
+        elif isinstance(tokens, dict):
+            self.value = self._reorder_list(tokens)
+        elif isinstance(tokens, (list, tuple)):
+            self.value = dict(enumerate(tokens))
+        else:
+            sp = None
+            lst = [ i for i in to_str(tokens).split() if i ]
+            if len(lst) == 1:
+                lst = [ i.strip() for i in lst[0].split(',') if i.strip() ]
+                if len(lst) > 1:
+                    sp = ','
+            self.value = dict(enumerate(tokens))
+            if sp:
+                self.value['_'] = ','
+    def _reorder_list(self, lst):
+        return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
+    def __nonzero__(self):
+        return len(self)
+    def __len__(self):
+        return len(self.value) - (1 if '_' in self.value else 0)
+    def __str__(self):
+        return to_str(self.value)
+    def items(self):
+        return sorted((k, v) for k, v in self.value.items() if k != '_')
+    def first(self):
+        try:
+            return sorted(self.value.items())[0][1]
+        except IndexError:
+            return None
 
 class ColorValue(Value):
     def __init__(self, tokens):
@@ -2719,22 +2725,21 @@ fnct = {
     'saturation:1': _saturation,
     'lightness:1': _lightness,
 
-    'join:2': _join,
-    'join:3': _join,
+    '-compass-list:n': __compass_list,
+    '-compass-space-list:n': __compass_space_list,
     'blank:n': _blank,
     'compact:n': _compact,
-    'first-value-of:1': _nth,
+    '-compass-slice:3': __compass_slice,
     'nth:2': _nth,
-    'nth:n': _nthn,
     '-compass-nth:2': _nth,
-    '-compass-nth:n': _nthn,
-    '-compass-space-list:n': _compass_space_list,
-    '-compass-list:n': _compass_list,
-    '-compass-list-size:1': _length,
-    '-compass-slice:3': _compass_slice,
-
+    'first-value-of:n': _first_value_of,
+    'join:2': _join,
+    'join:3': _join,
+    'length:n': _length,
+    '-compass-list-size:n': _length,
     'append:2': _append,
     'append:3': _append,
+    
     'nest:n': _nest,
     'append-selector:2': _append_selector,
     'headers:0': _headers,
@@ -2770,7 +2775,7 @@ for u in _units:
 def call(name, args, C, O, function=True):
     # Function call:
     _name = name.replace('_', '-')
-    s = sorted(args.items())
+    s = args and sorted(args.value.items()) or []
     try:
         _args = [ v for n,v in s if isinstance(n, int) ]
         _kwargs = dict( (n[1:],v) for n,v in s if not isinstance(n, int) and n != '_' )
@@ -2778,10 +2783,17 @@ def call(name, args, C, O, function=True):
         _fn_n = '%s:n' % _name
         fn = O and O.get('@function ' + _fn_a) or fnct.get(_fn_a) or fnct[_fn_n]
         node = fn(*_args, **_kwargs)
+        if args and isinstance(node, ListValue):
+            separator = args.value.get('_')
+            if separator is not None:
+                if separator:
+                    node.value['_'] = separator
+                else:
+                    node.value.pop('_', None)
     except:
-        raise#@@@#
+        #raise#@@@#
+        sp = args and args.value.get('_') or ''
         if function:
-            sp = args.get('_', '')
             _args = (sp + ' ').join( to_str(v) for n,v in s if isinstance(n, int) )
             _kwargs = (sp + ' ').join( '%s: %s' % (n, to_str(v)) for n,v in s if not isinstance(n, int) and n != '_' )
             if _args and _kwargs:
@@ -2789,7 +2801,6 @@ def call(name, args, C, O, function=True):
             # Function not found, simply write it as a string:
             node = StringValue(name + '(' + _args + _kwargs + ')')
         else:
-            sp = args.get('_', '')
             node = StringValue((sp + ' ').join( str(v) for n,v in s if n != '_' ))
     return node
 
@@ -2987,7 +2998,7 @@ class Calculator(Parser):
     def expr(self, C,O):
         and_test = self.and_test(C,O)
         v = and_test
-        while self._peek('OR', 'COMMA', 'VAR', 'NOT', 'INV', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'OR':
+        while self._peek('OR', 'NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'OR':
             OR = self._scan('OR')
             and_test = self.and_test(C,O)
             v = v or and_test
@@ -2996,7 +3007,7 @@ class Calculator(Parser):
     def and_test(self, C,O):
         not_test = self.not_test(C,O)
         v = not_test
-        while self._peek('AND', 'OR', 'COMMA', 'VAR', 'NOT', 'INV', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'AND':
+        while self._peek('AND', 'OR', 'NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'AND':
             AND = self._scan('AND')
             not_test = self.not_test(C,O)
             v = v and not_test
@@ -3018,13 +3029,13 @@ class Calculator(Parser):
                     INV = self._scan('INV')
                     not_test = self.not_test(C,O)
                     v = _inv('!', not_test)
-                if self._peek('NOT', 'INV', 'AND', 'OR', 'COMMA', 'VAR', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') not in ['NOT', 'INV']: break
+                if self._peek('NOT', 'INV', 'AND', 'OR', 'COMMA', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') not in ['NOT', 'INV']: break
             return v
 
     def comparison(self, C,O):
         or_expr = self.or_expr(C,O)
         v = or_expr
-        while self._peek('LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'OR', 'COMMA', 'VAR', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['LT', 'GT', 'LE', 'GE', 'EQ', 'NE']:
+        while self._peek('LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'OR', 'COMMA', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['LT', 'GT', 'LE', 'GE', 'EQ', 'NE']:
             _token_ = self._peek('LT', 'GT', 'LE', 'GE', 'EQ', 'NE')
             if _token_ == 'LT':
                 LT = self._scan('LT')
@@ -3055,7 +3066,7 @@ class Calculator(Parser):
     def or_expr(self, C,O):
         and_expr = self.and_expr(C,O)
         v = and_expr
-        while self._peek('OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'COMMA', 'VAR', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'OR':
+        while self._peek('OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'OR':
             OR = self._scan('OR')
             and_expr = self.and_expr(C,O)
             v = v or and_expr
@@ -3064,7 +3075,7 @@ class Calculator(Parser):
     def and_expr(self, C,O):
         a_expr = self.a_expr(C,O)
         v = a_expr
-        while self._peek('AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'VAR', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'AND':
+        while self._peek('AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'AND':
             AND = self._scan('AND')
             a_expr = self.a_expr(C,O)
             v = v and a_expr
@@ -3073,7 +3084,7 @@ class Calculator(Parser):
     def a_expr(self, C,O):
         m_expr = self.m_expr(C,O)
         v = m_expr
-        while self._peek('ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'VAR', 'RPAR', 'END', 'SIGN', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['ADD', 'SUB']:
+        while self._peek('ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['ADD', 'SUB']:
             _token_ = self._peek('ADD', 'SUB')
             if _token_ == 'ADD':
                 ADD = self._scan('ADD')
@@ -3088,7 +3099,7 @@ class Calculator(Parser):
     def m_expr(self, C,O):
         u_expr = self.u_expr(C,O)
         v = u_expr
-        while self._peek('MUL', 'DIV', 'ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'VAR', 'RPAR', 'END', 'SIGN', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['MUL', 'DIV']:
+        while self._peek('MUL', 'DIV', 'ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['MUL', 'DIV']:
             _token_ = self._peek('MUL', 'DIV')
             if _token_ == 'MUL':
                 MUL = self._scan('MUL')
@@ -3113,9 +3124,9 @@ class Calculator(Parser):
         else:# in ['LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR']
             atom = self.atom(C,O)
             v = atom
-            if self._peek('UNITS', 'MUL', 'DIV', 'ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'VAR', 'RPAR', 'END', 'SIGN', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'UNITS':
+            if self._peek('UNITS', 'MUL', 'DIV', 'ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'UNITS':
                 UNITS = self._scan('UNITS')
-                v = call(UNITS, { 0: v, 1: UNITS }, C, O, False)
+                v = call(UNITS, ListValue(ParserValue({ 0: v, 1: UNITS })), C, O, False)
             return v
 
     def atom(self, C,O):
@@ -3124,12 +3135,12 @@ class Calculator(Parser):
             LPAR = self._scan('LPAR')
             expr_lst = self.expr_lst(C,O)
             RPAR = self._scan('RPAR')
-            return expr_lst.get(0, expr_lst) if len(expr_lst) == 1 else expr_lst
+            return expr_lst.first() if len(expr_lst) == 1 else expr_lst
         elif _token_ == 'ID':
             ID = self._scan('ID')
             v = ID
-            if self._peek('LPAR', 'UNITS', 'MUL', 'DIV', 'ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'VAR', 'RPAR', 'END', 'SIGN', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'LPAR':
-                v = {}
+            if self._peek('LPAR', 'UNITS', 'MUL', 'DIV', 'ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'LPAR':
+                v = None
                 LPAR = self._scan('LPAR')
                 if self._peek('RPAR', 'VAR', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') != 'RPAR':
                     expr_lst = self.expr_lst(C,O)
@@ -3159,20 +3170,27 @@ class Calculator(Parser):
             VAR = self._scan('VAR')
             self._scan('":"')
             n = VAR
-        expr = self.expr(C,O)
-        v = { n or 0: expr }
-        while self._peek('COMMA', 'VAR', 'NOT', 'INV', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') not in ['RPAR', 'END']:
+        expr_slst = self.expr_slst(C,O)
+        v = { n or 0: expr_slst }
+        while self._peek('COMMA', 'RPAR', 'END') == 'COMMA':
             n = None
-            if self._peek('COMMA', 'VAR', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'COMMA':
-                COMMA = self._scan('COMMA')
-                v['_'] = COMMA
+            COMMA = self._scan('COMMA')
+            v['_'] = COMMA
             if self._peek('VAR', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'VAR':
                 VAR = self._scan('VAR')
                 self._scan('":"')
                 n = VAR
+            expr_slst = self.expr_slst(C,O)
+            v[n or len(v)] = expr_slst
+        return ListValue(ParserValue(v))
+
+    def expr_slst(self, C,O):
+        expr = self.expr(C,O)
+        v = { 0: expr }
+        while self._peek('NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') not in ['COMMA', 'RPAR', 'END']:
             expr = self.expr(C,O)
-            v[n or len(v)] = expr
-        return v
+            v[len(v)] = expr
+        return ListValue(ParserValue(v)) if len(v) > 1 else v[0]
 ### Grammar ends.
 
 def eval_expr(expr, context={}, options={}, raw=False):
@@ -3185,16 +3203,16 @@ def eval_expr(expr, context={}, options={}, raw=False):
         #print >>sys.stderr, '%%',results,'%%'
         if raw:
             return results
-        if results:
+        if results is not None:
             val = to_str(results)
             #print >>sys.stderr, '==',val,'=='
             return val
     except SyntaxError:
-        #return#@@@#
+        return#@@@#
         print >>sys.stderr, '>>',expr,'<<'
         raise
     except:
-        #return#@@@#
+        return#@@@#
         print >>sys.stderr, '>>',expr,'<<'
         raise
 
@@ -4197,6 +4215,26 @@ a:hover {
 	font-size: 60px;
 }
 
+>>> print css.compile('''
+... @option compress:no, short_colors:yes, reverse_colors:yes;
+... @each $animal in puma, sea-slug, egret, salamander {
+...   .#{$animal}-icon {
+...     background-image: url('/images/#{$animal}.png');
+...   }
+... }
+... ''') #doctest: +NORMALIZE_WHITESPACE
+.puma-icon {
+  background-image: url(/images/puma.png);
+}
+.sea-slug-icon {
+  background-image: url(/images/sea-slug.png);
+}
+.egret-icon {
+  background-image: url(/images/egret.png);
+}
+.salamander-icon {
+  background-image: url(/images/salamander.png);
+}
 
 """
 """
@@ -4250,8 +4288,16 @@ def usage():
     print "    -v, --version                    Print version"
     sys.exit(2)
 
-import getopt
 def main():
+    import getopt
+    import atexit
+    import readline
+    histfile = os.path.join(os.environ["HOME"], ".scss-history")
+    try:
+        readline.read_history_file(histfile)
+    except IOError:
+        pass
+    atexit.register(readline.write_history_file, histfile)
     try:
         # parse options
         opts, args = getopt.getopt(sys.argv[1:], '?hvtiI:M:A:', ['help', 'version', 'time', 'test', 'interactive', 'load-path=', 'media-root=', 'assets-root='])

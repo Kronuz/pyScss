@@ -1,4 +1,7 @@
 # python yapps2.py grammar.g grammar.py 
+def _reorder_list(lst):
+    return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
+
 _units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
           'grad', 'ms', 's', 'hz', 'khz', '%']
 ParserValue = lambda s: s
@@ -7,6 +10,7 @@ StringValue = lambda s: s
 QuotedStringValue = lambda s: s
 BooleanValue = lambda s: bool(s)
 ColorValue = lambda s: s
+ListValue = lambda s: s
 _inv = lambda s: s
 
 def call(fn, args, C, O, function=True):
@@ -118,13 +122,13 @@ parser Calculator:
                               |                             
                               atom<<C,O>>                   {{ v = atom }}
                               [                             
-                                  UNITS                     {{ v = call(UNITS, { 0: v, 1: UNITS }, C, O, False) }}
+                                  UNITS                     {{ v = call(UNITS, ListValue(ParserValue({ 0: v, 1: UNITS })), C, O, False) }}
                               ]                             {{ return v }}
                                                             
-    rule atom<<C,O>>:         LPAR expr_lst<<C,O>> RPAR     {{ return expr_lst.get(0, expr_lst) if len(expr_lst) == 1 else expr_lst }}
+    rule atom<<C,O>>:         LPAR expr_lst<<C,O>> RPAR     {{ return expr_lst.first() if len(expr_lst) == 1 else expr_lst }}
                               |                             
                               ID                            {{ v = ID }}
-                              [                             {{ v = {} }}
+                              [                             {{ v = None }}
                                   LPAR [
                                       expr_lst<<C,O>>       {{ v = expr_lst }}
                                   ] RPAR                    {{ return call(ID, v, C, O) }}
@@ -144,16 +148,19 @@ parser Calculator:
                               [                             
                                   VAR ":"                   {{ n = VAR }}
                               ]                             
-                              expr<<C,O>>                   {{ v = { n or 0: expr } }}
+                              expr_slst<<C,O>>              {{ v = { n or 0: expr_slst } }}
                               (                             {{ n = None }}
-                                  [                         
-                                      COMMA                 {{ v['_'] = COMMA }}
-                                  ]
+                                  COMMA                     {{ v['_'] = COMMA }}
                                   [                         
                                       VAR ":"               {{ n = VAR }}
                                   ]                         
-                                  expr<<C,O>>               {{ v[n or len(v)] = expr }}
-                              )*                            {{ return v }}
+                                  expr_slst<<C,O>>          {{ v[n or len(v)] = expr_slst }}
+                              )*                            {{ return ListValue(ParserValue(v)) }}
+
+    rule expr_slst<<C,O>>:    expr<<C,O>>                   {{ v = { 0: expr } }}
+                              (                             
+                                  expr<<C,O>>               {{ v[len(v)] = expr }}
+                              )*                            {{ return ListValue(ParserValue(v)) if len(v) > 1 else v[0] }}
 %%
 ### Grammar ends.
 
