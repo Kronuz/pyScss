@@ -2087,27 +2087,27 @@ def _elements_of_type(display):
     return StringValue(ret)
 
 def _nest(*arguments):
-    selectors = [ s.strip() for s in StringValue(arguments[0]).value.split(',') if s.strip() ]
+    ret = [ s.strip() for s in StringValue(arguments[0]).value.split(',') if s.strip() ]
     for arg in arguments[1:]:
-        new_selectors = []
+        new_ret = []
         for s in StringValue(arg).value.split(','):
             s = s.strip()
             if s:
-                for r in selectors:
-                    new_selectors.append(r + ' ' + s)
-        selectors = new_selectors
-    selectors = sorted(set(selectors))
-    selectors = dict(enumerate(selectors))
-    selectors['_'] = ','
-    return selectors
+                for r in ret:
+                    new_ret.append(r + ' ' + s)
+        ret = new_ret
+    ret = sorted(set(ret))
+    ret = dict(enumerate(ret))
+    ret['_'] = ','
+    return ret
 
 def _append_selector(selector, to_append):
     selector = StringValue(selector)
     to_append = StringValue(to_append).value.strip()
-    selectors = sorted(set(s.strip()+to_append for s in selector.value.split(',') if s.strip()))
-    selectors = dict(enumerate(selectors))
-    selectors['_'] = ','
-    return selectors
+    ret = sorted(set(s.strip()+to_append for s in selector.value.split(',') if s.strip()))
+    ret = dict(enumerate(ret))
+    ret['_'] = ','
+    return ret
 
 def _headers(frm=None, to=None):
     if frm and to is None:
@@ -2120,11 +2120,21 @@ def _headers(frm=None, to=None):
     else:
         frm = 1 if frm is None else int(getattr(frm, 'value', frm))
         to = 6 if to is None else int(getattr(to, 'value', to))
-    headers = [ 'h' + str(i) for i in range(frm, to+1) ]
-    headers = dict(enumerate(headers))
-    headers['_'] = ','
-    return headers
+    ret = [ 'h' + str(i) for i in range(frm, to + 1) ]
+    ret = dict(enumerate(ret))
+    ret['_'] = ','
+    return ret
 
+def _enumerate(prefix, frm, through, separator='-'):
+    prefix = StringValue(prefix).value
+    separator = StringValue(separator).value
+    frm = int(getattr(frm, 'value', frm))
+    through = int(getattr(through, 'value', through))
+    ret = [ prefix + separator + str(i) for i in range(frm, through + 1) ]
+    ret = dict(enumerate(ret))
+    ret['_'] = ','
+    return ret
+    
 ################################################################################
 # Specific to pyScss parser functions:
 
@@ -2625,6 +2635,8 @@ fnct = {
     'headers:0': _headers,
     'headers:1': _headers,
     'headers:2': _headers,
+    'enumerate:3': _enumerate,
+    'enumerate:4': _enumerate,
 
     'percentage:1': _percentage,
     'unitless:1': _unitless,
@@ -2662,7 +2674,7 @@ def call(name, args, C, O, function=True):
         fn = O and O.get('@function ' + _fn_a) or fnct.get(_fn_a) or fnct[_fn_n]
         node = fn(*_args, **_kwargs)
     except:
-        raise#@@@#
+        #raise#@@@#
         if function:
             sp = args.get('_', '')
             _args = (sp + ' ').join( to_str(v) for n,v in s if isinstance(n, int) )
@@ -3073,11 +3085,11 @@ def eval_expr(expr, context={}, options={}, raw=False):
             #print >>sys.stderr, '==',val,'=='
             return val
     except SyntaxError:
-        #return#@@@#
+        return#@@@#
         print >>sys.stderr, '>>',expr,'<<'
         raise
     except:
-        #return#@@@#
+        return#@@@#
         print >>sys.stderr, '>>',expr,'<<'
         raise
 
