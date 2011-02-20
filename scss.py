@@ -1982,19 +1982,28 @@ def _nth(list, n=1):
     Return the Nth item in the string
     """
     n = StringValue(n).value
+    if n.lower() == 'first':
+        n = 1
+    elif n.lower() == 'last':
+        n = -1
     try:
         n = int(n) - 1
     except:
         pass
     if isinstance(list, dict):
+        if n == -1:
+            n = len(list) - 1
         try:
             list = list[n]
-        except:
+        except KeyError:
             list = StringValue('')
     else:
         list = StringValue(list)
+        l = list.value.split()
+        if len(l) == 1:
+            l = l.split(',')
         try:
-            list.value = list.value.split()[n]
+            list.value = l[n].strip()
         except IndexError:
             list.value = ''
     return list
