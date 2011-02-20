@@ -2062,7 +2062,7 @@ def __compass_slice(lst, start_index, end_index=None):
     return ListValue(ret)
 
 def _first_value_of(*lst):
-    return _nth(lst)
+    return ListValue(lst).first()
 
 def _nth(lst, n=1):
     """
@@ -2528,7 +2528,7 @@ class ListValue(Value):
             return sorted((k, v) for k, v in self.value.items() if k != '_')
     def first(self):
         try:
-            return sorted(self.value.items())[0][1]
+            return self.items()[0][1]
         except IndexError:
             return None
 
