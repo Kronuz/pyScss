@@ -1977,6 +1977,11 @@ def _grad_point(*p):
     val = '%s%% %s%%' % (hrz, vrt)
     return val
 
+def _nthn(*list):
+    if len(list) <= 2:
+        raise SyntaxError
+    return _nth(dict(enumerate(list[:-1])), list[-1])
+
 def _nth(list, n=1):
     """
     Return the Nth item in the string
@@ -2641,6 +2646,7 @@ fnct = {
     'lightness:1': _lightness,
 
     'nth:2': _nth,
+    'nth:n': _nthn,
     'first-value-of:1': _nth,
     'join:2': _join,
     'join:3': _join,
