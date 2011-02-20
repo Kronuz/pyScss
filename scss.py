@@ -1977,6 +1977,93 @@ def _grad_point(*p):
     val = '%s%% %s%%' % (hrz, vrt)
     return val
 
+################################################################################
+
+def _reorder_list(list):
+    return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(list.items())))
+
+def _blank(*obj):
+    """Returns true when the object is false, an empty string, or an empty list"""
+    for l in obj:
+        if isinstance(l, dict) and len(l) == 1 and '_' in l:
+            continue # A list only with the "separator" item is a blank list
+        if bool(l):
+            return BooleanValue(False)
+    return BooleanValue(True)
+
+def _compact(*args):
+    """Returns a new list after removing any non-true values"""
+    ret = {}
+    print '###',repr(args)
+    if len(args) == 1:
+        if isinstance(args, dict):
+            for i, item in args.items():
+                if bool(item):
+                    ret[i] = item
+        elif bool(args):
+            ret[0] = args
+    else:
+        for i, item in enumerate(args):
+            if bool(item):
+                ret[i] = item
+    return _reorder_list(ret)
+
+def _compass_list(args):
+    if len(args) == 1:
+        if isinstance(args, dict):
+            ret = args.copy()
+        else:
+            ret = dict(enumerate(StringValue(args).value.split()))
+    else:
+        ret = dict(enumerate(args))
+    return _reorder_list(ret)
+
+def _compass_slice(list, start_index, end_index=None):
+    start_index = NumberValue(start_index).value
+    end_index = NumberValue(end_index).value if end_index is not None else None
+    ret = {}
+    for i, item in list.items():
+        if not isinstance(i, int):
+            ret[i] = item
+        elif i > start_index and end_index is None or i <= end_index:
+            ret[i] = item
+    if '_' in list:
+        ret['_'] = list['_']
+    return _reorder_list(ret)
+
+def _compass_space_list(list):
+    """
+    If the argument is a list, it will return a new list that is space delimited
+    Otherwise it returns a new, single element, space-delimited list.
+    """
+    if len(args) == 1:
+        if isinstance(args, dict):
+            ret = args.copy()
+            ret.pop('_', None)
+        else:
+            ret = { 0: args }
+    else:
+        ret = dict(enumerate(args))
+    if len(ret) == 1:
+        k,v = ret.popitem()
+        return v
+    return _reorder_list(ret)
+
+def _join(list1, list2, separator=None):
+    if not isinstance(list1, dict):
+        list1 = { 0: list1 }
+    if not isinstance(list2, dict):
+        list2 = { 0: list2 }
+    ret = list1.copy()
+    list_len = len(ret)
+    ret.update((k+list_len, v) for k,v in list2.items() if isinstance(k, int) )
+    ret.update((k, v) for k,v in list2.items() if not isinstance(k, int) )
+    if separator:
+        separator = StringValue(separator).value
+        if separator in (',', ' '):
+            ret['_'] = separator
+    return ret
+
 def _nthn(*list):
     if len(list) <= 2:
         raise SyntaxError
@@ -2015,23 +2102,8 @@ def _nth(list, n=1):
 
 def _length(l):
     if isinstance(l, dict):
-        return NumberValue(len(l))
+        return NumberValue(len(l) - (1 if '_' in l else 0))
     return NumberValue(1)
-
-def _join(list1, list2, separator=None):
-    if not isinstance(list1, dict):
-        list1 = { 0: list1 }
-    if not isinstance(list2, dict):
-        list2 = { 0: list2 }
-    ret = list1.copy()
-    list_len = len(ret)
-    ret.update((k+list_len, v) for k,v in list2.items() if isinstance(k, int) )
-    ret.update((k, v) for k,v in list2.items() if not isinstance(k, int) )
-    if separator:
-        separator = StringValue(separator).value
-        if separator in (',', ' '):
-            ret['_'] = separator
-    return ret
 
 def _append(list, val, separator=None):
     if not isinstance(list, dict):
@@ -2042,7 +2114,9 @@ def _append(list, val, separator=None):
         separator = StringValue(separator).value
         if separator in (',', ' '):
             ret['_'] = separator
-    return ret
+    return _reorder_list(ret)
+    
+################################################################################
 
 def _percentage(value):
     value = NumberValue(value)
@@ -2645,11 +2719,20 @@ fnct = {
     'saturation:1': _saturation,
     'lightness:1': _lightness,
 
-    'nth:2': _nth,
-    'nth:n': _nthn,
-    'first-value-of:1': _nth,
     'join:2': _join,
     'join:3': _join,
+    'blank:n': _blank,
+    'compact:n': _compact,
+    'first-value-of:1': _nth,
+    'nth:2': _nth,
+    'nth:n': _nthn,
+    '-compass-nth:2': _nth,
+    '-compass-nth:n': _nthn,
+    '-compass-space-list:n': _compass_space_list,
+    '-compass-list:n': _compass_list,
+    '-compass-list-size:1': _length,
+    '-compass-slice:3': _compass_slice,
+
     'append:2': _append,
     'append:3': _append,
     'nest:n': _nest,
@@ -2696,7 +2779,7 @@ def call(name, args, C, O, function=True):
         fn = O and O.get('@function ' + _fn_a) or fnct.get(_fn_a) or fnct[_fn_n]
         node = fn(*_args, **_kwargs)
     except:
-        #raise#@@@#
+        raise#@@@#
         if function:
             sp = args.get('_', '')
             _args = (sp + ' ').join( to_str(v) for n,v in s if isinstance(n, int) )
@@ -3107,11 +3190,11 @@ def eval_expr(expr, context={}, options={}, raw=False):
             #print >>sys.stderr, '==',val,'=='
             return val
     except SyntaxError:
-        return#@@@#
+        #return#@@@#
         print >>sys.stderr, '>>',expr,'<<'
         raise
     except:
-        return#@@@#
+        #return#@@@#
         print >>sys.stderr, '>>',expr,'<<'
         raise
 
