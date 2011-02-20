@@ -4153,7 +4153,7 @@ def main():
                         else:
                             eval_expr(s, context, options)
                     elif s == 'ls' or s.startswith('show(') or s.startswith('show ') or s.startswith('ls(') or s.startswith('ls '):
-                        m = re.match(r'(?:show|ls)(\()?([^,/\\)]*)(?:[,/\\]([^,/\\)]+))*(?(1)\))', s, re.IGNORECASE)
+                        m = re.match(r'(?:show|ls)(\()?\s*([^,/\\) ]*)(?:[,/\\ ]([^,/\\ )]+))*(?(1)\))', s, re.IGNORECASE)
                         if m:
                             name = m.group(2)
                             code = m.group(3)
