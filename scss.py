@@ -1921,7 +1921,7 @@ def _sprite_file(map, sprite):
     sprite = sprite_map.get(sprite)
     
     if sprite:
-        return StringValue(sprite[1])
+        return QuotedStringValue(sprite[1])
     return StringValue(None)
 
 def _sprites(map):
@@ -1954,7 +1954,7 @@ def _sprite_url(map):
     if map in sprite_maps:
         sprite_map = sprite_maps[map]
         url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
-        return StringValue(url)
+        return QuotedStringValue(url)
     return StringValue(None)
 
 def _sprite_position(map, sprite, offset_x=None, offset_y=None):
@@ -1985,7 +1985,7 @@ def _inline_image(image, mime_type=None):
         mime_type = StringValue(mime_type).value or mimetypes.guess_type(file)[0]
         file = open(file, 'rb')
         url = 'data:'+_mime_type+';base64,'+base64.b64encode(file.read())
-        inline = "url('%s')" % escape(url)
+        inline = 'url("%s")' % escape(url)
         return StringValue(inline)
     return StringValue(None)
 
@@ -1999,7 +1999,7 @@ def _image_url(image):
     if os.path.exists(path):
         filetime = int(os.path.getmtime(path))
         url = '%s%s?_=%s' % (MEDIA_URL, file, filetime)
-        return StringValue(url)
+        return QuotedStringValue(url)
     return StringValue(None)
 
 def _image_width(image):
