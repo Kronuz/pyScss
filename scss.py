@@ -1060,8 +1060,12 @@ class Scss(object):
             rule[CODESTR] = c_codestr
             self.manage_children(rule, p_selectors, p_parents, p_children, scope)
         else:
+            c_property = self.apply_vars(c_property, rule[CONTEXT], True)
+            c_property = self.do_glob_math(c_property, rule[CONTEXT], rule[OPTIONS])
+
             c_selectors = self.normalize_selectors(c_property)
             c_selectors, _, c_parents = c_selectors.partition(' extends ')
+
             better_selectors = set()
             c_selectors = c_selectors.split(',')
             for c_selector in c_selectors:
@@ -1082,13 +1086,6 @@ class Scss(object):
                 if parents:
                     better_selectors += ' extends ' + '&'.join(sorted(parents))
     
-            _better_selectors = better_selectors
-            better_selectors = self.apply_vars(better_selectors, rule[CONTEXT], True)
-            better_selectors = self.do_glob_math(better_selectors, rule[CONTEXT], rule[OPTIONS])
-            if _better_selectors != better_selectors:
-                # Normalize the whole thing:
-                better_selectors = self.normalize_selectors(better_selectors)
-            
             _rule = [ rule[FILEID], None, c_codestr, set(), rule[CONTEXT].copy(), rule[OPTIONS].copy(), better_selectors, [], rule[PATH], False ]
             p_children.appendleft(_rule)
 
