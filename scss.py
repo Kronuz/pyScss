@@ -4474,14 +4474,16 @@ def main():
                         continue
                     elif s.startswith('@'):
                         properties = []
+                        children = deque()
                         rule = [ 'string', None, s, set(), context, options, '', properties, './', False ]
                         code, name = (s.split(None, 1)+[''])[:2]
                         if code == '@option':
-                            css._settle_options(rule, [], set(), deque(), None, s, None, code, name)
+                            css._settle_options(rule, [], set(), children, None, s, None, code, name)
                         elif code == '@import':
-                            css._do_import(rule, [], set(), deque(), None, s, None, code, name)
+                            css._do_import(rule, [], set(), children, None, s, None, code, name)
                         elif code == '@include':
-                            css._do_include(rule, [], set(), deque(), None, s, None, code, name)
+                            css._do_include(rule, [], set(), children, None, s, None, code, name)
+                            #print children
                             print css._print_properties(properties).rstrip('\n')
                         else:
                             eval_expr(s, context, options)
