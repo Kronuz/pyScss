@@ -422,12 +422,14 @@ class Scss(object):
         self.scss_files = {}
         self.reset()
 
-    def reset(self, input_scss=None):
-        # Initialize
-        self.qrules = deque()
+    def clean(self):
+        self.children = deque()
         self.rules = []
         self._rules = {}
         self.parts = {}
+
+    def reset(self, input_scss=None):
+        # Initialize
         self.css_files = []
         self.scss_vars = _default_scss_vars.copy()
         self.scss_opts = _default_scss_opts.copy()
@@ -435,6 +437,8 @@ class Scss(object):
         self._contexts = {}
         self._replaces = {}
         self._scss_files = self.scss_files.copy()
+
+        self.clean()
 
     def longest_common_prefix(self, seq1, seq2):
         start = 0
@@ -678,7 +682,7 @@ class Scss(object):
     def parse_scss_string(self, fileid, str):
         str = self.load_string(str)
         rule = [ fileid, None, str, set(), self.scss_vars, self.scss_opts, '', [], './', False ]
-        self.qrules.append(rule)
+        self.children.append(rule)
         return str
 
     @print_timing(3)
@@ -686,7 +690,7 @@ class Scss(object):
         pos = 0
         while True:
             try:
-                rule = self.qrules.popleft()
+                rule = self.children.popleft()
             except:
                 break
             # Check if the block has nested blocks and work it out:
@@ -698,7 +702,7 @@ class Scss(object):
             # manage children or expand children:
             _children = deque()
             self.manage_children(rule, _selectors, _parents, _children)
-            self.qrules.extendleft(_children)
+            self.children.extendleft(_children)
 
             # prepare maps:
             if _parents:
@@ -711,7 +715,7 @@ class Scss(object):
             pos += 1
 
             #print >>sys.stderr, '='*80
-            #for r in [rule]+list(self.qrules)[:5]: print >>sys.stderr, repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:80]+('...' if len(r[CODESTR])>80 else '')), dict((k, v) for k, v in r[CONTEXT].items() if k.startswith('$') and not k.startswith('$__')), dict(r[PROPERTIES]).keys()
+            #for r in [rule]+list(self.children)[:5]: print >>sys.stderr, repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:80]+('...' if len(r[CODESTR])>80 else '')), dict((k, v) for k, v in r[CONTEXT].items() if k.startswith('$') and not k.startswith('$__')), dict(r[PROPERTIES]).keys()
         
     @print_timing(4)
     def manage_children(self, rule, p_selectors, p_parents, p_children, scope=None):
@@ -1249,7 +1253,6 @@ class Scss(object):
         """
         Generate the final CSS string
         """
-        result = ''
         if fileid:
             rules = self._rules.get(fileid) or []
         else:
@@ -1257,24 +1260,25 @@ class Scss(object):
 
         compress = self.scss_opts.get('compress', 1)
         if compress:
-            sc = False
-            sp = ''
-            tb = ''
-            nl = ''
+            sc, sp, tb, nl = False, '', '', ''
         else:
-            sc = True
-            sp = ' '
-            tb = '  '
-            nl = '\n'
+            sc, sp, tb, nl = True, ' ', '  ', '\n'
 
         scope = set()
+        return self._create_css(rules, scope, sc, sp, tb, nl)
+
+    def _create_css(self, rules, scope=None, sc=True, sp=' ', tb='  ', nl='\n'):
+        scope = set() if scope is None else scope
+
         open = False
         old_selectors = None
         old_property = None
-        
+
         wrap = textwrap.TextWrapper(break_long_words=False, break_on_hyphens=False)
         wrap.wordsep_simple_re = re.compile(r'(,\s*)')
         wrap = wrap.wrap
+
+        result = ''
         for rule in rules:
             fileid, position, codestr, deps, context, options, selectors, properties, path, final = rule
             #print >>sys.stderr, fileid, position, [ c for c in context if c[1] != '_' ], options.keys(), selectors, deps
@@ -1296,7 +1300,7 @@ class Scss(object):
                     _tb = tb
                 else:
                     _tb = ''
-                if not compress and options.get('verbosity', 0) > 1:
+                if options.get('verbosity', 0) > 1:
                     result += _tb + '/* file: ' + fileid + ' */' + nl
                     if context:
                         result += _tb + '/* vars:' + nl
@@ -1304,6 +1308,7 @@ class Scss(object):
                             result += _tb + _tb + k + ' = ' + v + ';' + nl
                         result += _tb + '*/' + nl
                 result += self._print_properties(properties, scope, [old_property], sc, sp, _tb, nl)
+
         if open:
             if not sc:
                 if result[-1] == ';':
@@ -4492,13 +4497,20 @@ def main():
                         rule = [ 'string', None, s, set(), context, options, '', properties, './', False ]
                         code, name = (s.split(None, 1)+[''])[:2]
                         if code == '@option':
-                            css._settle_options(rule, [], set(), children, None, s, None, code, name)
+                            css._settle_options(rule, [''], set(), children, None, s, None, code, name)
                         elif code == '@import':
-                            css._do_import(rule, [], set(), children, None, s, None, code, name)
+                            css._do_import(rule, [''], set(), children, None, s, None, code, name)
                         elif code == '@include':
-                            css._do_include(rule, [], set(), children, None, s, None, code, name)
-                            #print children
-                            print css._print_properties(properties).rstrip('\n')
+                            css._do_include(rule, [''], set(), children, None, s, None, code, name)
+                            code = css._print_properties(properties).rstrip('\n')
+                            if code:
+                                print code
+                            if children:
+                                css.children.extendleft(children)
+                                css.parse_children()
+                                code = css._create_css(css.rules).rstrip('\n')
+                                if code:
+                                    print code
                         else:
                             eval_expr(s, context, options)
                     elif s == 'ls' or s.startswith('show(') or s.startswith('show ') or s.startswith('ls(') or s.startswith('ls '):
