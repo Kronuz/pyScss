@@ -736,7 +736,8 @@ class Scss(object):
                 ################################################################
                 # @warn
                 if code == '@warn':
-                    print >>sys.stderr, self.apply_vars(dequote(name), rule[CONTEXT])
+                    err = "Warning: %s" % self.apply_vars(dequote(name), rule[CONTEXT])
+                    print >>sys.stderr, err
                 ################################################################
                 # @option
                 elif code == '@option':
@@ -816,6 +817,9 @@ class Scss(object):
 
     @print_timing(10)
     def _do_functions(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
+        """
+        Implements @mixin and @function
+        """
         if name:
             funct, params, _ = name.partition('(')
             funct = funct.strip()
@@ -864,6 +868,9 @@ class Scss(object):
 
     @print_timing(10)
     def _do_include(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
+        """
+        Implements @include, for @mixins
+        """
         funct, params, _ = name.partition('(')
         funct = funct.strip()
         params = split_params(depar(params + _))
@@ -900,6 +907,9 @@ class Scss(object):
             _rule[CONTEXT] = rule[CONTEXT].copy()
             _rule[CONTEXT].update(m_vars)
             self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
+        else:
+            err = "Warning: Required mixin not found: %s:%d" % (funct, num_args)
+            print >>sys.stderr, err
 
     @print_timing(10)
     def _do_import(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
@@ -947,7 +957,7 @@ class Scss(object):
                                 break
                         i_codestr = self._scss_files[name] = i_codestr and self.load_string(i_codestr)
                     if i_codestr is None:
-                        err = "File to import not found or unreadable: '" + filename + "'\nLoad paths:\n\t" + "\n\t".join(load_paths)
+                        err = "Warning: File to import not found or unreadable: '" + filename + "'\nLoad paths:\n\t" + "\n\t".join(load_paths)
                         print >>sys.stderr, err
                     else:
                         _rule = list(rule)
@@ -1878,7 +1888,8 @@ def _sprite_map(g, **kwargs):
                 try:
                     new_image.save(asset_path)
                 except IOError, e:
-                    print >>sys.stderr, str(e)
+                    err = "Error: %s" % e
+                    print >>sys.stderr, err
                 filetime = int(time.mktime(datetime.datetime.now().timetuple()))
     
             url = '%s%s?_=%s' % (ASSETS_URL, asset_file, filetime)
@@ -2894,16 +2905,16 @@ fnct = {
 for u in _units:
     fnct[u+':2'] = _convert_to
 
-def call(name, args, C, O, function=True):
+def call(name, args, C, O, is_function=True):
     # Function call:
     _name = name.replace('_', '-')
     s = args and args.value.items() or []
+    _args = [ v for n,v in s if isinstance(n, int) ]
+    _kwargs = dict( (n[1:],v) for n,v in s if not isinstance(n, int) and n != '_' )
+    _fn_a = '%s:%d' % (_name, len(_args))
+    #print >>sys.stderr, '#', _fn_a, _args, _kwargs
+    _fn_n = '%s:n' % _name
     try:
-        _args = [ v for n,v in s if isinstance(n, int) ]
-        _kwargs = dict( (n[1:],v) for n,v in s if not isinstance(n, int) and n != '_' )
-        _fn_a = '%s:%d' % (_name, len(_args))
-        #print >>sys.stderr, '#', _fn_a, _args, _kwargs
-        _fn_n = '%s:n' % _name
         fn = O and O.get('@function ' + _fn_a) or fnct.get(_fn_a) or fnct[_fn_n]
         node = fn(*_args, **_kwargs)
         if args and isinstance(node, ListValue):
@@ -2916,7 +2927,10 @@ def call(name, args, C, O, function=True):
     except:
         #raise#@@@#
         sp = args and args.value.get('_') or ''
-        if function:
+        if is_function:
+            if _name not in ('url',):
+                err = "Warning: Required function not found: %s" % _fn_a
+                print >>sys.stderr, err
             _args = (sp + ' ').join( to_str(v) for n,v in s if isinstance(n, int) )
             _kwargs = (sp + ' ').join( '%s: %s' % (n, to_str(v)) for n,v in s if not isinstance(n, int) and n != '_' )
             if _args and _kwargs:
