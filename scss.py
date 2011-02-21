@@ -1706,14 +1706,25 @@ def __color_stops(*args):
     stops = []
     prev_color = False
     for c in args:
-        if isinstance(c, ColorValue):
-            if prev_color:
-                stops.append(None)
-            colors.append(c)
-            prev_color = True
+        if isinstance(c, ListValue):
+            for i, c in c.items():
+                if isinstance(c, ColorValue):
+                    if prev_color:
+                        stops.append(None)
+                    colors.append(c)
+                    prev_color = True
+                elif isinstance(c, NumberValue):
+                    stops.append(c)
+                    prev_color = False
         else:
-            stops.append(NumberValue(c))
-            prev_color = False
+            if isinstance(c, ColorValue):
+                if prev_color:
+                    stops.append(None)
+                colors.append(c)
+                prev_color = True
+            elif isinstance(c, NumberValue):
+                stops.append(NumberValue(c))
+                prev_color = False
     if prev_color:
         stops.append(None)
     stops = stops[:len(colors)]
@@ -1747,6 +1758,39 @@ def _color_stops(*args):
     color_stops = __color_stops(*args)
     ret = ', '.join([ '%s %s%%' % (c, to_str(s*100.0)) for s,c in color_stops ])
     return StringValue(ret)
+
+#TODO: Make use of these SVG functions:
+def __color_stops_svg(*args):
+    color_stops = __color_stops(*args)
+    ret = ''.join('<stop offset="%s" stop-color="%s"/>' % (to_str(s), c) for s,c in color_stops )
+    return ret
+
+def __svg(gradient):
+    ret = '<?xml version="1.0" encoding="utf-8"?>\
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg">\
+<defs>%s</defs>\
+<rect x="0" y="0" width="100%" height="100%" fill="url(#grad)" />\
+</svg>' % gradient
+    return ret
+
+def _linear_svg(color_stops, x1, y1, x2, y2):
+  gradient = '<linearGradient id="grad" x1="%s" y1="%s" x2="%s" y2="%s">%s</linearGradient>' % (
+    to_str(NumberValue(x1)),
+    to_str(NumberValue(y1)),
+    to_str(NumberValue(x2)),
+    to_str(NumberValue(y2)),
+    __color_stops_svg(color_stops)
+  )
+  return __svg(gradient)
+
+def _radial_svg(color_stops, cx, cy, r):
+  gradient = '<radialGradient id="grad" gradientUnits="userSpaceOnUse" cx="%s" cy="%s" r="%s">%s</radialGradient>' %(
+    to_str(NumberValue(cx)),
+    to_str(NumberValue(cy)),
+    to_str(NumberValue(r)),
+    __color_stops_svg(color_stops)
+  )
+  return __svg(gradient)
 
 ################################################################################
 # Compass like functionality for sprites and images:
