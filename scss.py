@@ -53,12 +53,17 @@ MEDIA_URL = '/media/'
 ASSETS_URL = '/media/assets/'
 VERBOSITY = 1
 ################################################################################
-
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 import re
 import sys
 import time
 import textwrap
 from collections import deque
+
+profiling = {}
 
 # units and conversions
 _units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
@@ -363,17 +368,17 @@ FINAL = 9
 
 def print_timing(level=0):
     def _print_timing(func):
-        if VERBOSITY >= level:
+        if VERBOSITY:
             def wrapper(*arg):
                 if VERBOSITY >= level:
                     t1 = time.time()
                     res = func(*arg)
                     t2 = time.time()
-                    print >>sys.stderr, '%s took %0.3fs' % (func.func_name, (t2-t1))
+                    profiling.setdefault(func.func_name, 0)
+                    profiling[func.func_name] += (t2-t1)
                     return res
                 else:
-                    res = func(*arg)
-                    return res
+                    return func(*arg)
             return wrapper
         else:
             return func
@@ -612,7 +617,7 @@ class Scss(object):
         cont = _interpolate_re.sub(_av, cont)
         return cont
 
-    @print_timing(1)
+    @print_timing(2)
     def Compilation(self, input_scss=None):
         self.reset()
         
@@ -676,7 +681,7 @@ class Scss(object):
         self.qrules.append(rule)
         return str
 
-    @print_timing(2)
+    @print_timing(3)
     def parse_children(self):
         pos = 0
         while True:
@@ -708,6 +713,7 @@ class Scss(object):
             #print >>sys.stderr, '='*80
             #for r in [rule]+list(self.qrules)[:5]: print >>sys.stderr, repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:80]+('...' if len(r[CODESTR])>80 else '')), dict((k, v) for k, v in r[CONTEXT].items() if k.startswith('$') and not k.startswith('$__')), dict(r[PROPERTIES]).keys()
         
+    @print_timing(4)
     def manage_children(self, rule, p_selectors, p_parents, p_children, scope=None):
         for c_property, c_codestr in self.locate_blocks(rule[CODESTR]):
             # Rules preprocessing...
@@ -795,6 +801,7 @@ class Scss(object):
             elif scope is None: # needs to have no scope to crawl down the nested rules
                 self._nest_rules(rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr)
 
+    @print_timing(10)
     def _settle_options(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
         for option in name.split(','):
             option, value = (option.split(':', 1)+[''])[:2]
@@ -807,6 +814,7 @@ class Scss(object):
                     value = 0
                 rule[OPTIONS][option] = value
 
+    @print_timing(10)
     def _do_functions(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
         if name:
             funct, params, _ = name.partition('(')
@@ -854,6 +862,7 @@ class Scss(object):
             if not new_params:
                 rule[OPTIONS][code + ' ' + funct + ':0'] = mixin
 
+    @print_timing(10)
     def _do_include(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
         funct, params, _ = name.partition('(')
         funct = funct.strip()
@@ -892,6 +901,7 @@ class Scss(object):
             _rule[CONTEXT].update(m_vars)
             self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
 
+    @print_timing(10)
     def _do_import(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
         """
         Implements @import
@@ -948,6 +958,7 @@ class Scss(object):
         else:
             rule[PROPERTIES].append((c_property, None))
 
+    @print_timing(10)
     def _do_if(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
         if code != '@if':
             val = rule[OPTIONS].get('@if', True)
@@ -964,12 +975,14 @@ class Scss(object):
                 rule[CODESTR] = c_codestr
                 self.manage_children(rule, p_selectors, p_parents, p_children, scope)
 
+    @print_timing(10)
     def _do_else(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
         val = rule[OPTIONS].get('@if', True)
         if not val:
             rule[CODESTR] = c_codestr
             self.manage_children(rule, p_selectors, p_parents, p_children, scope)
 
+    @print_timing(10)
     def _do_for(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
         var, _, name = name.partition('from')
         name = self.apply_vars(name, rule[CONTEXT])
@@ -989,6 +1002,7 @@ class Scss(object):
                 rule[CONTEXT][var] = str(i)
                 self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
 
+    @print_timing(10)
     def _do_each(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
         """
         Implements @each
@@ -1007,12 +1021,14 @@ class Scss(object):
                     rule[CONTEXT][n] = v
                 self.manage_children(rule, p_selectors, p_parents, p_children)
 
+    @print_timing(10)
     def _get_variables(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr):
         _rule = list(rule)
         _rule[CODESTR] = c_codestr
         _rule[PROPERTIES] = rule[CONTEXT]
         self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
 
+    @print_timing(10)
     def _get_properties(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr):
         prop, value = (_prop_split_re.split(c_property, 1)+[None])[:2]
         try:
@@ -1038,6 +1054,7 @@ class Scss(object):
                 _prop = self.do_glob_math(_prop, rule[CONTEXT], rule[OPTIONS])
                 rule[PROPERTIES].append((_prop, value))
 
+    @print_timing(10)
     def _nest_rules(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr):
         if c_property == self.construct:
             rule[CODESTR] = c_codestr
@@ -1075,6 +1092,7 @@ class Scss(object):
             _rule = [ rule[FILEID], None, c_codestr, set(), rule[CONTEXT].copy(), rule[OPTIONS].copy(), better_selectors, [], rule[PATH], False ]
             p_children.appendleft(_rule)
 
+    @print_timing(4)
     def link_with_parents(self, parent, c_selectors, c_rules):
         """
         Link with a parent for the current child rule.
@@ -1135,7 +1153,7 @@ class Scss(object):
 
         return parent_found
 
-    @print_timing(2)
+    @print_timing(3)
     def parse_extends(self):
         """
         For each part, create the inheritance parts from the ' extends '
@@ -1190,7 +1208,7 @@ class Scss(object):
                         _new_options.update(rule[OPTIONS])
                         rule[OPTIONS] = _new_options
 
-    @print_timing(2)
+    @print_timing(3)
     def manage_order(self):
         # order rules according with their dependencies
         for rule in self.rules:
@@ -1200,7 +1218,7 @@ class Scss(object):
                 rule[POSITION] = min(rule[DEPS])
         self.rules = sorted(self.rules, key=lambda o: o[POSITION])
 
-    @print_timing(2)
+    @print_timing(3)
     def parse_properties(self):
         self.css_files = []
         self._rules = {}
@@ -1219,7 +1237,7 @@ class Scss(object):
                             css_files.add(fileid)
                             self.css_files.append(fileid)
 
-    @print_timing(2)
+    @print_timing(3)
     def create_css(self, fileid=None):
         """
         Generate the final CSS string
@@ -1353,7 +1371,7 @@ class Scss(object):
         content = _expr_glob_re.sub(self._calculate_expr(context, options), content)
         return content
 
-    @print_timing(2)
+    @print_timing(3)
     def post_process(self, cont):
         compress = self.scss_opts.get('compress', 1) and 'compress_' or ''
         # short colors:
@@ -1733,6 +1751,7 @@ def _color_stops(*args):
 ################################################################################
 # Compass like functionality for sprites and images:
 sprite_maps = {}
+sprite_images = {}
 def _sprite_map(g, **kwargs):
     """
     Generates a sprite map from the files matching the glob pattern.
@@ -1764,70 +1783,77 @@ def _sprite_map(g, **kwargs):
         asset_file = key + '.png'
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
 
-        images = tuple( Image.open(file) for file in files )
-        names = tuple( os.path.splitext(os.path.basename(file))[0] for file in files )
-        files = tuple( file[len(MEDIA_ROOT):] for file in files )
-        sizes = tuple( image.size for image in images )
-        offsets_x = []
-        offsets_y = []
-
-        if os.path.exists(asset_path):
-            filetime = int(os.path.getmtime(asset_path))
-            offset = gutter
-            for i, image in enumerate(images):
-                if vertical:
-                    offsets_x.append(0 - gutter)
-                    offsets_y.append(offset - gutter)
-                    offset += sizes[i][1] + gutter * 2
-                else:
-                    offsets_x.append(offset - gutter)
-                    offsets_y.append(0 - gutter)
-                    offset += sizes[i][0] + gutter * 2
+        if os.path.exists(asset_path + '.cache'):
+            asset, map, sizes = pickle.load(open(asset_path + '.cache'))
+            sprite_maps[asset] = map
+            for file, size in sizes:
+                sprite_images[file] = size
         else:
-            if vertical:
-                width = max(zip(*sizes)[0]) + gutter * 2
-                height = sum(zip(*sizes)[1]) + gutter * len(files) * 2
+            images = tuple( Image.open(file) for file in files )
+            names = tuple( os.path.splitext(os.path.basename(file))[0] for file in files )
+            files = tuple( file[len(MEDIA_ROOT):] for file in files )
+            sizes = tuple( image.size for image in images )
+            offsets_x = []
+            offsets_y = []
+            if os.path.exists(asset_path):
+                filetime = int(os.path.getmtime(asset_path))
+                offset = gutter
+                for i, image in enumerate(images):
+                    if vertical:
+                        offsets_x.append(0 - gutter)
+                        offsets_y.append(offset - gutter)
+                        offset += sizes[i][1] + gutter * 2
+                    else:
+                        offsets_x.append(offset - gutter)
+                        offsets_y.append(0 - gutter)
+                        offset += sizes[i][0] + gutter * 2
             else:
-                width = sum(zip(*sizes)[0]) + gutter * len(files) * 2
-                height = max(zip(*sizes)[1]) + gutter * 2
-
-            new_image = Image.new(
-                mode = 'RGBA',
-                size = (width, height),
-                color = (0, 0, 0, 0)
-            )
-
-            offset = gutter
-            for i, image in enumerate(images):
                 if vertical:
-                    new_image.paste(image, (gutter, offset))
-                    offsets_x.append(0 - gutter)
-                    offsets_y.append(offset - gutter)
-                    offset += sizes[i][1] + gutter * 2
+                    width = max(zip(*sizes)[0]) + gutter * 2
+                    height = sum(zip(*sizes)[1]) + gutter * len(files) * 2
                 else:
-                    new_image.paste(image, (offset, gutter))
-                    offsets_x.append(offset - gutter)
-                    offsets_y.append(0 - gutter)
-                    offset += sizes[i][0] + gutter * 2
-
-            try:
-                new_image.save(asset_path)
-            except IOError, e:
-                print >>sys.stderr, str(e)
-            filetime = int(time.mktime(datetime.datetime.now().timetuple()))
-
-        url = '%s%s?_=%s' % (ASSETS_URL, asset_file, filetime)
-        asset = 'url("%s") %dpx %dpx %s' % (escape(url), int(offset_x), int(offset_y), repeat)
-        # Use the sorted list to remove older elements (keep only 500 objects):
-        if len(sprite_maps) > 1000:
-            for a in sorted(sprite_maps, key=lambda a: sprite_maps[a]['*'], reverse=True)[500:]:
-                del sprite_maps[a]
-        # Add the new object:
-        sprite_maps[asset] = dict(zip(names, zip(sizes, files, offsets_x, offsets_y)))
-        sprite_maps[asset]['*'] = datetime.datetime.now()
-        sprite_maps[asset]['*f*'] = asset_file
-        sprite_maps[asset]['*k*'] = key
-        sprite_maps[asset]['*t*'] = filetime
+                    width = sum(zip(*sizes)[0]) + gutter * len(files) * 2
+                    height = max(zip(*sizes)[1]) + gutter * 2
+    
+                new_image = Image.new(
+                    mode = 'RGBA',
+                    size = (width, height),
+                    color = (0, 0, 0, 0)
+                )
+    
+                offset = gutter
+                for i, image in enumerate(images):
+                    if vertical:
+                        new_image.paste(image, (gutter, offset))
+                        offsets_x.append(0 - gutter)
+                        offsets_y.append(offset - gutter)
+                        offset += sizes[i][1] + gutter * 2
+                    else:
+                        new_image.paste(image, (offset, gutter))
+                        offsets_x.append(offset - gutter)
+                        offsets_y.append(0 - gutter)
+                        offset += sizes[i][0] + gutter * 2
+    
+                try:
+                    new_image.save(asset_path)
+                except IOError, e:
+                    print >>sys.stderr, str(e)
+                filetime = int(time.mktime(datetime.datetime.now().timetuple()))
+    
+            url = '%s%s?_=%s' % (ASSETS_URL, asset_file, filetime)
+            asset = 'url("%s") %dpx %dpx %s' % (escape(url), int(offset_x), int(offset_y), repeat)
+            # Use the sorted list to remove older elements (keep only 500 objects):
+            if len(sprite_maps) > 1000:
+                for a in sorted(sprite_maps, key=lambda a: sprite_maps[a]['*'], reverse=True)[500:]:
+                    del sprite_maps[a]
+            # Add the new object:
+            map = dict(zip(names, zip(sizes, files, offsets_x, offsets_y)))
+            map['*'] = datetime.datetime.now()
+            map['*f*'] = asset_file
+            map['*k*'] = key
+            map['*t*'] = filetime
+            pickle.dump((asset, map, zip(files, sizes)), open(asset_path + '.cache', 'w'))
+            sprite_maps[asset] = map
     return StringValue(asset)
 
 def _sprite_map_name(_map):
@@ -1849,7 +1875,10 @@ def _sprite_file(map, sprite):
     """
     map = StringValue(map).value
     sprite = StringValue(sprite).value
-    sprite = sprite_maps.get(map, {}).get(sprite)
+    
+    sprite_map = sprite_maps.get(map, {})
+    sprite = sprite_map.get(sprite)
+    
     if sprite:
         return StringValue(sprite[1])
     return StringValue(None)
@@ -1872,7 +1901,7 @@ def _sprite(map, sprite, offset_x=None, offset_y=None):
         url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
         offset_x = NumberValue(offset_x).value or 0
         offset_y = NumberValue(offset_y).value or 0
-        pos = "url('%s') %dpx %dpx" % (escape(url), int(offset_x - sprite[2]), int(offset_y - sprite[3]))
+        pos = "url(%s) %dpx %dpx" % (escape(url), int(offset_x - sprite[2]), int(offset_y - sprite[3]))
         return StringValue(pos)
     return StringValue('0 0')
 
@@ -1940,14 +1969,17 @@ def _image_width(image):
     if not Image:
         raise Exception("Images manipulation require PIL")
     file = StringValue(image).value
-    path = MEDIA_ROOT + file
-    if os.path.exists(path):
-        image = Image.open(path)
-        width = image.size[0]
-        ret = NumberValue(width)
-        ret.units = { 'px': _units_weights.get('px', 1), '_': 'px' }
-        return ret
-    ret = NumberValue(0)
+    path = os.path.join(MEDIA_ROOT, file)
+    try:
+        width = sprite_images[file][0]
+    except KeyError:
+        width = 0
+        if os.path.exists(path):
+            image = Image.open(path)
+            size = image.size
+            width = size[0]
+            sprite_images[path] = size
+    ret = NumberValue(width)
     ret.units = { 'px': _units_weights.get('px', 1), '_': 'px' }
     return ret
 
@@ -1959,14 +1991,17 @@ def _image_height(image):
     if not Image:
         raise Exception("Images manipulation require PIL")
     file = StringValue(image).value
-    path = MEDIA_ROOT + file
-    if os.path.exists(path):
-        image = Image.open(path)
-        height = image.size[1]
-        ret = NumberValue(height)
-        ret.units['px'] = _units_weights.get('px', 1)
-        return ret
-    ret = NumberValue(0)
+    path = os.path.join(MEDIA_ROOT, file)
+    try:
+        height = sprite_images[file][1]
+    except KeyError:
+        height = 0
+        if os.path.exists(path):
+            image = Image.open(path)
+            size = image.size
+            height = size[1]
+            sprite_images[path] = size
+    ret = NumberValue(height)
     ret.units['px'] = _units_weights.get('px', 1)
     return ret
 
@@ -2427,6 +2462,7 @@ class NumberValue(Value):
     def _do_op(cls, first, second, op):
         first = NumberValue(first)
         second = NumberValue(second)
+        
         first_unit = first.unit
         second_unit = second.unit
         if op == operator.__add__ or op == operator.__sub__:
@@ -2485,6 +2521,8 @@ class ListValue(Value):
             self.value = self._reorder_list(tokens.value)
         elif isinstance(tokens, ListValue):
             self.value = tokens.value.copy()
+        elif isinstance(tokens, Value):
+            self.value = { 0: tokens }
         elif isinstance(tokens, dict):
             self.value = self._reorder_list(tokens)
         elif isinstance(tokens, (list, tuple)):
@@ -2496,7 +2534,7 @@ class ListValue(Value):
                 lst = [ i.strip() for i in lst[0].split(',') if i.strip() ]
                 if len(lst) > 1:
                     sp = ','
-            self.value = dict(enumerate(tokens))
+            self.value = dict(enumerate(lst))
             if sp:
                 self.value['_'] = ','
     def _reorder_list(self, lst):
@@ -2504,28 +2542,27 @@ class ListValue(Value):
     def __nonzero__(self):
         return len(self)
     def __len__(self):
-        return len(self.value) - (1 if '_' in self.value else 0)
+        return len(self.items())
     def __str__(self):
         return to_str(self.value)
     def items(self):
-        if len(self) == 1:
-            value = self.value
-            while isinstance(value, dict):
+        value = self.value
+        if len(value) - (1 if '_' in value else 0) == 1:
+            while True:
                 for k, v in value.items():
                     if k != '_':
                         key = k
                         value = v
                         break
-                value = ListValue(value)
-                if len(value) != 1:
+                if isinstance(value, ListValue):
                     value = value.value
+                if not isinstance(value, dict):
                     break
-                value = value.value
+                if len(value) - (1 if '_' in value else 0) != 1:
+                    break
             if not isinstance(value, dict):
                 value = { key: value }
-            return sorted((k, v) for k, v in value.items() if k != '_')
-        else:
-            return sorted((k, v) for k, v in self.value.items() if k != '_')
+        return sorted((k, v) for k, v in value.items() if k != '_')
     def first(self):
         try:
             return self.items()[0][1]
@@ -2819,11 +2856,12 @@ for u in _units:
 def call(name, args, C, O, function=True):
     # Function call:
     _name = name.replace('_', '-')
-    s = args and sorted(args.value.items()) or []
+    s = args and args.value.items() or []
     try:
         _args = [ v for n,v in s if isinstance(n, int) ]
         _kwargs = dict( (n[1:],v) for n,v in s if not isinstance(n, int) and n != '_' )
         _fn_a = '%s:%d' % (_name, len(_args))
+        #print >>sys.stderr, '#', _fn_a, _args, _kwargs
         _fn_n = '%s:n' % _name
         fn = O and O.get('@function ' + _fn_a) or fnct.get(_fn_a) or fnct[_fn_n]
         node = fn(*_args, **_kwargs)
@@ -4367,7 +4405,7 @@ def main():
                     if p and p not in load_paths:
                         load_paths.append(p)
             elif o == '--time':
-                VERBOSITY = 1
+                VERBOSITY = 2
         LOAD_PATHS = ','.join(load_paths)
         opts = dict(opts)
         if '-t' in opts or '--test' in opts:
@@ -4466,5 +4504,7 @@ def main():
         else:
             css = Scss()
             sys.stdout.write(css.compile(sys.stdin.read()))
+            for f, t in profiling.items():
+                print >>sys.stderr, '%s took %0.3fs' % (f, t)
 if __name__ == "__main__":
     main()
