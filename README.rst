@@ -171,10 +171,9 @@ Examples
 		background: $icons;
 	}
 	@each $icon in sprites($icons) {
-        	$icon_file: sprite-file($icons, $icon);
 		div .$icon {
-			width: image-width($icon_file);
-			height: image-height($icon_file);
+			width: image-width(sprite-file($icons, $icon));
+			height: image-height(sprite-file($icons, $icon));
 			background-position: sprite-position($icons, $icon);
 		}
 	}
