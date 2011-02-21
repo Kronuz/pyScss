@@ -1000,7 +1000,7 @@ class Scss(object):
             for i in range(start, end + 1):
                 rule[CODESTR] = c_codestr
                 rule[CONTEXT][var] = str(i)
-                self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
+                self.manage_children(rule, p_selectors, p_parents, p_children, scope)
 
     @print_timing(10)
     def _do_each(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
