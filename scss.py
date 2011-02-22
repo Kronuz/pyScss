@@ -1941,9 +1941,9 @@ def _grid_image(left_gutter, width, right_gutter, height, grid_color=None, basel
         color = background_color
     )
     draw = ImageDraw.Draw(new_image)
-    draw.rectangle((_left_gutter, 0, _left_gutter + _width, _height),  fill=grid_color)
+    draw.rectangle((_left_gutter, 0, _left_gutter + _width - 1, _height - 1),  fill=grid_color)
     if _height > 1:
-        draw.rectangle((0, _height - 1, _left_gutter + _width + _right_gutter, _height),  fill=baseline_color)
+        draw.rectangle((0, _height - 1, _left_gutter + _width + _right_gutter - 1, _height - 1),  fill=baseline_color)
     output = StringIO.StringIO()
     new_image.save(output, format='PNG')
     contents = output.getvalue()
