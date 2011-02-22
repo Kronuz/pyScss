@@ -2013,8 +2013,8 @@ def _image_url(image):
         filetime = int(os.path.getmtime(path))
     else:
         filetime = 'NA'
-    url = '%s%s?_=%s' % (MEDIA_URL, file, filetime)
-    return QuotedStringValue(url)
+    url = 'url("%s%s?_=%s")' % (MEDIA_URL, file, filetime)
+    return StringValue(url)
 
 def _image_width(image):
     """
