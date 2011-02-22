@@ -1405,7 +1405,11 @@ import operator
 import colorsys
 
 try:
-    from PIL import Image
+    import cStringIO as StringIO
+except:
+    import StringIO
+try:
+    from PIL import Image, ImageDraw
 except ImportError:
     Image = None
 
@@ -1908,6 +1912,62 @@ def _sprite_map(g, **kwargs):
             pickle.dump((asset, map, zip(files, sizes)), open(asset_path + '.cache', 'w'))
             sprite_maps[asset] = map
     return StringValue(asset)
+
+def _grid_image(left_gutter, width, right_gutter, height, grid_color=None, baseline_color=None, background_color=None):
+    if not Image:
+        raise Exception("Images manipulation require PIL")
+    if grid_color == None:
+        grid_color = (120, 170, 250, 50)
+    else:
+        c = ColorValue(grid_color).value
+        grid_color = (c[0], c[1], c[2], int(c[3] * 255.0))
+    if baseline_color == None:
+        baseline_color = (0, 0, 0, 50)
+    else:
+        c = ColorValue(baseline_color).value
+        baseline_color = (c[0], c[1], c[2], int(c[3] * 255.0))
+    if background_color == None:
+        background_color = (0, 0, 0, 0)
+    else:
+        c = ColorValue(background_color).value
+        background_color = (c[0], c[1], c[2], int(c[3] * 255.0))
+    _height = int(height) if height >= 1 else int(_height * 1000.0)
+    _width = int(width) if width >= 1 else int(width * 1000.0)
+    _left_gutter = int(left_gutter) if left_gutter >= 1 else int(left_gutter * 1000.0)
+    _right_gutter = int(right_gutter) if right_gutter >= 1 else int(right_gutter * 1000.0)
+    new_image = Image.new(
+        mode = 'RGBA',
+        size = (_left_gutter + _width + _right_gutter, _height),
+        color = background_color
+    )
+    draw = ImageDraw.Draw(new_image)
+    draw.rectangle((_left_gutter, 0, _left_gutter + _width, _height),  fill=grid_color)
+    if _height > 1:
+        draw.rectangle((0, _height - 1, _left_gutter + _width + _right_gutter, _height),  fill=baseline_color)
+    output = StringIO.StringIO()
+    new_image.save(output, format='PNG')
+    contents = output.getvalue()
+    output.close()
+    url = 'data:image/png;base64,' + base64.b64encode(contents)
+    inline = 'url("%s")' % escape(url)
+    return StringValue(inline)
+
+def _image_color(color):
+    if not Image:
+        raise Exception("Images manipulation require PIL")
+    c = ColorValue(color).value
+    new_image = Image.new(
+        mode = 'RGBA',
+        size = (1, 1),
+        color = (c[0], c[1], c[2], int(c[3] * 255.0))
+    )
+    output = StringIO.StringIO()
+    new_image.save(output, format='PNG')
+    contents = output.getvalue()
+    output.close()
+    url = 'data:image/png;base64,' + base64.b64encode(contents)
+    inline = 'url("%s")' % escape(url)
+    return StringValue(inline)
 
 def _sprite_map_name(_map):
     """
@@ -2498,6 +2558,10 @@ class NumberValue(Value):
                 self.value = 0.0
     def __repr__(self):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.units))
+    def __int__(self):
+        return int(self.value)
+    def __float__(self):
+        return float(self.value)
     def __str__(self):
         unit = self.unit
         val = self.value / _conv_factor.get(unit, 1.0)
@@ -2799,6 +2863,8 @@ class StringValue(QuotedStringValue):
 
 # Parser/functions map:
 fnct = {
+    'grid-image:4': _grid_image,
+    'image-color:1': _image_color,
     'sprite-map:1': _sprite_map,
     'sprites:1': _sprites,
     'sprite:2': _sprite,
@@ -2928,7 +2994,7 @@ def call(name, args, C, O, is_function=True):
                 else:
                     node.value.pop('_', None)
     except:
-        #raise#@@@#
+        raise#@@@#
         sp = args and args.value.get('_') or ''
         if is_function:
             if _name not in ('url',):
@@ -3352,7 +3418,7 @@ def eval_expr(expr, context={}, options={}, raw=False):
         print >>sys.stderr, '>>',expr,'<<'
         raise
     except:
-        return#@@@#
+        #return#@@@#
         print >>sys.stderr, '>>',expr,'<<'
         raise
 
