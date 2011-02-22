@@ -1991,15 +1991,16 @@ def _inline_image(image, mime_type=None):
     this can be a performance benefit at the cost of a larger generated CSS
     file.
     """
-    image = StringValue(image).value
-    file = MEDIA_ROOT+image
-    if os.path.exists(file):
+    file = StringValue(image).value
+    path = os.path.join(MEDIA_ROOT, file)
+    if os.path.exists(path):
         mime_type = StringValue(mime_type).value or mimetypes.guess_type(file)[0]
         file = open(file, 'rb')
         url = 'data:'+_mime_type+';base64,'+base64.b64encode(file.read())
-        inline = 'url("%s")' % escape(url)
-        return StringValue(inline)
-    return StringValue(None)
+    else:
+        url = url = '%s%s?_=%s' % (MEDIA_URL, file, 'NA')
+    inline = 'url("%s")' % escape(url)
+    return StringValue(inline)
 
 def _image_url(image):
     """
@@ -2007,12 +2008,13 @@ def _image_url(image):
     directory.
     """
     file = StringValue(image).value
-    path = MEDIA_ROOT + file
+    path = os.path.join(MEDIA_ROOT, file)
     if os.path.exists(path):
         filetime = int(os.path.getmtime(path))
-        url = '%s%s?_=%s' % (MEDIA_URL, file, filetime)
-        return QuotedStringValue(url)
-    return StringValue(None)
+    else:
+        filetime = 'NA'
+    url = '%s%s?_=%s' % (MEDIA_URL, file, filetime)
+    return QuotedStringValue(url)
 
 def _image_width(image):
     """
