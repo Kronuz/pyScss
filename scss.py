@@ -1994,9 +1994,9 @@ def _inline_image(image, mime_type=None):
     file = StringValue(image).value
     path = os.path.join(MEDIA_ROOT, file)
     if os.path.exists(path):
-        mime_type = StringValue(mime_type).value or mimetypes.guess_type(file)[0]
-        file = open(file, 'rb')
-        url = 'data:'+_mime_type+';base64,'+base64.b64encode(file.read())
+        mime_type = StringValue(mime_type).value or mimetypes.guess_type(path)[0]
+        path = open(path, 'rb')
+        url = 'data:' + mime_type + ';base64,' + base64.b64encode(path.read())
     else:
         url = url = '%s%s?_=%s' % (MEDIA_URL, file, 'NA')
     inline = 'url("%s")' % escape(url)
