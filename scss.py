@@ -309,7 +309,7 @@ _sl_comment_re = re.compile(r'(?<!\w{2}:)\/\/.*')
 _zero_units_re = re.compile(r'\b0(' + '|'.join(map(re.escape, _units)) + r')(?!\w)', re.IGNORECASE)
 _zero_re = re.compile(r'\b0\.(?=\d)')
 
-_interpolate_re = re.compile(r'(?:\#\{)?(\$[-\w]+)\}?')
+_interpolate_re = re.compile(r'(\$[-\w]+)')
 _spaces_re = re.compile(r'\s+')
 _expand_rules_space_re = re.compile(r'\s*{')
 _collapse_properties_space_re = re.compile(r'([:#])\s*{')
@@ -584,7 +584,7 @@ class Scss(object):
             return ','.join(sorted(selectors)) + ' extends ' + '&'.join(sorted(parents))
         return ','.join(sorted(selectors))
 
-    def apply_vars(self, cont, context, _dequote=False):
+    def apply_vars(self, cont, context, options=None, _dequote=False):
         if '$' not in cont:
             return cont
         if cont in context:
@@ -619,6 +619,8 @@ class Scss(object):
                         v = '(' + depar(v) + ')'
             return v if v is not None else m.group(0)
         cont = _interpolate_re.sub(_av, cont)
+        if options is not None:
+            cont = self.do_glob_math(cont, context, options)
         return cont
 
     @print_timing(2)
@@ -733,62 +735,36 @@ class Scss(object):
                 c_property = '@mixin' + c_property[1:]
             elif c_property == '@prototype ': # Remove '@prototype '
                 c_property = c_property[11:]
-
             ####################################################################
             if c_property.startswith('@'):
                 code, name = (c_property.split(None, 1)+[''])[:2]
-                ################################################################
-                # @warn
                 if code == '@warn':
-                    err = "Warning: %s" % self.apply_vars(dequote(name), rule[CONTEXT])
+                    err = "Warning: %s" % self.apply_vars(dequote(name), rule[CONTEXT], rule[OPTIONS])
                     print >>sys.stderr, err
-                ################################################################
-                # @option
                 elif code == '@option':
                     self._settle_options(rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name)
-                ################################################################
-                # @import
                 elif code == '@import':
                     self._do_import(rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name)
-                ################################################################
-                # @extend
                 elif code == '@extend':
                     p_parents.update(p.strip() for p in name.replace(',', '&').split('&'))
                     p_parents.discard('')
-                ################################################################
-                # @mixin, @function
                 elif c_codestr is not None and code in ('@mixin', '@function'):
                     self._do_functions(rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name)
-                ################################################################
-                # @return
                 elif code == '@return':
-                    rule[OPTIONS]['@return'] = self.apply_vars(name, rule[CONTEXT])
+                    rule[OPTIONS]['@return'] = self.apply_vars(name, rule[CONTEXT], rule[OPTIONS])
                     return
-                ################################################################
-                # @include
                 elif code == '@include':
                     self._do_include(rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name)
-                ################################################################
-                # @if, @else if
                 elif c_codestr is not None and (code == '@if' or c_property.startswith('@else if ')):
                     self._do_if(rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name)
-                ################################################################
-                # @else
                 elif c_codestr is not None and code == '@else':
                     self._do_else(rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name)
-                ################################################################
-                # @for
                 elif c_codestr is not None and code == '@for':
                     self._do_for(rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name)
-                ################################################################
-                # @each
                 elif c_codestr is not None and code == '@each':
                     self._do_each(rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name)
-                ################################################################
-                # @variables, @vars
                 elif c_codestr is not None and code in ('@variables', '@vars'):
                     self._get_variables(rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr)
-                ################################################################
                 # Any other rule simply adds the property
                 # TODO: add @media here (and c_codestr is nested to it)
                 else:
@@ -837,9 +813,9 @@ class Scss(object):
                 if param:
                     new_params.append(param)
                     if default:
-                        default = self.apply_vars(default, rule[CONTEXT])
+                        default = self.apply_vars(default, rule[CONTEXT], None)
                         defaults[param] = default
-            mixin = [ list(new_params), defaults, self.apply_vars(c_codestr, rule[CONTEXT]) ]
+            mixin = [ list(new_params), defaults, self.apply_vars(c_codestr, rule[CONTEXT], None) ]
             if code == '@function':
                 def _call(mixin):
                     def __call(*args, **kwargs):
@@ -897,15 +873,19 @@ class Scss(object):
             m_params = mixin[0]
             m_vars = mixin[1].copy()
             m_codestr = mixin[2]
-            for varname, param in new_params.items():
+            for varname, value in new_params.items():
                 try:
                     m_param = m_params[varname]
                 except:
                     m_param = varname
-                m_vars[m_param] = self.apply_vars(param, rule[CONTEXT])
+                value = self.apply_vars(value, rule[CONTEXT], rule[OPTIONS])
+                value = self.calculate(value, rule[CONTEXT], rule[OPTIONS])
+                m_vars[m_param] = value
             for p in m_vars:
                 if p not in new_params:
-                    m_vars[p] = self.apply_vars(m_vars[p], m_vars)
+                    value = self.apply_vars(m_vars[p], m_vars, rule[OPTIONS])
+                    value = self.calculate(value, rule[CONTEXT], rule[OPTIONS])
+                    m_vars[p] = value
             _rule = list(rule)
             _rule[CODESTR] = m_codestr
             _rule[CONTEXT] = rule[CONTEXT].copy()
@@ -974,13 +954,16 @@ class Scss(object):
 
     @print_timing(10)
     def _do_if(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
+        """
+        Implements @if and @else if
+        """
         if code != '@if':
             val = rule[OPTIONS].get('@if', True)
             name = c_property[9:].strip()
         else:
             val = True
         if val:
-            name = self.apply_vars(name, rule[CONTEXT])
+            name = self.apply_vars(name, rule[CONTEXT], rule[OPTIONS])
             name = self.calculate(name, rule[CONTEXT], rule[OPTIONS])
             val = name and name.split()[0].lower()
             val = bool(False if not val or val in('0', 'false',) else val)
@@ -991,6 +974,9 @@ class Scss(object):
 
     @print_timing(10)
     def _do_else(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
+        """
+        Implements @else
+        """
         val = rule[OPTIONS].get('@if', True)
         if not val:
             rule[CODESTR] = c_codestr
@@ -998,8 +984,11 @@ class Scss(object):
 
     @print_timing(10)
     def _do_for(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
+        """
+        Implements @for
+        """
         var, _, name = name.partition('from')
-        name = self.apply_vars(name, rule[CONTEXT])
+        name = self.apply_vars(name, rule[CONTEXT], rule[OPTIONS])
         name = self.calculate(name, rule[CONTEXT], rule[OPTIONS])
         start, _, end = name.partition('through')
         if not end:
@@ -1022,7 +1011,7 @@ class Scss(object):
         Implements @each
         """
         var, _, name = name.partition('in')
-        name = self.apply_vars(name, rule[CONTEXT])
+        name = self.apply_vars(name, rule[CONTEXT], rule[OPTIONS])
         name = eval_expr(name, rule[CONTEXT], rule[OPTIONS], True)
         if name:
             var = var.strip()
@@ -1037,6 +1026,9 @@ class Scss(object):
 
     @print_timing(10)
     def _get_variables(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr):
+        """
+        Implements @variables and @vars
+        """
         _rule = list(rule)
         _rule[CODESTR] = c_codestr
         _rule[PROPERTIES] = rule[CONTEXT]
@@ -1044,6 +1036,9 @@ class Scss(object):
 
     @print_timing(10)
     def _get_properties(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr):
+        """
+        Implements properties and variables extraction
+        """
         prop, value = (_prop_split_re.split(c_property, 1)+[None])[:2]
         try:
             is_var = (c_property[len(prop)] == '=')
@@ -1053,7 +1048,7 @@ class Scss(object):
         if prop:
             if value:
                 value = value.strip()
-                value = self.apply_vars(value, rule[CONTEXT])
+                value = self.apply_vars(value, rule[CONTEXT], rule[OPTIONS])
                 value = self.calculate(value, rule[CONTEXT], rule[OPTIONS])
             _prop = (scope or '') + prop
             if is_var or prop.startswith('$') and value is not None:
@@ -1064,18 +1059,19 @@ class Scss(object):
                 else:
                     rule[CONTEXT][_prop] = value
             else:
-                _prop = self.apply_vars(_prop, rule[CONTEXT], True)
-                _prop = self.do_glob_math(_prop, rule[CONTEXT], rule[OPTIONS])
+                _prop = self.apply_vars(_prop, rule[CONTEXT], rule[OPTIONS], True)
                 rule[PROPERTIES].append((_prop, value))
 
     @print_timing(10)
     def _nest_rules(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr):
+        """
+        Implements Nested CSS rules
+        """
         if c_property == self.construct:
             rule[CODESTR] = c_codestr
             self.manage_children(rule, p_selectors, p_parents, p_children, scope)
         else:
-            c_property = self.apply_vars(c_property, rule[CONTEXT], True)
-            c_property = self.do_glob_math(c_property, rule[CONTEXT], rule[OPTIONS])
+            c_property = self.apply_vars(c_property, rule[CONTEXT], rule[OPTIONS], True)
 
             c_selectors = self.normalize_selectors(c_property)
             c_selectors, _, c_parents = c_selectors.partition(' extends ')
@@ -4564,10 +4560,10 @@ def main():
                                     pprint(sorted(d))
                     elif s.startswith('$') and (':' in s or '=' in s):
                         prop, value = [ a.strip() for a in _prop_split_re.split(s, 1) ]
-                        value = css.apply_vars(value, context)
+                        value = css.apply_vars(value, context, options)
                         context[prop] = value
                     else:
-                        s = css.apply_vars(s, context)
+                        s = css.apply_vars(s, context, options)
                         print eval_expr(s, context, options)
             print 'Bye!'
         else:
