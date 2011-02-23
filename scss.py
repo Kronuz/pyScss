@@ -1699,7 +1699,7 @@ def _lightness(color):
     ret.units = { '%': _units_weights.get('%', 1), '_': '%' }
     return ret
 
-def __color_stops(*args):
+def __color_stops(percentages, *args):
     if isinstance(args[0], StringValue):
         color_stops = []
         colors = split_params(args[0].value)
@@ -1740,9 +1740,13 @@ def __color_stops(*args):
     if prev_color:
         stops.append(None)
     stops = stops[:len(colors)]
-    max_stops = max(s and s.value for s in stops)
+    if percentages:
+        max_stops = max(s and (s.value if s.unit != '%' else None) for s in stops)
+    else:
+        max_stops = max(s and (s if s.unit != '%' else None) for s in stops)
     stops = [ s and (s.value / max_stops if s.unit != '%' else s.value) for s in stops ]
-
+    stops[0] = 0
+    
     init = 0
     start = None
     for i, s in enumerate(stops+[1.0]):
@@ -1759,16 +1763,25 @@ def __color_stops(*args):
             init = final
             start = None
 
+    if max_stops is None or percentages:
+        stops = [ NumberValue(s, '%') for s in stops ]
+    else:
+        stops = [ s * max_stops for s in stops ]
     return zip(stops, colors)
 
 def _grad_color_stops(*args):
-    color_stops = __color_stops(*args)
+    color_stops = __color_stops(True, *args)
     ret = ', '.join([ 'color-stop(%s%%, %s)' % (to_str(s*100.0), c) for s,c in color_stops ])
     return StringValue(ret)
 
 def _color_stops(*args):
-    color_stops = __color_stops(*args)
-    ret = ', '.join([ '%s %s%%' % (c, to_str(s*100.0)) for s,c in color_stops ])
+    color_stops = __color_stops(False, *args)
+    ret = ', '.join([ '%s %s' % (c, to_str(s)) for s,c in color_stops ])
+    return StringValue(ret)
+
+def _color_stops_in_percentages(*args):
+    color_stops = __color_stops(True, *args)
+    ret = ', '.join([ '%s %s' % (c, to_str(s)) for s,c in color_stops ])
     return StringValue(ret)
 
 #TODO: Make use of these SVG functions:
@@ -1913,7 +1926,7 @@ def _sprite_map(g, **kwargs):
             sprite_maps[asset] = map
     return StringValue(asset)
 
-def _grid_image(left_gutter, width, right_gutter, height, grid_color=None, baseline_color=None, background_color=None):
+def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=None, baseline_color=None, background_color=None):
     if not Image:
         raise Exception("Images manipulation require PIL")
     if grid_color == None:
@@ -1922,7 +1935,7 @@ def _grid_image(left_gutter, width, right_gutter, height, grid_color=None, basel
         c = ColorValue(grid_color).value
         grid_color = (c[0], c[1], c[2], int(c[3] * 255.0))
     if baseline_color == None:
-        baseline_color = (0, 0, 0, 50)
+        baseline_color = (120, 170, 250, 70)
     else:
         c = ColorValue(baseline_color).value
         baseline_color = (c[0], c[1], c[2], int(c[3] * 255.0))
@@ -1935,15 +1948,17 @@ def _grid_image(left_gutter, width, right_gutter, height, grid_color=None, basel
     _width = int(width) if width >= 1 else int(width * 1000.0)
     _left_gutter = int(left_gutter) if left_gutter >= 1 else int(left_gutter * 1000.0)
     _right_gutter = int(right_gutter) if right_gutter >= 1 else int(right_gutter * 1000.0)
+    _full_width = (_left_gutter + _width + _right_gutter)
     new_image = Image.new(
         mode = 'RGBA',
-        size = (_left_gutter + _width + _right_gutter, _height),
+        size = (_full_width * int(columns), _height),
         color = background_color
     )
     draw = ImageDraw.Draw(new_image)
-    draw.rectangle((_left_gutter, 0, _left_gutter + _width - 1, _height - 1),  fill=grid_color)
+    for i in range(int(columns)):
+        draw.rectangle((i * _full_width + _left_gutter, 0, i * _full_width + _left_gutter + _width - 1, _height - 1),  fill=grid_color)
     if _height > 1:
-        draw.rectangle((0, _height - 1, _left_gutter + _width + _right_gutter - 1, _height - 1),  fill=baseline_color)
+        draw.rectangle((0, _height - 1, _full_width * int(columns) - 1, _height - 1),  fill=baseline_color)
     output = StringIO.StringIO()
     new_image.save(output, format='PNG')
     contents = output.getvalue()
@@ -2530,7 +2545,7 @@ class BooleanValue(Value):
         return self
 
 class NumberValue(Value):
-    def __init__(self, tokens):
+    def __init__(self, tokens, type=None):
         self.tokens = tokens
         self.units = {}
         if tokens is None:
@@ -2556,6 +2571,8 @@ class NumberValue(Value):
                 self.value = to_float(to_str(tokens))
             except ValueError:
                 self.value = 0.0
+        if type is not None:
+            self.units = { type: _units_weights.get(type, 1), '_': type }
     def __repr__(self):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.units))
     def __int__(self):
@@ -2864,6 +2881,7 @@ class StringValue(QuotedStringValue):
 # Parser/functions map:
 fnct = {
     'grid-image:4': _grid_image,
+    'grid-image:5': _grid_image,
     'image-color:1': _image_color,
     'sprite-map:1': _sprite_map,
     'sprites:1': _sprites,
@@ -2886,6 +2904,7 @@ fnct = {
     'opposite-position:n': _opposite_position,
     'grad-point:n': _grad_point,
     'color-stops:n': _color_stops,
+    'color-stops-in-percentages:n': _color_stops_in_percentages,
     'grad-color-stops:n': _grad_color_stops,
 
     'opacify:2': _opacify,
@@ -4552,7 +4571,7 @@ def main():
                 except KeyboardInterrupt: print''; break
                 if s in ('exit', 'quit'): break
                 for s in s.split(';'):
-                    s = s.strip()
+                    s = css.load_string(s.strip())
                     if not s:
                         continue
                     elif s.startswith('@'):
@@ -4562,21 +4581,24 @@ def main():
                         code, name = (s.split(None, 1)+[''])[:2]
                         if code == '@option':
                             css._settle_options(rule, [''], set(), children, None, s, None, code, name)
+                            continue
                         elif code == '@import':
                             css._do_import(rule, [''], set(), children, None, s, None, code, name)
+                            continue
                         elif code == '@include':
                             css._do_include(rule, [''], set(), children, None, s, None, code, name)
                             code = css._print_properties(properties).rstrip('\n')
                             if code:
-                                print code
+                                final_cont += code
                             if children:
                                 css.children.extendleft(children)
                                 css.parse_children()
                                 code = css._create_css(css.rules).rstrip('\n')
                                 if code:
-                                    print code
-                        else:
-                            eval_expr(s, context, options)
+                                    final_cont += code
+                            final_cont = css.post_process(final_cont)
+                            print final_cont
+                            continue
                     elif s == 'ls' or s.startswith('show(') or s.startswith('show ') or s.startswith('ls(') or s.startswith('ls '):
                         m = re.match(r'(?:show|ls)(\()?\s*([^,/\\) ]*)(?:[,/\\ ]([^,/\\ )]+))*(?(1)\))', s, re.IGNORECASE)
                         if m:
@@ -4626,13 +4648,16 @@ def main():
                                 else:
                                     d = dict((k[len(name)+2:].split(':')[0], v) for k, v in options.items() if k.startswith('@' + name + ' '))
                                     pprint(sorted(d))
+                            continue
                     elif s.startswith('$') and (':' in s or '=' in s):
                         prop, value = [ a.strip() for a in _prop_split_re.split(s, 1) ]
                         value = css.apply_vars(value, context, options)
                         context[prop] = value
-                    else:
-                        s = css.apply_vars(s, context, options)
-                        print eval_expr(s, context, options)
+                        continue
+                    s = css.apply_vars(s, context, options)
+                    final_cont = eval_expr(s, context, options)
+                    final_cont = css.post_process(final_cont)
+                    print final_cont
             print 'Bye!'
         else:
             css = Scss()
