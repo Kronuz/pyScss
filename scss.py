@@ -1480,6 +1480,10 @@ def _rgba2(color, a, type='rgba'):
     col += [ type ]
     return ColorValue(col)
 
+def _ie_hex_str(color):
+    c = ColorValue(color).value
+    return StringValue('#%02X%02X%02X%02X' % (c[3]*255, c[0], c[1], c[2]))
+
 def _hsl(h, s, l, type='hsl'):
     return _hsla(h, s, l, 1.0, type)
 
@@ -2936,6 +2940,7 @@ fnct = {
     'rgb:3': _rgb,
     'rgba:2': _rgba2,
     'rgba:4': _rgba,
+    'ie-hex-str:1': _ie_hex_str,
 
     'red:1': _red,
     'green:1': _green,
@@ -3206,7 +3211,7 @@ class CalculatorScanner(Scanner):
         ('UNITS', re.compile('|'.join(_units))),
         ('NUM', re.compile('(?:\\d+(?:\\.\\d*)?|\\.\\d+)')),
         ('BOOL', re.compile('(?:true|false)')),
-        ('COLOR', re.compile('#(?:[a-fA-F0-9]{8}|[a-fA-F0-9]{6}|[a-fA-F0-9]{3,4})')),
+        ('COLOR', re.compile('#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})\b')),
         ('VAR', re.compile('\\$[-a-zA-Z0-9_]+')),
         ('ID', re.compile('[-a-zA-Z_][-a-zA-Z0-9_]*')),
     ]
@@ -4656,6 +4661,8 @@ def main():
                         continue
                     s = css.apply_vars(s, context, options)
                     final_cont = eval_expr(s, context, options)
+                    if final_cont is None:
+                        final_cont = s
                     final_cont = css.post_process(final_cont)
                     print final_cont
             print 'Bye!'

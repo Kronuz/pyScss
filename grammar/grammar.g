@@ -52,7 +52,7 @@ parser Calculator:
     token UNITS: "px|cm|mm|hz|%"
     token NUM: "(?:\d+(?:\.\d*)?|\.\d+)"
     token BOOL: "(?:true|false)"
-    token COLOR: "#(?:[a-fA-F0-9]{8}|[a-fA-F0-9]{6}|[a-fA-F0-9]{3,4})"
+    token COLOR: "#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})\b"
     token VAR: "\$[-a-zA-Z0-9_]+"
     token ID: "[-a-zA-Z_][-a-zA-Z0-9_]*"
 
