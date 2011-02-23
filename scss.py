@@ -3171,7 +3171,7 @@ class CalculatorScanner(Scanner):
         ('DIV', re.compile('/')),
         ('ADD', re.compile('[+]')),
         ('SUB', re.compile('-\\s')),
-        ('SIGN', re.compile('-')),
+        ('SIGN', re.compile('-(?![a-zA-Z_])')),
         ('AND', re.compile('and')),
         ('OR', re.compile('or')),
         ('NOT', re.compile('not')),

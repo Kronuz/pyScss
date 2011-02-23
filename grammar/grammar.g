@@ -34,7 +34,7 @@ parser Calculator:
     token DIV: "/"
     token ADD: "[+]"
     token SUB: "-\s"
-    token SIGN: "-"
+    token SIGN: "-(?![a-zA-Z_])"
     token AND: "and"
     token OR: "or"
     token NOT: "not"
