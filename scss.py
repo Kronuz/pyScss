@@ -2994,7 +2994,7 @@ def call(name, args, C, O, is_function=True):
                 else:
                     node.value.pop('_', None)
     except:
-        raise#@@@#
+        #raise#@@@#
         sp = args and args.value.get('_') or ''
         if is_function:
             if _name not in ('url',):
@@ -3418,7 +3418,7 @@ def eval_expr(expr, context={}, options={}, raw=False):
         print >>sys.stderr, '>>',expr,'<<'
         raise
     except:
-        #return#@@@#
+        return#@@@#
         print >>sys.stderr, '>>',expr,'<<'
         raise
 
