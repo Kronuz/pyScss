@@ -1952,6 +1952,8 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
     _width = int(width) if width >= 1 else int(width * 1000.0)
     _left_gutter = int(left_gutter) if left_gutter >= 1 else int(left_gutter * 1000.0)
     _right_gutter = int(right_gutter) if right_gutter >= 1 else int(right_gutter * 1000.0)
+    if _height <= 0 or _width <= 0 or _left_gutter <= 0 or _right_gutter <= 0:
+        raise ValueError
     _full_width = (_left_gutter + _width + _right_gutter)
     new_image = Image.new(
         mode = 'RGBA',
