@@ -2858,8 +2858,14 @@ class QuotedStringValue(Value):
     @classmethod
     def _do_op(cls, first, second, op):
         first = QuotedStringValue(first)
-        second = QuotedStringValue(second)
-        val = op(first.value, second.value)
+        first_value = first.value
+        if op == operator.__mul__:
+            second = NumberValue(second)
+            second_value = int(second.value)
+        else:
+            second = QuotedStringValue(second)
+            second_value = second.value
+        val = op(first_value, second_value)
         ret = QuotedStringValue(None).merge(first).merge(second)
         ret.value = val
         return ret
