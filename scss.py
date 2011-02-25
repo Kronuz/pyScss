@@ -4593,6 +4593,7 @@ def main():
                             css._do_import(rule, [''], set(), children, None, s, None, code, name)
                             continue
                         elif code == '@include':
+                            final_cont = ''
                             css._do_include(rule, [''], set(), children, None, s, None, code, name)
                             code = css._print_properties(properties).rstrip('\n')
                             if code:
