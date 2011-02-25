@@ -626,7 +626,7 @@ class Scss(object):
     @print_timing(2)
     def Compilation(self, input_scss=None):
         self.reset()
-        
+
         if input_scss is not None:
             self._scss_files = { 'string': input_scss }
 
@@ -718,7 +718,7 @@ class Scss(object):
 
             #print >>sys.stderr, '='*80
             #for r in [rule]+list(self.children)[:5]: print >>sys.stderr, repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:80]+('...' if len(r[CODESTR])>80 else '')), dict((k, v) for k, v in r[CONTEXT].items() if k.startswith('$') and not k.startswith('$__')), dict(r[PROPERTIES]).keys()
-        
+
     @print_timing(4)
     def manage_children(self, rule, p_selectors, p_parents, p_children, scope=None):
         for c_property, c_codestr in self.locate_blocks(rule[CODESTR]):
@@ -892,7 +892,7 @@ class Scss(object):
             _rule[CONTEXT].update(m_vars)
             self.manage_children(_rule, p_selectors, p_parents, p_children, scope)
         else:
-            err = "Warning: Required mixin not found: %s:%d" % (funct, num_args)
+            err = "Error: Required mixin not found: %s:%d" % (funct, num_args)
             print >>sys.stderr, err
 
     @print_timing(10)
@@ -1095,7 +1095,7 @@ class Scss(object):
                 parents.discard('')
                 if parents:
                     better_selectors += ' extends ' + '&'.join(sorted(parents))
-    
+
             _rule = [ rule[FILEID], None, c_codestr, set(), rule[CONTEXT].copy(), rule[OPTIONS].copy(), better_selectors, [], rule[PATH], False ]
             p_children.appendleft(_rule)
 
@@ -1359,19 +1359,19 @@ class Scss(object):
                 # If we are in a global variable, we remove '#{' and '}'
                 if _base_str.startswith('#{') and _base_str.endswith('}'):
                     _base_str = _base_str[2:-1]
-    
+
                 better_expr_str = _base_str
-    
+
                 if _skip_re.match(better_expr_str) and '- ' not in better_expr_str:
                     self._replaces[_group0] = better_expr_str
                     return better_expr_str
-    
+
                 better_expr_str = eval_expr(better_expr_str, context, options)
                 if better_expr_str is None:
                     better_expr_str = _base_str
-    
+
                 self._replaces[_group0] = better_expr_str
-    
+
             return better_expr_str
         return __calculate_expr
 
@@ -1475,7 +1475,7 @@ def _rgba(r, g, b, a, type='rgba'):
 
 def _rgba2(color, a, type='rgba'):
     a = NumberValue(a).value
-    col = ColorValue(color).value[:3]
+    col = list(ColorValue(color).value[:3])
     col += [ 0.0 if a < 0 else 1.0 if a > 1 else a ]
     col += [ type ]
     return ColorValue(col)
@@ -1586,7 +1586,7 @@ def _adjust_saturation(color, amount):
 
 def _scale_lightness(color, amount):
     return __hsl_op(operator.__mul__, color, 0, 0, amount)
-    
+
 def _scale_saturation(color, amount):
     return __hsl_op(operator.__mul__, color, 0, amount, 0)
 
@@ -1750,7 +1750,7 @@ def __color_stops(percentages, *args):
         max_stops = max(s and (s if s.unit != '%' else None) for s in stops)
     stops = [ s and (s.value / max_stops if s.unit != '%' else s.value) for s in stops ]
     stops[0] = 0
-    
+
     init = 0
     start = None
     for i, s in enumerate(stops+[1.0]):
@@ -1887,13 +1887,13 @@ def _sprite_map(g, **kwargs):
                 else:
                     width = sum(zip(*sizes)[0]) + gutter * len(files) * 2
                     height = max(zip(*sizes)[1]) + gutter * 2
-    
+
                 new_image = Image.new(
                     mode = 'RGBA',
                     size = (width, height),
                     color = (0, 0, 0, 0)
                 )
-    
+
                 offset = gutter
                 for i, image in enumerate(images):
                     if vertical:
@@ -1906,14 +1906,14 @@ def _sprite_map(g, **kwargs):
                         offsets_x.append(offset - gutter)
                         offsets_y.append(0 - gutter)
                         offset += sizes[i][0] + gutter * 2
-    
+
                 try:
                     new_image.save(asset_path)
                 except IOError, e:
                     err = "Error: %s" % e
                     print >>sys.stderr, err
                 filetime = int(time.mktime(datetime.datetime.now().timetuple()))
-    
+
             url = '%s%s?_=%s' % (ASSETS_URL, asset_file, filetime)
             asset = 'url("%s") %dpx %dpx %s' % (escape(url), int(offset_x), int(offset_y), repeat)
             # Use the sorted list to remove older elements (keep only 500 objects):
@@ -2009,10 +2009,10 @@ def _sprite_file(map, sprite):
     """
     map = StringValue(map).value
     sprite = StringValue(sprite).value
-    
+
     sprite_map = sprite_maps.get(map, {})
     sprite = sprite_map.get(sprite)
-    
+
     if sprite:
         return QuotedStringValue(sprite[1])
     return StringValue(None)
@@ -2190,7 +2190,7 @@ def __compass_space_list(*lst):
     Otherwise it returns a new, single element, space-delimited list.
     """
     ret = __compass_list(*lst)
-    ret.pop('_', None)
+    ret.value.pop('_', None)
     return ret
 
 def _blank(*objs):
@@ -2281,7 +2281,7 @@ def _append(lst, val, separator=None):
         if separator:
             ret.value['_'] = separator
     return ret
-    
+
 ################################################################################
 
 def _percentage(value):
@@ -2322,7 +2322,7 @@ def _type_of(obj): # -> bool, number, string, color, list
 
 def _if(condition, if_true, if_false):
     return if_true if bool(BooleanValue(condition)) else if_false
-    
+
 def _unit(number): # -> px, em, cm, etc.
     unit = NumberValue(number).unit
     return StringValue(unit)
@@ -2604,7 +2604,7 @@ class NumberValue(Value):
     def _do_op(cls, first, second, op):
         first = NumberValue(first)
         second = NumberValue(second)
-        
+
         first_unit = first.unit
         second_unit = second.unit
         if op == operator.__add__ or op == operator.__sub__:
@@ -2973,7 +2973,7 @@ fnct = {
     '-compass-list-size:n': _length,
     'append:2': _append,
     'append:3': _append,
-    
+
     'nest:n': _nest,
     'append-selector:2': _append_selector,
     'headers:0': _headers,
@@ -3030,7 +3030,7 @@ def call(name, args, C, O, is_function=True):
         sp = args and args.value.get('_') or ''
         if is_function:
             if _name not in ('url',):
-                err = "Warning: Required function not found: %s" % _fn_a
+                err = "Error: Required function not found: %s" % _fn_a
                 print >>sys.stderr, err
             _args = (sp + ' ').join( to_str(v) for n,v in s if isinstance(n, int) )
             _kwargs = (sp + ' ').join( '%s: %s' % (n, to_str(v)) for n,v in s if not isinstance(n, int) and n != '_' )
@@ -3086,7 +3086,7 @@ class Scanner(object):
         self.restrictions = []
         self.input = input
         self.pos = 0
-        
+
     def token(self, i, restrict=None):
         """
         Get the i'th token, and if i is one past the end, then scan
@@ -3103,7 +3103,7 @@ class Scanner(object):
                         raise NotImplementedError("Unimplemented: restriction set changed")
             return self.tokens[i]
         raise NoMoreTokens()
-    
+
     def __repr__(self):
         """
         Print the last 10 tokens that have been scanned in
@@ -3112,7 +3112,7 @@ class Scanner(object):
         for t in self.tokens[-10:]:
             output = "%s\n  (@%s)  %s  =  %s" % (output, t[0], t[2], repr(t[3]))
         return output
-    
+
     def scan(self, restrict):
         """
         Should scan another token and add it to the list, self.tokens,
@@ -3134,7 +3134,7 @@ class Scanner(object):
                     best_pat = p
                     best_match = len(m.group(0))
                     break
-                    
+
             # If we didn't find anything, raise an error
             if best_pat == '(error)' and best_match < 0:
                 msg = "Bad Token"
@@ -3178,7 +3178,7 @@ class Parser(object):
         """
         tok = self._scanner.token(self._pos, types)
         return tok[2]
-        
+
     def _scan(self, type):
         """
         Returns the matched text, and moves to the next token
@@ -3236,7 +3236,7 @@ class Calculator(Parser):
     def expr(self, C,O):
         and_test = self.and_test(C,O)
         v = and_test
-        while self._peek('OR', 'NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'OR':
+        while self._peek('OR', 'NOT', 'INV', 'COMMA', 'SIGN', 'ADD', 'RPAR', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') == 'OR':
             OR = self._scan('OR')
             and_test = self.and_test(C,O)
             v = v or and_test
@@ -3245,7 +3245,7 @@ class Calculator(Parser):
     def and_test(self, C,O):
         not_test = self.not_test(C,O)
         v = not_test
-        while self._peek('AND', 'OR', 'NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'AND':
+        while self._peek('AND', 'OR', 'NOT', 'INV', 'COMMA', 'SIGN', 'ADD', 'RPAR', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') == 'AND':
             AND = self._scan('AND')
             not_test = self.not_test(C,O)
             v = v and not_test
@@ -3267,62 +3267,44 @@ class Calculator(Parser):
                     INV = self._scan('INV')
                     not_test = self.not_test(C,O)
                     v = _inv('!', not_test)
-                if self._peek('NOT', 'INV', 'AND', 'OR', 'COMMA', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') not in ['NOT', 'INV']: break
+                if self._peek('NOT', 'INV', 'AND', 'OR', 'COMMA', 'SIGN', 'ADD', 'RPAR', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') not in ['NOT', 'INV']: break
             return v
 
     def comparison(self, C,O):
-        or_expr = self.or_expr(C,O)
-        v = or_expr
-        while self._peek('LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'OR', 'COMMA', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['LT', 'GT', 'LE', 'GE', 'EQ', 'NE']:
+        a_expr = self.a_expr(C,O)
+        v = a_expr
+        while self._peek('LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'OR', 'COMMA', 'SIGN', 'ADD', 'RPAR', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') in ['LT', 'GT', 'LE', 'GE', 'EQ', 'NE']:
             _token_ = self._peek('LT', 'GT', 'LE', 'GE', 'EQ', 'NE')
             if _token_ == 'LT':
                 LT = self._scan('LT')
-                or_expr = self.or_expr(C,O)
-                v = v < or_expr
+                a_expr = self.a_expr(C,O)
+                v = v < a_expr
             elif _token_ == 'GT':
                 GT = self._scan('GT')
-                or_expr = self.or_expr(C,O)
-                v = v > or_expr
+                a_expr = self.a_expr(C,O)
+                v = v > a_expr
             elif _token_ == 'LE':
                 LE = self._scan('LE')
-                or_expr = self.or_expr(C,O)
-                v = v <= or_expr
+                a_expr = self.a_expr(C,O)
+                v = v <= a_expr
             elif _token_ == 'GE':
                 GE = self._scan('GE')
-                or_expr = self.or_expr(C,O)
-                v = v >= or_expr
+                a_expr = self.a_expr(C,O)
+                v = v >= a_expr
             elif _token_ == 'EQ':
                 EQ = self._scan('EQ')
-                or_expr = self.or_expr(C,O)
-                v = v == or_expr
+                a_expr = self.a_expr(C,O)
+                v = v == a_expr
             else:# == 'NE'
                 NE = self._scan('NE')
-                or_expr = self.or_expr(C,O)
-                v = v != or_expr
-        return v
-
-    def or_expr(self, C,O):
-        and_expr = self.and_expr(C,O)
-        v = and_expr
-        while self._peek('OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'OR':
-            OR = self._scan('OR')
-            and_expr = self.and_expr(C,O)
-            v = v or and_expr
-        return v
-
-    def and_expr(self, C,O):
-        a_expr = self.a_expr(C,O)
-        v = a_expr
-        while self._peek('AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'AND':
-            AND = self._scan('AND')
-            a_expr = self.a_expr(C,O)
-            v = v and a_expr
+                a_expr = self.a_expr(C,O)
+                v = v != a_expr
         return v
 
     def a_expr(self, C,O):
         m_expr = self.m_expr(C,O)
         v = m_expr
-        while self._peek('ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['ADD', 'SUB']:
+        while self._peek('ADD', 'SUB', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'OR', 'COMMA', 'SIGN', 'RPAR', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') in ['ADD', 'SUB']:
             _token_ = self._peek('ADD', 'SUB')
             if _token_ == 'ADD':
                 ADD = self._scan('ADD')
@@ -3337,7 +3319,7 @@ class Calculator(Parser):
     def m_expr(self, C,O):
         u_expr = self.u_expr(C,O)
         v = u_expr
-        while self._peek('MUL', 'DIV', 'ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') in ['MUL', 'DIV']:
+        while self._peek('MUL', 'DIV', 'ADD', 'SUB', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'OR', 'COMMA', 'SIGN', 'RPAR', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') in ['MUL', 'DIV']:
             _token_ = self._peek('MUL', 'DIV')
             if _token_ == 'MUL':
                 MUL = self._scan('MUL')
@@ -3362,7 +3344,7 @@ class Calculator(Parser):
         else:# in ['LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR']
             atom = self.atom(C,O)
             v = atom
-            if self._peek('UNITS', 'MUL', 'DIV', 'ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'UNITS':
+            if self._peek('UNITS', 'MUL', 'DIV', 'ADD', 'SUB', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'OR', 'COMMA', 'SIGN', 'RPAR', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') == 'UNITS':
                 UNITS = self._scan('UNITS')
                 v = call(UNITS, ListValue(ParserValue({ 0: v, 1: UNITS })), C, O, False)
             return v
@@ -3377,7 +3359,7 @@ class Calculator(Parser):
         elif _token_ == 'ID':
             ID = self._scan('ID')
             v = ID
-            if self._peek('LPAR', 'UNITS', 'MUL', 'DIV', 'ADD', 'SUB', 'AND', 'OR', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'LPAR':
+            if self._peek('LPAR', 'UNITS', 'MUL', 'DIV', 'ADD', 'SUB', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'OR', 'COMMA', 'SIGN', 'RPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') == 'LPAR':
                 v = None
                 LPAR = self._scan('LPAR')
                 if self._peek('RPAR', 'VAR', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') != 'RPAR':
@@ -3425,7 +3407,7 @@ class Calculator(Parser):
     def expr_slst(self, C,O):
         expr = self.expr(C,O)
         v = { 0: expr }
-        while self._peek('NOT', 'INV', 'COMMA', 'RPAR', 'END', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') not in ['COMMA', 'RPAR', 'END']:
+        while self._peek('NOT', 'INV', 'COMMA', 'SIGN', 'ADD', 'RPAR', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') not in ['COMMA', 'RPAR', 'END']:
             expr = self.expr(C,O)
             v[len(v)] = expr
         return ListValue(ParserValue(v)) if len(v) > 1 else v[0]
@@ -4231,7 +4213,7 @@ TESTS
 ...   $perc: ($t / $c) * 100%;
 ...   @return $perc;
 ... }
-... 
+...
 ... a {
 ...   width: percent-width(12, 80);
 ... }
