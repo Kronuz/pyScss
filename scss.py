@@ -2343,7 +2343,7 @@ def _elements_of_type(display):
     d = StringValue(display)
     ret = __elements_of_type.get(d.value, [])
     ret['_'] = ','
-    return ret
+    return ListValue(ret)
 
 def _nest(*arguments):
     ret = [ s.strip() for s in StringValue(arguments[0]).value.split(',') if s.strip() ]
