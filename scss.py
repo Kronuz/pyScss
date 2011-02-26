@@ -1503,12 +1503,13 @@ def _hsla(h, s, l, a, type='hsla'):
 def __rgba_op(op, color, r, g, b, a):
     color = ColorValue(color)
     c = color.value
-    a = (
+    a = [
         NumberValue(r).value if r is not None else None,
         NumberValue(g).value if g is not None else None,
         NumberValue(b).value if b is not None else None,
         NumberValue(a).value if a is not None else None,
-    )
+    ]
+    a = [ a / 255.0 if a > 1 else a for a in a ]
     # Do the additions:
     c = [ op(c[i], a[i]) if op is not None and a[i] is not None else a[i] if a[i] is not None else c[i] for i in range(4) ]
     # Validations:
@@ -1526,11 +1527,12 @@ def _transparentize(color, amount):
 def __hsl_op(op, color, h, s, l):
     color = ColorValue(color)
     c = color.value
-    a = (
+    a = [
         NumberValue(h).value / 360.0 if h is not None else None,
         NumberValue(s).value if s is not None else None,
         NumberValue(l).value if l is not None else None,
-    )
+    ]
+    a = [ a / 255.0 if a > 1 else a for a in a ]
     # Convert to HSL:
     h, l, s = list(colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0))
     c = h, s, l
