@@ -739,7 +739,9 @@ class Scss(object):
             if c_property.startswith('@'):
                 code, name = (c_property.split(None, 1)+[''])[:2]
                 if code == '@warn':
-                    err = "Warning: %s" % self.apply_vars(dequote(name), rule[CONTEXT], rule[OPTIONS])
+                    name = self.apply_vars(name, rule[CONTEXT], rule[OPTIONS])
+                    name = self.calculate(name, rule[CONTEXT], rule[OPTIONS])
+                    err = "Warning: %s" % dequote(name)
                     print >>sys.stderr, err
                 elif code == '@option':
                     self._settle_options(rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name)
@@ -1504,12 +1506,11 @@ def __rgba_op(op, color, r, g, b, a):
     color = ColorValue(color)
     c = color.value
     a = [
-        NumberValue(r).value if r is not None else None,
-        NumberValue(g).value if g is not None else None,
-        NumberValue(b).value if b is not None else None,
-        NumberValue(a).value if a is not None else None,
+        None if r is None else NumberValue(r).value,
+        None if g is None else NumberValue(g).value,
+        None if b is None else NumberValue(b).value,
+        None if a is None else NumberValue(a).value,
     ]
-    a = [ a / 100.0 if a > 1 else a for a in a ]
     # Do the additions:
     c = [ op(c[i], a[i]) if op is not None and a[i] is not None else a[i] if a[i] is not None else c[i] for i in range(4) ]
     # Validations:
@@ -1527,12 +1528,14 @@ def _transparentize(color, amount):
 def __hsl_op(op, color, h, s, l):
     color = ColorValue(color)
     c = color.value
+    h = None if h is None else NumberValue(h)
+    s = None if s is None else NumberValue(s)
+    l = None if l is None else NumberValue(l)
     a = [
-        NumberValue(h).value / 360.0 if h is not None else None,
-        NumberValue(s).value if s is not None else None,
-        NumberValue(l).value if l is not None else None,
+        None if h is None else h.value / 360.0,
+        None if s is None else s.value / 100.0 if s.unit != '%' and s.value >= 1 else s.value,
+        None if l is None else l.value / 100.0 if l.unit != '%' and l.value >= 1 else l.value,
     ]
-    a = [ a / 100.0 if a > 1 else a for a in a ]
     # Convert to HSL:
     h, l, s = list(colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0))
     c = h, s, l
@@ -1706,19 +1709,22 @@ def _lightness(color):
     return ret
 
 def __color_stops(percentages, *args):
-    if isinstance(args[0], StringValue):
-        color_stops = []
-        colors = split_params(args[0].value)
-        for color in colors:
-            color = color.strip()
-            if color.startswith('color-stop('):
-                s, c = split_params(color[11:].rstrip(')'))
-                s = s.strip()
-                c = c.strip()
-            else:
-                c, s = color.split()
-            color_stops.append((to_float(s), c))
-        return color_stops
+    if len(args) == 1:
+        if isinstance(args[0], list):
+            return args[0]
+        elif isinstance(args[0], StringValue):
+            color_stops = []
+            colors = split_params(args[0].value)
+            for color in colors:
+                color = color.strip()
+                if color.startswith('color-stop('):
+                    s, c = split_params(color[11:].rstrip(')'))
+                    s = s.strip()
+                    c = c.strip()
+                else:
+                    c, s = color.split()
+                color_stops.append((to_float(s), c))
+            return color_stops
 
     colors = []
     stops = []
@@ -1780,6 +1786,23 @@ def _grad_color_stops(*args):
     ret = ', '.join([ 'color-stop(%s, %s)' % (to_str(s), c) for s,c in color_stops ])
     return StringValue(ret)
 
+def __grad_end_position(radial, color_stops):
+    return __grad_position(-1, 100, radial, color_stops)
+
+def __grad_position(index, default, radial, color_stops):
+    try:
+        stops = NumberValue(color_stops[index][0])
+        if radial and stops.unit != 'px' and (index == 0 or index == -1 or index == len(color_stops) -1):
+            err = "Warning: Webkit only supports pixels for the start and end stops for radial gradients. Got %s" % stops
+            print >>sys.stderr, err
+    except IndexError:
+        stops = NumberValue(default)
+    return stops
+
+def _grad_end_position(*color_stops):
+    color_stops = __color_stops(False, *color_stops)
+    return NumberValue(__grad_end_position(False, color_stops))
+
 def _color_stops(*args):
     color_stops = __color_stops(False, *args)
     ret = ', '.join([ '%s %s' % (c, to_str(s)) for s,c in color_stops ])
@@ -1790,7 +1813,6 @@ def _color_stops_in_percentages(*args):
     ret = ', '.join([ '%s %s' % (c, to_str(s)) for s,c in color_stops ])
     return StringValue(ret)
 
-#TODO: Make use of these SVG functions:
 def _radial_gradient(*args):
     color_stops = args
     position_and_angle = None
@@ -1803,7 +1825,7 @@ def _radial_gradient(*args):
         else:
             color_stops = args[1:]
     
-    color_stops = __color_stops(True, *color_stops)
+    color_stops = __color_stops(False, *color_stops)
 
     args = [
         position_and_angle if position_and_angle is not None else None,
@@ -1818,7 +1840,8 @@ def _radial_gradient(*args):
     ret.to__moz = to__moz
 
     def to__pie():
-        return StringValue('-pie-' + to__s)
+        print >>sys.stderr, "Warning: PIE does not support radial-gradient."
+        return StringValue('-pie-radial-gradient(unsupported)')
     ret.to__pie = to__pie
 
     def to__css2():
@@ -1831,12 +1854,16 @@ def _radial_gradient(*args):
             _grad_point(position_and_angle) if position_and_angle is not None else 'center',
             '0',
             _grad_point(position_and_angle) if position_and_angle is not None else 'center',
-            _grad_end_position(color_stops),
+            __grad_end_position(True, color_stops),
         ]
         args.extend('color-stop(%s, %s)' % (to_str(s), c) for s,c in color_stops)
         ret = '-webkit-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
         return StringValue(ret)
     ret.to__webkit = to__webkit
+
+    def to__svg():
+        return _radial_svg_gradient(color_stops, position_and_angle or 'center')
+    ret.to__svg = to__svg
 
     return ret
 
@@ -1847,7 +1874,7 @@ def _linear_gradient(*args):
         position_and_angle = args[0]
         color_stops = args[1:]
 
-    color_stops = __color_stops(True, *color_stops)
+    color_stops = __color_stops(False, *color_stops)
     
     args = [
         position_and_angle if position_and_angle is not None else None,
@@ -1878,40 +1905,75 @@ def _linear_gradient(*args):
         ret = '-webkit-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
         return StringValue(ret)
     ret.to__webkit = to__webkit
-    
+
+    def to__svg():
+        return _linear_svg_gradient(color_stops, position_and_angle or 'top')
+    ret.to__svg = to__svg
+
     return ret
 
-def __color_stops_svg(*args):
-    color_stops = __color_stops(*args)
+def _radial_svg_gradient(*args):
+    color_stops = args
+    center = None
+    if isinstance(args[-1], (StringValue, NumberValue)):
+        center = args[-1]
+        color_stops = args[:-1]
+    if len(color_stops) == 1 and isinstance(color_stops[0], list):
+        color_stops = color_stops[0]
+    color_stops = __color_stops(False, *color_stops)
+    cx, cy = zip(*_grad_point(center).items())[1]
+    r = __grad_end_position(True, color_stops)
+    svg = __radial_svg(color_stops, cx, cy, r)
+    url = 'data:' + 'image/svg+xml' + ';base64,' + base64.b64encode(svg)
+    inline = 'url("%s")' % escape(url)
+    return StringValue(inline)
+
+def _linear_svg_gradient(*args):
+    color_stops = args
+    start = None
+    if isinstance(args[-1], (StringValue, NumberValue)):
+        start = args[-1]
+        color_stops = args[:-1]
+    if len(color_stops) == 1 and isinstance(color_stops[0], list):
+        color_stops = color_stops[0]
+    color_stops = __color_stops(False, *color_stops)
+    x1, y1 = zip(*_grad_point(start).items())[1]
+    x2, y2 = zip(*_grad_point(_opposite_position(start)).items())[1]
+    svg = __linear_svg(color_stops, x1, y1, x2, y2)
+    url = 'data:' + 'image/svg+xml' + ';base64,' + base64.b64encode(svg)
+    inline = 'url("%s")' % escape(url)
+    return StringValue(inline)
+
+def __color_stops_svg(color_stops):
     ret = ''.join('<stop offset="%s" stop-color="%s"/>' % (to_str(s), c) for s,c in color_stops )
     return ret
 
-def __svg(gradient):
+def __svg_template(gradient):
     ret = '<?xml version="1.0" encoding="utf-8"?>\
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg">\
 <defs>%s</defs>\
-<rect x="0" y="0" width="100%" height="100%" fill="url(#grad)" />\
+<rect x="0" y="0" width="100%%" height="100%%" fill="url(#grad)" />\
 </svg>' % gradient
     return ret
 
-def _linear_svg(color_stops, x1, y1, x2, y2):
-  gradient = '<linearGradient id="grad" x1="%s" y1="%s" x2="%s" y2="%s">%s</linearGradient>' % (
-    to_str(NumberValue(x1)),
-    to_str(NumberValue(y1)),
-    to_str(NumberValue(x2)),
-    to_str(NumberValue(y2)),
-    __color_stops_svg(color_stops)
-  )
-  return __svg(gradient)
+def __linear_svg(color_stops, x1, y1, x2, y2):
+    gradient = '<linearGradient id="grad" x1="%s" y1="%s" x2="%s" y2="%s">%s</linearGradient>' % (
+        to_str(NumberValue(x1)),
+        to_str(NumberValue(y1)),
+        to_str(NumberValue(x2)),
+        to_str(NumberValue(y2)),
+        __color_stops_svg(color_stops)
+    )
+    return __svg_template(gradient)
 
-def _radial_svg(color_stops, cx, cy, r):
-  gradient = '<radialGradient id="grad" gradientUnits="userSpaceOnUse" cx="%s" cy="%s" r="%s">%s</radialGradient>' %(
-    to_str(NumberValue(cx)),
-    to_str(NumberValue(cy)),
-    to_str(NumberValue(r)),
-    __color_stops_svg(color_stops)
-  )
-  return __svg(gradient)
+def __radial_svg(color_stops, cx, cy, r):
+    gradient = '<radialGradient id="grad" gradientUnits="userSpaceOnUse" cx="%s" cy="%s" r="%s">%s</radialGradient>' %(
+        to_str(NumberValue(cx)),
+        to_str(NumberValue(cy)),
+        to_str(NumberValue(r)),
+        __color_stops_svg(color_stops)
+    )
+    return __svg_template(gradient)
 
 ################################################################################
 # Compass like functionality for sprites and images:
@@ -2236,41 +2298,40 @@ def _image_height(image):
 ################################################################################
 def _opposite_position(*p):
     pos = set()
-    new_pos = set()
+    hrz = vrt = None
     for _p in p:
         pos.update(StringValue(_p).value.split())
-    if 'center' in pos:
-        new_pos.add('center')
     if 'left' in pos:
-        new_pos.add('right')
+        hrz = 'right'
     elif 'right' in pos:
-        new_pos.add('right')
+        hrz = 'left'
+    elif 'center' in pos:
+        hrz = 'center'
     if 'top' in pos:
-        new_pos.add('bottom')
+        vrt = 'bottom'
     elif 'bottom' in pos:
-        new_pos.add('top')
-    val = ' '.join(new_pos)
-    return StringValue(val)
+        vrt = 'top'
+    elif 'center' in pos:
+        vrt = 'center'
+    if hrz == vrt:
+        vrt = None
+    return ListValue(v for v in (hrz, vrt) if v is not None)
 
 def _grad_point(*p):
     pos = set()
-    hrz = vrt = 50
+    hrz = vrt = NumberValue(0.5, '%')
     for _p in p:
         pos.update(StringValue(_p).value.split())
     if 'left' in pos:
-        hrz = 0
+        hrz = NumberValue(0, '%')
     elif 'right' in pos:
-        hrz = 100
+        hrz = NumberValue(1, '%')
     if 'top' in pos:
-        vrt = 0
+        vrt = NumberValue(0, '%')
     elif 'bottom' in pos:
-        vrt = 100
-    val = '%s%% %s%%' % (hrz, vrt)
-    return val
+        vrt = NumberValue(1, '%')
+    return ListValue(list(v for v in (hrz, vrt) if v is not None))
 
-def _grad_end_position(*p):
-    #TODO: Implement!
-    pass
 
 ################################################################################
 
@@ -2398,11 +2459,11 @@ def _prefix(prefix, *args):
     for i, arg in enumerate(args):
         if isinstance(arg, ListValue):
             for k, iarg in arg.value.items():
-                to_fnct = getattr(iarg, to_fnct_str)
+                to_fnct = getattr(iarg, to_fnct_str, None)
                 if to_fnct:
                     arg.value[k] = to_fnct()
         else:
-            to_fnct = getattr(arg, to_fnct_str)
+            to_fnct = getattr(arg, to_fnct_str, None)
             if to_fnct:
                 args[i] = to_fnct()
     if len(args) == 1:
@@ -2845,6 +2906,8 @@ class ListValue(Value):
         return len(self.items())
     def __str__(self):
         return to_str(self.value)
+    def __tuple__(self):
+        return tuple(sorted((k, v) for k, v in value.items() if k != '_'))
     def items(self):
         value = self.value
         if len(value) - (1 if '_' in value else 0) == 1:
@@ -3073,11 +3136,14 @@ fnct = {
 
     'opposite-position:n': _opposite_position,
     'grad-point:n': _grad_point,
+    'grad-end-position:n': _grad_end_position,
     'color-stops:n': _color_stops,
     'color-stops-in-percentages:n': _color_stops_in_percentages,
     'grad-color-stops:n': _grad_color_stops,
     'radial-gradient:n': _radial_gradient,
     'linear-gradient:n': _linear_gradient,
+    'radial-svg-gradient:n': _radial_svg_gradient,
+    'linear-svg-gradient:n': _linear_svg_gradient,
 
     'opacify:2': _opacify,
     'fadein:2': _opacify,
