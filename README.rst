@@ -1,7 +1,7 @@
 pyScss, a Scss compiler for Python
 ==================================
 :Author:
-    German M. Bravo (Kronuz) <german.mb@gmail.com>
+	German M. Bravo (Kronuz) <german.mb@gmail.com>
 
 About
 =====
@@ -20,200 +20,212 @@ syntax and functionality.
 
 Support
 ========
-pyScss has most of the funcitonality in Sass 3.2 ...it supports:
+pyScss is fully compatible with SCSS (Sass) 3.2 ...it has:
 
-    * **Compass**: Compass 0.11 Support
-    * **Nested rules**
-    * **Keyword arguments**
-    * **Mixins**: `@mixin`, `@include`
-    * **Functions**: `@function`, `@return`
-    * **Inheritance**: `@extend`
-    * **Conditions**: `@if`, `@else if`, `@else`
-    * **Loops**: `@for`, `@each`
-    * **Variables**: `$`, `@variables`, `@vars`
-    * **Sprites**: `sprite-map()`, `sprite()`, `sprite-position()`, `sprite-url()`, ...
-    * **Images**: `image-url()`, `image-width()`, `image-height()`, ...
-    * **Embedded (inline) images**: `inline-image()`
-    * **Colors handling**: `adjust-color()`, `scale-color()`, `opacify()`/`transparentize()`, `lighten()`/`darken()`, `mix()`, ...
-    * **Math functions**: `sin()`, `cos()`, `tan()`, `round()`, `ceil()`, `floor()`, `pi()`, ...
-    * **CSS Compression**: `@option compress:yes;`
+	* **Compass**: Compass 0.11 Support
+	* **Nested rules**
+	* **Keyword arguments**
+	* **Mixins**: `@mixin`, `@include`
+	* **Functions**: `@function`, `@return`
+	* **Inheritance**: `@extend`
+	* **Conditions**: `@if`, `@else if`, `@else`
+	* **Loops**: `@for`, `@each`
+	* **Variables**: `$`, `@variables`, `@vars`
+	* **Sprites**: `sprite-map()`, `sprite()`, `sprite-position()`, `sprite-url()`, ...
+	* **Images**: `image-url()`, `image-width()`, `image-height()`, ...
+	* **Embedded (inline) images**: `inline-image()`
+	* **Colors handling**: `adjust-color()`, `scale-color()`, `opacify()`/`transparentize()`, `lighten()`/`darken()`, `mix()`, ...
+	* **Math functions**: `sin()`, `cos()`, `tan()`, `round()`, `ceil()`, `floor()`, `pi()`, ...
+	* **CSS Compression**: `@option compress:yes;`
+
+Requirements
+============
+	* python >= 2.5
+
+Installation
+============
+pyScss should be installed using pip or setuptools::
+
+	pip install scss
+
+	easy_install scss
 
 Usage
 =====
 Usage example::
 
-    from scss import Scss
-    css = Scss()
-    css.compile("a { color: red + green; }")
+	from scss import Scss
+	css = Scss()
+	css.compile("a { color: red + green; }")
 
 Or compile from the command line::
 
-    python scss.py < file.scss
+	python scss.py < file.scss
 
 Interactive mode::
 
-    python scss.py --interactive
+	python scss.py --interactive
 
 Examples
 ========
 #. **Nested Rules**
-    Example::
+	Example::
 
-	@option compress: no;
-	.selector {
-	    a {
-		display: block;
-	    }
-	    strong {
-		color: blue;
-	    }
-	}
+		@option compress: no;
+		.selector {
+			a {
+				display: block;
+			}
+			strong {
+				color: blue;
+			}
+		}
 
-    ...produces::
+	...produces::
 
-	.selector a {
-	    display: block;
-	}
-	.selector strong {
-	    color: #00f;
-	}
+		.selector a {
+			display: block;
+		}
+		.selector strong {
+			color: #00f;
+		}
 
 #. **Variables**
-    Example::
+	Example::
 
-	@option compress: no;
-	$main-color: #ce4dd6;
-	$style: solid;
-	$side: bottom;
-	#navbar {
-	  border-#{$side}: {
-	    color: $main-color;
-	    style: $style;
-	  }
-	}
+		@option compress: no;
+		$main-color: #ce4dd6;
+		$style: solid;
+		$side: bottom;
+		#navbar {
+		  border-#{$side}: {
+			color: $main-color;
+			style: $style;
+		  }
+		}
 
-    ...produces::
+	...produces::
 
-	#navbar {
-		border-bottom-color: #ce4dd6;
-		border-bottom-style: solid;
-	}
+		#navbar {
+				border-bottom-color: #ce4dd6;
+				border-bottom-style: solid;
+		}
 
 #. **Mixins**
-    Example::
+	Example::
 
-	@option compress: no;
-	@mixin rounded($side, $radius: 10px) {
-	  border-#{$side}-radius: $radius;
-	  -moz-border-radius-#{$side}: $radius;
-	  -webkit-border-#{$side}-radius: $radius;
-	}
-	#navbar li { @include rounded(top); }
-	#footer { @include rounded(top, 5px); }
-	#sidebar { @include rounded(left, 8px); }
+		@option compress: no;
+		@mixin rounded($side, $radius: 10px) {
+		  border-#{$side}-radius: $radius;
+		  -moz-border-radius-#{$side}: $radius;
+		  -webkit-border-#{$side}-radius: $radius;
+		}
+		#navbar li { @include rounded(top); }
+		#footer { @include rounded(top, 5px); }
+		#sidebar { @include rounded(left, 8px); }
 
-    ...produces::
+	...produces::
 
-	#navbar li {
-		border-top-radius: 10px;
-		-moz-border-radius-top: 10px;
-		-webkit-border-top-radius: 10px;
-	}
-	#footer {
-		border-top-radius: 5px;
-		-moz-border-radius-top: 5px;
-		-webkit-border-top-radius: 5px;
-	}
-	#sidebar {
-		border-left-radius: 8px;
-		-moz-border-radius-left: 8px;
-		-webkit-border-left-radius: 8px;
-	}
+		#navbar li {
+				border-top-radius: 10px;
+				-moz-border-radius-top: 10px;
+				-webkit-border-top-radius: 10px;
+		}
+		#footer {
+				border-top-radius: 5px;
+				-moz-border-radius-top: 5px;
+				-webkit-border-top-radius: 5px;
+		}
+		#sidebar {
+				border-left-radius: 8px;
+				-moz-border-radius-left: 8px;
+				-webkit-border-left-radius: 8px;
+		}
 
 #. **Extend** (using `@extend`)
-    Example::
+	Example::
 
-	@option compress: no;
-	.error {
-	  border: 1px #f00;
-	  background-color: #fdd;
-	}
-	.error.intrusion {
-	  background-image: url("/image/hacked.png");
-	}
-	.seriousError {
-	  @extend .error;
-	  border-width: 3px;
-	}
+		@option compress: no;
+		.error {
+		  border: 1px #f00;
+		  background-color: #fdd;
+		}
+		.error.intrusion {
+		  background-image: url("/image/hacked.png");
+		}
+		.seriousError {
+		  @extend .error;
+		  border-width: 3px;
+		}
 
-    ...produces::
+	...produces::
 
-	.error,
-	.seriousError {
-		border: 1px red;
-		background-color: #fdd;
-	}
-	.error.intrusion,
-	.seriousError.intrusion {
-		background-image: url("/image/hacked.png");
-	}
-	.seriousError {
-		border-width: 3px;
-	}
+		.error,
+		.seriousError {
+				border: 1px red;
+				background-color: #fdd;
+		}
+		.error.intrusion,
+		.seriousError.intrusion {
+				background-image: url("/image/hacked.png");
+		}
+		.seriousError {
+				border-width: 3px;
+		}
 
 
 #. **Sprites** (using `sprite-map()`)
-    Example::
+	Example::
 
-	@option compress: no;
-	$icons: sprite-map("sociable/*.png"); // contains sociable/facebook.png among others.
-	div {
-		background: $icons;
-	}
-	@each $icon in sprites($icons) {
-		div .$icon {
-			width: image-width(sprite-file($icons, $icon));
-			height: image-height(sprite-file($icons, $icon));
-			background-position: sprite-position($icons, $icon);
+		@option compress: no;
+		$icons: sprite-map("sociable/*.png"); // contains sociable/facebook.png among others.
+		div {
+				background: $icons;
 		}
-	}
+		@each $icon in sprites($icons) {
+				div .$icon {
+						width: image-width(sprite-file($icons, $icon));
+						height: image-height(sprite-file($icons, $icon));
+						background-position: sprite-position($icons, $icon);
+				}
+		}
 
-    ...generates a new sprite file and produces something like::
+	...generates a new sprite file and produces something like::
 
-	div {
-		background: url("/media/assets/u8Y7yEQL0UffAVw5rX7yhw.png?_=1298240989") 0px 0px no-repeat;
-	}
-	div .facebook {
-		width: 32px;
-		height: 32px;
-		background-position: 0px 0px;
-	}
-	div .twitter {
-		width: 32px;
-		height: 32px;
-		background-position: 0px -32px;
-	}
-	...
+		div {
+				background: url("/media/assets/u8Y7yEQL0UffAVw5rX7yhw.png?_=1298240989") 0px 0px no-repeat;
+		}
+		div .facebook {
+				width: 32px;
+				height: 32px;
+				background-position: 0px 0px;
+		}
+		div .twitter {
+				width: 32px;
+				height: 32px;
+				background-position: 0px -32px;
+		}
+		...
 
 #. **Interactive mode**
-    Example::
+	Example::
 
-	$ python scss.py --interactive
-	>>> @import "compass/css3"
-	>>> show()
-	['functions', 'mixins', 'options', 'vars']
-	>>> show(mixins)
-	['apply-origin',
-	 'apply-transform',
-	 ...
-	 'transparent']
-	>>> show(mixins, transparent)
-	@mixin transparent() {
-	  @include opacity(0);
-	}
-	>>> 1px + 5px
-	6px
-	>>> _
+		$ python scss.py --interactive
+		>>> @import "compass/css3"
+		>>> show()
+		['functions', 'mixins', 'options', 'vars']
+		>>> show(mixins)
+		['apply-origin',
+		 'apply-transform',
+		 ...
+		 'transparent']
+		>>> show(mixins, transparent)
+		@mixin transparent() {
+		  @include opacity(0);
+		}
+		>>> 1px + 5px
+		6px
+		>>> _
 
 Sass Sassy CSS
 ==============
@@ -232,32 +244,42 @@ Compass framework path (I have `frameworks/compass/*.scss` and
 I have succesfully compiled some Compass using `python scss.py < myfile.css` the
 following `myfile.css`::
 
-	@option compress: no;
+		@option compress: no;
 
-	$blueprint-grid-columns : 24;
-	$blueprint-grid-width   : 30px;
-	$blueprint-grid-margin  : 10px;
-	$font-color	     : #333;
+		$blueprint-grid-columns : 24;
+		$blueprint-grid-width   : 30px;
+		$blueprint-grid-margin  : 10px;
+		$font-color			 : #333;
 
-	@import "compass/reset";
-	@import "compass/utilities";
-	@import "blueprint";
+		@import "compass/reset";
+		@import "compass/utilities";
+		@import "blueprint";
 
-	// Stuff goes here...
+		// Stuff goes here...
 
 Benchmarks
 ==========
-    pyScss has been optimized for speed. Compiling **Compass 0.11.beta.2**
-    (`compass/doc-src/content/stylesheets/screen.scss`)
-    
-    ...using **Sass 3.1.0.alpha.221**::
+pyScss has been optimized for speed. Compiling **Compass 0.11.beta.2**
+(`compass/doc-src/content/stylesheets/screen.scss`)
+
+...using **Sass 3.1.0.alpha.221**::
 
 	Compilation took 2.683s (w/o cache)
 	Compilation took 1.35s  (cached)
-    
-    ...using **pyScss 1.0 beta**::
+
+...using **pyScss 1.0 beta**::
 
 	Compilation took 0.614s
+
+Bug tracker
+===========
+If you have any suggestions, bug reports or annoyances please report them to the
+issue tracker at http://github.com/Kronuz/pyScss/issues
+
+
+Contributing
+============
+Development of pyScss happens at github: https://github.com/Kronuz/pyScss
 
 License
 =======
@@ -266,15 +288,15 @@ http://www.opensource.org/licenses/mit-license.php
 
 Copyright
 =========
-	Copyright (c) 2011 German M. Bravo (Kronuz)
-	*Bits of code in pyScss come from various projects:*
+Copyright (c) 2011 German M. Bravo (Kronuz)
+*Bits of code in pyScss come from various projects:*
 
-	Compass:
-	    (c) 2009 Christopher M. Eppstein
-	    http://compass-style.org/
-	Sass:
-	    (c) 2006-2009 Hampton Catlin and Nathan Weizenbaum
-	    http://sass-lang.com/
-	xCSS:
-	    (c) 2010 Anton Pawlik
-	    http://xcss.antpaw.org/docs/
+Compass:
+	(c) 2009 Christopher M. Eppstein
+	http://compass-style.org/
+Sass:
+	(c) 2006-2009 Hampton Catlin and Nathan Weizenbaum
+	http://sass-lang.com/
+xCSS:
+	(c) 2010 Anton Pawlik
+	http://xcss.antpaw.org/docs/

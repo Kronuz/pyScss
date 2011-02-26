@@ -3,8 +3,8 @@
 """
 pyScss, a Scss compiler for Python
 
-@author     German M. Bravo (Kronuz)
-@version    1.0 beta 3
+@author     German M. Bravo (Kronuz) <german.mb@gmail.com>
+@version    1.0 rc1
 @see        https://github.com/Kronuz/pyScss
 @copyright  (c) 2011 German M. Bravo (Kronuz)
 @license    MIT License
@@ -36,7 +36,19 @@ xCSS:
 
 """
 
-VERSION = "pyScss v1.0 beta 3 (20110219)"
+VERSION_INFO = (1, 0, 0)
+BUILD_INFO = "pyScss v1.0 rc1 (20110226)"
+AUTHOR = "German M. Bravo (Kronuz)"
+AUTHOR_EMAIL = '<german.mb@gmail.com>'
+URL = 'http://github.com/Kronuz/pyScss'
+DOWNLOAD_URL = 'http://github.com/Kronuz/pyScss/tarball/v1.0rc1'
+LICENSE = "MIT"
+PROJECT = __name__
+
+__project__ = PROJECT
+__version__ = VERSION = '.'.join(str(i) for i in VERSION_INFO)
+__author__ = AUTHOR + ' ' + AUTHOR_EMAIL
+__license__ = LICENSE
 
 ################################################################################
 # Configuration:
@@ -4801,14 +4813,14 @@ def main():
         elif '-h' in opts or '--help' in opts:
             usage()
         elif '-v' in opts or '--version' in opts:
-            print VERSION
+            print BUILD_INFO
             sys.exit(2)
         elif '-i' in opts or '--interactive' in opts:
             from pprint import pprint
             css = Scss()
             context = css.scss_vars
             options = css.scss_opts
-            print 'Welcome to ' + VERSION + " interactive shell"
+            print 'Welcome to ' + BUILD_INFO + " interactive shell"
             while True:
                 try: s = raw_input('>>> ').strip()
                 except EOFError: print ''; break
