@@ -2384,19 +2384,32 @@ def _prefixed(prefix, *args):
     to_fnct_str = 'to_' + to_str(prefix).replace('-', '_')
     for arg in args:
         if isinstance(arg, ListValue):
-            for iarg in arg.value.items():
+            for k, iarg in arg.value.items():
                 if hasattr(iarg, to_fnct_str):
                     return BooleanValue(True)
-            return BooleanValue(False)
-        return BooleanValue(hasattr(arg, to_fnct_str))
+        else:
+            if hasattr(arg, to_fnct_str):
+                return BooleanValue(True)
+    return BooleanValue(False)
 
 def _prefix(prefix, *args):
     to_fnct_str = 'to_' + to_str(prefix).replace('-', '_')
-    for arg in args:
-        to_fnct = getattr(arg, to_fnct_str)
-        if to_fnct:
-            return to_fnct()
-        return arg
+    args = list(args)
+    for i, arg in enumerate(args):
+        if isinstance(arg, ListValue):
+            for k, iarg in arg.value.items():
+                to_fnct = getattr(iarg, to_fnct_str)
+                if to_fnct:
+                    arg.value[k] = to_fnct()
+        else:
+            to_fnct = getattr(arg, to_fnct_str)
+            if to_fnct:
+                args[i] = to_fnct()
+    if len(args) == 1:
+        return args[0]
+    ret = ListValue(args)
+    ret.value['_'] = ','
+    return ret
 
 def __moz(*args):
     return _prefix('_moz', *args)
