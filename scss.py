@@ -960,6 +960,8 @@ class Scss(object):
         Implements @if and @else if
         """
         if code != '@if':
+            if '@if' not in rule[OPTIONS]:
+                print >>sys.stderr, "Warning: @else with no @if!"
             val = rule[OPTIONS].get('@if', True)
             name = c_property[9:].strip()
         else:
@@ -969,16 +971,18 @@ class Scss(object):
             name = self.calculate(name, rule[CONTEXT], rule[OPTIONS])
             val = name and name.split()[0].lower()
             val = bool(False if not val or val in('0', 'false',) else val)
-            rule[OPTIONS]['@if'] = val
             if val:
                 rule[CODESTR] = c_codestr
                 self.manage_children(rule, p_selectors, p_parents, p_children, scope)
+            rule[OPTIONS]['@if'] = val
 
     @print_timing(10)
     def _do_else(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
         """
         Implements @else
         """
+        if '@if' not in rule[OPTIONS]:
+            print >>sys.stderr, "Warning: @else with no @if!"
         val = rule[OPTIONS].get('@if', True)
         if not val:
             rule[CODESTR] = c_codestr
