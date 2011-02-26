@@ -2848,9 +2848,13 @@ class NumberValue(Value):
             if first_unit == '%' and not second_unit:
                 second.units = { '%': _units_weights.get('%', 1), '_': '%' }
                 second.value /= 100.0
+            elif first_unit == '%' and second_unit != '%':
+                first = NumberValue(second) * first.value
             elif second_unit == '%' and not first_unit:
                 first.units = { '%': _units_weights.get('%', 1), '_': '%' }
                 first.value /= 100.0
+            elif second_unit == '%' and first_unit != '%':
+                second = NumberValue(first) * second.value
 
         val = op(first.value, second.value)
 
