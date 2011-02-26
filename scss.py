@@ -43,7 +43,7 @@ AUTHOR_EMAIL = '<german.mb@gmail.com>'
 URL = 'http://github.com/Kronuz/pyScss'
 DOWNLOAD_URL = 'http://github.com/Kronuz/pyScss/tarball/v1.0rc1'
 LICENSE = "MIT"
-PROJECT = __name__
+PROJECT = "pyScss"
 
 __project__ = PROJECT
 __version__ = VERSION = '.'.join(str(i) for i in VERSION_INFO)
