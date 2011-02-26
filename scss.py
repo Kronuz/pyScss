@@ -1703,6 +1703,7 @@ def _hue(color):
     c = ColorValue(color).value
     h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
     ret = NumberValue(h * 360.0)
+    ret.units = { 'deg': _units_weights.get('deg', 1), '_': 'deg' }
     return ret
 def _saturation(color):
     c = ColorValue(color).value
@@ -2877,6 +2878,8 @@ class NumberValue(Value):
         if not self.unit:
             val *= _conv_factor.get(type, 1.0)
         ret = NumberValue(val)
+        if type == 'deg':
+            ret.value = ret.value % 360.0
         ret.units = { type: _units_weights.get(type, 1), '_': type }
         return ret
     @property
@@ -4502,7 +4505,7 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 a {
 	color: rgb(87.254%, 48.482%, 37.546%);
 	color: hsl(13.2, 66.1%, 62.4%);
-	color-hue: 13.2;
+	color-hue: 13.2deg;
 	color-saturation: 66.101%;
 	color-lightness: 62.4%;
 }
