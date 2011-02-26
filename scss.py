@@ -293,15 +293,7 @@ _reverse_colors_re = re.compile(r'(?<![-\w$])(' + '|'.join(map(re.escape, _rever
 _colors_re = re.compile(r'(?<![-\w$])(' + '|'.join(map(re.escape, _colors))+r')(?![-\w])', re.IGNORECASE)
 
 _expr_glob_re = re.compile(r'''
-    \#\{.*?\}                   # Global Interpolation only
-''', re.VERBOSE)
-
-_expr_re = re.compile(r'''
-(?:
-    \#\{.*?\}                   # Global Interpolation only
-|
-    (?<=:\s)[^\{;}]+            # Any properties in rules
-)
+    \#\{(.*?)\}                   # Global Interpolation only
 ''', re.VERBOSE)
 
 _ml_comment_re = re.compile(r'\/\*(.*?)\*\/', re.DOTALL)
@@ -309,7 +301,7 @@ _sl_comment_re = re.compile(r'(?<!\w{2}:)\/\/.*')
 _zero_units_re = re.compile(r'\b0(' + '|'.join(map(re.escape, _units)) + r')(?!\w)', re.IGNORECASE)
 _zero_re = re.compile(r'\b0\.(?=\d)')
 
-_interpolate_re = re.compile(r'(\$[-\w]+)')
+_interpolate_re = re.compile(r'(#\{\s*)?(\$[-\w]+)(?(1)\s*\})')
 _spaces_re = re.compile(r'\s+')
 _expand_rules_space_re = re.compile(r'\s*{')
 _collapse_properties_space_re = re.compile(r'([:#])\s*{')
@@ -605,11 +597,11 @@ class Scss(object):
             flat_context[k] = v
         # Interpolate variables:
         def _av(m):
-            v = flat_context.get(m.group(1))
+            v = flat_context.get(m.group(2))
             if v:
-                if _dequote:
+                if _dequote and m.group(1):
                     v = dequote(v)
-                if ' ' in v:
+                if ' ' in v: #FIXME: Perhaps this "if" block is no longer needed?:
                     try:
                         if cont[m.start()-1] != '(' or cont[m.end()] != ')':
                             v = '(' + depar(v) + ')'
@@ -620,7 +612,7 @@ class Scss(object):
             return v if v is not None else m.group(0)
         cont = _interpolate_re.sub(_av, cont)
         if options is not None:
-            cont = self.do_glob_math(cont, context, options)
+            cont = self.do_glob_math(cont, context, options, _dequote)
         return cont
 
     @print_timing(2)
@@ -1355,17 +1347,13 @@ class Scss(object):
             self._replaces[_base_str] = better_expr_str
         return better_expr_str
 
-    def _calculate_expr(self, context, options):
+    def _calculate_expr(self, context, options, _dequote):
         def __calculate_expr(result):
-            _group0 = result.group(0)
+            _group0 = result.group(1)
             _base_str = _group0
             try:
                 better_expr_str = self._replaces[_group0]
             except KeyError:
-                # If we are in a global variable, we remove '#{' and '}'
-                if _base_str.startswith('#{') and _base_str.endswith('}'):
-                    _base_str = _base_str[2:-1]
-
                 better_expr_str = _base_str
 
                 if _skip_re.match(better_expr_str) and '- ' not in better_expr_str:
@@ -1373,17 +1361,22 @@ class Scss(object):
                     return better_expr_str
 
                 better_expr_str = eval_expr(better_expr_str, context, options)
+
                 if better_expr_str is None:
                     better_expr_str = _base_str
+                elif _dequote:
+                    better_expr_str = dequote(better_expr_str)
 
                 self._replaces[_group0] = better_expr_str
 
             return better_expr_str
         return __calculate_expr
 
-    def do_glob_math(self, content, context, options):
-        content = _expr_glob_re.sub(self._calculate_expr(context, options), content)
-        return content
+    def do_glob_math(self, cont, context, options, _dequote=False):
+        if '#{' not in cont:
+            return cont
+        cont = _expr_glob_re.sub(self._calculate_expr(context, options, _dequote), cont)
+        return cont
 
     @print_timing(3)
     def post_process(self, cont):
@@ -2820,19 +2813,35 @@ class NumberValue(Value):
             return op(first_type, second_type)
     @classmethod
     def _do_op(cls, first, second, op):
-        first = NumberValue(first)
-        second = NumberValue(second)
+        if op == operator.__mul__:
+            first = StringValue(first) if isinstance(first, basestring) else first
+            first = NumberValue(first) if not isinstance(first, QuotedStringValue) else first
+            second = StringValue(second) if isinstance(second, basestring) else second
+            second = NumberValue(second) if not isinstance(second, QuotedStringValue) else second
+            if isinstance(first, NumberValue) and isinstance(second, QuotedStringValue):
+                first.value = int(first.value)
+                val = op(second.value, first.value)
+                return second.__class__(val)
+            if isinstance(first, QuotedStringValue) and isinstance(second, NumberValue):
+                second.value = int(second.value)
+                val = op(first.value, second.value)
+                return first.__class__(val)
+        else:
+            first = NumberValue(first)
+            second = NumberValue(second)
 
-        first_unit = first.unit
-        second_unit = second.unit
         if op == operator.__add__ or op == operator.__sub__:
+            first_unit = first.unit
+            second_unit = second.unit
             if first_unit == '%' and not second_unit:
                 second.units = { '%': _units_weights.get('%', 1), '_': '%' }
                 second.value /= 100.0
             elif second_unit == '%' and not first_unit:
                 first.units = { '%': _units_weights.get('%', 1), '_': '%' }
                 first.value /= 100.0
+
         val = op(first.value, second.value)
+
         ret = NumberValue(None).merge(first)
         ret = ret.merge(second)
         ret.value = val
