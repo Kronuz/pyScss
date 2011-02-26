@@ -1745,9 +1745,9 @@ def __color_stops(percentages, *args):
         stops.append(None)
     stops = stops[:len(colors)]
     if percentages:
-        max_stops = max(s and (s.value if s.unit != '%' else None) for s in stops)
+        max_stops = max(s and (s.value if s.unit != '%' else None) or None for s in stops)
     else:
-        max_stops = max(s and (s if s.unit != '%' else None) for s in stops)
+        max_stops = max(s and (s if s.unit != '%' else None) or None for s in stops)
     stops = [ s and (s.value / max_stops if s.unit != '%' else s.value) for s in stops ]
     stops[0] = 0
 
@@ -1767,7 +1767,7 @@ def __color_stops(percentages, *args):
             init = final
             start = None
 
-    if max_stops is None or percentages:
+    if not max_stops or percentages:
         stops = [ NumberValue(s, '%') for s in stops ]
     else:
         stops = [ s * max_stops for s in stops ]
@@ -1775,7 +1775,7 @@ def __color_stops(percentages, *args):
 
 def _grad_color_stops(*args):
     color_stops = __color_stops(True, *args)
-    ret = ', '.join([ 'color-stop(%s%%, %s)' % (to_str(s*100.0), c) for s,c in color_stops ])
+    ret = ', '.join([ 'color-stop(%s, %s)' % (to_str(s), c) for s,c in color_stops ])
     return StringValue(ret)
 
 def _color_stops(*args):
@@ -1789,6 +1789,96 @@ def _color_stops_in_percentages(*args):
     return StringValue(ret)
 
 #TODO: Make use of these SVG functions:
+def _radial_gradient(*args):
+    color_stops = args
+    position_and_angle = None
+    shape_and_size = None
+    if isinstance(args[0], (StringValue, NumberValue)):
+        position_and_angle = args[0]
+        if isinstance(args[1], (StringValue, NumberValue)):
+            shape_and_size = args[1]
+            color_stops = args[2:]
+        else:
+            color_stops = args[1:]
+    
+    color_stops = __color_stops(True, *color_stops)
+
+    args = [
+        position_and_angle if position_and_angle is not None else None,
+        shape_and_size if shape_and_size is not None else None,
+    ]
+    args.extend('%s %s' % (c, to_str(s)) for s,c in color_stops)
+    to__s = 'radial-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
+    ret = StringValue(to__s)
+
+    def to__moz():
+        return StringValue('-moz-' + to__s)
+    ret.to__moz = to__moz
+
+    def to__pie():
+        return StringValue('-pie-' + to__s)
+    ret.to__pie = to__pie
+
+    def to__css2():
+        return StringValue('')
+    ret.to__css2 = to__css2
+
+    def to__webkit():
+        args = [
+            'radial',
+            _grad_point(position_and_angle) if position_and_angle is not None else 'center',
+            '0',
+            _grad_point(position_and_angle) if position_and_angle is not None else 'center',
+            _grad_end_position(color_stops),
+        ]
+        args.extend('color-stop(%s, %s)' % (to_str(s), c) for s,c in color_stops)
+        ret = '-webkit-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
+        return StringValue(ret)
+    ret.to__webkit = to__webkit
+
+    return ret
+
+def _linear_gradient(*args):
+    color_stops = args
+    position_and_angle = None
+    if isinstance(args[0], (StringValue, NumberValue)):
+        position_and_angle = args[0]
+        color_stops = args[1:]
+
+    color_stops = __color_stops(True, *color_stops)
+    
+    args = [
+        position_and_angle if position_and_angle is not None else None,
+    ]
+    args.extend('%s %s' % (c, to_str(s)) for s,c in color_stops)
+    to__s = 'linear-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
+    ret = StringValue(to__s)
+
+    def to__moz():
+        return StringValue('-moz-' + to__s)
+    ret.to__moz = to__moz
+
+    def to__pie():
+        return StringValue('-pie-' + to__s)
+    ret.to__pie = to__pie
+
+    def to__css2():
+        return StringValue('')
+    ret.to__css2 = to__css2
+
+    def to__webkit():
+        args = [
+            'linear',
+            position_and_angle or 'top',
+            _opposite_position(position_and_angle or 'top'),
+        ]
+        args.extend('color-stop(%s, %s)' % (to_str(s), c) for s,c in color_stops)
+        ret = '-webkit-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
+        return StringValue(ret)
+    ret.to__webkit = to__webkit
+    
+    return ret
+
 def __color_stops_svg(*args):
     color_stops = __color_stops(*args)
     ret = ''.join('<stop offset="%s" stop-color="%s"/>' % (to_str(s), c) for s,c in color_stops )
@@ -2176,6 +2266,10 @@ def _grad_point(*p):
     val = '%s%% %s%%' % (hrz, vrt)
     return val
 
+def _grad_end_position(*p):
+    #TODO: Implement!
+    pass
+
 ################################################################################
 
 def __compass_list(*args):
@@ -2281,6 +2375,50 @@ def _append(lst, val, separator=None):
         if separator:
             ret.value['_'] = separator
     return ret
+
+################################################################################
+
+def _prefixed(prefix, *args):
+    to_fnct_str = 'to_' + to_str(prefix).replace('-', '_')
+    for arg in args:
+        if isinstance(arg, ListValue):
+            for iarg in arg.value.items():
+                if hasattr(iarg, to_fnct_str):
+                    return BooleanValue(True)
+            return BooleanValue(False)
+        return BooleanValue(hasattr(arg, to_fnct_str))
+
+def _prefix(prefix, *args):
+    to_fnct_str = 'to_' + to_str(prefix).replace('-', '_')
+    for arg in args:
+        to_fnct = getattr(arg, to_fnct_str)
+        if to_fnct:
+            return to_fnct()
+        return arg
+
+def __moz(*args):
+    return _prefix('_moz', *args)
+
+def __svg(*args):
+    return _prefix('_svg', *args)
+
+def __css2(*args):
+    return _prefix('_css2', *args)
+
+def __pie(*args):
+    return _prefix('_pie', *args)
+
+def __webkit(*args):
+    return _prefix('_webkit', *args)
+
+def __khtml(*args):
+    return _prefix('_khtml', *args)
+
+def __ms(*args):
+    return _prefix('_ms', *args)
+
+def __o(*args):
+    return _prefix('_o', *args)
 
 ################################################################################
 
@@ -2679,6 +2817,11 @@ class ListValue(Value):
             self.value = dict(enumerate(lst))
             if sp:
                 self.value['_'] = ','
+    @classmethod
+    def _do_cmps(cls, first, second, op):
+        first = ListValue(first)
+        second = ListValue(second)
+        return op(first.value, second.value)
     def _reorder_list(self, lst):
         return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
     def __nonzero__(self):
@@ -2918,6 +3061,8 @@ fnct = {
     'color-stops:n': _color_stops,
     'color-stops-in-percentages:n': _color_stops_in_percentages,
     'grad-color-stops:n': _grad_color_stops,
+    'radial-gradient:n': _radial_gradient,
+    'linear-gradient:n': _linear_gradient,
 
     'opacify:2': _opacify,
     'fadein:2': _opacify,
@@ -2958,6 +3103,16 @@ fnct = {
     'hue:1': _hue,
     'saturation:1': _saturation,
     'lightness:1': _lightness,
+
+    'prefixed:n': _prefixed,
+    'prefix:n': _prefix,
+    '-moz:n': __moz,
+    '-svg:n': __svg,
+    '-css2:n': __css2,
+    '-pie:n': __pie,
+    '-webkit:n': __webkit,
+    '-ms:n': __ms,
+    '-o:n': __o,
 
     '-compass-list:n': __compass_list,
     '-compass-space-list:n': __compass_space_list,
