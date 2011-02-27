@@ -39,7 +39,7 @@ xCSS:
 VERSION_INFO = (1, 0, 2)
 BUILD_INFO = "pyScss v1.0 rc2 (20110226)"
 AUTHOR = "German M. Bravo (Kronuz)"
-AUTHOR_EMAIL = '<german.mb@gmail.com>'
+AUTHOR_EMAIL = 'german.mb@gmail.com'
 URL = 'http://github.com/Kronuz/pyScss'
 DOWNLOAD_URL = 'http://github.com/Kronuz/pyScss/tarball/v1.0rc2'
 LICENSE = "MIT"
@@ -47,7 +47,7 @@ PROJECT = "pyScss"
 
 __project__ = PROJECT
 __version__ = VERSION = '.'.join(str(i) for i in VERSION_INFO)
-__author__ = AUTHOR + ' ' + AUTHOR_EMAIL
+__author__ = AUTHOR + ' <' + AUTHOR_EMAIL + '>'
 __license__ = LICENSE
 
 ################################################################################
