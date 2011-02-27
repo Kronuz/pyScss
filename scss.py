@@ -85,7 +85,7 @@ _units_weights = {
     'mm': 10,
     'ms': 10,
     'hz': 10,
-    '%': 100,
+    '%': 0,
 }
 _conv = {
     'size': {
@@ -2843,9 +2843,9 @@ class NumberValue(Value):
             first = NumberValue(first)
             second = NumberValue(second)
 
+        first_unit = first.unit
+        second_unit = second.unit
         if op == operator.__add__ or op == operator.__sub__:
-            first_unit = first.unit
-            second_unit = second.unit
             if first_unit == '%' and not second_unit:
                 second.units = { '%': _units_weights.get('%', 1), '_': '%' }
                 second.value /= 100.0
@@ -2870,8 +2870,9 @@ class NumberValue(Value):
             if unit != '_':
                 self.units.setdefault(unit, 0)
                 self.units[unit] += val
-        if '_' not in self.units:
-            self.units['_'] = obj.unit
+        unit = obj.unit
+        if _units_weights.get(self.units.get('_'), 1) <= _units_weights.get(unit, 1):
+            self.units['_'] = unit
         return self
     def convert_to(self, type):
         val = self.value
