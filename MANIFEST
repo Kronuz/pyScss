@@ -1,5 +1,4 @@
 ./DESCRIPTION
-./grammar
 ./grammar/grammar.g
 ./grammar/LICENSE
 ./grammar/yapps2.py
@@ -9,3 +8,7 @@
 ./README.rst
 ./scss.py
 ./setup.py
+./pyScss.egg-info/PKG-INFO
+./pyScss.egg-info/SOURCES.txt
+./pyScss.egg-info/dependency_links.txt
+./pyScss.egg-info/top_level.txt
