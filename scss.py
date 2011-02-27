@@ -1572,7 +1572,7 @@ def _desaturate(color, amount):
     return __hsl_op(operator.__sub__, color, 0, amount, 0)
 
 def _grayscale(color):
-    return __hsl_op(operator.__sub__, color, 0, 1.0, 0)
+    return __hsl_op(operator.__sub__, color, 0, 100.0, 0)
 
 def _adjust_hue(color, degrees):
     return __hsl_op(operator.__add__, color, degrees, 0, 0)
@@ -3188,6 +3188,7 @@ fnct = {
     'saturate:2': _saturate,
     'desaturate:2': _desaturate,
     'grayscale:1': _grayscale,
+    'greyscale:1': _grayscale,
     'adjust-hue:2': _adjust_hue,
     'adjust-lightness:2': _adjust_lightness,
     'adjust-saturation:2': _adjust_saturation,
