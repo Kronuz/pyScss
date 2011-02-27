@@ -3034,10 +3034,10 @@ class ColorValue(Value):
         c = self.value
         if type == 'hsl' or type == 'hsla' and c[3] == 1:
             h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
-            return 'hsl(%s, %s%%, %s%%)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0))
+            return 'hsl(%sdeg, %s%%, %s%%)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0))
         if type == 'hsla':
             h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
-            return 'hsla(%s, %s%%, %s%%, %s)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0), to_str(a))
+            return 'hsla(%sdeg, %s%%, %s%%, %s)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0), to_str(a))
         r, g, b = to_str(c[0]), to_str(c[1]), to_str(c[2])
         _, _, r = r.partition('.')
         _, _, g = g.partition('.')
@@ -3045,10 +3045,10 @@ class ColorValue(Value):
         if c[3] == 1:
             if len(r) > 2 or len(g) > 2 or len(b) > 2:
                 return 'rgb(%s%%, %s%%, %s%%)' % (to_str(c[0]*100.0/255.0), to_str(c[1]*100.0/255.0), to_str(c[2]*100.0/255.0))
-            return '#%02x%02x%02x' % (c[0], c[1], c[2])
+            return '#%02x%02x%02x' % (round(c[0]), round(c[1]), round(c[2]))
         if len(r) > 2 or len(g) > 2 or len(b) > 2:
             return 'rgba(%s%%, %s%%, %s%%, %s)' % (to_str(c[0]*100.0/255.0), to_str(c[1]*100.0/255.0), to_str(c[2]*100.0/255.0), to_str(c[3]))
-        return 'rgba(%d, %d, %d, %s)' % (c[0], c[1], c[2], to_str(c[3]))
+        return 'rgba(%d, %d, %d, %s)' % (round(c[0]), round(c[1]), round(c[2]), to_str(c[3]))
     @classmethod
     def _do_cmps(cls, first, second, op):
         first = ColorValue(first)
@@ -4506,7 +4506,7 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 a {
 	color: rgb(87.254%, 48.482%, 37.546%);
-	color: hsl(13.2, 66.1%, 62.4%);
+	color: hsl(13.2deg, 66.1%, 62.4%);
 	color-hue: 13.2deg;
 	color-saturation: 66.101%;
 	color-lightness: 62.4%;
@@ -4524,21 +4524,21 @@ a {
 ...     lighten1: lighten(hsl(0, 0%, 0%), 30%); // hsl(0, 0, 30)
 ...     lighten2: lighten(#800, 20%); // #e00
 ...
-...     darken1: darken(hsl(25, 100%, 80%), 30%); // hsl(25, 100%, 50%)
+...     darken1: darken(hsl(25, 100%, 80%), 30%); // hsl(25deg, 100%, 50%)
 ...     darken2: darken(#800, 20%); // #200
 ...
-...     saturate1: saturate(hsl(120, 30%, 90%), 20%); // hsl(120, 50%, 90%)
+...     saturate1: saturate(hsl(120, 30%, 90%), 20%); // hsl(120deg, 50%, 90%)
 ...     saturate2: saturate(#855, 20%); // #9e3f3f
 ...
-...     desaturate1: desaturate(hsl(120, 30%, 90%), 20%); // hsl(120, 10%, 90%)
+...     desaturate1: desaturate(hsl(120, 30%, 90%), 20%); // hsl(120deg, 10%, 90%)
 ...     desaturate2: desaturate(#855, 20%); // #726b6b
 ...
-...     adjust1: adjust-hue(hsl(120, 30%, 90%), 60deg); // hsl(180, 30%, 90%)
-...     adjust2: adjust-hue(hsl(120, 30%, 90%), -60deg); // hsl(60, 30%, 90%)
+...     adjust1: adjust-hue(hsl(120, 30%, 90%), 60deg); // hsl(180deg, 30%, 90%)
+...     adjust2: adjust-hue(hsl(120, 30%, 90%), -60deg); // hsl(60deg, 30%, 90%)
 ...     adjust3: adjust-hue(#811, 45deg); // #886a11
 ...
-...     mix1: mix(#f00, #00f, 50%); // #7f007f
-...     mix2: mix(#f00, #00f, 25%); // #3f00bf
+...     mix1: mix(#f00, #00f, 50%); // purple
+...     mix2: mix(#f00, #00f, 25%); // #4000bf
 ...     mix3: mix(rgba(255, 0, 0, 0.5), #00f, 50%); // rgba(64, 0, 191, 0.75)
 ...
 ...     percentage1: percentage(100px / 50px); // 200%
@@ -4561,20 +4561,20 @@ a {
     opacify2: #001;
     transparentize1: rgba(0, 0, 0, 0.4);
     transparentize2: rgba(0, 0, 0, 0.6);
-    lighten1: hsl(0, 0%, 30%);
+    lighten1: hsl(0deg, 0%, 30%);
     lighten2: #e00;
-    darken1: hsl(25, 100%, 50%);
-    darken2: #210000;
-    saturate1: hsl(120, 50%, 90%);
-    saturate2: #9e3e3e;
-    desaturate1: hsl(120, 10%, 90%);
-    desaturate2: #716b6b;
-    adjust1: hsl(180, 30%, 90%);
-    adjust2: hsl(60, 30%, 90%);
-    adjust3: #886a10;
-    mix1: #7f007f;
-    mix2: #3f00bf;
-    mix3: rgba(63, 0, 191, 0.75);
+    darken1: hsl(25deg, 100%, 50%);
+    darken2: #200;
+    saturate1: hsl(120deg, 50%, 90%);
+    saturate2: #9e3f3f;
+    desaturate1: hsl(120deg, 10%, 90%);
+    desaturate2: #726b6b;
+    adjust1: hsl(180deg, 30%, 90%);
+    adjust2: hsl(60deg, 30%, 90%);
+    adjust3: #886a11;
+    mix1: purple;
+    mix2: #4000bf;
+    mix3: rgba(64, 0, 191, 0.75);
     percentage1: 200%;
     round1: 10px;
     round2: 11px;
