@@ -65,6 +65,7 @@ MEDIA_URL = '/media/'
 ASSETS_URL = '/media/assets/'
 VERBOSITY = 1
 ################################################################################
+
 try:
     import cPickle as pickle
 except ImportError:

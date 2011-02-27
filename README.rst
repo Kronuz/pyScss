@@ -73,21 +73,21 @@ Examples
 
 		@option compress: no;
 		.selector {
-			a {
-				display: block;
-			}
-			strong {
-				color: blue;
-			}
+		  a {
+		    display: block;
+		  }
+		    strong {
+		    color: blue;
+		  }
 		}
 
 	...produces::
 
 		.selector a {
-			display: block;
+		  display: block;
 		}
 		.selector strong {
-			color: #00f;
+		  color: #00f;
 		}
 
 #. **Variables**
@@ -99,16 +99,16 @@ Examples
 		$side: bottom;
 		#navbar {
 		  border-#{$side}: {
-			color: $main-color;
-			style: $style;
+		    color: $main-color;
+		    style: $style;
 		  }
 		}
 
 	...produces::
 
 		#navbar {
-				border-bottom-color: #ce4dd6;
-				border-bottom-style: solid;
+		  border-bottom-color: #ce4dd6;
+		  border-bottom-style: solid;
 		}
 
 #. **Mixins**
@@ -127,19 +127,19 @@ Examples
 	...produces::
 
 		#navbar li {
-				border-top-radius: 10px;
-				-moz-border-radius-top: 10px;
-				-webkit-border-top-radius: 10px;
+		  border-top-radius: 10px;
+		  -moz-border-radius-top: 10px;
+		  -webkit-border-top-radius: 10px;
 		}
 		#footer {
-				border-top-radius: 5px;
-				-moz-border-radius-top: 5px;
-				-webkit-border-top-radius: 5px;
+		  border-top-radius: 5px;
+		  -moz-border-radius-top: 5px;
+		  -webkit-border-top-radius: 5px;
 		}
 		#sidebar {
-				border-left-radius: 8px;
-				-moz-border-radius-left: 8px;
-				-webkit-border-left-radius: 8px;
+		  border-left-radius: 8px;
+		  -moz-border-radius-left: 8px;
+		  -webkit-border-left-radius: 8px;
 		}
 
 #. **Extend** (using `@extend`)
@@ -162,48 +162,47 @@ Examples
 
 		.error,
 		.seriousError {
-				border: 1px red;
-				background-color: #fdd;
+		  border: 1px red;
+		  background-color: #fdd;
 		}
 		.error.intrusion,
 		.seriousError.intrusion {
-				background-image: url("/image/hacked.png");
+		  background-image: url("/image/hacked.png");
 		}
 		.seriousError {
-				border-width: 3px;
+		  border-width: 3px;
 		}
-
 
 #. **Sprites** (using `sprite-map()`)
 	Example::
 
 		@option compress: no;
-		$icons: sprite-map("sociable/*.png"); // contains sociable/facebook.png among others.
+		$icons: sprite-map("sociable/\*.png"); // contains sociable/facebook.png among others.
 		div {
-				background: $icons;
+		  background: $icons;
 		}
 		@each $icon in sprites($icons) {
-				div .$icon {
-						width: image-width(sprite-file($icons, $icon));
-						height: image-height(sprite-file($icons, $icon));
-						background-position: sprite-position($icons, $icon);
-				}
+		  div .$icon {
+		    width: image-width(sprite-file($icons, $icon));
+		    height: image-height(sprite-file($icons, $icon));
+		    background-position: sprite-position($icons, $icon);
+		  }
 		}
 
 	...generates a new sprite file and produces something like::
 
 		div {
-				background: url("/media/assets/u8Y7yEQL0UffAVw5rX7yhw.png?_=1298240989") 0px 0px no-repeat;
+		  background: url("/media/assets/u8Y7yEQL0UffAVw5rX7yhw.png?_=1298240989") 0px 0px no-repeat;
 		}
-		div .facebook {
-				width: 32px;
-				height: 32px;
-				background-position: 0px 0px;
+		  div .facebook {
+		  width: 32px;
+		  height: 32px;
+		  background-position: 0px 0px;
 		}
 		div .twitter {
-				width: 32px;
-				height: 32px;
-				background-position: 0px -32px;
+		  width: 32px;
+		  height: 32px;
+		  background-position: 0px -32px;
 		}
 		...
 
@@ -213,9 +212,9 @@ Examples
 		$ python scss.py --interactive
 		>>> @import "compass/css3"
 		>>> show()
-		['functions', 'mixins', 'options', 'vars']
+		\['functions', 'mixins', 'options', 'vars']
 		>>> show(mixins)
-		['apply-origin',
+		\['apply-origin',
 		 'apply-transform',
 		 ...
 		 'transparent']
@@ -231,31 +230,33 @@ Sass Sassy CSS
 ==============
 pyScss is a Scss (Sass) implementation for Python.
 Currently it implements @mixin, @include, @if, @else, @for, and @import... it
-also implements many of the Sass functions including colors function like
+also implements many of the Sass functions including color functions like
 hsla(), hsl(), darken(), lighten(), mix(), opacify(), transparentize(),
 saturate(), desaturate(), etc.) as well as sprite-map(), sprite-file(),
 image-width(), image-height() and the others.
 
-In the file `scss.py`, by the top, configure the LOAD_PATHS to point to your
-Compass framework path (I have `frameworks/compass/*.scss` and
-`framework/blueprint/*.scss` files in my project directory:
-`/usr/local/www/project/`, so I have that set for that path by default)
+In the file `scss.py`, by the top, you can configure the LOAD_PATHS to point to
+your Sass frameworks path (I have `sass/frameworks/compass/*.scss` and
+`sass/framework/blueprint/*.scss` files in my project directory:
+`/usr/local/www/project/`, where `scss.py` lives, so it defaults to use the
+`sass/framework/` path, relative to the `scss.py` file) or configure using the
+command line `--load-path` option, see `python scss.py --help`.
 
 I have succesfully compiled some Compass using `python scss.py < myfile.css` the
 following `myfile.css`::
 
-		@option compress: no;
+	@option compress: no;
 
-		$blueprint-grid-columns : 24;
-		$blueprint-grid-width   : 30px;
-		$blueprint-grid-margin  : 10px;
-		$font-color			 : #333;
+	$blueprint-grid-columns : 24;
+	$blueprint-grid-width   : 30px;
+	$blueprint-grid-margin  : 10px;
+	$font-color             : #333;
 
-		@import "compass/reset";
-		@import "compass/utilities";
-		@import "blueprint";
+	@import "compass/reset";
+	@import "compass/utilities";
+	@import "blueprint";
 
-		// Stuff goes here...
+	// Stuff goes here...
 
 Benchmarks
 ==========
