@@ -309,7 +309,7 @@ Description: pyScss, a Scss compiler for Python
         xCSS:
         (c) 2010 Anton Pawlik
         http://xcss.antpaw.org/docs/
-Keywords: css oocss xcss sass scss precompiler
+Keywords: css oocss xcss sass scss less precompiler
 Platform: UNKNOWN
 Classifier: Development Status :: 5 - Production/Stable
 Classifier: Intended Audience :: Developers
