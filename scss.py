@@ -2328,7 +2328,8 @@ def _opposite_position(*p):
         vrt = 'center'
     if hrz == vrt:
         vrt = None
-    return ListValue(v for v in (hrz, vrt) if v is not None)
+    ret = ListValue(list(v for v in (hrz, vrt) if v is not None))
+    return ret
 
 def _grad_point(*p):
     pos = set()
@@ -2343,7 +2344,8 @@ def _grad_point(*p):
         vrt = NumberValue(0, '%')
     elif 'bottom' in pos:
         vrt = NumberValue(1, '%')
-    return ListValue(list(v for v in (hrz, vrt) if v is not None))
+    ret = ListValue(list(v for v in (hrz, vrt) if v is not None))
+    return ret
 
 
 ################################################################################
