@@ -590,41 +590,43 @@ class Scss(object):
         return ','.join(sorted(selectors))
 
     def apply_vars(self, cont, context, options=None, _dequote=False):
-        if '$' not in cont:
-            return cont
-        if cont in context:
-            while cont in context:
-                _cont = context[cont]
-                if _cont == cont:
-                    break
-                cont = _cont
-            return cont
-        # Flatten the context (no variables mapping to variables)
-        flat_context = {}
-        for k, v in context.items():
-            while v in context:
-                _v = context[v]
-                if _v == v:
-                    break
-                v = _v
-            flat_context[k] = v
-        # Interpolate variables:
-        def _av(m):
-            v = flat_context.get(m.group(2))
-            if v:
-                if _dequote and m.group(1):
-                    v = dequote(v)
-                if ' ' in v: #FIXME: Perhaps this "if" block is no longer needed?:
-                    try:
-                        if cont[m.start()-1] != '(' or cont[m.end()] != ')':
-                            v = '(' + depar(v) + ')'
-                        else:
-                            v = depar(v)
-                    except IndexError:
-                        v = '(' + depar(v) + ')'
-            return v if v is not None else m.group(0)
-        cont = _interpolate_re.sub(_av, cont)
+        if '$' in cont:
+            if cont in context:
+                # Optimization: the full cont is a variable in the context,
+                # flatten the interpolation and use it:
+                while cont in context:
+                    _cont = context[cont]
+                    if _cont == cont:
+                        break
+                    cont = _cont
+            else:
+                # Flatten the context (no variables mapping to variables)
+                flat_context = {}
+                for k, v in context.items():
+                    while v in context:
+                        _v = context[v]
+                        if _v == v:
+                            break
+                        v = _v
+                    flat_context[k] = v
+                # Interpolate variables:
+                def _av(m):
+                    v = flat_context.get(m.group(2))
+                    if v:
+                        if _dequote and m.group(1):
+                            v = dequote(v)
+                        if ' ' in v: #FIXME: Perhaps this "if" block is no longer needed?:
+                            try:
+                                if cont[m.start()-1] != '(' or cont[m.end()] != ')':
+                                    v = '(' + depar(v) + ')'
+                                else:
+                                    v = depar(v)
+                            except IndexError:
+                                v = '(' + depar(v) + ')'
+                    return v if v is not None else m.group(0)
+                cont = _interpolate_re.sub(_av, cont)
         if options is not None:
+            # ...apply math:
             cont = self.do_glob_math(cont, context, options, _dequote)
         return cont
 
@@ -4725,6 +4727,27 @@ a:hover {
 }
 .salamander-icon {
   background-image: url(/images/salamander.png);
+}
+
+TESTS FOR REPORTED ISSUES:
+--------------------------------------------------------------------------------
+
+Issue #2 test
+>>> print css.compile('''
+... @option compress:no, short_colors:yes, reverse_colors:yes;
+... #{enumerate(".pull", 1, 24)} {
+...   display: inline;
+...   float: left;
+...   position: relative;
+... }
+... ''') #doctest: +NORMALIZE_WHITESPACE
+.pull-1, .pull-10, .pull-11, .pull-12, .pull-13, .pull-14, .pull-15, 
+.pull-16, .pull-17, .pull-18, .pull-19, .pull-2, .pull-20, .pull-21, 
+.pull-22, .pull-23, .pull-24, .pull-3, .pull-4, .pull-5, .pull-6, 
+.pull-7, .pull-8, .pull-9 {
+  display: inline;
+  float: left;
+  position: relative;
 }
 
 """
