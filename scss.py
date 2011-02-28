@@ -724,6 +724,7 @@ class Scss(object):
             pos += 1
 
             #print >>sys.stderr, '='*80
+            #for r in [rule]+list(self.children)[:5]: print >>sys.stderr, repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:80]+('...' if len(r[CODESTR])>80 else ''))
             #for r in [rule]+list(self.children)[:5]: print >>sys.stderr, repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:80]+('...' if len(r[CODESTR])>80 else '')), dict((k, v) for k, v in r[CONTEXT].items() if k.startswith('$') and not k.startswith('$__')), dict(r[PROPERTIES]).keys()
 
     @print_timing(4)
@@ -3317,6 +3318,9 @@ def call(name, args, C, O, is_function=True):
             node = StringValue((sp + ' ').join( str(v) for n,v in s if n != '_' ))
     return node
 
+################################################################################
+# Parser
+
 class SyntaxError(Exception):
     """
     When we run into an unexpected token, this is the exception to use
@@ -3342,10 +3346,7 @@ class Scanner(object):
         Ignore is [terminal,...];
         Input is a string
         """
-        self.tokens = []
-        self.restrictions = []
-        self.input = input
-        self.pos = 0
+        self.reset(input)
         self.ignore = ignore
         # The stored patterns are a pair (compiled regex,source
         # regex).  If the patterns variable passed in to the
@@ -3362,23 +3363,6 @@ class Scanner(object):
         self.input = input
         self.pos = 0
 
-    def token(self, i, restrict=None):
-        """
-        Get the i'th token, and if i is one past the end, then scan
-        for another token; restrict is a list of tokens that
-        are allowed, or 0 for any token.
-        """
-        if i == len(self.tokens):
-            self.scan(restrict)
-        if i < len(self.tokens):
-            # Make sure the restriction is more restricted
-            if restrict and self.restrictions[i]:
-                for r in restrict:
-                    if r not in self.restrictions[i]:
-                        raise NotImplementedError("Unimplemented: restriction set changed")
-            return self.tokens[i]
-        raise NoMoreTokens()
-
     def __repr__(self):
         """
         Print the last 10 tokens that have been scanned in
@@ -3388,6 +3372,21 @@ class Scanner(object):
             output = "%s\n  (@%s)  %s  =  %s" % (output, t[0], t[2], repr(t[3]))
         return output
 
+    def token(self, i, restrict=None):
+        """
+        Get the i'th token, and if i is one past the end, then scan
+        for another token; restrict is a list of tokens that
+        are allowed, or 0 for any token.
+        """
+        tokens_len = len(self.tokens)
+        if i == tokens_len: # We are at the end, ge the next...
+            tokens_len += self.scan(restrict)
+        if i < tokens_len:
+            if restrict > self.restrictions[i]:
+                raise NotImplementedError("Unimplemented: restriction set changed")
+            return self.tokens[i]
+        raise NoMoreTokens()
+
     def scan(self, restrict):
         """
         Should scan another token and add it to the list, self.tokens,
@@ -3395,47 +3394,50 @@ class Scanner(object):
         """
         # Keep looking for a token, ignoring any in self.ignore
         while True:
-            # Search the patterns for the longest match, with earlier
+            # Search the patterns for a match, with earlier
             # tokens in the list having preference
-            best_match = -1
-            best_pat = '(error)'
+            best_pat = None
+            best_pat_len = 0
             for p, regexp in self.patterns:
-                # First check to see if we're ignoring this token
+                # First check to see if we're restricting to this token
                 if restrict and p not in restrict and p not in self.ignore:
                     continue
                 m = regexp.match(self.input, self.pos)
-                if m and len(m.group(0)) > best_match:
-                    # We got a match that's better than the previous one
+                if m:
+                    # We got a match
                     best_pat = p
-                    best_match = len(m.group(0))
+                    best_pat_len = len(m.group(0))
                     break
 
             # If we didn't find anything, raise an error
-            if best_pat == '(error)' and best_match < 0:
+            if best_pat is None:
                 msg = "Bad Token"
                 if restrict:
                     msg = "Trying to find one of " + ", ".join(restrict)
                 raise SyntaxError(self.pos, msg)
 
             # If we found something that isn't to be ignored, return it
-            if best_pat not in self.ignore or restrict and best_pat in restrict:
+            if best_pat in self.ignore:
+                # This token should be ignored ..
+                self.pos += best_pat_len
+            else:
+                end_pos = self.pos + best_pat_len
                 # Create a token with this data
                 token = (
                     self.pos,
-                    self.pos + best_match,
+                    end_pos,
                     best_pat,
-                    self.input[self.pos:self.pos + best_match]
+                    self.input[self.pos:end_pos]
                 )
-                self.pos = self.pos + best_match
+                self.pos = end_pos
                 # Only add this token if it's not in the list
                 # (to prevent looping)
                 if not self.tokens or token != self.tokens[-1]:
                     self.tokens.append(token)
                     self.restrictions.append(restrict)
+                    return 1
                 break
-            else:
-                # This token should be ignored ..
-                self.pos += best_match
+        return 0
 
 class Parser(object):
     def __init__(self, scanner):
@@ -3446,7 +3448,7 @@ class Parser(object):
         self._scanner.reset(input)
         self._pos = 0
 
-    def _peek(self, *types):
+    def _peek(self, types):
         """
         Returns the token type for lookahead; if there are any args
         then the list of args is the set of token types to allow
@@ -3458,11 +3460,13 @@ class Parser(object):
         """
         Returns the matched text, and moves to the next token
         """
-        tok = self._scanner.token(self._pos, [type])
+        tok = self._scanner.token(self._pos, set([type]))
         if tok[2] != type:
             raise SyntaxError(tok[0], "Trying to find " + type)
         self._pos += 1
         return tok[3]
+
+################################################################################
 
 #'|'.join(_units)
 ## Grammar compiled using Yapps:
@@ -3511,7 +3515,7 @@ class Calculator(Parser):
     def expr(self, C,O):
         and_test = self.and_test(C,O)
         v = and_test
-        while self._peek('OR', 'NOT', 'INV', 'COMMA', 'SIGN', 'ADD', 'RPAR', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') == 'OR':
+        while self._peek(self.expr_rsts) == 'OR':
             OR = self._scan('OR')
             and_test = self.and_test(C,O)
             v = v or and_test
@@ -3520,20 +3524,20 @@ class Calculator(Parser):
     def and_test(self, C,O):
         not_test = self.not_test(C,O)
         v = not_test
-        while self._peek('AND', 'OR', 'NOT', 'INV', 'COMMA', 'SIGN', 'ADD', 'RPAR', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') == 'AND':
+        while self._peek(self.and_test_rsts) == 'AND':
             AND = self._scan('AND')
             not_test = self.not_test(C,O)
             v = v and not_test
         return v
 
     def not_test(self, C,O):
-        _token_ = self._peek('NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR')
-        if _token_ not in ['NOT', 'INV']:
+        _token_ = self._peek(self.not_test_rsts)
+        if _token_ not in self.not_test_chks:
             comparison = self.comparison(C,O)
             return comparison
-        else:# in ['NOT', 'INV']
+        else:# in self.not_test_chks
             while 1:
-                _token_ = self._peek('NOT', 'INV')
+                _token_ = self._peek(self.not_test_chks)
                 if _token_ == 'NOT':
                     NOT = self._scan('NOT')
                     not_test = self.not_test(C,O)
@@ -3542,14 +3546,14 @@ class Calculator(Parser):
                     INV = self._scan('INV')
                     not_test = self.not_test(C,O)
                     v = _inv('!', not_test)
-                if self._peek('NOT', 'INV', 'AND', 'OR', 'COMMA', 'SIGN', 'ADD', 'RPAR', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') not in ['NOT', 'INV']: break
+                if self._peek(self.not_test_rsts_) not in self.not_test_chks: break
             return v
 
     def comparison(self, C,O):
         a_expr = self.a_expr(C,O)
         v = a_expr
-        while self._peek('LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'OR', 'COMMA', 'SIGN', 'ADD', 'RPAR', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') in ['LT', 'GT', 'LE', 'GE', 'EQ', 'NE']:
-            _token_ = self._peek('LT', 'GT', 'LE', 'GE', 'EQ', 'NE')
+        while self._peek(self.comparison_rsts) in self.comparison_chks:
+            _token_ = self._peek(self.comparison_chks)
             if _token_ == 'LT':
                 LT = self._scan('LT')
                 a_expr = self.a_expr(C,O)
@@ -3579,8 +3583,8 @@ class Calculator(Parser):
     def a_expr(self, C,O):
         m_expr = self.m_expr(C,O)
         v = m_expr
-        while self._peek('ADD', 'SUB', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'OR', 'COMMA', 'SIGN', 'RPAR', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') in ['ADD', 'SUB']:
-            _token_ = self._peek('ADD', 'SUB')
+        while self._peek(self.a_expr_rsts) in self.a_expr_chks:
+            _token_ = self._peek(self.a_expr_chks)
             if _token_ == 'ADD':
                 ADD = self._scan('ADD')
                 m_expr = self.m_expr(C,O)
@@ -3594,8 +3598,8 @@ class Calculator(Parser):
     def m_expr(self, C,O):
         u_expr = self.u_expr(C,O)
         v = u_expr
-        while self._peek('MUL', 'DIV', 'ADD', 'SUB', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'OR', 'COMMA', 'SIGN', 'RPAR', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') in ['MUL', 'DIV']:
-            _token_ = self._peek('MUL', 'DIV')
+        while self._peek(self.m_expr_rsts) in self.m_expr_chks:
+            _token_ = self._peek(self.m_expr_chks)
             if _token_ == 'MUL':
                 MUL = self._scan('MUL')
                 u_expr = self.u_expr(C,O)
@@ -3607,7 +3611,7 @@ class Calculator(Parser):
         return v
 
     def u_expr(self, C,O):
-        _token_ = self._peek('SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR')
+        _token_ = self._peek(self.u_expr_rsts)
         if _token_ == 'SIGN':
             SIGN = self._scan('SIGN')
             u_expr = self.u_expr(C,O)
@@ -3616,16 +3620,16 @@ class Calculator(Parser):
             ADD = self._scan('ADD')
             u_expr = self.u_expr(C,O)
             return u_expr
-        else:# in ['LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR']
+        else:# in self.u_expr_chks
             atom = self.atom(C,O)
             v = atom
-            if self._peek('UNITS', 'MUL', 'DIV', 'ADD', 'SUB', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'OR', 'COMMA', 'SIGN', 'RPAR', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') == 'UNITS':
+            if self._peek(self.u_expr_rsts_) == 'UNITS':
                 UNITS = self._scan('UNITS')
                 v = call(UNITS, ListValue(ParserValue({ 0: v, 1: UNITS })), C, O, False)
             return v
 
     def atom(self, C,O):
-        _token_ = self._peek('LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR')
+        _token_ = self._peek(self.u_expr_chks)
         if _token_ == 'LPAR':
             LPAR = self._scan('LPAR')
             expr_lst = self.expr_lst(C,O)
@@ -3634,10 +3638,10 @@ class Calculator(Parser):
         elif _token_ == 'ID':
             ID = self._scan('ID')
             v = ID
-            if self._peek('LPAR', 'UNITS', 'MUL', 'DIV', 'ADD', 'SUB', 'LT', 'GT', 'LE', 'GE', 'EQ', 'NE', 'AND', 'NOT', 'INV', 'OR', 'COMMA', 'SIGN', 'RPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') == 'LPAR':
+            if self._peek(self.atom_rsts) == 'LPAR':
                 v = None
                 LPAR = self._scan('LPAR')
-                if self._peek('RPAR', 'VAR', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') != 'RPAR':
+                if self._peek(self.atom_rsts_) != 'RPAR':
                     expr_lst = self.expr_lst(C,O)
                     v = expr_lst
                 RPAR = self._scan('RPAR')
@@ -3661,17 +3665,17 @@ class Calculator(Parser):
 
     def expr_lst(self, C,O):
         n = None
-        if self._peek('VAR', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'VAR':
+        if self._peek(self.expr_lst_rsts) == 'VAR':
             VAR = self._scan('VAR')
             self._scan('":"')
             n = VAR
         expr_slst = self.expr_slst(C,O)
         v = { n or 0: expr_slst }
-        while self._peek('COMMA', 'RPAR', 'END') == 'COMMA':
+        while self._peek(self.expr_lst_rsts_) == 'COMMA':
             n = None
             COMMA = self._scan('COMMA')
             v['_'] = COMMA
-            if self._peek('VAR', 'NOT', 'INV', 'SIGN', 'ADD', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR') == 'VAR':
+            if self._peek(self.expr_lst_rsts) == 'VAR':
                 VAR = self._scan('VAR')
                 self._scan('":"')
                 n = VAR
@@ -3682,26 +3686,39 @@ class Calculator(Parser):
     def expr_slst(self, C,O):
         expr = self.expr(C,O)
         v = { 0: expr }
-        while self._peek('NOT', 'INV', 'COMMA', 'SIGN', 'ADD', 'RPAR', 'LPAR', 'ID', 'NUM', 'STR', 'QSTR', 'BOOL', 'COLOR', 'END') not in ['COMMA', 'RPAR', 'END']:
+        while self._peek(self.expr_slst_rsts) not in self.expr_lst_rsts_:
             expr = self.expr(C,O)
             v[len(v)] = expr
         return ListValue(ParserValue(v)) if len(v) > 1 else v[0]
+
+    not_test_rsts_ = set(['AND', 'LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'ADD', 'NUM', 'COMMA', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
+    m_expr_chks = set(['MUL', 'DIV'])
+    comparison_rsts = set(['LPAR', 'QSTR', 'RPAR', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'ADD', 'STR', 'EQ', 'ID', 'AND', 'INV', 'GE', 'BOOL', 'NOT', 'OR'])
+    atom_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
+    not_test_chks = set(['NOT', 'INV'])
+    u_expr_chks = set(['LPAR', 'COLOR', 'QSTR', 'NUM', 'BOOL', 'STR', 'ID'])
+    m_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'STR', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
+    expr_lst_rsts_ = set(['END', 'COMMA', 'RPAR'])
+    expr_lst_rsts = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'NOT', 'ADD', 'NUM', 'BOOL', 'STR', 'VAR', 'ID'])
+    and_test_rsts = set(['AND', 'LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'ADD', 'NUM', 'COMMA', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
+    u_expr_rsts_ = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
+    u_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'ADD', 'NUM', 'BOOL', 'STR', 'ID'])
+    expr_rsts = set(['LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'ADD', 'NUM', 'COMMA', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
+    not_test_rsts = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'ADD', 'NUM', 'BOOL', 'STR', 'NOT', 'ID'])
+    atom_rsts_ = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'NOT', 'ADD', 'NUM', 'BOOL', 'STR', 'VAR', 'RPAR', 'ID'])
+    comparison_chks = set(['GT', 'GE', 'NE', 'LT', 'LE', 'EQ'])
+    a_expr_chks = set(['ADD', 'SUB'])
+    a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'STR', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
+    expr_slst_rsts = set(['LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'RPAR', 'ADD', 'NUM', 'COMMA', 'STR', 'NOT', 'BOOL', 'SIGN', 'ID'])
+
 ### Grammar ends.
 
 def eval_expr(expr, context={}, options={}, raw=False):
-    #print >>sys.stderr, '>>',expr,'<<'
     val = None
     try:
         P = Calculator(CalculatorScanner())
         P.reset(expr)
         results = P.goal(context, options)
-        #print >>sys.stderr, '%%',results,'%%'
-        if raw:
-            return results
-        if results is not None:
-            val = to_str(results)
-            #print >>sys.stderr, '==',val,'=='
-            return val
     except SyntaxError:
         return#@@@#
         print >>sys.stderr, '>>',expr,'<<'
@@ -3710,7 +3727,14 @@ def eval_expr(expr, context={}, options={}, raw=False):
         return#@@@#
         print >>sys.stderr, '>>',expr,'<<'
         raise
-
+    else:
+        #print >>sys.stderr, '%%',results,'%%'
+        if raw:
+            return results
+        if results is not None:
+            val = to_str(results)
+            #print >>sys.stderr, '==',val,'=='
+            return val
 
 __doc__ += """
 >>> css = Scss()

@@ -4,6 +4,9 @@
 
 import re
 
+################################################################################
+# Parser
+
 class SyntaxError(Exception):
     """
     When we run into an unexpected token, this is the exception to use
@@ -29,10 +32,7 @@ class Scanner(object):
         Ignore is [terminal,...];
         Input is a string
         """
-        self.tokens = []
-        self.restrictions = []
-        self.input = input
-        self.pos = 0
+        self.reset(input)
         self.ignore = ignore
         # The stored patterns are a pair (compiled regex,source
         # regex).  If the patterns variable passed in to the
@@ -48,24 +48,7 @@ class Scanner(object):
         self.restrictions = []
         self.input = input
         self.pos = 0
-        
-    def token(self, i, restrict=None):
-        """
-        Get the i'th token, and if i is one past the end, then scan
-        for another token; restrict is a list of tokens that
-        are allowed, or 0 for any token.
-        """
-        if i == len(self.tokens):
-            self.scan(restrict)
-        if i < len(self.tokens):
-            # Make sure the restriction is more restricted
-            if restrict and self.restrictions[i]:
-                for r in restrict:
-                    if r not in self.restrictions[i]:
-                        raise NotImplementedError("Unimplemented: restriction set changed")
-            return self.tokens[i]
-        raise NoMoreTokens()
-    
+
     def __repr__(self):
         """
         Print the last 10 tokens that have been scanned in
@@ -74,7 +57,22 @@ class Scanner(object):
         for t in self.tokens[-10:]:
             output = "%s\n  (@%s)  %s  =  %s" % (output, t[0], t[2], repr(t[3]))
         return output
-    
+
+    def token(self, i, restrict=None):
+        """
+        Get the i'th token, and if i is one past the end, then scan
+        for another token; restrict is a list of tokens that
+        are allowed, or 0 for any token.
+        """
+        tokens_len = len(self.tokens)
+        if i == tokens_len: # We are at the end, ge the next...
+            tokens_len += self.scan(restrict)
+        if i < tokens_len:
+            if restrict > self.restrictions[i]:
+                raise NotImplementedError("Unimplemented: restriction set changed")
+            return self.tokens[i]
+        raise NoMoreTokens()
+
     def scan(self, restrict):
         """
         Should scan another token and add it to the list, self.tokens,
@@ -82,47 +80,50 @@ class Scanner(object):
         """
         # Keep looking for a token, ignoring any in self.ignore
         while True:
-            # Search the patterns for the longest match, with earlier
+            # Search the patterns for a match, with earlier
             # tokens in the list having preference
-            best_match = -1
-            best_pat = '(error)'
+            best_pat = None
+            best_pat_len = 0
             for p, regexp in self.patterns:
-                # First check to see if we're ignoring this token
+                # First check to see if we're restricting to this token
                 if restrict and p not in restrict and p not in self.ignore:
                     continue
                 m = regexp.match(self.input, self.pos)
-                if m and len(m.group(0)) > best_match:
-                    # We got a match that's better than the previous one
+                if m:
+                    # We got a match
                     best_pat = p
-                    best_match = len(m.group(0))
+                    best_pat_len = len(m.group(0))
                     break
-                    
+
             # If we didn't find anything, raise an error
-            if best_pat == '(error)' and best_match < 0:
+            if best_pat is None:
                 msg = "Bad Token"
                 if restrict:
                     msg = "Trying to find one of " + ", ".join(restrict)
                 raise SyntaxError(self.pos, msg)
 
             # If we found something that isn't to be ignored, return it
-            if best_pat not in self.ignore or restrict and best_pat in restrict:
+            if best_pat in self.ignore:
+                # This token should be ignored ..
+                self.pos += best_pat_len
+            else:
+                end_pos = self.pos + best_pat_len
                 # Create a token with this data
                 token = (
                     self.pos,
-                    self.pos + best_match,
+                    end_pos,
                     best_pat,
-                    self.input[self.pos:self.pos + best_match]
+                    self.input[self.pos:end_pos]
                 )
-                self.pos = self.pos + best_match
+                self.pos = end_pos
                 # Only add this token if it's not in the list
                 # (to prevent looping)
                 if not self.tokens or token != self.tokens[-1]:
                     self.tokens.append(token)
                     self.restrictions.append(restrict)
+                    return 1
                 break
-            else:
-                # This token should be ignored ..
-                self.pos += best_match
+        return 0
 
 class Parser(object):
     def __init__(self, scanner):
@@ -133,25 +134,25 @@ class Parser(object):
         self._scanner.reset(input)
         self._pos = 0
 
-    def _peek(self, *types):
+    def _peek(self, types):
         """
         Returns the token type for lookahead; if there are any args
         then the list of args is the set of token types to allow
         """
         tok = self._scanner.token(self._pos, types)
         return tok[2]
-        
+
     def _scan(self, type):
         """
         Returns the matched text, and moves to the next token
         """
-        tok = self._scanner.token(self._pos, [type])
+        tok = self._scanner.token(self._pos, set([type]))
         if tok[2] != type:
             raise SyntaxError(tok[0], "Trying to find " + type)
         self._pos += 1
         return tok[3]
 
-
+################################################################################
 
 def print_error(input, err, scanner):
     """This is a really dumb long function to print error messages nicely."""

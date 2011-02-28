@@ -41,6 +41,7 @@ class Generator:
         self.postparser = None
         
         self.tokens = {} # Map from tokens to regexps
+        self.sets = {} # Map for restriction sets
         self.ignore = [] # List of token names to ignore in parsing
         self.terminals = [] # List of token names (to maintain ordering)
         for n,t in tokens:
@@ -101,34 +102,63 @@ class Generator:
         for a in args:
             self.output.write(a)
 
-    def in_test(self, x, full, b):
+    def in_test(self, r, x, full, b):
         if not b: return '0'
         if len(b) == 1: return '%s == %s' % (x, repr(b[0]))
         if full and len(b) > len(full)/2:
             # Reverse the sense of the test.
             not_b = filter(lambda x, b=b: x not in b, full)
-            return self.not_in_test(x, full, not_b)
-        return '%s in %s' % (x, repr(b))
+            return self.not_in_test(r, x, full, not_b)
+        n = None
+        for k, v in self.sets.items():
+            if v == b:
+                n = k
+        if n is None:
+            n = '%s_chks' % r
+            while n in self.sets:
+                n += '_'
+            self.sets[n] = b
+        b_set = 'self.%s' % n
+        return '%s in %s' % (x, b_set)
     
-    def not_in_test(self, x, full, b):
+    def not_in_test(self, r, x, full, b):
         if not b: return '1'
         if len(b) == 1: return '%s != %s' % (x, repr(b[0]))
-        return '%s not in %s' % (x, repr(b))
+        n = None
+        for k, v in self.sets.items():
+            if v == b:
+                n = k
+        if n is None:
+            n = '%s_chks' % r
+            while n in self.sets:
+                n += '_'
+            self.sets[n] = b
+        b_set = 'self.%s' % n
+        return '%s not in %s' % (x, b_set)
 
-    def peek_call(self, a):
-        a_set = (repr(a)[1:-1])
+    def peek_call(self, r, a):
+        n = None
+        for k, v in self.sets.items():
+            if v == a:
+                n = k
+        if n is None:
+            n = '%s_rsts' % r
+            while n in self.sets:
+                n += '_'
+            self.sets[n] = a
+        a_set = 'self.%s' % n
         if self.equal_set(a, self.non_ignored_tokens()): a_set = ''
         if self['context-insensitive-scanner']: a_set = ''
         return 'self._peek(%s)' % a_set
     
-    def peek_test(self, a, b):
+    def peek_test(self, r, a, b):
         if self.subset(a, b): return '1'
         if self['context-insensitive-scanner']: a = self.non_ignored_tokens()
-        return self.in_test(self.peek_call(a), a, b)
+        return self.in_test(r, self.peek_call(r, a), a, b)
 
-    def not_peek_test(self, a, b):
+    def not_peek_test(self, r, a, b):
         if self.subset(a, b): return '0'
-        return self.not_in_test(self.peek_call(a), a, b)
+        return self.not_in_test(r, self.peek_call(r, a), a, b)
 
     def calculate(self):
         while 1:
@@ -189,6 +219,9 @@ class Generator:
             self.write("):\n")
             self.rules[r].output(self, INDENT+INDENT)
             self.write("\n")
+
+        for n, s in self.sets.items():
+            self.write("    %s = %s\n" % (n, set(s)))
 
         self.write("\n")
         self.write("P = ", self.name, "(", self.name, "Scanner())\n")
@@ -399,7 +432,7 @@ class Choice(Node):
 
     def output(self, gen, indent):
         test = "if"
-        gen.write(indent, "_token_ = ", gen.peek_call(self.first), "\n")
+        gen.write(indent, "_token_ = ", gen.peek_call(self.rule, self.first), "\n")
         tokens_seen = []
         tokens_unseen = self.first[:]
         if gen['context-insensitive-scanner']:
@@ -431,14 +464,14 @@ class Choice(Node):
                         c.output(gen, indent)
                     else:
                         gen.write(indent, "else:")
-                        t = gen.in_test('', [], testset)
+                        t = gen.in_test(self.rule, '', [], testset)
                         if len(t) < 70-len(indent):
                             gen.write("#", t)
                         gen.write("\n")
                         c.output(gen, indent+INDENT)
                 else:
                     gen.write(indent, test, " ",
-                              gen.in_test('_token_', tokens_unseen, testset),
+                              gen.in_test(self.rule, '_token_', tokens_unseen, testset),
                               ":\n")
                     c.output(gen, indent+INDENT)
                 test = "elif"
@@ -480,7 +513,7 @@ class Option(Wrapper):
         if self.child.accepts_epsilon:
             print 'Warning in rule', self.rule+': contents may be empty.'
         gen.write(indent, "if %s:\n" %
-                  gen.peek_test(self.first, self.child.first))
+                  gen.peek_test(self.rule, self.first, self.child.first))
         self.child.output(gen, indent+INDENT)
         
 class Plus(Wrapper):
@@ -507,7 +540,7 @@ class Plus(Wrapper):
         union = self.first[:]
         gen.add_to(union, self.follow)
         gen.write(indent+INDENT, "if %s: break\n" %
-                  gen.not_peek_test(union, self.child.first))
+                  gen.not_peek_test(self.rule, union, self.child.first))
 
 class Star(Plus):
     def setup(self, gen, rule):
@@ -525,7 +558,7 @@ class Star(Plus):
             print ' * The repeated pattern could be empty.  The resulting'
             print '   parser probably will not work properly.'
         gen.write(indent, "while %s:\n" %
-                  gen.peek_test(self.follow, self.child.first))
+                  gen.peek_test(self.rule, self.follow, self.child.first))
         self.child.output(gen, indent+INDENT)
 
 ######################################################################
@@ -607,7 +640,7 @@ class ParserDescription(Parser):
 
     def Options(self):
         opt = {}
-        while self._peek('"option"', '"token"', '"ignore"', 'END', '"rule"') == '"option"':
+        while self._peek(set(['"option"', '"token"', '"ignore"', 'END', '"rule"'])) == '"option"':
             self._scan('"option"')
             self._scan('":"')
             Str = self.Str()
@@ -616,8 +649,8 @@ class ParserDescription(Parser):
 
     def Tokens(self):
         tok = []
-        while self._peek('"token"', '"ignore"', 'END', '"rule"') in ['"token"', '"ignore"']:
-            _token_ = self._peek('"token"', '"ignore"')
+        while self._peek(set(['"token"', '"ignore"', 'END', '"rule"'])) in ['"token"', '"ignore"']:
+            _token_ = self._peek(set(['"token"', '"ignore"']))
             if _token_ == '"token"':
                 self._scan('"token"')
                 ID = self._scan('ID')
@@ -633,7 +666,7 @@ class ParserDescription(Parser):
 
     def Rules(self, tokens):
         rul = []
-        while self._peek('"rule"', 'END') == '"rule"':
+        while self._peek(set(['"rule"', 'END'])) == '"rule"':
             self._scan('"rule"')
             ID = self._scan('ID')
             OptParam = self.OptParam()
@@ -645,7 +678,7 @@ class ParserDescription(Parser):
     def ClauseA(self, tokens):
         ClauseB = self.ClauseB(tokens)
         v = [ClauseB]
-        while self._peek('OR', 'RP', 'RB', '"rule"', 'END') == 'OR':
+        while self._peek(set(['OR', 'RP', 'RB', '"rule"', 'END'])) == 'OR':
             OR = self._scan('OR')
             ClauseB = self.ClauseB(tokens)
             v.append(ClauseB)
@@ -653,14 +686,14 @@ class ParserDescription(Parser):
 
     def ClauseB(self, tokens):
         v = []
-        while self._peek('STR', 'ID', 'LP', 'LB', 'STMT', 'OR', 'RP', 'RB', '"rule"', 'END') in ['STR', 'ID', 'LP', 'LB', 'STMT']:
+        while self._peek(set(['STR', 'ID', 'LP', 'LB', 'STMT', 'OR', 'RP', 'RB', '"rule"', 'END'])) in ['STR', 'ID', 'LP', 'LB', 'STMT']:
             ClauseC = self.ClauseC(tokens)
             v.append(ClauseC)
         return cleanup_sequence(v)
 
     def ClauseC(self, tokens):
         ClauseD = self.ClauseD(tokens)
-        _token_ = self._peek('PLUS', 'STAR', 'STR', 'ID', 'LP', 'LB', 'STMT', 'OR', 'RP', 'RB', '"rule"', 'END')
+        _token_ = self._peek(set(['PLUS', 'STAR', 'STR', 'ID', 'LP', 'LB', 'STMT', 'OR', 'RP', 'RB', '"rule"', 'END']))
         if _token_ == 'PLUS':
             PLUS = self._scan('PLUS')
             return Plus(ClauseD)
@@ -671,7 +704,7 @@ class ParserDescription(Parser):
             return ClauseD
 
     def ClauseD(self, tokens):
-        _token_ = self._peek('STR', 'ID', 'LP', 'LB', 'STMT')
+        _token_ = self._peek(set(['STR', 'ID', 'LP', 'LB', 'STMT']))
         if _token_ == 'STR':
             STR = self._scan('STR')
             t = (STR, eval(STR,{},{}))
@@ -696,7 +729,7 @@ class ParserDescription(Parser):
             return Eval(STMT[2:-2])
 
     def OptParam(self):
-        if self._peek('ATTR', '":"', 'PLUS', 'STAR', 'STR', 'ID', 'LP', 'LB', 'STMT', 'OR', 'RP', 'RB', '"rule"', 'END') == 'ATTR':
+        if self._peek(set(['ATTR', '":"', 'PLUS', 'STAR', 'STR', 'ID', 'LP', 'LB', 'STMT', 'OR', 'RP', 'RB', '"rule"', 'END'])) == 'ATTR':
             ATTR = self._scan('ATTR')
             return ATTR[2:-2]
         return ''
