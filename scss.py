@@ -4,7 +4,7 @@
 pyScss, a Scss compiler for Python
 
 @author     German M. Bravo (Kronuz) <german.mb@gmail.com>
-@version    1.0 rc2
+@version    1.0 rc3
 @see        https://github.com/Kronuz/pyScss
 @copyright  (c) 2011 German M. Bravo (Kronuz)
 @license    MIT License
@@ -36,12 +36,12 @@ xCSS:
 
 """
 
-VERSION_INFO = (1, 0, 2)
-BUILD_INFO = "pyScss v1.0 rc2 (20110226)"
+VERSION_INFO = (1, 0, 3)
+BUILD_INFO = "pyScss v1.0 rc3 (20110301)"
 AUTHOR = "German M. Bravo (Kronuz)"
 AUTHOR_EMAIL = 'german.mb@gmail.com'
 URL = 'http://github.com/Kronuz/pyScss'
-DOWNLOAD_URL = 'http://github.com/Kronuz/pyScss/tarball/v1.0rc2'
+DOWNLOAD_URL = 'http://github.com/Kronuz/pyScss/tarball/v1.0rc3'
 LICENSE = "MIT"
 PROJECT = "pyScss"
 
