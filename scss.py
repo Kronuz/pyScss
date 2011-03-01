@@ -753,7 +753,7 @@ class Scss(object):
                 code, name = (c_property.split(None, 1)+[''])[:2]
                 if code == '@warn':
                     name = self.calculate(name, rule[CONTEXT], rule[OPTIONS])
-                    err = "Warning: %s" % dequote(name)
+                    err = "Warning: %s" % dequote(to_str(name))
                     print >>sys.stderr, err
                 elif code == '@option':
                     self._settle_options(rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name)
@@ -1307,7 +1307,7 @@ class Scss(object):
                         result += '}' + nl
                     # feel free to modify the indentations the way you like it
                     selector = (',' + sp).join(selectors.split(',')) + sp + '{'
-                    if nl: selector = nl.join(wrap(selector)).replace('\n,', ',')
+                    if nl: selector = nl.join(wrap(selector)).replace('\n,' + sp, ',\n')
                     result += selector + nl
                     old_selectors = selectors
                     open = True
