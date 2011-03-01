@@ -1,12 +1,12 @@
 Metadata-Version: 1.0
 Name: pyScss
-Version: 1.0.2
+Version: 1.0.3
 Summary: pyScss, a Scss compiler for Python
 Home-page: http://github.com/Kronuz/pyScss
 Author: German M. Bravo (Kronuz)
 Author-email: german.mb@gmail.com
 License: MIT
-Download-URL: http://github.com/Kronuz/pyScss/tarball/v1.0rc2
+Download-URL: http://github.com/Kronuz/pyScss/tarball/v1.0rc3
 Description: pyScss, a Scss compiler for Python
         ==================================
         :Author:
@@ -182,12 +182,11 @@ Description: pyScss, a Scss compiler for Python
         border-width: 3px;
         }
         
-        
         #. **Sprites** (using `sprite-map()`)
         Example::
         
         @option compress: no;
-        $icons: sprite-map("sociable/*.png"); // contains sociable/facebook.png among others.
+        $icons: sprite-map("sociable/\*.png"); // contains sociable/facebook.png among others.
         div {
         background: $icons;
         }
@@ -240,15 +239,17 @@ Description: pyScss, a Scss compiler for Python
         ==============
         pyScss is a Scss (Sass) implementation for Python.
         Currently it implements @mixin, @include, @if, @else, @for, and @import... it
-        also implements many of the Sass functions including colors function like
+        also implements many of the Sass functions including color functions like
         hsla(), hsl(), darken(), lighten(), mix(), opacify(), transparentize(),
         saturate(), desaturate(), etc.) as well as sprite-map(), sprite-file(),
         image-width(), image-height() and the others.
         
-        In the file `scss.py`, by the top, configure the LOAD_PATHS to point to your
-        Compass framework path (I have `frameworks/compass/*.scss` and
-        `framework/blueprint/*.scss` files in my project directory:
-        `/usr/local/www/project/`, so I have that set for that path by default)
+        In the file `scss.py`, by the top, you can configure the LOAD_PATHS to point to
+        your Sass frameworks path (I have `sass/frameworks/compass/*.scss` and
+        `sass/framework/blueprint/*.scss` files in my project directory:
+        `/usr/local/www/project/`, where `scss.py` lives, so it defaults to use the
+        `sass/framework/` path, relative to the `scss.py` file) or configure using the
+        command line `--load-path` option, see `python scss.py --help`.
         
         I have succesfully compiled some Compass using `python scss.py < myfile.css` the
         following `myfile.css`::
@@ -258,7 +259,7 @@ Description: pyScss, a Scss compiler for Python
         $blueprint-grid-columns : 24;
         $blueprint-grid-width   : 30px;
         $blueprint-grid-margin  : 10px;
-        $font-color			 : #333;
+        $font-color             : #333;
         
         @import "compass/reset";
         @import "compass/utilities";
