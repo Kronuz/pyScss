@@ -613,6 +613,7 @@ class Scss(object):
                 def _av(m):
                     v = flat_context.get(m.group(2))
                     if v:
+                        v = to_str(v)
                         if _dequote and m.group(1):
                             v = dequote(v)
                         if ' ' in v: #FIXME: Perhaps this "if" block is no longer needed?:
@@ -623,7 +624,11 @@ class Scss(object):
                                     v = depar(v)
                             except IndexError:
                                 v = '(' + depar(v) + ')'
-                    return v if v is not None else m.group(0)
+                    elif v is not None:
+                        v = to_str(v)
+                    else:
+                        v = m.group(0)
+                    return v
                 cont = _interpolate_re.sub(_av, cont)
         if options is not None:
             # ...apply math:
@@ -747,7 +752,6 @@ class Scss(object):
             if c_property.startswith('@'):
                 code, name = (c_property.split(None, 1)+[''])[:2]
                 if code == '@warn':
-                    name = self.apply_vars(name, rule[CONTEXT], rule[OPTIONS])
                     name = self.calculate(name, rule[CONTEXT], rule[OPTIONS])
                     err = "Warning: %s" % dequote(name)
                     print >>sys.stderr, err
@@ -761,7 +765,8 @@ class Scss(object):
                 elif c_codestr is not None and code in ('@mixin', '@function'):
                     self._do_functions(rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name)
                 elif code == '@return':
-                    rule[OPTIONS]['@return'] = self.apply_vars(name, rule[CONTEXT], rule[OPTIONS])
+                    ret = self.calculate(name, rule[CONTEXT], rule[OPTIONS])
+                    rule[OPTIONS]['@return'] = ret
                     return
                 elif code == '@include':
                     self._do_include(rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name)
@@ -840,8 +845,6 @@ class Scss(object):
                         _rule = [ '', None, m_codestr, set(), m_vars, _options, '', [], './', False ]
                         self.manage_children(_rule, p_selectors, p_parents, p_children, (scope or '') + '')
                         ret = _options.pop('@return', '')
-                        ret = eval_expr(ret, m_vars, _options, True)
-                        ret = ret.first() if len(ret) == 1 else ret
                         return ret
                     return __call
                 _mixin = _call(mixin)
@@ -888,14 +891,13 @@ class Scss(object):
                     m_param = m_params[varname]
                 except:
                     m_param = varname
-                value = self.apply_vars(value, rule[CONTEXT], rule[OPTIONS])
                 value = self.calculate(value, rule[CONTEXT], rule[OPTIONS])
                 m_vars[m_param] = value
             for p in m_vars:
                 if p not in new_params:
-                    value = self.apply_vars(m_vars[p], m_vars, rule[OPTIONS])
-                    value = self.calculate(value, rule[CONTEXT], rule[OPTIONS])
-                    m_vars[p] = value
+                    if isinstance(m_vars[p], basestring):
+                        value = self.calculate(m_vars[p], m_vars, rule[OPTIONS])
+                        m_vars[p] = value
             _rule = list(rule)
             _rule[CODESTR] = m_codestr
             _rule[CONTEXT] = rule[CONTEXT].copy()
@@ -975,9 +977,7 @@ class Scss(object):
         else:
             val = True
         if val:
-            name = self.apply_vars(name, rule[CONTEXT], rule[OPTIONS])
-            name = self.calculate(name, rule[CONTEXT], rule[OPTIONS])
-            val = name and name.split()[0].lower()
+            val = self.calculate(name, rule[CONTEXT], rule[OPTIONS])
             val = bool(False if not val or val in('0', 'false',) else val)
             if val:
                 rule[CODESTR] = c_codestr
@@ -1002,14 +1002,14 @@ class Scss(object):
         Implements @for
         """
         var, _, name = name.partition('from')
-        name = self.apply_vars(name, rule[CONTEXT], rule[OPTIONS])
-        name = self.calculate(name, rule[CONTEXT], rule[OPTIONS])
         start, _, end = name.partition('through')
         if not end:
             start, _, end = start.partition('to')
+        start = self.calculate(start, rule[CONTEXT], rule[OPTIONS])
+        end = self.calculate(end, rule[CONTEXT], rule[OPTIONS])
         try:
-            start = int(float(start.strip()))
-            end = int(float(end.strip()))
+            start = int(float(start))
+            end = int(float(end))
         except ValueError:
             pass
         else:
@@ -1025,8 +1025,7 @@ class Scss(object):
         Implements @each
         """
         var, _, name = name.partition('in')
-        name = self.apply_vars(name, rule[CONTEXT], rule[OPTIONS])
-        name = eval_expr(name, rule[CONTEXT], rule[OPTIONS], True)
+        name = self.calculate(name, rule[CONTEXT], rule[OPTIONS])
         if name:
             var = var.strip()
             name = ListValue(name)
@@ -1062,19 +1061,26 @@ class Scss(object):
         if prop:
             if value:
                 value = value.strip()
-                value = self.apply_vars(value, rule[CONTEXT], rule[OPTIONS])
                 value = self.calculate(value, rule[CONTEXT], rule[OPTIONS])
             _prop = (scope or '') + prop
             if is_var or prop.startswith('$') and value is not None:
-                if value and '!default' in value:
-                    value = value.replace('!default', '').replace('  ', ' ').strip()
-                    if _prop not in rule[CONTEXT]:
-                        rule[CONTEXT][_prop] = value
-                else:
+                if isinstance(value, basestring):
+                    if '!default' in value:
+                        value = value.replace('!default', '').replace('  ', ' ').strip()
+                elif isinstance(value, ListValue):
+                    for k, v in value.value.items():
+                        if v == '!default':
+                            del value.value[k]
+                            if _prop in rule[CONTEXT]:
+                                value = None
+                            else:
+                                value = value.first() if len(value) == 1 else value
+                            break
+                if value is not None:
                     rule[CONTEXT][_prop] = value
             else:
                 _prop = self.apply_vars(_prop, rule[CONTEXT], rule[OPTIONS], True)
-                rule[PROPERTIES].append((_prop, value))
+                rule[PROPERTIES].append((_prop, to_str(value) if value is not None else None))
 
     @print_timing(10)
     def _nest_rules(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr):
@@ -1356,11 +1362,14 @@ class Scss(object):
                     self._replaces[_base_str] = better_expr_str
                     return better_expr_str
 
-            better_expr_str = eval_expr(better_expr_str, context, options)
-            if better_expr_str is None:
-                better_expr_str = _base_str
+            better_expr_str = self.do_glob_math(better_expr_str, context, options)
 
-            self._replaces[_base_str] = better_expr_str
+            better_expr_str = eval_expr(better_expr_str, context, options, True)
+            if better_expr_str is None:
+                better_expr_str = self.apply_vars(_base_str, context, options)
+
+            if '$' not in _base_str:
+                self._replaces[_base_str] = better_expr_str
         return better_expr_str
 
     def _calculate_expr(self, context, options, _dequote):
@@ -1383,7 +1392,8 @@ class Scss(object):
                 elif _dequote:
                     better_expr_str = dequote(better_expr_str)
 
-                self._replaces[_group0] = better_expr_str
+                if '$' not in _group0:
+                    self._replaces[_group0] = better_expr_str
 
             return better_expr_str
         return __calculate_expr
@@ -2764,9 +2774,17 @@ class BooleanValue(Value):
         return 'true' if self.value else 'false'
     @classmethod
     def _do_cmps(cls, first, second, op):
-        first = BooleanValue(first)
-        second = BooleanValue(second)
-        return op(first.value, second.value)
+        first = first.value if isinstance(first, Value) else first
+        second = second.value if isinstance(second, Value) else second
+        if first in ('true', '1', 'on', 'yes', 't', 'y'):
+            first = True
+        elif first in ('false', '0', 'off', 'no', 'f', 'n'):
+            first = False
+        if second in ('true', '1', 'on', 'yes', 't', 'y'):
+            second = True
+        elif second in ('false', '0', 'off', 'no', 'f', 'n'):
+            second = False
+        return op(first, second)
     @classmethod
     def _do_op(cls, first, second, op):
         first = BooleanValue(first)
@@ -2942,29 +2960,19 @@ class ListValue(Value):
     def __nonzero__(self):
         return len(self)
     def __len__(self):
-        return len(self.items())
+        return len(self.value) - (1 if '_' in self.value else 0)
     def __str__(self):
         return to_str(self.value)
     def __tuple__(self):
         return tuple(sorted((k, v) for k, v in value.items() if k != '_'))
+    def __iter__(self):
+        return iter(self.values())
+    def values(self):
+        return zip(*self.items())[1]
+    def keys(self):
+        return zip(*self.items())[1]
     def items(self):
-        value = self.value
-        if len(value) - (1 if '_' in value else 0) == 1:
-            while True:
-                for k, v in value.items():
-                    if k != '_':
-                        key = k
-                        value = v
-                        break
-                if isinstance(value, ListValue):
-                    value = value.value
-                if not isinstance(value, dict):
-                    break
-                if len(value) - (1 if '_' in value else 0) != 1:
-                    break
-            if not isinstance(value, dict):
-                value = { key: value }
-        return sorted((k, v) for k, v in value.items() if k != '_')
+        return sorted((k, v) for k, v in self.value.items() if k != '_')
     def first(self):
         try:
             return self.items()[0][1]
@@ -3282,6 +3290,14 @@ fnct = {
 for u in _units:
     fnct[u+':2'] = _convert_to
 
+def interpolate(v, C, O):
+    v = C.get(v, v)
+    if isinstance(v, basestring):
+        vi = eval_expr(v, C, O, True)
+        if vi is not None:
+            v = vi
+    return v
+
 def call(name, args, C, O, is_function=True):
     # Function call:
     _name = name.replace('_', '-')
@@ -3301,7 +3317,7 @@ def call(name, args, C, O, is_function=True):
                     node.value['_'] = separator
                 else:
                     node.value.pop('_', None)
-    except:
+    except KeyError:
         #raise#@@@#
         sp = args and args.value.get('_') or ''
         if is_function:
@@ -3382,11 +3398,19 @@ class Scanner(object):
         if i == tokens_len: # We are at the end, ge the next...
             tokens_len += self.scan(restrict)
         if i < tokens_len:
-            if restrict > self.restrictions[i]:
+            if restrict and restrict > self.restrictions[i]:
                 raise NotImplementedError("Unimplemented: restriction set changed")
             return self.tokens[i]
         raise NoMoreTokens()
 
+    def rewind(self, i):
+        tokens_len = len(self.tokens)
+        if i <= tokens_len:
+            token = self.tokens[i]
+            self.tokens = self.tokens[:i]
+            self.restrictions = self.restrictions[:i]
+            self.pos = token[0]
+    
     def scan(self, restrict):
         """
         Should scan another token and add it to the list, self.tokens,
@@ -3465,6 +3489,10 @@ class Parser(object):
             raise SyntaxError(tok[0], "Trying to find " + type)
         self._pos += 1
         return tok[3]
+    
+    def _rewind(self, n=1):
+        self._pos -= min(n, self._pos)
+        self._scanner.rewind(self._pos)
 
 ################################################################################
 
@@ -3508,7 +3536,7 @@ class CalculatorScanner(Scanner):
 class Calculator(Parser):
     def goal(self, C,O):
         expr_lst = self.expr_lst(C,O)
-        v = expr_lst
+        v = expr_lst.first() if len(expr_lst) == 1 else expr_lst
         END = self._scan('END')
         return v
 
@@ -3659,26 +3687,34 @@ class Calculator(Parser):
         elif _token_ == 'BOOL':
             BOOL = self._scan('BOOL')
             return BooleanValue(ParserValue(BOOL))
-        else:# == 'COLOR'
+        elif _token_ == 'COLOR':
             COLOR = self._scan('COLOR')
             return ColorValue(ParserValue(COLOR))
+        else:# == 'VAR'
+            VAR = self._scan('VAR')
+            return interpolate(VAR, C, O)
 
     def expr_lst(self, C,O):
         n = None
         if self._peek(self.expr_lst_rsts) == 'VAR':
             VAR = self._scan('VAR')
-            self._scan('":"')
-            n = VAR
+            if self._peek(self.expr_lst_rsts_) == '":"':
+                self._scan('":"')
+                n = VAR
+            else:
+                self._rewind()
         expr_slst = self.expr_slst(C,O)
         v = { n or 0: expr_slst }
-        while self._peek(self.expr_lst_rsts_) == 'COMMA':
+        while self._peek(self.expr_lst_rsts__) == 'COMMA':
             n = None
             COMMA = self._scan('COMMA')
             v['_'] = COMMA
             if self._peek(self.expr_lst_rsts) == 'VAR':
                 VAR = self._scan('VAR')
-                self._scan('":"')
-                n = VAR
+                if self._peek(self.expr_lst_rsts_) == '":"':
+                    self._scan('":"')
+                    n = VAR
+                else: self._rewind()
             expr_slst = self.expr_slst(C,O)
             v[n or len(v)] = expr_slst
         return ListValue(ParserValue(v))
@@ -3686,56 +3722,56 @@ class Calculator(Parser):
     def expr_slst(self, C,O):
         expr = self.expr(C,O)
         v = { 0: expr }
-        while self._peek(self.expr_slst_rsts) not in self.expr_lst_rsts_:
+        while self._peek(self.expr_slst_rsts) not in self.expr_lst_rsts__:
             expr = self.expr(C,O)
             v[len(v)] = expr
         return ListValue(ParserValue(v)) if len(v) > 1 else v[0]
 
-    not_test_rsts_ = set(['AND', 'LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'ADD', 'NUM', 'COMMA', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
+    not_test_rsts_ = set(['AND', 'LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
     m_expr_chks = set(['MUL', 'DIV'])
-    comparison_rsts = set(['LPAR', 'QSTR', 'RPAR', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'ADD', 'STR', 'EQ', 'ID', 'AND', 'INV', 'GE', 'BOOL', 'NOT', 'OR'])
-    atom_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
+    comparison_rsts = set(['LPAR', 'QSTR', 'RPAR', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'ADD', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'INV', 'GE', 'BOOL', 'NOT', 'OR'])
+    atom_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'VAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
     not_test_chks = set(['NOT', 'INV'])
-    u_expr_chks = set(['LPAR', 'COLOR', 'QSTR', 'NUM', 'BOOL', 'STR', 'ID'])
-    m_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'STR', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
-    expr_lst_rsts_ = set(['END', 'COMMA', 'RPAR'])
+    u_expr_chks = set(['LPAR', 'COLOR', 'QSTR', 'NUM', 'BOOL', 'STR', 'VAR', 'ID'])
+    m_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
+    expr_lst_rsts_ = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'BOOL', '":"', 'STR', 'NOT', 'ID'])
     expr_lst_rsts = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'NOT', 'ADD', 'NUM', 'BOOL', 'STR', 'VAR', 'ID'])
-    and_test_rsts = set(['AND', 'LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'ADD', 'NUM', 'COMMA', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
-    u_expr_rsts_ = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
-    u_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'ADD', 'NUM', 'BOOL', 'STR', 'ID'])
-    expr_rsts = set(['LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'ADD', 'NUM', 'COMMA', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
-    not_test_rsts = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'ADD', 'NUM', 'BOOL', 'STR', 'NOT', 'ID'])
+    and_test_rsts = set(['AND', 'LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
+    u_expr_rsts_ = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'VAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
+    u_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'ADD', 'NUM', 'BOOL', 'STR', 'VAR', 'ID'])
+    expr_rsts = set(['LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
+    not_test_rsts = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'BOOL', 'STR', 'NOT', 'ID'])
     atom_rsts_ = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'NOT', 'ADD', 'NUM', 'BOOL', 'STR', 'VAR', 'RPAR', 'ID'])
     comparison_chks = set(['GT', 'GE', 'NE', 'LT', 'LE', 'EQ'])
+    expr_slst_rsts = set(['LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'RPAR', 'VAR', 'ADD', 'NUM', 'COMMA', 'STR', 'NOT', 'BOOL', 'SIGN', 'ID'])
     a_expr_chks = set(['ADD', 'SUB'])
-    a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'STR', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
-    expr_slst_rsts = set(['LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'RPAR', 'ADD', 'NUM', 'COMMA', 'STR', 'NOT', 'BOOL', 'SIGN', 'ID'])
+    a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
+    expr_lst_rsts__ = set(['END', 'COMMA', 'RPAR'])
+
+    expr_lst_rsts_ = None
 
 ### Grammar ends.
 
 def eval_expr(expr, context={}, options={}, raw=False):
+    #print >>sys.stderr, '>>',expr,'<<'
     val = None
     try:
         P = Calculator(CalculatorScanner())
         P.reset(expr)
         results = P.goal(context, options)
-    except SyntaxError:
-        return#@@@#
-        print >>sys.stderr, '>>',expr,'<<'
-        raise
-    except:
-        return#@@@#
-        print >>sys.stderr, '>>',expr,'<<'
-        raise
-    else:
-        #print >>sys.stderr, '%%',results,'%%'
         if raw:
+            #print >>sys.stderr, '%%',repr(results),'%%'
             return results
         if results is not None:
             val = to_str(results)
             #print >>sys.stderr, '==',val,'=='
             return val
-
+    except SyntaxError:
+        return#@@@#
+        raise
+    except:
+        #return#@@@#
+        raise
 __doc__ += """
 >>> css = Scss()
 
@@ -4537,7 +4573,7 @@ a {
 	color: rgb(87.254%, 48.482%, 37.546%);
 	color: hsl(13.2deg, 66.1%, 62.4%);
 	color-hue: 13.2deg;
-	color-saturation: 66.101%;
+	color-saturation: 66.1%;
 	color-lightness: 62.4%;
 }
 
@@ -4967,15 +5003,12 @@ def main():
                             continue
                     elif s.startswith('$') and (':' in s or '=' in s):
                         prop, value = [ a.strip() for a in _prop_split_re.split(s, 1) ]
-                        value = css.apply_vars(value, context, options)
+                        value = css.calculate(value, context, options)
                         context[prop] = value
                         continue
-                    s = css.apply_vars(s, context, options)
-                    final_cont = eval_expr(s, context, options)
-                    if final_cont is None:
-                        final_cont = s
-                    final_cont = css.post_process(final_cont)
-                    print final_cont
+                    s = to_str(css.calculate(s, context, options))
+                    s = css.post_process(s)
+                    print s
             print 'Bye!'
         else:
             css = Scss()

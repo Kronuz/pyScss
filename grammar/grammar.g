@@ -11,6 +11,8 @@ BooleanValue = lambda s: bool(s)
 ColorValue = lambda s: s
 ListValue = lambda s: s
 _inv = lambda s: s
+def interpolate(v, C, O):
+    return v
 def call(fn, args, C, O, function=True):
     print 'call: ',fn, args
     return args
@@ -46,7 +48,7 @@ parser Calculator:
     token COLOR: "#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])"
     token VAR: "\$[-a-zA-Z0-9_]+"
     token ID: "[-a-zA-Z_][-a-zA-Z0-9_]*"
-    rule goal<<C,O>>:         expr_lst<<C,O>>               {{ v = expr_lst }}
+    rule goal<<C,O>>:         expr_lst<<C,O>>               {{ v = expr_lst.first() if len(expr_lst) == 1 else expr_lst }}
                               END                           {{ return v }}
     rule expr<<C,O>>:         and_test<<C,O>>               {{ v = and_test }}
                               (
@@ -115,15 +117,21 @@ parser Calculator:
                               BOOL                          {{ return BooleanValue(ParserValue(BOOL)) }}
                               |
                               COLOR                         {{ return ColorValue(ParserValue(COLOR)) }}
+                              |
+                              VAR                           {{ return interpolate(VAR, C, O) }}
     rule expr_lst<<C,O>>:                                   {{ n = None }}
                               [
-                                  VAR ":"                   {{ n = VAR }}
+                                  VAR [
+                                      ":"                   {{ n = VAR }}
+                                  ]                         {{ else: self._rewind() }}
                               ]
                               expr_slst<<C,O>>              {{ v = { n or 0: expr_slst } }}
                               (                             {{ n = None }}
                                   COMMA                     {{ v['_'] = COMMA }}
                                   [
-                                      VAR ":"               {{ n = VAR }}
+                                      VAR [
+                                          ":"               {{ n = VAR }}
+                                      ]                     {{ else: self._rewind() }}
                                   ]
                                   expr_slst<<C,O>>          {{ v[n or len(v)] = expr_slst }}
                               )*                            {{ return ListValue(ParserValue(v)) }}
@@ -132,7 +140,15 @@ parser Calculator:
                                   expr<<C,O>>               {{ v[len(v)] = expr }}
                               )*                            {{ return ListValue(ParserValue(v)) if len(v) > 1 else v[0] }}
 %%
+    expr_lst_rsts_ = None
+
 ### Grammar ends.
+
+P = Calculator(CalculatorScanner())
+def parse(rule, text, *args):
+    P.reset(text)
+    return wrap_error_reporter(P, rule, *args)
+
 if __name__ == '__main__':
     while True:
         try: s = raw_input('>>> ')

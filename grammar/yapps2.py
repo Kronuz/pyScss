@@ -223,15 +223,16 @@ class Generator:
         for n, s in self.sets.items():
             self.write("    %s = %s\n" % (n, set(s)))
 
-        self.write("\n")
-        self.write("P = ", self.name, "(", self.name, "Scanner())\n")
-        self.write("def parse(rule, text, *args):\n")
-        self.write("    P.reset(text)\n")
-        self.write("    return wrap_error_reporter(P, rule, *args)\n")
-        self.write("\n")
         if self.postparser is not None:
             self.write(self.postparser)
         else:
+            self.write("\n")
+            self.write("P = ", self.name, "(", self.name, "Scanner())\n")
+            self.write("def parse(rule, text, *args):\n")
+            self.write("    P.reset(text)\n")
+            self.write("    return wrap_error_reporter(P, rule, *args)\n")
+            self.write("\n")
+
             self.write("if __name__ == '__main__':\n")
             self.write(INDENT, "from sys import argv, stdin\n")
             self.write(INDENT, "if len(argv) >= 2:\n")

@@ -68,11 +68,19 @@ class Scanner(object):
         if i == tokens_len: # We are at the end, ge the next...
             tokens_len += self.scan(restrict)
         if i < tokens_len:
-            if restrict > self.restrictions[i]:
+            if restrict and restrict > self.restrictions[i]:
                 raise NotImplementedError("Unimplemented: restriction set changed")
             return self.tokens[i]
         raise NoMoreTokens()
 
+    def rewind(self, i):
+        tokens_len = len(self.tokens)
+        if i <= tokens_len:
+            token = self.tokens[i]
+            self.tokens = self.tokens[:i]
+            self.restrictions = self.restrictions[:i]
+            self.pos = token[0]
+    
     def scan(self, restrict):
         """
         Should scan another token and add it to the list, self.tokens,
@@ -151,6 +159,12 @@ class Parser(object):
             raise SyntaxError(tok[0], "Trying to find " + type)
         self._pos += 1
         return tok[3]
+    
+    def _rewind(self, n=1):
+        self._pos -= min(n, self._pos)
+        self._scanner.rewind(self._pos)
+        
+        
 
 ################################################################################
 
