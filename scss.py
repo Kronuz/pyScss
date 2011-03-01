@@ -2484,10 +2484,14 @@ def _prefix(prefix, *args):
     args = list(args)
     for i, arg in enumerate(args):
         if isinstance(arg, ListValue):
+            _value = {}
             for k, iarg in arg.value.items():
                 to_fnct = getattr(iarg, to_fnct_str, None)
                 if to_fnct:
-                    arg.value[k] = to_fnct()
+                    _value[k] = to_fnct()
+                else:
+                    _value[k] = iarg
+            args[i] = ListValue(_value)
         else:
             to_fnct = getattr(arg, to_fnct_str, None)
             if to_fnct:
