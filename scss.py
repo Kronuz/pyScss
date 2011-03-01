@@ -3774,7 +3774,7 @@ def eval_expr(expr, context={}, options={}, raw=False):
         return#@@@#
         raise
     except:
-        #return#@@@#
+        return#@@@#
         raise
 __doc__ += """
 >>> css = Scss()
