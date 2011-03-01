@@ -2151,13 +2151,15 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
     inline = 'url("%s")' % escape(url)
     return StringValue(inline)
 
-def _image_color(color):
+def _image_color(color, width=1, height=1):
     if not Image:
         raise Exception("Images manipulation require PIL")
     c = ColorValue(color).value
+    w = int(NumberValue(width).value)
+    h = int(NumberValue(height).value)
     new_image = Image.new(
         mode = 'RGBA',
-        size = (1, 1),
+        size = (w, h),
         color = (c[0], c[1], c[2], int(c[3] * 255.0))
     )
     output = StringIO.StringIO()
@@ -3167,6 +3169,8 @@ fnct = {
     'grid-image:4': _grid_image,
     'grid-image:5': _grid_image,
     'image-color:1': _image_color,
+    'image-color:2': _image_color,
+    'image-color:3': _image_color,
     'sprite-map:1': _sprite_map,
     'sprites:1': _sprites,
     'sprite:2': _sprite,
