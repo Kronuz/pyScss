@@ -2157,6 +2157,8 @@ def _image_color(color, width=1, height=1):
     c = ColorValue(color).value
     w = int(NumberValue(width).value)
     h = int(NumberValue(height).value)
+    if w <= 0 or h <= 0:
+        raise ValueError
     new_image = Image.new(
         mode = 'RGBA',
         size = (w, h),
