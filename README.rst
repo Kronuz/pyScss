@@ -46,9 +46,9 @@ Installation
 ============
 pyScss should be installed using pip or setuptools::
 
-	pip install scss
+	pip install pyScss
 
-	easy_install scss
+	easy_install pyScss
 
 Usage
 =====
