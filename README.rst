@@ -182,7 +182,7 @@ Examples
 		    background: $icons;
 		}
 		@each $icon in sprites($icons) {
-		    div .$icon {
+		    div .#{$icon} {
 		        width: image-width(sprite-file($icons, $icon));
 		        height: image-height(sprite-file($icons, $icon));
 		        background-position: sprite-position($icons, $icon);
