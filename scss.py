@@ -1149,11 +1149,12 @@ class Scss(object):
                         lcs = self.longest_common_suffix(c_selector, p_selector)
                         if lcs: c_selector = c_selector[:-lcs]
                         # Get the new selectors:
-                        prev_symbol = r'(?<![-\w])' if parent[0] not in ('#', '.', ':') else ''
+                        prev_symbol = '(?<![#.:])' if parent[0] in ('#', '.', ':') else r'(?<![-\w#.:])'
                         post_symbol = r'(?![-\w])'
                         new_parent = re.sub(prev_symbol + parent + post_symbol, c_selector, p_selector)
-                        new_selectors.add(new_parent)
-                        found = True
+                        if p_selector != new_parent:
+                            new_selectors.add(new_parent)
+                            found = True
 
             if found:
                 # add parent:
@@ -1219,21 +1220,23 @@ class Scss(object):
 
                     parents = self.link_with_parents(parent, selectors, rules)
 
-                    assert parents is not None, "Parent not found: %s (%s)" % (parent, selectors)
-
-                    # from the parent, inherit the context and the options:
-                    new_context = {}
-                    new_options = {}
-                    for parent in parents:
-                        new_context.update(parent[CONTEXT])
-                        new_options.update(parent[OPTIONS])
-                    for rule in rules:
-                        _new_context = new_context.copy()
-                        _new_context.update(rule[CONTEXT])
-                        rule[CONTEXT] = _new_context
-                        _new_options = new_options.copy()
-                        _new_options.update(rule[OPTIONS])
-                        rule[OPTIONS] = _new_options
+                    if parents is None:
+                        err = "Warning: Parent rule not found: %s" % parent
+                        print >>sys.stderr, err
+                    else:
+                        # from the parent, inherit the context and the options:
+                        new_context = {}
+                        new_options = {}
+                        for parent in parents:
+                            new_context.update(parent[CONTEXT])
+                            new_options.update(parent[OPTIONS])
+                        for rule in rules:
+                            _new_context = new_context.copy()
+                            _new_context.update(rule[CONTEXT])
+                            rule[CONTEXT] = _new_context
+                            _new_options = new_options.copy()
+                            _new_options.update(rule[OPTIONS])
+                            rule[OPTIONS] = _new_options
 
     @print_timing(3)
     def manage_order(self):
