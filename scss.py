@@ -1922,8 +1922,8 @@ def _linear_gradient(*args):
     def to__webkit():
         args = [
             'linear',
-            position_and_angle or 'top',
-            _opposite_position(position_and_angle or 'top'),
+            position_and_angle or 'center top',
+            _opposite_position(position_and_angle or 'center top'),
         ]
         args.extend('color-stop(%s, %s)' % (to_str(s), c) for s,c in color_stops)
         ret = '-webkit-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
@@ -2112,12 +2112,12 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
     if not Image:
         raise Exception("Images manipulation require PIL")
     if grid_color == None:
-        grid_color = (120, 170, 250, 50)
+        grid_color = (120, 170, 250, 15)
     else:
         c = ColorValue(grid_color).value
         grid_color = (c[0], c[1], c[2], int(c[3] * 255.0))
     if baseline_color == None:
-        baseline_color = (120, 170, 250, 70)
+        baseline_color = (120, 170, 250, 30)
     else:
         c = ColorValue(baseline_color).value
         baseline_color = (c[0], c[1], c[2], int(c[3] * 255.0))
