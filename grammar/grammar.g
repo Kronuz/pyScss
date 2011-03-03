@@ -16,7 +16,7 @@ def interpolate(v, C, O):
 def call(fn, args, C, O, function=True):
     print 'call: ',fn, args
     return args
-#'|'.join(_units)
+#'(?:'+'|'.join(_units)+')(?![-\w])'
 ## Grammar compiled using Yapps:
 %%
 parser Calculator:

@@ -3511,8 +3511,7 @@ class Parser(object):
         self._scanner.rewind(self._pos)
 
 ################################################################################
-
-#'|'.join(_units)
+#'(?:'+'|'.join(_units)+')(?![-\w])'
 ## Grammar compiled using Yapps:
 class CalculatorScanner(Scanner):
     patterns = [
@@ -3539,7 +3538,7 @@ class CalculatorScanner(Scanner):
         ('GE', re.compile('>=')),
         ('STR', re.compile("'[^']*'")),
         ('QSTR', re.compile('"[^"]*"')),
-        ('UNITS', re.compile('|'.join(_units))),
+        ('UNITS', re.compile('(?:'+'|'.join(_units)+')(?![-\w])')),
         ('NUM', re.compile('(?:\\d+(?:\\.\\d*)?|\\.\\d+)')),
         ('BOOL', re.compile('(?:true|false)')),
         ('COLOR', re.compile('#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])')),
@@ -4842,6 +4841,18 @@ Issue #4 test
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .foo {
   width: 100px;
+}
+
+Issue #5 test
+>>> print css.compile('''
+... @option compress:no, short_colors:yes, reverse_colors:yes;
+... $width: 1px;
+... foo {
+...     border: $width solid red;
+... }
+... ''') #doctest: +NORMALIZE_WHITESPACE
+foo {
+  border: 1px solid red;
 }
 
 """
