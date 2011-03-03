@@ -830,7 +830,10 @@ class Scss(object):
                     if default:
                         default = self.apply_vars(default, rule[CONTEXT], None)
                         defaults[param] = default
-            mixin = [ list(new_params), defaults, self.apply_vars(c_codestr, rule[CONTEXT], None) ]
+            context = rule[CONTEXT].copy()
+            for p in new_params:
+                context.pop(p, None)
+            mixin = [ list(new_params), defaults, self.apply_vars(c_codestr, context, None) ]
             if code == '@function':
                 def _call(mixin):
                     def __call(*args, **kwargs):
@@ -4823,6 +4826,22 @@ Issue #2 test
   display: inline;
   float: left;
   position: relative;
+}
+
+Issue #4 test
+>>> print css.compile('''
+... @option compress:no, short_colors:yes, reverse_colors:yes;
+... $width: 150px;
+... @mixin foo($width) {
+...     width: $width;
+... }
+... $other_width: 100px;
+... .foo {
+...     @include foo($other_width);
+... }
+... ''') #doctest: +NORMALIZE_WHITESPACE
+.foo {
+  width: 100px;
 }
 
 """
