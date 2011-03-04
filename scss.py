@@ -4873,6 +4873,26 @@ foo {
   border: 1px solid red;
 }
 
+Issue #6 test
+>>> print css.compile('''
+... @option compress:no, short_colors:yes, reverse_colors:yes;
+... $type: monster;
+... p {
+...   @if $type == ocean {
+...     color: blue;
+...   } @else if $type == matador {
+...     color: red;
+...   } @else if $type == monster {
+...     color: green;
+...   } @else {
+...     color: black;
+...   }
+... }
+... ''') #doctest: +NORMALIZE_WHITESPACE
+p {
+  color: green;
+}
+
 """
 """
 ADVANCED STUFF, NOT SUPPORTED (FROM SASS):
