@@ -55,14 +55,14 @@ __license__ = LICENSE
 import os
 PROJECT_ROOT = os.path.normpath(os.path.dirname(os.path.abspath(__file__)))
 # Sass @import load_paths:
-LOAD_PATHS = os.path.join(PROJECT_ROOT, 'sass', 'frameworks/')
-# Media base root path where images, fonts and other resources are located:
-MEDIA_ROOT = os.path.join(PROJECT_ROOT, 'media/')
+LOAD_PATHS = os.path.join(PROJECT_ROOT, 'sass/frameworks/')
 # Assets path, where new sprite files are created:
-ASSETS_ROOT = os.path.join(PROJECT_ROOT, 'media', 'assets/')
-# Urls for the media and assets:
-MEDIA_URL = '/media/'
-ASSETS_URL = '/media/assets/'
+STATIC_ROOT = os.path.join(PROJECT_ROOT, 'static/')
+# Assets path, where new sprite files are created:
+ASSETS_ROOT = os.path.join(PROJECT_ROOT, 'static/assets/')
+# Urls for the static and assets:
+STATIC_URL = '/static/'
+ASSETS_URL = '/static/assets/'
 VERBOSITY = 1
 ################################################################################
 
@@ -86,7 +86,7 @@ _units_weights = {
     'mm': 10,
     'ms': 10,
     'hz': 10,
-    '%': 0,
+    '%': 100,
 }
 _conv = {
     'size': {
@@ -264,6 +264,19 @@ _colors = {
     'yellowgreen': '#9acd32'
 }
 
+_safe_strings = {
+    '^doubleslash^': '//',
+    '^bigcopen^': '/*',
+    '^bigcclose^': '*/',
+    '^doubledot^': ':',
+    '^semicolon^': ';',
+    '^curlybracketopen^': '{',
+    '^curlybracketclosed^': '}',
+}
+_reverse_safe_strings = dict((v, k) for k, v in _safe_strings.items()) 
+_safe_strings_re = re.compile('|'.join(map(re.escape, _safe_strings)))
+_reverse_safe_strings_re = re.compile('|'.join(map(re.escape, _reverse_safe_strings)))
+
 _default_scss_vars = {
     # unsafe chars will be hidden as vars
     '$__doubleslash': '//',
@@ -319,9 +332,7 @@ _spaces_re = re.compile(r'\s+')
 _expand_rules_space_re = re.compile(r'\s*{')
 _collapse_properties_space_re = re.compile(r'([:#])\s*{')
 
-_reverse_default_scss_vars = dict((v, k) for k, v in _default_scss_vars.items())
-_reverse_default_scss_vars_re = re.compile(r'(content.*:.*(\'|").*)(' + '|'.join(map(re.escape, _reverse_default_scss_vars)) + ')(.*\2)')
-
+_strings_re = re.compile(r'([\'"]).*?\1')
 _blocks_re = re.compile(r'[{},;()\'"]|\n+|$')
 
 _prop_split_re = re.compile(r'[:=]')
@@ -671,13 +682,16 @@ class Scss(object):
 
     def load_string(self, str):
         # protects content: "..." strings
-        str = _reverse_default_scss_vars_re.sub(lambda m: m.group(0) + _reverse_default_scss_vars.get(m.group(2)) + m.group(3), str)
+        
+        str = _strings_re.sub(lambda m: _reverse_safe_strings_re.sub(lambda n: _reverse_safe_strings[n.group(0)], m.group(0)), str)
 
         # removes multiple line comments
         str = _ml_comment_re.sub('', str)
 
         # removes inline comments, but not :// (protocol)
         str = _sl_comment_re.sub('', str)
+
+        str = _safe_strings_re.sub(lambda m: _safe_strings[m.group(0)], str)
 
         # expand the space in rules
         str = _expand_rules_space_re.sub(' {', str)
@@ -2028,9 +2042,12 @@ def _sprite_map(g, **kwargs):
         repeat = kwargs.get('$repeat', 'no-repeat')
         vertical = (kwargs.get('$direction', 'vertical') == 'vertical')
 
-        files = sorted(glob.glob(os.path.join(MEDIA_ROOT, g)))
+        glob_path = os.path.join(STATIC_ROOT, g)
+        files = sorted(glob.glob(glob_path))
 
         if not files:
+            err = "Error: nothing found at '%s'" % glob_path
+            print >>sys.stderr, err
             return StringValue(None)
 
         times = [ int(os.path.getmtime(file)) for file in files ]
@@ -2048,7 +2065,7 @@ def _sprite_map(g, **kwargs):
         else:
             images = tuple( Image.open(file) for file in files )
             names = tuple( os.path.splitext(os.path.basename(file))[0] for file in files )
-            files = tuple( file[len(MEDIA_ROOT):] for file in files )
+            files = tuple( file[len(STATIC_ROOT):] for file in files )
             sizes = tuple( image.size for image in images )
             offsets_x = []
             offsets_y = []
@@ -2166,15 +2183,16 @@ def _image_color(color, width=1, height=1):
     if w <= 0 or h <= 0:
         raise ValueError
     new_image = Image.new(
-        mode = 'RGBA',
+        mode = 'RGB' if c[3] == 1 else 'RGBA',
         size = (w, h),
         color = (c[0], c[1], c[2], int(c[3] * 255.0))
     )
     output = StringIO.StringIO()
-    new_image.save(output, format='PNG')
+    new_image.save(output, format='PNG' if c[3] == 1 else 'GIF')
     contents = output.getvalue()
     output.close()
-    url = 'data:image/png;base64,' + base64.b64encode(contents)
+    mime_type = 'image/gif' if c[3] == 1 else 'image/png'
+    url = 'data:' + mime_type + ';base64,' + base64.b64encode(contents)
     inline = 'url("%s")' % escape(url)
     return StringValue(inline)
 
@@ -2261,13 +2279,13 @@ def _inline_image(image, mime_type=None):
     file.
     """
     file = StringValue(image).value
-    path = os.path.join(MEDIA_ROOT, file)
+    path = os.path.join(STATIC_ROOT, file)
     if os.path.exists(path):
         mime_type = StringValue(mime_type).value or mimetypes.guess_type(path)[0]
         path = open(path, 'rb')
         url = 'data:' + mime_type + ';base64,' + base64.b64encode(path.read())
     else:
-        url = url = '%s%s?_=%s' % (MEDIA_URL, file, 'NA')
+        url = url = '%s%s?_=%s' % (STATIC_URL, file, 'NA')
     inline = 'url("%s")' % escape(url)
     return StringValue(inline)
 
@@ -2277,12 +2295,12 @@ def _image_url(image):
     directory.
     """
     file = StringValue(image).value
-    path = os.path.join(MEDIA_ROOT, file)
+    path = os.path.join(STATIC_ROOT, file)
     if os.path.exists(path):
         filetime = int(os.path.getmtime(path))
     else:
         filetime = 'NA'
-    url = 'url("%s%s?_=%s")' % (MEDIA_URL, file, filetime)
+    url = 'url("%s%s?_=%s")' % (STATIC_URL, file, filetime)
     return StringValue(url)
 
 def _image_width(image):
@@ -2293,7 +2311,7 @@ def _image_width(image):
     if not Image:
         raise Exception("Images manipulation require PIL")
     file = StringValue(image).value
-    path = os.path.join(MEDIA_ROOT, file)
+    path = os.path.join(STATIC_ROOT, file)
     try:
         width = sprite_images[file][0]
     except KeyError:
@@ -2315,7 +2333,7 @@ def _image_height(image):
     if not Image:
         raise Exception("Images manipulation require PIL")
     file = StringValue(image).value
-    path = os.path.join(MEDIA_ROOT, file)
+    path = os.path.join(STATIC_ROOT, file)
     try:
         height = sprite_images[file][1]
     except KeyError:
@@ -4901,7 +4919,7 @@ def usage():
     print "        --time                       Display compilation times."
     print "    -i, --interactive                Run an interactive Scss shell."
     print "    -I, --load-path PATH             Add a scss import path."
-    print "    -M, --media-root PATH            Media root path (Where images and media resources are located)"
+    print "    -S, --static-root PATH           Static root path (Where images and static resources are located)"
     print "    -A, --assets-root PATH           Assets root path (Sprite images will be created here)"
     print "    -?, -h, --help                   Show this message"
     print "    -v, --version                    Print version"
@@ -4922,18 +4940,18 @@ def main():
         pass
     try:
         # parse options
-        opts, args = getopt.getopt(sys.argv[1:], '?hvtiI:M:A:', ['help', 'version', 'time', 'test', 'interactive', 'load-path=', 'media-root=', 'assets-root='])
+        opts, args = getopt.getopt(sys.argv[1:], '?hvtiI:S:A:', ['help', 'version', 'time', 'test', 'interactive', 'load-path=', 'static-root=', 'assets-root='])
     except getopt.GetoptError, err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
         usage()
     else:
-        global LOAD_PATHS, VERBOSITY, MEDIA_ROOT, ASSETS_ROOT
+        global LOAD_PATHS, VERBOSITY, STATIC_ROOT, ASSETS_ROOT
         VERBOSITY = 0
         load_paths = [ p.strip() for p in LOAD_PATHS.split(',') ]
         for o, a in opts:
-            if o in ('-M', '--media-root'):
-                MEDIA_ROOT = a
+            if o in ('-S', '--static-root'):
+                STATIC_ROOT = a
             elif o in ('-A', '--assets-root'):
                 ASSETS_ROOT = a
             elif o in ('-I', '--load-path'):

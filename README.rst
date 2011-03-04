@@ -192,7 +192,7 @@ Examples
 	...generates a new sprite file and produces something like::
 
 		div {
-		    background: url("/media/assets/u8Y7yEQL0UffAVw5rX7yhw.png?_=1298240989") 0px 0px no-repeat;
+		    background: url("/static/assets/u8Y7yEQL0UffAVw5rX7yhw.png?_=1298240989") 0px 0px no-repeat;
 		}
 		div .facebook {
 		    width: 32px;
