@@ -989,7 +989,7 @@ class Scss(object):
         if code != '@if':
             if '@if' not in rule[OPTIONS]:
                 print >>sys.stderr, "Warning: @else with no @if!"
-            val = rule[OPTIONS].get('@if', True)
+            val = not rule[OPTIONS].get('@if', True)
             name = c_property[9:].strip()
         else:
             val = True
