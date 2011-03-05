@@ -2090,20 +2090,20 @@ def _sprite_map(g, **kwargs):
                     offset = margins[3]
                 for i, image in enumerate(images):
                     if vertical:
-                        offsets_x.append(0 - margins[3])
+                        offsets_x.append(0)
                         offsets_y.append(offset - margins[0])
                         offset += sizes[i][1] + margins[0] + margins[2]
                     else:
                         offsets_x.append(offset - margins[3])
-                        offsets_y.append(0 - margins[0])
+                        offsets_y.append(0)
                         offset += sizes[i][0] + margins[1] + margins[3]
             else:
                 if vertical:
-                    width = max(zip(*sizes)[0]) + margins[0] + margins[2]
+                    width = max(zip(*sizes)[0]) + margins[1] + margins[3]
                     height = sum(zip(*sizes)[1]) + (margins[0] + margins[2]) * len(files)
                 else:
                     width = sum(zip(*sizes)[0]) + (margins[1] + margins[3]) * len(files)
-                    height = max(zip(*sizes)[1]) + margins[1] + margins[3]
+                    height = max(zip(*sizes)[1]) + margins[0] + margins[2]
 
                 new_image = Image.new(
                     mode = 'RGBA',
@@ -2118,13 +2118,13 @@ def _sprite_map(g, **kwargs):
                 for i, image in enumerate(images):
                     if vertical:
                         new_image.paste(image, (margins[3], offset))
-                        offsets_x.append(0 - margins[3])
+                        offsets_x.append(0)
                         offsets_y.append(offset - margins[0])
                         offset += sizes[i][1] + margins[0] + margins[2]
                     else:
                         new_image.paste(image, (offset, margins[0]))
                         offsets_x.append(offset - margins[3])
-                        offsets_y.append(0 - margins[0])
+                        offsets_y.append(0)
                         offset += sizes[i][0] + margins[1] + margins[3]
 
                 try:
