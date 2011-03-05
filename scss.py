@@ -2042,17 +2042,27 @@ def _sprite_map(g, **kwargs):
         repeat = kwargs.get('$repeat', 'no-repeat')
         vertical = (kwargs.get('$direction', 'vertical') == 'vertical')
 
-        glob_path = os.path.join(STATIC_ROOT, g)
-        files = sorted(glob.glob(glob_path))
+        if callable(STATIC_ROOT):
+            files = sorted(STATIC_ROOT(g))
+        else:
+            glob_path = os.path.join(STATIC_ROOT, g)
+            files = glob.glob(glob_path)
+            files = sorted( (file[len(STATIC_ROOT):], None) for file in files )
 
         if not files:
             err = "Error: nothing found at '%s'" % glob_path
             print >>sys.stderr, err
             return StringValue(None)
 
-        times = [ int(os.path.getmtime(file)) for file in files ]
+        times = []
+        for file, storage in files:
+            try:
+                d_obj = storage.modified_time(file)
+                times.append(int(time.mktime(d_obj.timetuple())))
+            except:
+                times.append(int(os.path.getmtime(file)))
 
-        key = files + times + [ gutter, offset_x, offset_y, repeat, vertical ]
+        key = list(zip(*files)[0]) + times + [ gutter, offset_x, offset_y, repeat, vertical ]
         key = base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
@@ -2060,12 +2070,9 @@ def _sprite_map(g, **kwargs):
         if os.path.exists(asset_path + '.cache'):
             asset, map, sizes = pickle.load(open(asset_path + '.cache'))
             sprite_maps[asset] = map
-            for file, size in sizes:
-                sprite_images[file] = size
         else:
-            images = tuple( Image.open(file) for file in files )
-            names = tuple( os.path.splitext(os.path.basename(file))[0] for file in files )
-            files = tuple( file[len(STATIC_ROOT):] for file in files )
+            images = tuple( Image.open(storage.open(file)) if storage is not None else Image.open(file) for file, storage in files )
+            names = tuple( os.path.splitext(os.path.basename(file))[0] for file, storage in files )
             sizes = tuple( image.size for image in images )
             offsets_x = []
             offsets_y = []
@@ -2129,6 +2136,8 @@ def _sprite_map(g, **kwargs):
             map['*t*'] = filetime
             pickle.dump((asset, map, zip(files, sizes)), open(asset_path + '.cache', 'w'))
             sprite_maps[asset] = map
+        for file, size in sizes:
+            sprite_images[file] = size
     return StringValue(asset)
 
 def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=None, baseline_color=None, background_color=None):
@@ -2220,7 +2229,7 @@ def _sprite_file(map, sprite):
     sprite = sprite_map.get(sprite)
 
     if sprite:
-        return QuotedStringValue(sprite[1])
+        return QuotedStringValue(sprite[1][0])
     return StringValue(None)
 
 def _sprites(map):
@@ -2279,13 +2288,21 @@ def _inline_image(image, mime_type=None):
     file.
     """
     file = StringValue(image).value
-    path = os.path.join(STATIC_ROOT, file)
-    if os.path.exists(path):
-        mime_type = StringValue(mime_type).value or mimetypes.guess_type(path)[0]
-        path = open(path, 'rb')
-        url = 'data:' + mime_type + ';base64,' + base64.b64encode(path.read())
+    mime_type = StringValue(mime_type).value or mimetypes.guess_type(file)[0]
+    path = None
+    if callable(STATIC_ROOT):
+        try:
+            _file, _storage = list(STATIC_ROOT(file))[0]
+            path = _storage.open(_file)
+        except:
+            pass
     else:
-        url = url = '%s%s?_=%s' % (STATIC_URL, file, 'NA')
+        _path = os.path.join(STATIC_ROOT, file)
+        if os.path.exists(_path):
+            path = open(_path, 'rb')
+    if path:
+        url = 'data:' + mime_type + ';base64,' + base64.b64encode(path.read())
+    url = url = '%s%s?_=%s' % (STATIC_URL, file, 'NA')
     inline = 'url("%s")' % escape(url)
     return StringValue(inline)
 
@@ -2295,11 +2312,19 @@ def _image_url(image):
     directory.
     """
     file = StringValue(image).value
-    path = os.path.join(STATIC_ROOT, file)
-    if os.path.exists(path):
-        filetime = int(os.path.getmtime(path))
+    if callable(STATIC_ROOT):
+        try:
+            _file, _storage = list(STATIC_ROOT(file))[0]
+            d_obj = _storage.modified_time(_file)
+            filetime = int(time.mktime(d_obj.timetuple()))
+        except:
+            filetime = 'NA'
     else:
-        filetime = 'NA'
+        path = os.path.join(STATIC_ROOT, file)
+        if os.path.exists(path):
+            filetime = int(os.path.getmtime(path))
+        else:
+            filetime = 'NA'
     url = 'url("%s%s?_=%s")' % (STATIC_URL, file, filetime)
     return StringValue(url)
 
@@ -2311,16 +2336,26 @@ def _image_width(image):
     if not Image:
         raise Exception("Images manipulation require PIL")
     file = StringValue(image).value
-    path = os.path.join(STATIC_ROOT, file)
+    path = None
     try:
         width = sprite_images[file][0]
     except KeyError:
         width = 0
-        if os.path.exists(path):
+        if callable(STATIC_ROOT):
+            try:
+                _file, _storage = list(STATIC_ROOT(file))[0]
+                path = _storage.open(_file)
+            except:
+                pass
+        else:
+            _path = os.path.join(STATIC_ROOT, file)
+            if os.path.exists(_path):
+                path = open(_path, 'rb')
+        if path:
             image = Image.open(path)
             size = image.size
             width = size[0]
-            sprite_images[path] = size
+            sprite_images[file] = size
     ret = NumberValue(width)
     ret.units = { 'px': _units_weights.get('px', 1), '_': 'px' }
     return ret
@@ -2333,16 +2368,26 @@ def _image_height(image):
     if not Image:
         raise Exception("Images manipulation require PIL")
     file = StringValue(image).value
-    path = os.path.join(STATIC_ROOT, file)
+    path = None
     try:
         height = sprite_images[file][1]
     except KeyError:
         height = 0
-        if os.path.exists(path):
+        if callable(STATIC_ROOT):
+            try:
+                _file, _storage = list(STATIC_ROOT(file))[0]
+                path = _storage.open(_file)
+            except:
+                pass
+        else:
+            _path = os.path.join(STATIC_ROOT, file)
+            if os.path.exists(_path):
+                path = open(_path, 'rb')
+        if path:
             image = Image.open(path)
             size = image.size
             height = size[1]
-            sprite_images[path] = size
+            sprite_images[file] = size
     ret = NumberValue(height)
     ret.units['px'] = _units_weights.get('px', 1)
     return ret
@@ -3352,7 +3397,6 @@ def call(name, args, C, O, is_function=True):
                 else:
                     node.value.pop('_', None)
     except KeyError:
-        #raise#@@@#
         sp = args and args.value.get('_') or ''
         if is_function:
             if _name not in ('url',):
