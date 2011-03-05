@@ -2036,11 +2036,17 @@ def _sprite_map(g, **kwargs):
     if g in sprite_maps:
         sprite_maps[glob]['*'] = datetime.datetime.now()
     elif '..' not in g: # Protect against going to prohibited places...
-        gutter = kwargs.get('$gutter', 0)
-        offset_x = kwargs.get('$offset-x', 0)
-        offset_y = kwargs.get('$offset-y', 0)
-        repeat = kwargs.get('$repeat', 'no-repeat')
-        vertical = (kwargs.get('$direction', 'vertical') == 'vertical')
+        margins = kwargs.get('margin', 0)
+        vertical = (kwargs.get('direction', 'vertical') == 'vertical')
+        offset_x = kwargs.get('offset-x', 0)
+        offset_y = kwargs.get('offset-y', 0)
+        repeat = kwargs.get('repeat', 'no-repeat')
+        if isinstance(margins, ListValue):
+            margins = [ NumberValue(v).value for n,v in margins.items() ]
+        else:
+            margins = [ NumberValue(margins).value ]
+        margins = (margins * 4)[:4]
+        print margins
 
         if callable(STATIC_ROOT):
             files = sorted(STATIC_ROOT(g))
@@ -2062,7 +2068,7 @@ def _sprite_map(g, **kwargs):
             except:
                 times.append(int(os.path.getmtime(file)))
 
-        key = list(zip(*files)[0]) + times + [ gutter, offset_x, offset_y, repeat, vertical ]
+        key = list(zip(*files)[0]) + times + margins + [ offset_x, offset_y, repeat, vertical ]
         key = base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
@@ -2078,23 +2084,26 @@ def _sprite_map(g, **kwargs):
             offsets_y = []
             if os.path.exists(asset_path):
                 filetime = int(os.path.getmtime(asset_path))
-                offset = gutter
+                if vertical:
+                    offset = margins[0]
+                else:
+                    offset = margins[3]
                 for i, image in enumerate(images):
                     if vertical:
-                        offsets_x.append(0 - gutter)
-                        offsets_y.append(offset - gutter)
-                        offset += sizes[i][1] + gutter * 2
+                        offsets_x.append(0 - margins[3])
+                        offsets_y.append(offset - margins[0])
+                        offset += sizes[i][1] + margins[0] + margins[2]
                     else:
-                        offsets_x.append(offset - gutter)
-                        offsets_y.append(0 - gutter)
-                        offset += sizes[i][0] + gutter * 2
+                        offsets_x.append(offset - margins[3])
+                        offsets_y.append(0 - margins[0])
+                        offset += sizes[i][0] + margins[1] + margins[3]
             else:
                 if vertical:
-                    width = max(zip(*sizes)[0]) + gutter * 2
-                    height = sum(zip(*sizes)[1]) + gutter * len(files) * 2
+                    width = max(zip(*sizes)[0]) + margins[0] + margins[2]
+                    height = sum(zip(*sizes)[1]) + (margins[0] + margins[2]) * len(files)
                 else:
-                    width = sum(zip(*sizes)[0]) + gutter * len(files) * 2
-                    height = max(zip(*sizes)[1]) + gutter * 2
+                    width = sum(zip(*sizes)[0]) + (margins[1] + margins[3]) * len(files)
+                    height = max(zip(*sizes)[1]) + margins[1] + margins[3]
 
                 new_image = Image.new(
                     mode = 'RGBA',
@@ -2102,18 +2111,21 @@ def _sprite_map(g, **kwargs):
                     color = (0, 0, 0, 0)
                 )
 
-                offset = gutter
+                if vertical:
+                    offset = margins[0]
+                else:
+                    offset = margins[3]
                 for i, image in enumerate(images):
                     if vertical:
-                        new_image.paste(image, (gutter, offset))
-                        offsets_x.append(0 - gutter)
-                        offsets_y.append(offset - gutter)
-                        offset += sizes[i][1] + gutter * 2
+                        new_image.paste(image, (margins[3], offset))
+                        offsets_x.append(0 - margins[3])
+                        offsets_y.append(offset - margins[0])
+                        offset += sizes[i][1] + margins[0] + margins[2]
                     else:
-                        new_image.paste(image, (offset, gutter))
-                        offsets_x.append(offset - gutter)
-                        offsets_y.append(0 - gutter)
-                        offset += sizes[i][0] + gutter * 2
+                        new_image.paste(image, (offset, margins[0]))
+                        offsets_x.append(offset - margins[3])
+                        offsets_y.append(0 - margins[0])
+                        offset += sizes[i][0] + margins[1] + margins[3]
 
                 try:
                     new_image.save(asset_path)
@@ -3382,7 +3394,7 @@ def call(name, args, C, O, is_function=True):
     _name = name.replace('_', '-')
     s = args and args.value.items() or []
     _args = [ v for n,v in s if isinstance(n, int) ]
-    _kwargs = dict( (n[1:],v) for n,v in s if not isinstance(n, int) and n != '_' )
+    _kwargs = dict( (str(n[1:]),v) for n,v in s if not isinstance(n, int) and n != '_' )
     _fn_a = '%s:%d' % (_name, len(_args))
     #print >>sys.stderr, '#', _fn_a, _args, _kwargs
     _fn_n = '%s:n' % _name
@@ -3476,7 +3488,7 @@ class Scanner(object):
         if i == tokens_len: # We are at the end, ge the next...
             tokens_len += self.scan(restrict)
         if i < tokens_len:
-            if restrict and restrict > self.restrictions[i]:
+            if restrict and self.restrictions[i] and restrict > self.restrictions[i]:
                 raise NotImplementedError("Unimplemented: restriction set changed")
             return self.tokens[i]
         raise NoMoreTokens()

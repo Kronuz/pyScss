@@ -68,7 +68,7 @@ class Scanner(object):
         if i == tokens_len: # We are at the end, ge the next...
             tokens_len += self.scan(restrict)
         if i < tokens_len:
-            if restrict and restrict > self.restrictions[i]:
+            if restrict and self.restrictions[i] and restrict > self.restrictions[i]:
                 raise NotImplementedError("Unimplemented: restriction set changed")
             return self.tokens[i]
         raise NoMoreTokens()
@@ -163,8 +163,6 @@ class Parser(object):
     def _rewind(self, n=1):
         self._pos -= min(n, self._pos)
         self._scanner.rewind(self._pos)
-        
-        
 
 ################################################################################
 
