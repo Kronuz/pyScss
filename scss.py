@@ -2046,7 +2046,6 @@ def _sprite_map(g, **kwargs):
         else:
             margins = [ NumberValue(margins).value ]
         margins = (margins * 4)[:4]
-        print margins
 
         if callable(STATIC_ROOT):
             files = sorted(STATIC_ROOT(g))
