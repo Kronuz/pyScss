@@ -774,6 +774,7 @@ class Scss(object):
                 elif code == '@import':
                     self._do_import(rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name)
                 elif code == '@extend':
+                    name = self.apply_vars(name, rule[CONTEXT], rule[OPTIONS])
                     p_parents.update(p.strip() for p in name.replace(',', '&').split('&'))
                     p_parents.discard('')
                 elif c_codestr is not None and code in ('@mixin', '@function'):
@@ -968,6 +969,8 @@ class Scss(object):
                                         load_paths.append(full_path)
                             if i_codestr is not None:
                                 break
+                        if i_codestr is None:
+                            i_codestr = self._do_magic_import(rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name)
                         i_codestr = self._scss_files[name] = i_codestr and self.load_string(i_codestr)
                     if i_codestr is None:
                         err = "Warning: File to import not found or unreadable: '" + filename + "'\nLoad paths:\n\t" + "\n\t".join(load_paths)
@@ -980,6 +983,79 @@ class Scss(object):
                         rule[OPTIONS]['@import ' + name] = True
         else:
             rule[PROPERTIES].append((c_property, None))
+
+    @print_timing(10)
+    def _do_magic_import(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
+        """
+        Implements @import for sprite-maps
+        Imports magic sprite map directories
+        """
+        if callable(STATIC_ROOT):
+            files = sorted(STATIC_ROOT(name))
+        else:
+            glob_path = os.path.join(STATIC_ROOT, name)
+            files = glob.glob(glob_path)
+            files = sorted( (file[len(STATIC_ROOT):], None) for file in files )
+
+        if files:
+            # Build magic context
+            map_name = os.path.normpath(os.path.dirname(name)).replace('/', '_')
+            kwargs = {}
+            def setdefault(var, val):
+                _var = '$' + map_name + '-' + var
+                if _var not in rule[CONTEXT]:
+                    rule[CONTEXT][_var] = val
+                kwargs[var] = val
+                return rule[CONTEXT][_var]
+            setdefault('sprite-base-class', StringValue('.' + map_name + '-sprite'))
+            setdefault('sprite-dimensions', BooleanValue(False))
+            position = setdefault('position', NumberValue(0, '%'))
+            spacing = setdefault('spacing', NumberValue(0))
+            repeat = setdefault('repeat', StringValue('no-repeat'))
+            names = tuple( os.path.splitext(os.path.basename(file))[0] for file, storage in files )
+            for n in names:
+                setdefault(n + '-position', position)
+                setdefault(n + '-spacing', spacing)
+                setdefault(n + '-repeat', repeat)
+            sprite_map = _sprite_map(name, **kwargs)
+            rule[CONTEXT]['$' + map_name + '-' + 'sprites'] = sprite_map
+            ret = """
+                @import "compass/utilities/sprites/base";
+                
+                // All sprites should extend this class
+                // The %(map_name)s-sprite mixin will do so for you.
+                #{$%(map_name)s-sprite-base-class} {
+                    background: $%(map_name)s-sprites;
+                }
+                
+                // Use this to set the dimensions of an element
+                // based on the size of the original image.
+                @mixin %(map_name)s-sprite-dimensions($name) {
+                    @include sprite-dimensions($%(map_name)s-sprites, $name);
+                }
+                
+                // Move the background position to display the sprite.
+                @mixin %(map_name)s-sprite-position($name, $offset-x: 0, $offset-y: 0) {
+                    @include sprite-position($%(map_name)s-sprites, $name, $offset-x, $offset-y);
+                }
+                
+                // Extends the sprite base class and set the background position for the desired sprite.
+                // It will also apply the image dimensions if $dimensions is true.
+                @mixin %(map_name)s-sprite($name, $dimensions: $%(map_name)s-sprite-dimensions, $offset-x: 0, $offset-y: 0) {
+                    @extend #{$%(map_name)s-sprite-base-class};
+                    @include sprite($%(map_name)s-sprites, $name, $dimensions, $offset-x, $offset-y);
+                }
+                
+                @mixin %(map_name)s-sprites($sprite-names, $dimensions: $%(map_name)s-sprite-dimensions) {
+                    @include sprites($%(map_name)s-sprites, $sprite-names, $%(map_name)s-sprite-base-class, $dimensions);
+                }
+                
+                // Generates a class for each sprited image.
+                @mixin all-%(map_name)s-sprites($dimensions: $%(map_name)s-sprite-dimensions) {
+                    @include %(map_name)s-sprites(%(sprites)s, $dimensions);
+                }
+            """ % { 'map_name': map_name, 'sprites': ' '.join(names) }
+            return ret
 
     @print_timing(10)
     def _do_if(self, rule, p_selectors, p_parents, p_children, scope, c_property, c_codestr, code, name):
@@ -2048,11 +2124,12 @@ def _sprite_map(g, **kwargs):
         spacing = (spacing * 4)[:4]
 
         if callable(STATIC_ROOT):
-            files = sorted(STATIC_ROOT(g))
+            rfiles = files = sorted(STATIC_ROOT(g))
         else:
             glob_path = os.path.join(STATIC_ROOT, g)
             files = glob.glob(glob_path)
-            files = sorted( (file[len(STATIC_ROOT):], None) for file in files )
+            files = sorted( (f, None) for f in files )
+            rfiles = [ (f[len(STATIC_ROOT):], s) for f, s in files ]
 
         if not files:
             err = "Error: nothing found at '%s'" % glob_path
@@ -2152,16 +2229,18 @@ def _sprite_map(g, **kwargs):
                 for a in sorted(sprite_maps, key=lambda a: sprite_maps[a]['*'], reverse=True)[500:]:
                     del sprite_maps[a]
             # Add the new object:
-            map = dict(zip(names, zip(sizes, files, offsets_x, offsets_y)))
+            map = dict(zip(names, zip(sizes, rfiles, offsets_x, offsets_y)))
             map['*'] = datetime.datetime.now()
             map['*f*'] = asset_file
             map['*k*'] = key
+            map['*n*'] = map_name = os.path.normpath(os.path.dirname(g)).replace('/', '_')
             map['*t*'] = filetime
             pickle.dump((asset, map, zip(files, sizes)), open(asset_path + '.cache', 'w'))
             sprite_maps[asset] = map
         for file, size in sizes:
             sprite_images[file] = size
-    return StringValue(asset)
+    ret = StringValue(asset)
+    return ret
 
 def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=None, baseline_color=None, background_color=None):
     if not Image:
@@ -2228,16 +2307,21 @@ def _image_color(color, width=1, height=1):
     inline = 'url("%s")' % escape(url)
     return StringValue(inline)
 
-def _sprite_map_name(_map):
+def _sprite_map_name(map):
     """
     Returns the name of a sprite map The name is derived from the folder than
     contains the sprites.
     """
-    map = StringValue(map).value
-    sprite_map = sprite_maps.get(map, {})
-    if sprite_map:
-        return StringValue(sprite_map['*k*'])
-    return StringValue(None)
+    try:
+        map = StringValue(map).value
+        sprite_map = sprite_maps.get(map, {})
+        if sprite_map:
+            return StringValue(sprite_map['*n*'])
+        return StringValue(None)
+    except:
+        import traceback
+        traceback.print_exc()
+        raise
 
 def _sprite_file(map, sprite):
     """
@@ -2660,7 +2744,7 @@ def _type_of(obj): # -> bool, number, string, color, list
         return StringValue('list')
     return 'string'
 
-def _if(condition, if_true, if_false):
+def _if(condition, if_true, if_false=''):
     return if_true if bool(BooleanValue(condition)) else if_false
 
 def _unit(number): # -> px, em, cm, etc.
@@ -3371,6 +3455,7 @@ fnct = {
     'percentage:1': _percentage,
     'unitless:1': _unitless,
     'unit:1': _unit,
+    'if:2': _if,
     'if:3': _if,
     'type-of:1': _type_of,
     'comparable:2': _comparable,
@@ -3611,21 +3696,21 @@ class CalculatorScanner(Scanner):
         ('ADD', re.compile('[+]')),
         ('SUB', re.compile('-\\s')),
         ('SIGN', re.compile('-(?![a-zA-Z_])')),
-        ('AND', re.compile('and')),
-        ('OR', re.compile('or')),
-        ('NOT', re.compile('not')),
+        ('AND', re.compile('(?<![-\w])and(?![-\w])')),
+        ('OR', re.compile('(?<![-\w])or(?![-\w])')),
+        ('NOT', re.compile('(?<![-\w])not(?![-\w])')),
+        ('NE', re.compile('!=')),
         ('INV', re.compile('!')),
         ('EQ', re.compile('==')),
-        ('NE', re.compile('!=')),
-        ('LT', re.compile('<')),
-        ('GT', re.compile('>')),
         ('LE', re.compile('<=')),
         ('GE', re.compile('>=')),
+        ('LT', re.compile('<')),
+        ('GT', re.compile('>')),
         ('STR', re.compile("'[^']*'")),
         ('QSTR', re.compile('"[^"]*"')),
         ('UNITS', re.compile('(?:'+'|'.join(_units)+')(?![-\w])')),
         ('NUM', re.compile('(?:\\d+(?:\\.\\d*)?|\\.\\d+)')),
-        ('BOOL', re.compile('(?:true|false)')),
+        ('BOOL', re.compile('(?<![-\w])(?:true|false)(?![-\w])')),
         ('COLOR', re.compile('#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])')),
         ('VAR', re.compile('\\$[-a-zA-Z0-9_]+')),
         ('ID', re.compile('[-a-zA-Z_][-a-zA-Z0-9_]*')),
