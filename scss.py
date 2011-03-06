@@ -2042,9 +2042,9 @@ def _sprite_map(g, **kwargs):
         offset_y = kwargs.get('offset-y', 0)
         repeat = kwargs.get('repeat', 'no-repeat')
         if isinstance(margins, ListValue):
-            margins = [ NumberValue(v).value for n,v in margins.items() ]
+            margins = [ int(NumberValue(v).value) for n,v in margins.items() ]
         else:
-            margins = [ NumberValue(margins).value ]
+            margins = [ int(NumberValue(margins).value) ]
         margins = (margins * 4)[:4]
 
         if callable(STATIC_ROOT):
