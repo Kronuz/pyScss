@@ -2036,16 +2036,16 @@ def _sprite_map(g, **kwargs):
     if g in sprite_maps:
         sprite_maps[glob]['*'] = datetime.datetime.now()
     elif '..' not in g: # Protect against going to prohibited places...
-        margins = kwargs.get('margin', 0)
         vertical = (kwargs.get('direction', 'vertical') == 'vertical')
         offset_x = kwargs.get('offset-x', 0)
         offset_y = kwargs.get('offset-y', 0)
         repeat = kwargs.get('repeat', 'no-repeat')
-        if isinstance(margins, ListValue):
-            margins = [ int(NumberValue(v).value) for n,v in margins.items() ]
+        spacing = kwargs.get('spacing', 0)
+        if isinstance(spacing, ListValue):
+            spacing = [ int(NumberValue(v).value) for n,v in spacing.items() ]
         else:
-            margins = [ int(NumberValue(margins).value) ]
-        margins = (margins * 4)[:4]
+            spacing = [ int(NumberValue(spacing).value) ]
+        spacing = (spacing * 4)[:4]
 
         if callable(STATIC_ROOT):
             files = sorted(STATIC_ROOT(g))
@@ -2067,7 +2067,7 @@ def _sprite_map(g, **kwargs):
             except:
                 times.append(int(os.path.getmtime(file)))
 
-        key = list(zip(*files)[0]) + times + margins + [ offset_x, offset_y, repeat, vertical ]
+        key = list(zip(*files)[0]) + times + [ repr(kwargs) ]
         key = base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
@@ -2078,31 +2078,43 @@ def _sprite_map(g, **kwargs):
         else:
             images = tuple( Image.open(storage.open(file)) if storage is not None else Image.open(file) for file, storage in files )
             names = tuple( os.path.splitext(os.path.basename(file))[0] for file, storage in files )
+            spacings = []
+            for name in names:
+                _spacing = kwargs.get(name + '-spacing')
+                if _spacing is None:
+                    _spacing = spacing
+                else:
+                    if isinstance(_spacing, ListValue):
+                        _spacing = [ int(NumberValue(v).value) for n,v in _spacing.items() ]
+                    else:
+                        _spacing = [ int(NumberValue(_spacing).value) ]
+                    _spacing = (_spacing * 4)[:4]
+                spacings.append(_spacing)
             sizes = tuple( image.size for image in images )
             offsets_x = []
             offsets_y = []
             if os.path.exists(asset_path):
                 filetime = int(os.path.getmtime(asset_path))
-                if vertical:
-                    offset = margins[0]
-                else:
-                    offset = margins[3]
                 for i, image in enumerate(images):
+                    spacing = spacings[i]
                     if vertical:
+                        offset += spacing[0]
                         offsets_x.append(0)
-                        offsets_y.append(offset - margins[0])
-                        offset += sizes[i][1] + margins[0] + margins[2]
+                        offsets_y.append(offset - spacing[0])
+                        offset += sizes[i][1] + spacing[2]
                     else:
-                        offsets_x.append(offset - margins[3])
+                        offset += spacing[3]
+                        offsets_x.append(offset - spacing[3])
                         offsets_y.append(0)
-                        offset += sizes[i][0] + margins[1] + margins[3]
+                        offset += sizes[i][0] + spacing[1]
             else:
+                _spacings = zip(*spacings)
                 if vertical:
-                    width = max(zip(*sizes)[0]) + margins[1] + margins[3]
-                    height = sum(zip(*sizes)[1]) + (margins[0] + margins[2]) * len(files)
+                    width = max(zip(*sizes)[0]) + max(_spacings[1]) + max(_spacings[3])
+                    height = sum(zip(*sizes)[1]) + sum(_spacings[0]) + sum(_spacings[2])
                 else:
-                    width = sum(zip(*sizes)[0]) + (margins[1] + margins[3]) * len(files)
-                    height = max(zip(*sizes)[1]) + margins[0] + margins[2]
+                    width = sum(zip(*sizes)[0]) + sum(_spacings[1]) + sum(_spacings[3])
+                    height = max(zip(*sizes)[1]) + max(_spacings[0]) + max(_spacings[2])
 
                 new_image = Image.new(
                     mode = 'RGBA',
@@ -2110,21 +2122,21 @@ def _sprite_map(g, **kwargs):
                     color = (0, 0, 0, 0)
                 )
 
-                if vertical:
-                    offset = margins[0]
-                else:
-                    offset = margins[3]
+                offset = 0
                 for i, image in enumerate(images):
+                    spacing = spacings[i]
                     if vertical:
-                        new_image.paste(image, (margins[3], offset))
+                        offset += spacing[0]
+                        new_image.paste(image, (spacing[3], offset))
                         offsets_x.append(0)
-                        offsets_y.append(offset - margins[0])
-                        offset += sizes[i][1] + margins[0] + margins[2]
+                        offsets_y.append(offset - spacing[0])
+                        offset += sizes[i][1] + spacing[2]
                     else:
-                        new_image.paste(image, (offset, margins[0]))
-                        offsets_x.append(offset - margins[3])
+                        offset += spacing[3]
+                        new_image.paste(image, (offset, spacing[0]))
+                        offsets_x.append(offset - spacing[3])
                         offsets_y.append(0)
-                        offset += sizes[i][0] + margins[1] + margins[3]
+                        offset += sizes[i][0] + spacing[1]
 
                 try:
                     new_image.save(asset_path)
