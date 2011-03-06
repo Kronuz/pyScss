@@ -1,12 +1,12 @@
 Metadata-Version: 1.0
 Name: pyScss
-Version: 1.0.3
+Version: 1.0.4
 Summary: pyScss, a Scss compiler for Python
 Home-page: http://github.com/Kronuz/pyScss
 Author: German M. Bravo (Kronuz)
 Author-email: german.mb@gmail.com
 License: MIT
-Download-URL: http://github.com/Kronuz/pyScss/tarball/v1.0rc3
+Download-URL: http://github.com/Kronuz/pyScss/tarball/v1.0
 Description: pyScss, a Scss compiler for Python
         ==================================
         :Author:
@@ -55,9 +55,9 @@ Description: pyScss, a Scss compiler for Python
         ============
         pyScss should be installed using pip or setuptools::
         
-        pip install scss
+        pip install pyScss
         
-        easy_install scss
+        easy_install pyScss
         
         Usage
         =====
@@ -186,12 +186,12 @@ Description: pyScss, a Scss compiler for Python
         Example::
         
         @option compress: no;
-        $icons: sprite-map("sociable/\*.png"); // contains sociable/facebook.png among others.
+        $icons: sprite-map("sociable/*.png"); // contains sociable/facebook.png among others.
         div {
         background: $icons;
         }
         @each $icon in sprites($icons) {
-        div .$icon {
+        div .#{$icon} {
         width: image-width(sprite-file($icons, $icon));
         height: image-height(sprite-file($icons, $icon));
         background-position: sprite-position($icons, $icon);
@@ -201,7 +201,7 @@ Description: pyScss, a Scss compiler for Python
         ...generates a new sprite file and produces something like::
         
         div {
-        background: url("/media/assets/u8Y7yEQL0UffAVw5rX7yhw.png?_=1298240989") 0px 0px no-repeat;
+        background: url("/static/assets/u8Y7yEQL0UffAVw5rX7yhw.png?_=1298240989") 0px 0px no-repeat;
         }
         div .facebook {
         width: 32px;
