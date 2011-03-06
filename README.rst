@@ -177,7 +177,7 @@ Examples
 	Example::
 
 		@option compress: no;
-		$icons: sprite-map("sociable/\*.png"); // contains sociable/facebook.png among others.
+		$icons: sprite-map("sociable/*.png"); // contains sociable/facebook.png among others.
 		div {
 		    background: $icons;
 		}
