@@ -2144,8 +2144,9 @@ def _sprite_map(g, **kwargs):
             except:
                 times.append(int(os.path.getmtime(file)))
 
+        map_name = os.path.normpath(os.path.dirname(g)).replace('/', '_')
         key = list(zip(*files)[0]) + times + [ repr(kwargs) ]
-        key = base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
+        key = map_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
 
@@ -2233,7 +2234,7 @@ def _sprite_map(g, **kwargs):
             map['*'] = datetime.datetime.now()
             map['*f*'] = asset_file
             map['*k*'] = key
-            map['*n*'] = map_name = os.path.normpath(os.path.dirname(g)).replace('/', '_')
+            map['*n*'] = map_name
             map['*t*'] = filetime
             pickle.dump((asset, map, zip(files, sizes)), open(asset_path + '.cache', 'w'))
             sprite_maps[asset] = map
