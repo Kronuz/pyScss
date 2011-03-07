@@ -1003,9 +1003,11 @@ class Scss(object):
             kwargs = {}
             def setdefault(var, val):
                 _var = '$' + map_name + '-' + var
-                if _var not in rule[CONTEXT]:
+                if _var in rule[CONTEXT]:
+                    kwargs[var] = interpolate(rule[CONTEXT][_var], rule[CONTEXT], rule[OPTIONS])
+                else:
                     rule[CONTEXT][_var] = val
-                kwargs[var] = val
+                    kwargs[var] = interpolate(val, rule[CONTEXT], rule[OPTIONS])
                 return rule[CONTEXT][_var]
             setdefault('sprite-base-class', StringValue('.' + map_name + '-sprite'))
             setdefault('sprite-dimensions', BooleanValue(False))
@@ -2113,9 +2115,12 @@ def _sprite_map(g, **kwargs):
         sprite_maps[glob]['*'] = datetime.datetime.now()
     elif '..' not in g: # Protect against going to prohibited places...
         vertical = (kwargs.get('direction', 'vertical') == 'vertical')
-        offset_x = kwargs.get('offset-x', 0)
-        offset_y = kwargs.get('offset-y', 0)
-        repeat = kwargs.get('repeat', 'no-repeat')
+        offset_x = NumberValue(kwargs.get('offset-x', 0))
+        offset_y = NumberValue(kwargs.get('offset-y', 0))
+        repeat = StringValue(kwargs.get('repeat', 'no-repeat'))
+        position = NumberValue(kwargs.get('position', 0))
+        if position and position > -1 and position < 1:
+            position.units = { '%': _units_weights.get('%', 1), '_': '%' }
         spacing = kwargs.get('spacing', 0)
         if isinstance(spacing, ListValue):
             spacing = [ int(NumberValue(v).value) for n,v in spacing.items() ]
@@ -2156,8 +2161,18 @@ def _sprite_map(g, **kwargs):
         else:
             images = tuple( Image.open(storage.open(file)) if storage is not None else Image.open(file) for file, storage in files )
             names = tuple( os.path.splitext(os.path.basename(file))[0] for file, storage in files )
+            positions = []
             spacings = []
+            tot_spacings = []
             for name in names:
+                _position = kwargs.get(name + '-position')
+                if _position is None:
+                    _position = position
+                else:
+                    _position = NumberValue(_position)
+                    if _position and _position > -1 and _position < 1:
+                        _position.units = { '%': _units_weights.get('%', 1), '_': '%' }
+                positions.append(_position)
                 _spacing = kwargs.get(name + '-spacing')
                 if _spacing is None:
                     _spacing = spacing
@@ -2168,63 +2183,71 @@ def _sprite_map(g, **kwargs):
                         _spacing = [ int(NumberValue(_spacing).value) ]
                     _spacing = (_spacing * 4)[:4]
                 spacings.append(_spacing)
+                if _position and _position.unit != '%':
+                    if vertical:
+                        if _position > 0:
+                            tot_spacings.append((_spacing[0], _spacing[1], _spacing[2], _spacing[3] + _position))
+                    else:
+                        if _position > 0:
+                            tot_spacings.append((_spacing[0] + _position, _spacing[1], _spacing[2], _spacing[3]))
+                else:
+                    tot_spacings.append(_spacing)
             sizes = tuple( image.size for image in images )
+
+            _spacings = zip(*tot_spacings)
+            if vertical:
+                width = max(zip(*sizes)[0]) + max(_spacings[1]) + max(_spacings[3])
+                height = sum(zip(*sizes)[1]) + sum(_spacings[0]) + sum(_spacings[2])
+            else:
+                width = sum(zip(*sizes)[0]) + sum(_spacings[1]) + sum(_spacings[3])
+                height = max(zip(*sizes)[1]) + max(_spacings[0]) + max(_spacings[2])
+
+            new_image = Image.new(
+                mode = 'RGBA',
+                size = (width, height),
+                color = (0, 0, 0, 0)
+            )
+
             offsets_x = []
             offsets_y = []
-            if os.path.exists(asset_path):
-                filetime = int(os.path.getmtime(asset_path))
-                for i, image in enumerate(images):
-                    spacing = spacings[i]
-                    if vertical:
-                        offset += spacing[0]
-                        offsets_x.append(0)
-                        offsets_y.append(offset - spacing[0])
-                        offset += sizes[i][1] + spacing[2]
-                    else:
-                        offset += spacing[3]
-                        offsets_x.append(offset - spacing[3])
-                        offsets_y.append(0)
-                        offset += sizes[i][0] + spacing[1]
-            else:
-                _spacings = zip(*spacings)
+            offset = 0
+            for i, image in enumerate(images):
+                spacing = spacings[i]
+                position = positions[i]
                 if vertical:
-                    width = max(zip(*sizes)[0]) + max(_spacings[1]) + max(_spacings[3])
-                    height = sum(zip(*sizes)[1]) + sum(_spacings[0]) + sum(_spacings[2])
-                else:
-                    width = sum(zip(*sizes)[0]) + sum(_spacings[1]) + sum(_spacings[3])
-                    height = max(zip(*sizes)[1]) + max(_spacings[0]) + max(_spacings[2])
-
-                new_image = Image.new(
-                    mode = 'RGBA',
-                    size = (width, height),
-                    color = (0, 0, 0, 0)
-                )
-
-                offset = 0
-                for i, image in enumerate(images):
-                    spacing = spacings[i]
-                    if vertical:
-                        offset += spacing[0]
-                        new_image.paste(image, (spacing[3], offset))
-                        offsets_x.append(0)
-                        offsets_y.append(offset - spacing[0])
-                        offset += sizes[i][1] + spacing[2]
+                    if position and position.unit == '%':
+                        x = width * position.value - (spacing[3] + sizes[i][1] + spacing[1])
+                    elif position.value < 0:
+                        x = width + position.value - (spacing[3] + sizes[i][1] + spacing[1])
                     else:
-                        offset += spacing[3]
-                        new_image.paste(image, (offset, spacing[0]))
-                        offsets_x.append(offset - spacing[3])
-                        offsets_y.append(0)
-                        offset += sizes[i][0] + spacing[1]
+                        x = position.value
+                    offset += spacing[0]
+                    new_image.paste(image, (int(x + spacing[3]), offset))
+                    offsets_x.append(x)
+                    offsets_y.append(offset - spacing[0])
+                    offset += sizes[i][1] + spacing[2]
+                else:
+                    if position and position.unit == '%':
+                        y = height * position.value - (spacing[0] + sizes[i][1] + spacing[2])
+                    elif position.value < 0:
+                        y = height + position.value - (spacing[0] + sizes[i][1] + spacing[2])
+                    else:
+                        y = position.value
+                    offset += spacing[3]
+                    new_image.paste(image, (offset, int(y + spacing[0])))
+                    offsets_x.append(offset - spacing[3])
+                    offsets_y.append(y)
+                    offset += sizes[i][0] + spacing[1]
 
-                try:
-                    new_image.save(asset_path)
-                except IOError, e:
-                    err = "Error: %s" % e
-                    print >>sys.stderr, err
-                filetime = int(time.mktime(datetime.datetime.now().timetuple()))
+            try:
+                new_image.save(asset_path)
+            except IOError, e:
+                err = "Error: %s" % e
+                print >>sys.stderr, err
+            filetime = int(time.mktime(datetime.datetime.now().timetuple()))
 
             url = '%s%s?_=%s' % (ASSETS_URL, asset_file, filetime)
-            asset = 'url("%s") %dpx %dpx %s' % (escape(url), int(offset_x), int(offset_y), repeat)
+            asset = 'url("%s") %s' % (escape(url), repeat)
             # Use the sorted list to remove older elements (keep only 500 objects):
             if len(sprite_maps) > 1000:
                 for a in sorted(sprite_maps, key=lambda a: sprite_maps[a]['*'], reverse=True)[500:]:
@@ -2356,9 +2379,13 @@ def _sprite(map, sprite, offset_x=None, offset_y=None):
     sprite = sprite_map.get(sprite)
     if sprite:
         url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
-        offset_x = NumberValue(offset_x).value or 0
-        offset_y = NumberValue(offset_y).value or 0
-        pos = "url(%s) %dpx %dpx" % (escape(url), int(offset_x - sprite[2]), int(offset_y - sprite[3]))
+        x = NumberValue(offset_x or 0, 'px')
+        y = NumberValue(offset_y or 0, 'px')
+        if not x or (x <= -1 or x >= 1) and x.unit != '%':
+            x -= sprite[2]
+        if not y or (y <= -1 or y >= 1) and y.unit != '%':
+            y -= sprite[3]
+        pos = "url(%s) %s %s" % (escape(url), x, y)
         return StringValue(pos)
     return StringValue('0 0')
 
@@ -2382,9 +2409,13 @@ def _sprite_position(map, sprite, offset_x=None, offset_y=None):
     sprite = StringValue(sprite).value
     sprite = sprite_maps.get(map, {}).get(sprite)
     if sprite:
-        offset_x = NumberValue(offset_x).value or 0
-        offset_y = NumberValue(offset_y).value or 0
-        pos = '%dpx %dpx' % (int(offset_x - sprite[2]), int(offset_y - sprite[3]))
+        x = NumberValue(offset_x or 0, 'px')
+        y = NumberValue(offset_y or 0, 'px')
+        if not x or (x <= -1 or x >= 1) and x.unit != '%':
+            x -= sprite[2]
+        if not y or (y <= -1 or y >= 1) and y.unit != '%':
+            y -= sprite[3]
+        pos = '%s %s' % (x, y)
         return StringValue(pos)
     return StringValue('0 0')
 
@@ -2994,22 +3025,22 @@ class NumberValue(Value):
         elif isinstance(tokens, NumberValue):
             self.value = tokens.value
             self.units = tokens.units.copy()
-        elif isinstance(tokens, StringValue):
+            if tokens.units:
+                type = None
+        elif isinstance(tokens, (StringValue, basestring)):
+            tokens = getattr(tokens, 'value', tokens)
             try:
-                if tokens.value and tokens.value[-1] == '%':
-                    self.value = to_float(tokens.value[:-1]) / 100.0
+                if tokens and tokens[-1] == '%':
+                    self.value = to_float(tokens[:-1]) / 100.0
                     self.units = { '%': _units_weights.get('%', 1), '_': '%' }
                 else:
-                    self.value = to_float(tokens.value)
+                    self.value = to_float(tokens)
             except ValueError:
                 self.value = 0.0
         elif isinstance(tokens, (int, float)):
             self.value = float(tokens)
         else:
-            try:
-                self.value = to_float(to_str(tokens))
-            except ValueError:
-                self.value = 0.0
+            self.value = 0.0
         if type is not None:
             self.units = { type: _units_weights.get(type, 1), '_': type }
     def __repr__(self):
