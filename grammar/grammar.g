@@ -11,9 +11,9 @@ BooleanValue = lambda s: bool(s)
 ColorValue = lambda s: s
 ListValue = lambda s: s
 _inv = lambda s: s
-def interpolate(v, C, O):
+def interpolate(v, R):
     return v
-def call(fn, args, C, O, function=True):
+def call(fn, args, R, function=True):
     print 'call: ',fn, args
     return args
 #'(?:'+'|'.join(_units)+')(?![-\w])'
@@ -48,64 +48,64 @@ parser Calculator:
     token COLOR: "#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])"
     token VAR: "\$[-a-zA-Z0-9_]+"
     token ID: "[-a-zA-Z_][-a-zA-Z0-9_]*"
-    rule goal<<C,O>>:         expr_lst<<C,O>>               {{ v = expr_lst.first() if len(expr_lst) == 1 else expr_lst }}
+    rule goal<<R>>:         expr_lst<<R>>                   {{ v = expr_lst.first() if len(expr_lst) == 1 else expr_lst }}
                               END                           {{ return v }}
-    rule expr<<C,O>>:         and_test<<C,O>>               {{ v = and_test }}
+    rule expr<<R>>:         and_test<<R>>                   {{ v = and_test }}
                               (
-                                  OR and_test<<C,O>>        {{ v = v or and_test }}
+                                  OR and_test<<R>>          {{ v = v or and_test }}
                               )*                            {{ return v }}
-    rule and_test<<C,O>>:     not_test<<C,O>>               {{ v = not_test }}
+    rule and_test<<R>>:     not_test<<R>>                   {{ v = not_test }}
                               (
-                                  AND not_test<<C,O>>       {{ v = v and not_test }}
+                                  AND not_test<<R>>         {{ v = v and not_test }}
                               )*                            {{ return v }}
-    rule not_test<<C,O>>:     comparison<<C,O>>             {{ return comparison }}
+    rule not_test<<R>>:     comparison<<R>>                 {{ return comparison }}
                               |
                               (
-                                  NOT not_test<<C,O>>       {{ v = not not_test }}
+                                  NOT not_test<<R>>         {{ v = not not_test }}
                                   |
-                                  INV not_test<<C,O>>       {{ v = _inv('!', not_test) }}
+                                  INV not_test<<R>>         {{ v = _inv('!', not_test) }}
                               )+                            {{ return v }}
-    rule comparison<<C,O>>:   a_expr<<C,O>>                 {{ v = a_expr }}
+    rule comparison<<R>>:   a_expr<<R>>                     {{ v = a_expr }}
                               (
-                                  LT a_expr<<C,O>>          {{ v = v < a_expr }}
+                                  LT a_expr<<R>>            {{ v = v < a_expr }}
                                   |
-                                  GT a_expr<<C,O>>          {{ v = v > a_expr }}
+                                  GT a_expr<<R>>            {{ v = v > a_expr }}
                                   |
-                                  LE a_expr<<C,O>>          {{ v = v <= a_expr }}
+                                  LE a_expr<<R>>            {{ v = v <= a_expr }}
                                   |
-                                  GE a_expr<<C,O>>          {{ v = v >= a_expr }}
+                                  GE a_expr<<R>>            {{ v = v >= a_expr }}
                                   |
-                                  EQ a_expr<<C,O>>          {{ v = v == a_expr }}
+                                  EQ a_expr<<R>>            {{ v = v == a_expr }}
                                   |
-                                  NE a_expr<<C,O>>          {{ v = v != a_expr }}
+                                  NE a_expr<<R>>            {{ v = v != a_expr }}
                               )*                            {{ return v }}
-    rule a_expr<<C,O>>:       m_expr<<C,O>>                 {{ v = m_expr }}
+    rule a_expr<<R>>:       m_expr<<R>>                     {{ v = m_expr }}
                               (
-                                  ADD m_expr<<C,O>>         {{ v = v + m_expr }}
+                                  ADD m_expr<<R>>           {{ v = v + m_expr }}
                                   |
-                                  SUB m_expr<<C,O>>         {{ v = v - m_expr }}
+                                  SUB m_expr<<R>>           {{ v = v - m_expr }}
                               )*                            {{ return v }}
-    rule m_expr<<C,O>>:       u_expr<<C,O>>                 {{ v = u_expr }}
+    rule m_expr<<R>>:       u_expr<<R>>                     {{ v = u_expr }}
                               (
-                                  MUL u_expr<<C,O>>         {{ v = v * u_expr }}
+                                  MUL u_expr<<R>>           {{ v = v * u_expr }}
                                   |
-                                  DIV u_expr<<C,O>>         {{ v = v / u_expr }}
+                                  DIV u_expr<<R>>           {{ v = v / u_expr }}
                               )*                            {{ return v }}
-    rule u_expr<<C,O>>:       SIGN u_expr<<C,O>>            {{ return _inv('-', u_expr) }}
+    rule u_expr<<R>>:       SIGN u_expr<<R>>                {{ return _inv('-', u_expr) }}
                               |
-                              ADD u_expr<<C,O>>             {{ return u_expr }}
+                              ADD u_expr<<R>>               {{ return u_expr }}
                               |
-                              atom<<C,O>>                   {{ v = atom }}
+                              atom<<R>>                     {{ v = atom }}
                               [
-                                  UNITS                     {{ v = call(UNITS, ListValue(ParserValue({ 0: v, 1: UNITS })), C, O, False) }}
+                                  UNITS                     {{ v = call(UNITS, ListValue(ParserValue({ 0: v, 1: UNITS })), R, False) }}
                               ]                             {{ return v }}
-    rule atom<<C,O>>:         LPAR expr_lst<<C,O>> RPAR     {{ return expr_lst.first() if len(expr_lst) == 1 else expr_lst }}
+    rule atom<<R>>:         LPAR expr_lst<<R>> RPAR         {{ return expr_lst.first() if len(expr_lst) == 1 else expr_lst }}
                               |
                               ID                            {{ v = ID }}
                               [                             {{ v = None }}
                                   LPAR [
-                                      expr_lst<<C,O>>       {{ v = expr_lst }}
-                                  ] RPAR                    {{ return call(ID, v, C, O) }}
+                                      expr_lst<<R>>         {{ v = expr_lst }}
+                                  ] RPAR                    {{ return call(ID, v, R) }}
                               ]                             {{ return v }}
                               |
                               NUM                           {{ return NumberValue(ParserValue(NUM)) }}
@@ -118,14 +118,14 @@ parser Calculator:
                               |
                               COLOR                         {{ return ColorValue(ParserValue(COLOR)) }}
                               |
-                              VAR                           {{ return interpolate(VAR, C, O) }}
-    rule expr_lst<<C,O>>:                                   {{ n = None }}
+                              VAR                           {{ return interpolate(VAR, R) }}
+    rule expr_lst<<R>>:                                     {{ n = None }}
                               [
                                   VAR [
                                       ":"                   {{ n = VAR }}
                                   ]                         {{ else: self._rewind() }}
                               ]
-                              expr_slst<<C,O>>              {{ v = { n or 0: expr_slst } }}
+                              expr_slst<<R>>                {{ v = { n or 0: expr_slst } }}
                               (                             {{ n = None }}
                                   COMMA                     {{ v['_'] = COMMA }}
                                   [
@@ -133,11 +133,11 @@ parser Calculator:
                                           ":"               {{ n = VAR }}
                                       ]                     {{ else: self._rewind() }}
                                   ]
-                                  expr_slst<<C,O>>          {{ v[n or len(v)] = expr_slst }}
+                                  expr_slst<<R>>            {{ v[n or len(v)] = expr_slst }}
                               )*                            {{ return ListValue(ParserValue(v)) }}
-    rule expr_slst<<C,O>>:    expr<<C,O>>                   {{ v = { 0: expr } }}
+    rule expr_slst<<R>>:    expr<<R>>                       {{ v = { 0: expr } }}
                               (
-                                  expr<<C,O>>               {{ v[len(v)] = expr }}
+                                  expr<<R>>                 {{ v[len(v)] = expr }}
                               )*                            {{ return ListValue(ParserValue(v)) if len(v) > 1 else v[0] }}
 %%
     expr_lst_rsts_ = None
@@ -154,5 +154,5 @@ if __name__ == '__main__':
         try: s = raw_input('>>> ')
         except EOFError: break
         if not s.strip(): break
-        print parse('goal', s, {}, {})
+        print parse('goal', s, None)
     print 'Bye.'
