@@ -460,7 +460,8 @@ class Scss(object):
     def longest_common_prefix(self, seq1, seq2):
         start = 0
         common = 0
-        while start < min(len(seq1), len(seq2)):
+        length = min(len(seq1), len(seq2))
+        while start < length:
             if seq1[start] != seq2[start]:
                 break
             if seq1[start] == ' ':
@@ -471,7 +472,19 @@ class Scss(object):
         return common
 
     def longest_common_suffix(self, seq1, seq2):
-        return self.longest_common_prefix(seq1[::-1], seq2[::-1])
+        seq1, seq2 = seq1[::-1], seq2[::-1]
+        start = 0
+        common = 0
+        length = min(len(seq1), len(seq2))
+        while start < length:
+            if seq1[start] != seq2[start]:
+                break
+            if seq1[start] == ' ':
+                common = start + 1
+            elif seq1[start] in ('#', ':', '.'):
+                common = start + 1
+            start += 1
+        return common
 
     def locate_blocks(self, str):
         """
@@ -1242,17 +1255,23 @@ class Scss(object):
                     # since selectors can be together, separated with # or . (i.e. something.parent) check that too:
                     for c_selector in c_selectors.split(','):
                         # Get whatever is different between the two selectors:
-                        lcp = self.longest_common_prefix(c_selector, p_selector)
-                        if lcp: c_selector = c_selector[lcp:]
-                        lcs = self.longest_common_suffix(c_selector, p_selector)
-                        if lcs: c_selector = c_selector[:-lcs]
-                        # Get the new selectors:
-                        prev_symbol = '(?<![#.:])' if parent[0] in ('#', '.', ':') else r'(?<![-\w#.:])'
-                        post_symbol = r'(?![-\w])'
-                        new_parent = re.sub(prev_symbol + parent + post_symbol, c_selector, p_selector)
-                        if p_selector != new_parent:
-                            new_selectors.add(new_parent)
-                            found = True
+                        _c_selector, _parent = c_selector, parent
+                        lcp = self.longest_common_prefix(_c_selector, _parent)
+                        if lcp:
+                            _c_selector = _c_selector[lcp:]
+                            _parent = _parent[lcp:]
+                        lcs = self.longest_common_suffix(_c_selector, _parent)
+                        if lcs:
+                            _c_selector = _c_selector[:-lcs]
+                            _parent = _parent[:-lcs]
+                        if _c_selector and _parent:
+                            # Get the new selectors:
+                            prev_symbol = '(?<![#.:])' if _parent[0] in ('#', '.', ':') else r'(?<![-\w#.:])'
+                            post_symbol = r'(?![-\w])'
+                            new_parent = re.sub(prev_symbol + _parent + post_symbol, _c_selector, p_selector)
+                            if p_selector != new_parent:
+                                new_selectors.add(new_parent)
+                                found = True
 
             if found:
                 # add parent:
@@ -5118,6 +5137,20 @@ p {
   color: green;
 }
 
+Issue #7 test
+>>> print css.compile('''
+... @option compress: no, short_colors: no;
+... a.button:hover {
+... color: #000000;
+... }
+... button:hover {
+... @extend a.button:hover;
+... }
+... ''') #doctest: +NORMALIZE_WHITESPACE
+a.button:hover, button:hover {
+  color: #000000;
+}
+   
 """
 """
 ADVANCED STUFF, NOT SUPPORTED (FROM SASS):
