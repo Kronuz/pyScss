@@ -2413,7 +2413,7 @@ def _sprite_file(map, sprite):
         err = "Error: No sprite map found: %s" % map
         print >>sys.stderr, err
     elif not sprite:
-        err = "Error: No sprite found: %s" % sprite_name
+        err = "Error: No sprite found: %s in %s" % (sprite_name, sprite_map['*n*'])
         print >>sys.stderr, err
     if sprite:
         return QuotedStringValue(sprite[1][0])
@@ -2437,7 +2437,7 @@ def _sprite(map, sprite, offset_x=None, offset_y=None):
         err = "Error: No sprite map found: %s" % map
         print >>sys.stderr, err
     elif not sprite:
-        err = "Error: No sprite found: %s" % sprite_name
+        err = "Error: No sprite found: %s in %s" % (sprite_name, sprite_map['*n*'])
         print >>sys.stderr, err
     if sprite:
         url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
@@ -2478,7 +2478,7 @@ def _sprite_position(map, sprite, offset_x=None, offset_y=None):
         err = "Error: No sprite map found: %s" % map
         print >>sys.stderr, err
     elif not sprite:
-        err = "Error: No sprite found: %s" % sprite_name
+        err = "Error: No sprite found: %s in %s" % (sprite_name, sprite_map['*n*'])
         print >>sys.stderr, err
     if sprite:
         x = NumberValue(offset_x or 0, 'px')
