@@ -2390,16 +2390,14 @@ def _sprite_map_name(map):
     Returns the name of a sprite map The name is derived from the folder than
     contains the sprites.
     """
-    try:
-        map = StringValue(map).value
-        sprite_map = sprite_maps.get(map, {})
-        if sprite_map:
-            return StringValue(sprite_map['*n*'])
-        return StringValue(None)
-    except:
-        import traceback
-        traceback.print_exc()
-        raise
+    map = StringValue(map).value
+    sprite_map = sprite_maps.get(map)
+    if not sprite_map:
+        err = "Error: No sprite map found: %s" % map
+        print >>sys.stderr, err
+    if sprite_map:
+        return StringValue(sprite_map['*n*'])
+    return StringValue(None)
 
 def _sprite_file(map, sprite):
     """
@@ -2408,11 +2406,15 @@ def _sprite_file(map, sprite):
     image_width and image_height helpers.
     """
     map = StringValue(map).value
-    sprite = StringValue(sprite).value
-
-    sprite_map = sprite_maps.get(map, {})
-    sprite = sprite_map.get(sprite)
-
+    sprite_name = StringValue(sprite).value
+    sprite_map = sprite_maps.get(map)
+    sprite = sprite_map and sprite_map.get(sprite_name)
+    if not sprite_map:
+        err = "Error: No sprite map found: %s" % map
+        print >>sys.stderr, err
+    elif not sprite:
+        err = "Error: No sprite found: %s" % sprite_name
+        print >>sys.stderr, err
     if sprite:
         return QuotedStringValue(sprite[1][0])
     return StringValue(None)
@@ -2428,9 +2430,15 @@ def _sprite(map, sprite, offset_x=None, offset_y=None):
     property
     """
     map = StringValue(map).value
-    sprite = StringValue(sprite).value
-    sprite_map = sprite_maps.get(map, {})
-    sprite = sprite_map.get(sprite)
+    sprite_name = StringValue(sprite).value
+    sprite_map = sprite_maps.get(map)
+    sprite = sprite_map and sprite_map.get(sprite_name)
+    if not sprite_map:
+        err = "Error: No sprite map found: %s" % map
+        print >>sys.stderr, err
+    elif not sprite:
+        err = "Error: No sprite found: %s" % sprite_name
+        print >>sys.stderr, err
     if sprite:
         url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
         x = NumberValue(offset_x or 0, 'px')
@@ -2448,8 +2456,11 @@ def _sprite_url(map):
     Returns a url to the sprite image.
     """
     map = StringValue(map).value
-    if map in sprite_maps:
-        sprite_map = sprite_maps[map]
+    sprite_map = sprite_maps.get(map)
+    if not sprite_map:
+        err = "Error: No sprite map found: %s" % map
+        print >>sys.stderr, err
+    if sprite_map:
         url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
         return QuotedStringValue(url)
     return StringValue(None)
@@ -2460,8 +2471,15 @@ def _sprite_position(map, sprite, offset_x=None, offset_y=None):
     This is suitable for use as a value to background-position.
     """
     map = StringValue(map).value
-    sprite = StringValue(sprite).value
-    sprite = sprite_maps.get(map, {}).get(sprite)
+    sprite_name = StringValue(sprite).value
+    sprite_map = sprite_maps.get(map)
+    sprite = sprite_map and sprite_map.get(sprite_name)
+    if not sprite_map:
+        err = "Error: No sprite map found: %s" % map
+        print >>sys.stderr, err
+    elif not sprite:
+        err = "Error: No sprite found: %s" % sprite_name
+        print >>sys.stderr, err
     if sprite:
         x = NumberValue(offset_x or 0, 'px')
         y = NumberValue(offset_y or 0, 'px')
@@ -5254,6 +5272,7 @@ def main():
             css = Scss()
             context = css.scss_vars
             options = css.scss_opts
+            rule = [ None, None, '', set(), context, options, '', [], './', False, None ]
             print 'Welcome to ' + BUILD_INFO + " interactive shell"
             while True:
                 try: s = raw_input('>>> ').strip()
@@ -5270,14 +5289,14 @@ def main():
                         rule = [ 'string', None, s, set(), context, options, '', properties, './', False, None ]
                         code, name = (s.split(None, 1)+[''])[:2]
                         if code == '@option':
-                            css._settle_options(rule, [''], set(), children, None, s, None, code, name)
+                            css._settle_options(rule, [''], set(), children, None, None, s, None, code, name)
                             continue
                         elif code == '@import':
-                            css._do_import(rule, [''], set(), children, None, s, None, code, name)
+                            css._do_import(rule, [''], set(), children, None, None, s, None, code, name)
                             continue
                         elif code == '@include':
                             final_cont = ''
-                            css._do_include(rule, [''], set(), children, None, s, None, code, name)
+                            css._do_include(rule, [''], set(), children, None, None, s, None, code, name)
                             code = css._print_properties(properties).rstrip('\n')
                             if code:
                                 final_cont += code
@@ -5342,10 +5361,10 @@ def main():
                             continue
                     elif s.startswith('$') and (':' in s or '=' in s):
                         prop, value = [ a.strip() for a in _prop_split_re.split(s, 1) ]
-                        value = css.calculate(value, context, options, None)
+                        value = css.calculate(value, context, options, rule)
                         context[prop] = value
                         continue
-                    s = to_str(css.calculate(s, context, options, None))
+                    s = to_str(css.calculate(s, context, options, rule))
                     s = css.post_process(s)
                     print s
             print 'Bye!'
