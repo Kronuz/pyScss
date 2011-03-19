@@ -36,8 +36,8 @@ xCSS:
 
 """
 
-VERSION_INFO = (1, 0, 4)
-BUILD_INFO = "pyScss v1.0 (20110306)"
+VERSION_INFO = (1, 0, 5)
+BUILD_INFO = "pyScss v1.0 (20110319)"
 AUTHOR = "German M. Bravo (Kronuz)"
 AUTHOR_EMAIL = 'german.mb@gmail.com'
 URL = 'http://github.com/Kronuz/pyScss'
