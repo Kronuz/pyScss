@@ -3583,12 +3583,13 @@ for u in _units:
 
 def interpolate(v, R):
     C, O = R[CONTEXT], R[OPTIONS]
-    v = C.get(v, v)
-    if isinstance(v, basestring):
-        vi = eval_expr(v, R, True)
-        if vi is not None:
-            v = vi
-    return v
+    vi = C.get(v, v)
+    if v != vi and isinstance(vi, basestring):
+        print '>',v, vi
+        _vi = eval_expr(vi, R, True)
+        if _vi is not None:
+            vi = _vi
+    return vi
 
 def call(name, args, R, is_function=True):
     C, O = R[CONTEXT], R[OPTIONS]
