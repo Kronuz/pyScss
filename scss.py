@@ -315,8 +315,8 @@ for long_k, v in _colors.items():
     _reverse_colors[short_k] = k
     _reverse_colors[rgb_k] = k
     _reverse_colors[rgba_k] = k
-_reverse_colors_re = re.compile(r'(?<![-\w$])(' + '|'.join(map(re.escape, _reverse_colors))+r')(?![-\w])', re.IGNORECASE)
-_colors_re = re.compile(r'(?<![-\w$])(' + '|'.join(map(re.escape, _colors))+r')(?![-\w])', re.IGNORECASE)
+_reverse_colors_re = re.compile(r'(?<![-\w.:#$])(' + '|'.join(map(re.escape, _reverse_colors))+r')(?![-\w])', re.IGNORECASE)
+_colors_re = re.compile(r'(?<![-\w.:#$])(' + '|'.join(map(re.escape, _colors))+r')(?![-\w])', re.IGNORECASE)
 
 _expr_glob_re = re.compile(r'''
     \#\{(.*?)\}                   # Global Interpolation only
@@ -3585,7 +3585,6 @@ def interpolate(v, R):
     C, O = R[CONTEXT], R[OPTIONS]
     vi = C.get(v, v)
     if v != vi and isinstance(vi, basestring):
-        print '>',v, vi
         _vi = eval_expr(vi, R, True)
         if _vi is not None:
             vi = _vi
@@ -5169,7 +5168,18 @@ Issue #7 test
 a.button:hover, button:hover {
   color: #000000;
 }
-   
+
+Issue #10 test
+>>> print css.compile('''
+... @option compress: no, short_colors: no;
+... .yellow {
+...   color: yelow;
+... }
+... ''') #doctest: +NORMALIZE_WHITESPACE
+.yellow {
+  color: yelow;
+}
+
 """
 """
 ADVANCED STUFF, NOT SUPPORTED (FROM SASS):
