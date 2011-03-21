@@ -1413,7 +1413,7 @@ class Scss(object):
         old_property = None
 
         wrap = textwrap.TextWrapper(break_long_words=False)
-        wrap.wordsep_re = re.compile(r'(,\s*)')
+        wrap.wordsep_re = re.compile(r'(?<=,)(\s*)')
         wrap = wrap.wrap
 
         result = ''
@@ -1450,7 +1450,7 @@ class Scss(object):
                         open_selectors = False
                     if selectors:
                         selector = (',' + sp).join(selectors.split(',')) + sp + '{'
-                        if nl: selector = nl.join(wrap(selector)).replace('\n,' + sp, ',\n')
+                        if nl: selector = nl.join(wrap(selector))
                         result += _tb + selector + nl
                         open_selectors = True
                     old_selectors = selectors
