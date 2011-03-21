@@ -2320,7 +2320,7 @@ def _sprite_map(g, **kwargs):
     ret = StringValue(asset)
     return ret
 
-def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=None, baseline_color=None, background_color=None):
+def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=None, baseline_color=None, background_color=None, inline=False):
     if not Image:
         raise Exception("Images manipulation require PIL")
     if grid_color == None:
@@ -2355,11 +2355,29 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
         draw.rectangle((i * _full_width + _left_gutter, 0, i * _full_width + _left_gutter + _width - 1, _height - 1),  fill=grid_color)
     if _height > 1:
         draw.rectangle((0, _height - 1, _full_width * int(columns) - 1, _height - 1),  fill=baseline_color)
-    output = StringIO.StringIO()
-    new_image.save(output, format='PNG')
-    contents = output.getvalue()
-    output.close()
-    url = 'data:image/png;base64,' + base64.b64encode(contents)
+    if not inline:
+        grid_name = 'grid_'
+        if left_gutter: grid_name += str(int(left_gutter)) + '+'
+        grid_name += str(int(width))
+        if right_gutter: grid_name += '+' + str(int(right_gutter))
+        if height and height > 1: grid_name += 'x' + str(int(height))
+        key = (columns, grid_color, baseline_color, background_color)
+        key = grid_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
+        asset_file = key + '.png'
+        asset_path = os.path.join(ASSETS_ROOT, asset_file)
+        try:
+            new_image.save(asset_path)
+        except IOError, e:
+            err = "Error: %s" % e
+            print >>sys.stderr, err
+            inline = True # Retry inline version
+        url = '%s%s' % (ASSETS_URL, asset_file)
+    if inline:
+        output = StringIO.StringIO()
+        new_image.save(output, format='PNG')
+        contents = output.getvalue()
+        output.close()
+        url = 'data:image/png;base64,' + base64.b64encode(contents)
     inline = 'url("%s")' % escape(url)
     return StringValue(inline)
 
@@ -2377,10 +2395,10 @@ def _image_color(color, width=1, height=1):
         color = (c[0], c[1], c[2], int(c[3] * 255.0))
     )
     output = StringIO.StringIO()
-    new_image.save(output, format='PNG' if c[3] == 1 else 'GIF')
+    new_image.save(output, format='PNG')
     contents = output.getvalue()
     output.close()
-    mime_type = 'image/gif' if c[3] == 1 else 'image/png'
+    mime_type = 'image/png'
     url = 'data:' + mime_type + ';base64,' + base64.b64encode(contents)
     inline = 'url("%s")' % escape(url)
     return StringValue(inline)
