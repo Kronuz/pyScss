@@ -1015,7 +1015,7 @@ class Scss(object):
 
         if files:
             # Build magic context
-            map_name = os.path.normpath(os.path.dirname(name)).replace('/', '_')
+            map_name = os.path.normpath(os.path.dirname(name)).replace('\\', '_').replace('/', '_')
             kwargs = {}
             def setdefault(var, val):
                 _var = '$' + map_name + '-' + var
@@ -2535,26 +2535,64 @@ def _inline_image(image, mime_type=None):
     inline = 'url("%s")' % escape(url)
     return StringValue(inline)
 
-def _image_url(image):
+def _image_url(image, src_color=None, dst_color=None):
     """
     Generates a path to an asset found relative to the project's images
     directory.
     """
+    if src_color and dst_color:
+        if not Image:
+            raise Exception("Images manipulation require PIL")
     file = StringValue(image).value
+    path = None
     if callable(STATIC_ROOT):
         try:
             _file, _storage = list(STATIC_ROOT(file))[0]
             d_obj = _storage.modified_time(_file)
             filetime = int(time.mktime(d_obj.timetuple()))
+            if src_color and dst_color:
+                path = _storage.open(_file)
         except:
             filetime = 'NA'
     else:
-        path = os.path.join(STATIC_ROOT, file)
-        if os.path.exists(path):
-            filetime = int(os.path.getmtime(path))
+        _path = os.path.join(STATIC_ROOT, file)
+        if os.path.exists(_path):
+            filetime = int(os.path.getmtime(_path))
+            if src_color and dst_color:
+                path = open(_path, 'rb')
         else:
             filetime = 'NA'
-    url = 'url("%s%s?_=%s")' % (STATIC_URL, file, filetime)
+    BASE_URL = STATIC_URL
+    if path:
+        src_color = ColorValue(src_color).value[:3]
+        dst_color = list(ColorValue(dst_color).value[:3])
+
+        file_name, file_ext = os.path.splitext(os.path.normpath(file).replace('\\', '_').replace('/', '_'))
+        key = (filetime, src_color, dst_color)
+        key = file_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
+        asset_file = key + '.' + file_ext
+        asset_path = os.path.join(ASSETS_ROOT, asset_file)
+
+        if os.path.exists(asset_path):
+            file = asset_file
+            BASE_URL = ASSETS_URL
+            filetime = int(os.path.getmtime(asset_path))
+        else:
+            image = Image.open(path)
+            image = image.convert("RGBA")
+            pixdata = image.load()
+            for y in xrange(image.size[1]):
+                for x in xrange(image.size[0]):
+                    if pixdata[x, y][:3] == src_color:
+                        pixdata[x, y] = tuple(dst_color + [ pixdata[x, y][3] ])
+            try:
+                image.save(asset_path)
+                file = asset_file
+                BASE_URL = ASSETS_URL
+            except IOError, e:
+                err = "Error: %s" % e
+                print >>sys.stderr, err
+    url = 'url("%s%s?_=%s")' % (BASE_URL, file, filetime)
     return StringValue(url)
 
 def _image_width(image):
@@ -3486,6 +3524,7 @@ fnct = {
     'inline-image:1': _inline_image,
     'inline-image:2': _inline_image,
     'image-url:1': _image_url,
+    'image-url:3': _image_url,
     'image-width:1': _image_width,
     'image-height:1': _image_height,
 
