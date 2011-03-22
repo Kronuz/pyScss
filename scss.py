@@ -2173,6 +2173,8 @@ def _sprite_map(g, **kwargs):
         offset_y = NumberValue(kwargs.get('offset-y', 0))
         repeat = StringValue(kwargs.get('repeat', 'no-repeat'))
         position = NumberValue(kwargs.get('position', 0))
+        dst_color = kwargs.get('dst-color')
+        src_color = kwargs.get('src-color')
         if position and position > -1 and position < 1:
             position.units = { '%': _units_weights.get('%', 1), '_': '%' }
         spacing = kwargs.get('spacing', 0)
@@ -2292,6 +2294,15 @@ def _sprite_map(g, **kwargs):
                     offsets_x.append(offset - spacing[3])
                     offsets_y.append(y)
                     offset += sizes[i][0] + spacing[1]
+
+            if dst_color:
+                src_color = ColorValue(src_color).value[:3] if src_color else (255, 0, 255)
+                dst_color = list(ColorValue(dst_color).value[:3])
+                pixdata = new_image.load()
+                for y in xrange(new_image.size[1]):
+                    for x in xrange(new_image.size[0]):
+                        if pixdata[x, y][:3] == src_color:
+                            pixdata[x, y] = tuple(dst_color + [ pixdata[x, y][3] ])
 
             try:
                 new_image.save(asset_path)
@@ -2535,7 +2546,7 @@ def _inline_image(image, mime_type=None):
     inline = 'url("%s")' % escape(url)
     return StringValue(inline)
 
-def _image_url(image, src_color=None, dst_color=None):
+def _image_url(image, dst_color=None, src_color=None):
     """
     Generates a path to an asset found relative to the project's images
     directory.
@@ -2550,7 +2561,7 @@ def _image_url(image, src_color=None, dst_color=None):
             _file, _storage = list(STATIC_ROOT(file))[0]
             d_obj = _storage.modified_time(_file)
             filetime = int(time.mktime(d_obj.timetuple()))
-            if src_color and dst_color:
+            if dst_color:
                 path = _storage.open(_file)
         except:
             filetime = 'NA'
@@ -2558,13 +2569,13 @@ def _image_url(image, src_color=None, dst_color=None):
         _path = os.path.join(STATIC_ROOT, file)
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
-            if src_color and dst_color:
+            if dst_color:
                 path = open(_path, 'rb')
         else:
             filetime = 'NA'
     BASE_URL = STATIC_URL
     if path:
-        src_color = ColorValue(src_color).value[:3]
+        src_color = ColorValue(src_color).value[:3] if src_color else (255, 0, 255)
         dst_color = list(ColorValue(dst_color).value[:3])
 
         file_name, file_ext = os.path.splitext(os.path.normpath(file).replace('\\', '_').replace('/', '_'))
@@ -3490,17 +3501,21 @@ class StringValue(QuotedStringValue):
     def __str__(self):
         return self.value
     def __add__(self, other):
+        string_class = StringValue
         if self.__class__ == QuotedStringValue or other.__class__ == QuotedStringValue:
-            other = QuotedStringValue(other)
-            return QuotedStringValue(self.value + other.value)
-        other = StringValue(other)
-        return StringValue(self.value + '+' + other.value)
+            string_class = QuotedStringValue
+        other = string_class(other)
+        if not isinstance(other, (QuotedStringValue, basestring)):
+            return string_class(self.value + '+' + other.value)
+        return string_class(self.value + other.value)
     def __radd__(self, other):
+        string_class = StringValue
         if self.__class__ == QuotedStringValue or other.__class__ == QuotedStringValue:
-            other = QuotedStringValue(other)
-            return QuotedStringValue(other.value + self.value)
-        other = StringValue(other)
-        return StringValue(other.value + '+' + self.value)
+            string_class = QuotedStringValue
+        other = string_class(other)
+        if not isinstance(other, (QuotedStringValue, basestring)):
+            return string_class(other.value + '+' + self.value)
+        return string_class(other.value + self.value)
 
 # Parser/functions map:
 fnct = {
@@ -3524,6 +3539,7 @@ fnct = {
     'inline-image:1': _inline_image,
     'inline-image:2': _inline_image,
     'image-url:1': _image_url,
+    'image-url:2': _image_url,
     'image-url:3': _image_url,
     'image-width:1': _image_width,
     'image-height:1': _image_height,
