@@ -1650,31 +1650,46 @@ def _rgba(r, g, b, a, type='rgba'):
     col += [ type ]
     return ColorValue(col)
 
-def _rgba2(color, a, type='rgba'):
-    a = NumberValue(a).value
-    col = list(ColorValue(color).value[:3])
+def _color_type(color, a, type):
+    color = ColorValue(color).value
+    a = NumberValue(a).value if a is not None else color[3]
+    col = list(color[:3])
     col += [ 0.0 if a < 0 else 1.0 if a > 1 else a ]
     col += [ type ]
     return ColorValue(col)
+
+def _rgb2(color):
+    return _color_type(color, 1.0, 'rgb')
+
+def _rgba2(color, a=None):
+    return _color_type(color, a, 'rgba')
+
+def _hsl2(color):
+    return _color_type(color, 1.0, 'hsl')
+
+def _hsla2(color, a=None):
+    return _color_type(color, a, 'hsla')
 
 def _ie_hex_str(color):
     c = ColorValue(color).value
     return StringValue('#%02X%02X%02X%02X' % (c[3]*255, c[0], c[1], c[2]))
 
-def _hsl(h, s, l, type='rgb'):
+def _hsl(h, s, l, type='hsl'):
     return _hsla(h, s, l, 1.0, type)
 
-def _hsla(h, s, l, a, type='rgba'):
+def _hsla(h, s, l, a, type='hsla'):
     c = NumberValue(h), NumberValue(s), NumberValue(l), NumberValue(a)
-    col = [ c[0] if (c[0].unit == '%' or c[0].value > 0 and c[0].value <= 1) else (c[0].value % 360.0) / 360.0 ]
-    col += [ c[i].value if (c[i].unit == '%' or c[i].value > 0 and c[i].value <= 1) else
-            0.0 if c[i].value < 0 else
-            1.0 if c[i].value > 1 else
-            c[i].value / 255.0
-            for i in range(1, 4)
-          ]
+    col = [ c[0] if (c[0].unit == '%' and c[0].value > 0 and c[0].value <= 1) else (c[0].value % 360.0) / 360.0 ]
+    col += [ 0.0 if cl <= 0 else 1.0 if cl >= 1.0 else cl
+            for cl in [
+                c[i].value if (c[i].unit == '%' or c[i].value > 0 and c[i].value <= 1) else
+                c[i].value / 100.0
+                for i in range(1, 4)
+              ]
+           ]
     col += [ type ]
-    col = ColorValue(tuple([ c * 255.0 for c in colorsys.hls_to_rgb(col[0], col[2], col[1]) ] + [ col[3], type ]))
+    c = [ c * 255.0 for c in colorsys.hls_to_rgb(col[0], 0.999999 if col[2] == 1 else col[2], 0.999999 if col[1] == 1 else col[1]) ] + [ col[3], type ]
+    col = ColorValue(c)
     return col
 
 def __rgba_op(op, color, r, g, b, a):
@@ -1721,7 +1736,7 @@ def __hsl_op(op, color, h, s, l):
     r = 360.0, 1.0, 1.0
     c = [ 0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(3) ]
     # Convert back to RGB:
-    c = colorsys.hls_to_rgb(c[0] / 360.0, c[2], c[1])
+    c = colorsys.hls_to_rgb(c[0] / 360.0, 0.999999 if c[2] == 1 else c[2], 0.999999 if c[1] == 1 else c[1])
     color.value = (c[0] * 255.0, c[1] * 255.0, c[2] * 255.0, color.value[3])
     return color
 
@@ -3391,7 +3406,7 @@ class ColorValue(Value):
                                 c = [ to_float(c[i]) for i in range(4) ]
                                 col = [ c[0] % 360.0 ] / 360.0
                                 col += [ 0.0 if c[i] < 0 else 1.0 if c[i] > 1 else c[i] for i in range(1,4) ]
-                                self.value = tuple([ c * 255.0 for c in colorsys.hls_to_rgb(col[0], col[2], col[1]) ] + [ col[3] ])
+                                self.value = tuple([ c * 255.0 for c in colorsys.hls_to_rgb(col[0], 0.999999 if col[2] == 1 else col[2], 0.999999 if col[1] == 1 else col[1]) ] + [ col[3] ])
                                 self.types = { type: 1 }
                             except:
                                 pass
@@ -3404,10 +3419,10 @@ class ColorValue(Value):
         c = self.value
         if type == 'hsl' or type == 'hsla' and c[3] == 1:
             h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
-            return 'hsl(%sdeg, %s%%, %s%%)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0))
+            return 'hsl(%s, %s%%, %s%%)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0))
         if type == 'hsla':
             h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
-            return 'hsla(%sdeg, %s%%, %s%%, %s)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0), to_str(a))
+            return 'hsla(%s, %s%%, %s%%, %s)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0), to_str(a))
         r, g, b = to_str(c[0]), to_str(c[1]), to_str(c[2])
         _, _, r = r.partition('.')
         _, _, g = g.partition('.')
@@ -3582,8 +3597,13 @@ fnct = {
     'mix:2': _mix,
     'mix:3': _mix,
     'hsl:3': _hsl,
+    'hsl:1': _hsl2,
+    'hsla:1': _hsla2,
+    'hsla:2': _hsla2,
     'hsla:4': _hsla,
     'rgb:3': _rgb,
+    'rgb:1': _rgb2,
+    'rgba:1': _rgba2,
     'rgba:2': _rgba2,
     'rgba:4': _rgba,
     'ie-hex-str:1': _ie_hex_str,
@@ -4940,7 +4960,7 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 a {
 	color: rgb(87.254%, 48.482%, 37.546%);
-	color: hsl(13.2deg, 66.1%, 62.4%);
+	color: hsl(13.2, 66.1%, 62.4%);
 	color-hue: 13.2deg;
 	color-saturation: 66.1%;
 	color-lightness: 62.4%;
@@ -4995,16 +5015,16 @@ a {
     opacify2: #001;
     transparentize1: rgba(0, 0, 0, 0.4);
     transparentize2: rgba(0, 0, 0, 0.6);
-    lighten1: hsl(0deg, 0%, 30%);
+    lighten1: hsl(0, 0%, 30%);
     lighten2: #e00;
-    darken1: hsl(25deg, 100%, 50%);
+    darken1: hsl(25, 100%, 50%);
     darken2: #200;
-    saturate1: hsl(120deg, 50%, 90%);
+    saturate1: hsl(120, 50%, 90%);
     saturate2: #9e3f3f;
-    desaturate1: hsl(120deg, 10%, 90%);
+    desaturate1: hsl(120, 10%, 90%);
     desaturate2: #726b6b;
-    adjust1: hsl(180deg, 30%, 90%);
-    adjust2: hsl(60deg, 30%, 90%);
+    adjust1: hsl(180, 30%, 90%);
+    adjust2: hsl(60, 30%, 90%);
     adjust3: #886a11;
     mix1: purple;
     mix2: #4000bf;
