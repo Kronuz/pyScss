@@ -1661,10 +1661,10 @@ def _ie_hex_str(color):
     c = ColorValue(color).value
     return StringValue('#%02X%02X%02X%02X' % (c[3]*255, c[0], c[1], c[2]))
 
-def _hsl(h, s, l, type='hsl'):
+def _hsl(h, s, l, type='rgb'):
     return _hsla(h, s, l, 1.0, type)
 
-def _hsla(h, s, l, a, type='hsla'):
+def _hsla(h, s, l, a, type='rgba'):
     c = NumberValue(h), NumberValue(s), NumberValue(l), NumberValue(a)
     col = [ c[0] if (c[0].unit == '%' or c[0].value > 0 and c[0].value <= 1) else (c[0].value % 360.0) / 360.0 ]
     col += [ c[i].value if (c[i].unit == '%' or c[i].value > 0 and c[i].value <= 1) else
@@ -2169,12 +2169,12 @@ def _sprite_map(g, **kwargs):
         sprite_maps[glob]['*'] = datetime.datetime.now()
     elif '..' not in g: # Protect against going to prohibited places...
         vertical = (kwargs.get('direction', 'vertical') == 'vertical')
-        offset_x = NumberValue(kwargs.get('offset-x', 0))
-        offset_y = NumberValue(kwargs.get('offset-y', 0))
+        offset_x = NumberValue(kwargs.get('offset_x', 0))
+        offset_y = NumberValue(kwargs.get('offset_y', 0))
         repeat = StringValue(kwargs.get('repeat', 'no-repeat'))
         position = NumberValue(kwargs.get('position', 0))
-        dst_color = kwargs.get('dst-color')
-        src_color = kwargs.get('src-color')
+        dst_color = kwargs.get('dst_color')
+        src_color = kwargs.get('src_color')
         if position and position > -1 and position < 1:
             position.units = { '%': _units_weights.get('%', 1), '_': '%' }
         spacing = kwargs.get('spacing', 0)
@@ -2221,7 +2221,8 @@ def _sprite_map(g, **kwargs):
             spacings = []
             tot_spacings = []
             for name in names:
-                _position = kwargs.get(name + '-position')
+                name = name.replace('-', '_')
+                _position = kwargs.get(name + '_position')
                 if _position is None:
                     _position = position
                 else:
@@ -2229,7 +2230,7 @@ def _sprite_map(g, **kwargs):
                     if _position and _position > -1 and _position < 1:
                         _position.units = { '%': _units_weights.get('%', 1), '_': '%' }
                 positions.append(_position)
-                _spacing = kwargs.get(name + '-spacing')
+                _spacing = kwargs.get(name + '_spacing')
                 if _spacing is None:
                     _spacing = spacing
                 else:
@@ -3669,7 +3670,7 @@ def call(name, args, R, is_function=True):
     _name = name.replace('_', '-')
     s = args and args.value.items() or []
     _args = [ v for n,v in s if isinstance(n, int) ]
-    _kwargs = dict( (str(n[1:]),v) for n,v in s if not isinstance(n, int) and n != '_' )
+    _kwargs = dict( (str(n[1:]).replace('-', '_'), v) for n,v in s if not isinstance(n, int) and n != '_' )
     _fn_a = '%s:%d' % (_name, len(_args))
     #print >>sys.stderr, '#', _fn_a, _args, _kwargs
     _fn_n = '%s:n' % _name
