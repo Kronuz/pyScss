@@ -2591,8 +2591,8 @@ def _image_url(image, dst_color=None, src_color=None):
             filetime = 'NA'
     BASE_URL = STATIC_URL
     if path:
-        src_color = ColorValue(src_color).value[:3] if src_color else (255, 0, 255)
-        dst_color = list(ColorValue(dst_color).value[:3])
+        src_color = tuple( int(round(c)) for c in ColorValue(src_color).value[:3] ) if src_color else (255, 0, 255)
+        dst_color = [ int(round(c)) for c in ColorValue(dst_color).value[:3] ]
 
         file_name, file_ext = os.path.splitext(os.path.normpath(file).replace('\\', '_').replace('/', '_'))
         key = (filetime, src_color, dst_color)
@@ -2611,7 +2611,8 @@ def _image_url(image, dst_color=None, src_color=None):
             for y in xrange(image.size[1]):
                 for x in xrange(image.size[0]):
                     if pixdata[x, y][:3] == src_color:
-                        pixdata[x, y] = tuple(dst_color + [ pixdata[x, y][3] ])
+                        new_color = tuple(dst_color + [ pixdata[x, y][3] ])
+                        pixdata[x, y] = new_color
             try:
                 image.save(asset_path)
                 file = asset_file
