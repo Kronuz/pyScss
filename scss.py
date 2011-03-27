@@ -437,6 +437,8 @@ class Scss(object):
 
     def __init__(self):
         self.scss_files = {}
+        self.scss_vars = _default_scss_vars.copy()
+        self.scss_opts = _default_scss_opts.copy()
         self.reset()
 
     def clean(self):
@@ -448,12 +450,12 @@ class Scss(object):
     def reset(self, input_scss=None):
         # Initialize
         self.css_files = []
-        self.scss_vars = _default_scss_vars.copy()
-        self.scss_opts = _default_scss_opts.copy()
+        self._scss_vars = self.scss_vars.copy()
+        self._scss_opts = self.scss_opts.copy()
+        self._scss_files = self.scss_files.copy()
 
         self._contexts = {}
         self._replaces = {}
-        self._scss_files = self.scss_files.copy()
 
         self.clean()
 
@@ -723,7 +725,7 @@ class Scss(object):
 
     def parse_scss_string(self, fileid, str):
         str = self.load_string(str)
-        rule = [ fileid, None, str, set(), self.scss_vars, self.scss_opts, '', [], './', False, None ]
+        rule = [ fileid, None, str, set(), self._scss_vars, self._scss_opts, '', [], './', False, None ]
         self.children.append(rule)
         return str
 
@@ -1394,7 +1396,7 @@ class Scss(object):
         else:
             rules = self.rules
 
-        compress = self.scss_opts.get('compress', 1)
+        compress = self._scss_opts.get('compress', 1)
         if compress:
             sc, sp, tb, nl = False, '', '', ''
         else:
@@ -1558,12 +1560,12 @@ class Scss(object):
 
     @print_timing(3)
     def post_process(self, cont):
-        compress = self.scss_opts.get('compress', 1) and 'compress_' or ''
+        compress = self._scss_opts.get('compress', 1) and 'compress_' or ''
         # short colors:
-        if self.scss_opts.get(compress+'short_colors', 1):
+        if self._scss_opts.get(compress+'short_colors', 1):
             cont = _short_color_re.sub(r'#\1\2\3', cont)
         # color names:
-        if self.scss_opts.get(compress+'reverse_colors', 1):
+        if self._scss_opts.get(compress+'reverse_colors', 1):
             cont = _reverse_colors_re.sub(lambda m: _reverse_colors[m.group(0).lower()], cont)
         if compress:
             # zero units out (i.e. 0px or 0em -> 0):
@@ -5376,8 +5378,8 @@ def main():
         elif '-i' in opts or '--interactive' in opts:
             from pprint import pprint
             css = Scss()
-            context = css.scss_vars
-            options = css.scss_opts
+            context = css._scss_vars
+            options = css._scss_opts
             rule = [ None, None, '', set(), context, options, '', [], './', False, None ]
             print 'Welcome to ' + BUILD_INFO + " interactive shell"
             while True:
