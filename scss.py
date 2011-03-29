@@ -273,7 +273,7 @@ _safe_strings = {
     '^curlybracketopen^': '{',
     '^curlybracketclosed^': '}',
 }
-_reverse_safe_strings = dict((v, k) for k, v in _safe_strings.items()) 
+_reverse_safe_strings = dict((v, k) for k, v in _safe_strings.items())
 _safe_strings_re = re.compile('|'.join(map(re.escape, _safe_strings)))
 _reverse_safe_strings_re = re.compile('|'.join(map(re.escape, _reverse_safe_strings)))
 
@@ -698,7 +698,7 @@ class Scss(object):
 
     def load_string(self, str):
         # protects content: "..." strings
-        
+
         str = _strings_re.sub(lambda m: _reverse_safe_strings_re.sub(lambda n: _reverse_safe_strings[n.group(0)], m.group(0)), str)
 
         # removes multiple line comments
@@ -1041,35 +1041,35 @@ class Scss(object):
             rule[CONTEXT]['$' + map_name + '-' + 'sprites'] = sprite_map
             ret = '''
                 @import "compass/utilities/sprites/base";
-                
+
                 // All sprites should extend this class
                 // The %(map_name)s-sprite mixin will do so for you.
                 #{$%(map_name)s-sprite-base-class} {
                     background: $%(map_name)s-sprites;
                 }
-                
+
                 // Use this to set the dimensions of an element
                 // based on the size of the original image.
                 @mixin %(map_name)s-sprite-dimensions($name) {
                     @include sprite-dimensions($%(map_name)s-sprites, $name);
                 }
-                
+
                 // Move the background position to display the sprite.
                 @mixin %(map_name)s-sprite-position($name, $offset-x: 0, $offset-y: 0) {
                     @include sprite-position($%(map_name)s-sprites, $name, $offset-x, $offset-y);
                 }
-                
+
                 // Extends the sprite base class and set the background position for the desired sprite.
                 // It will also apply the image dimensions if $dimensions is true.
                 @mixin %(map_name)s-sprite($name, $dimensions: $%(map_name)s-sprite-dimensions, $offset-x: 0, $offset-y: 0) {
                     @extend #{$%(map_name)s-sprite-base-class};
                     @include sprite($%(map_name)s-sprites, $name, $dimensions, $offset-x, $offset-y);
                 }
-                
+
                 @mixin %(map_name)s-sprites($sprite-names, $dimensions: $%(map_name)s-sprite-dimensions) {
                     @include sprites($%(map_name)s-sprites, $sprite-names, $%(map_name)s-sprite-base-class, $dimensions);
                 }
-                
+
                 // Generates a class for each sprited image.
                 @mixin all-%(map_name)s-sprites($dimensions: $%(map_name)s-sprite-dimensions) {
                     @include %(map_name)s-sprites(%(sprites)s, $dimensions);
@@ -2017,7 +2017,7 @@ def _radial_gradient(*args):
             color_stops = args[2:]
         else:
             color_stops = args[1:]
-    
+
     color_stops = __color_stops(False, *color_stops)
 
     args = [
@@ -2068,7 +2068,7 @@ def _linear_gradient(*args):
         color_stops = args[1:]
 
     color_stops = __color_stops(False, *color_stops)
-    
+
     args = [
         position_and_angle if position_and_angle is not None else None,
     ]
@@ -2367,7 +2367,7 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
     else:
         c = ColorValue(background_color).value
         background_color = (c[0], c[1], c[2], int(c[3] * 255.0))
-    _height = int(height) if height >= 1 else int(_height * 1000.0)
+    _height = int(height) if height >= 1 else int(height * 1000.0)
     _width = int(width) if width >= 1 else int(width * 1000.0)
     _left_gutter = int(left_gutter) if left_gutter >= 1 else int(left_gutter * 1000.0)
     _right_gutter = int(right_gutter) if right_gutter >= 1 else int(right_gutter * 1000.0)
@@ -3338,7 +3338,7 @@ class ListValue(Value):
     def __str__(self):
         return to_str(self.value)
     def __tuple__(self):
-        return tuple(sorted((k, v) for k, v in value.items() if k != '_'))
+        return tuple(sorted((k, v) for k, v in self.value.items() if k != '_'))
     def __iter__(self):
         return iter(self.values())
     def values(self):
@@ -3392,7 +3392,7 @@ class ColorValue(Value):
                 except ValueError:
                     try:
                         hex.replace(' ', '').lower()
-                        type, _, colors = hex.pertition('(').rstrip(')')
+                        type, _, colors = hex.partition('(').rstrip(')')
                         if type in ('rgb', 'rgba'):
                             c = tuple(colors.split(','))
                             try:
@@ -3425,7 +3425,7 @@ class ColorValue(Value):
             return 'hsl(%s, %s%%, %s%%)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0))
         if type == 'hsla':
             h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
-            return 'hsla(%s, %s%%, %s%%, %s)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0), to_str(a))
+            return 'hsla(%s, %s%%, %s%%, %s)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0), to_str(c[3]))
         r, g, b = to_str(c[0]), to_str(c[1]), to_str(c[2])
         _, _, r = r.partition('.')
         _, _, g = g.partition('.')
@@ -3803,7 +3803,7 @@ class Scanner(object):
             self.tokens = self.tokens[:i]
             self.restrictions = self.restrictions[:i]
             self.pos = token[0]
-    
+
     def scan(self, restrict):
         """
         Should scan another token and add it to the list, self.tokens,
@@ -3882,7 +3882,7 @@ class Parser(object):
             raise SyntaxError(tok[0], "Trying to find " + type)
         self._pos += 1
         return tok[3]
-    
+
     def _rewind(self, n=1):
         self._pos -= min(n, self._pos)
         self._scanner.rewind(self._pos)
@@ -4373,20 +4373,20 @@ http://xcss.antpaw.org/docs/syntax/extends
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .basicList li,
 .specialClass li {
-	padding: 5px 10px;
-	border-bottom: 1px solid #000;
+    padding: 5px 10px;
+    border-bottom: 1px solid #000;
 }
 .basicList dd,
 .specialClass dd {
-	margin: 4px;
+    margin: 4px;
 }
 .basicList span,
 .specialClass span {
-	display: inline-block;
+    display: inline-block;
 }
 .roundBox,
 .specialClass {
-	some: props;
+    some: props;
 }
 
 >>> print css.compile('''
@@ -4436,9 +4436,9 @@ http://xcss.antpaw.org/docs/syntax/math
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .selector {
-	padding: 10px;
-	color: #fff;
-	background-color: #ede343;
+    padding: 10px;
+    color: #fff;
+    background-color: #ede343;
 }
 
 
@@ -4449,7 +4449,7 @@ http://xcss.antpaw.org/docs/syntax/math
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .selector {
-	padding: 4px;
+    padding: 4px;
 }
 
 
@@ -4461,8 +4461,8 @@ http://xcss.antpaw.org/docs/syntax/math
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .selector {
-	padding: 31px;
-	margin: 10 20%;
+    padding: 31px;
+    margin: 10 20%;
 }
 
 
@@ -4485,17 +4485,17 @@ http://sass-lang.com/tutorial.html
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 #navbar {
-	width: 80%;
-	height: 23px;
+    width: 80%;
+    height: 23px;
 }
 #navbar ul {
-	list-style-type: none;
+    list-style-type: none;
 }
 #navbar li {
-	float: left;
+    float: left;
 }
 #navbar li a {
-	font-weight: bold;
+    font-weight: bold;
 }
 
 
@@ -4517,11 +4517,11 @@ http://sass-lang.com/tutorial.html
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .fakeshadow {
-	border-style: solid;
-	border-left-width: 4px;
-	border-left-color: #888;
-	border-right-width: 2px;
-	border-right-color: #ccc;
+    border-style: solid;
+    border-left-width: 4px;
+    border-left-color: #888;
+    border-right-width: 2px;
+    border-right-color: #ccc;
 }
 
 
@@ -4535,13 +4535,13 @@ http://sass-lang.com/tutorial.html
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 a {
-	color: #ce4dd6;
+    color: #ce4dd6;
 }
 a:hover {
-	color: #ffb3ff;
+    color: #ffb3ff;
 }
 a:visited {
-	color: #c458cb;
+    color: #c458cb;
 }
 
 
@@ -4568,14 +4568,14 @@ http://sass-lang.com/tutorial.html
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 #navbar {
-	border-bottom-color: #ce4dd6;
-	border-bottom-style: solid;
+    border-bottom-color: #ce4dd6;
+    border-bottom-style: solid;
 }
 a {
-	color: #ce4dd6;
+    color: #ce4dd6;
 }
 a:hover {
-	border-bottom: solid 1px;
+    border-bottom: solid 1px;
 }
 
 
@@ -4596,9 +4596,9 @@ http://sass-lang.com/tutorial.html
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .rounded-top {
-	border-top-radius: 10px;
-	-moz-border-radius-top: 10px;
-	-webkit-border-top-radius: 10px;
+    border-top-radius: 10px;
+    -moz-border-radius-top: 10px;
+    -webkit-border-top-radius: 10px;
 }
 
 
@@ -4623,14 +4623,14 @@ http://sass-lang.com/tutorial.html
 ... #footer { @include rounded-top; }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 #navbar li {
-	border-top-radius: 10px;
-	-moz-border-radius-top: 10px;
-	-webkit-border-top-radius: 10px;
+    border-top-radius: 10px;
+    -moz-border-radius-top: 10px;
+    -webkit-border-top-radius: 10px;
 }
 #footer {
-	border-top-radius: 10px;
-	-moz-border-radius-top: 10px;
-	-webkit-border-top-radius: 10px;
+    border-top-radius: 10px;
+    -moz-border-radius-top: 10px;
+    -webkit-border-top-radius: 10px;
 }
 
 
@@ -4649,19 +4649,19 @@ http://sass-lang.com/tutorial.html
 ... #sidebar { @include rounded(left, 8px); }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 #navbar li {
-	border-top-radius: 10px;
-	-moz-border-radius-top: 10px;
-	-webkit-border-top-radius: 10px;
+    border-top-radius: 10px;
+    -moz-border-radius-top: 10px;
+    -webkit-border-top-radius: 10px;
 }
 #footer {
-	border-top-radius: 5px;
-	-moz-border-radius-top: 5px;
-	-webkit-border-top-radius: 5px;
+    border-top-radius: 5px;
+    -moz-border-radius-top: 5px;
+    -webkit-border-top-radius: 5px;
 }
 #sidebar {
-	border-left-radius: 8px;
-	-moz-border-radius-left: 8px;
-	-webkit-border-left-radius: 8px;
+    border-left-radius: 8px;
+    -moz-border-radius-left: 8px;
+    -webkit-border-left-radius: 8px;
 }
 
 
@@ -4685,15 +4685,15 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html#extend
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .error,
 .seriousError {
-	border: 1px red;
-	background-color: #fdd;
+    border: 1px red;
+    background-color: #fdd;
 }
 .error.intrusion,
 .seriousError.intrusion {
-	background-image: url("/image/hacked.png");
+    background-image: url("/image/hacked.png");
 }
 .seriousError {
-	border-width: 3px;
+    border-width: 3px;
 }
 
 
@@ -4715,16 +4715,16 @@ Multiple Extends
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .error,
 .seriousError {
-	border: 1px red;
-	background-color: #fdd;
+    border: 1px red;
+    background-color: #fdd;
 }
 .attention,
 .seriousError {
-	font-size: 3em;
-	background-color: #ff0;
+    font-size: 3em;
+    background-color: #ff0;
 }
 .seriousError {
-	border-width: 3px;
+    border-width: 3px;
 }
 
 Multiple Extends
@@ -4748,18 +4748,18 @@ Multiple Extends
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .bad, .seriousError {
-	color: red !important;
+    color: red !important;
 }
 .error, .seriousError {
-	border: 1px red;
-	background-color: #fdd;
+    border: 1px red;
+    background-color: #fdd;
 }
 .attention, .seriousError {
-	font-size: 3em;
-	background-color: #ff0;
+    font-size: 3em;
+    background-color: #ff0;
 }
 .seriousError {
-	border-width: 3px;
+    border-width: 3px;
 }
 
 
@@ -4775,7 +4775,7 @@ http://groups.google.com/group/xcss/browse_thread/thread/6989243973938362#
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 body {
-	_width: expression(document.body.clientWidth > 1440? "1440px" : "auto");
+    _width: expression(document.body.clientWidth > 1440? "1440px" : "auto");
 }
 
 
@@ -4796,16 +4796,16 @@ http://groups.google.com/group/xcss/browse_thread/thread/2d27ddec3c15c385#
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 *html .a {
-	color: #fff;
+    color: #fff;
 }
 *html .b {
-	color: #000;
+    color: #000;
 }
 *:first-child+html .a {
-	color: #fff;
+    color: #fff;
 }
 *:first-child+html .b {
-	color: #000;
+    color: #000;
 }
 
 
@@ -4853,17 +4853,17 @@ http://groups.google.com/group/xcss/browse_thread/thread/5f4f3af046883c3b#
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .parent,
 .some-selector {
-	some: prop;
+    some: prop;
 }
 .parent .children,
 .some-selector-more {
-	some: proop;
+    some: proop;
 }
 .parent {
-	height: auto;
+    height: auto;
 }
 .parent .children {
-	height: autoo;
+    height: autoo;
 }
 
 
@@ -4882,13 +4882,13 @@ http://groups.google.com/group/xcss/browse_thread/thread/540f8ad0771c053b#
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .errorBox,
 .noticeBox {
-	background-color: red;
+    background-color: red;
 }
 .errorBox p,
 .errorBox span,
 .noticeBox p,
 .noticeBox span {
-	some: props;
+    some: props;
 }
 
 http://groups.google.com/group/xcss/browse_thread/thread/b5757c24586c1519#
@@ -4914,18 +4914,18 @@ http://groups.google.com/group/xcss/browse_thread/thread/b5757c24586c1519#
 .cleanBox,
 .cleanBoxExtended,
 .mod {
-	margin: 10px;
+    margin: 10px;
 }
 .articleBox h1,
 .cleanBox h1,
 .cleanBoxExtended h1,
 .mod h1 {
-	font-size: 40px;
+    font-size: 40px;
 }
 .articleBox h1,
 .cleanBox h1,
 .cleanBoxExtended h1 {
-	font-size: 60px;
+    font-size: 60px;
 }
 
 
@@ -4962,11 +4962,11 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 a {
-	color: rgb(87.254%, 48.482%, 37.546%);
-	color: hsl(13.2, 66.1%, 62.4%);
-	color-hue: 13.2deg;
-	color-saturation: 66.1%;
-	color-lightness: 62.4%;
+    color: rgb(87.254%, 48.482%, 37.546%);
+    color: hsl(13.2, 66.1%, 62.4%);
+    color-hue: 13.2deg;
+    color-saturation: 66.1%;
+    color-lightness: 62.4%;
 }
 
 >>> print css.compile('''
@@ -5052,8 +5052,8 @@ a {
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
     .coloredClass {
-    	padding: 20px;
-    	background-color: green;
+        padding: 20px;
+        background-color: green;
     }
 
 
@@ -5114,7 +5114,7 @@ All styles defined for a:hover are also applied to .hoverlink:
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .hoverlink,
 a:hover {
-	text-decoration: underline;
+    text-decoration: underline;
 }
 
 
@@ -5130,36 +5130,36 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 #fake-links .link,
 a {
-	color: #00f;
+    color: #00f;
 }
 #fake-links .link:hover,
 a:hover {
-	text-decoration: underline;
+    text-decoration: underline;
 }
 
 
 >>> print css.compile('''
 ... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .mod {
-... 	margin: 10px;
+...     margin: 10px;
 ... }
 ... .mod h1 {
-... 	font-size: 40px;
+...     font-size: 40px;
 ... }
 ... .cleanBox h1 extends .mod {
-... 	font-size: 60px;
+...     font-size: 60px;
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .cleanBox h1,
 .mod {
-	margin: 10px;
+    margin: 10px;
 }
 .cleanBox h1,
 .mod h1 {
-	font-size: 40px;
+    font-size: 40px;
 }
 .cleanBox h1 {
-	font-size: 60px;
+    font-size: 60px;
 }
 
 >>> print css.compile('''
@@ -5195,9 +5195,9 @@ Issue #2 test
 ...   position: relative;
 ... }
 ... ''') #doctest: +NORMALIZE_WHITESPACE
-.pull-1, .pull-10, .pull-11, .pull-12, .pull-13, .pull-14, .pull-15, 
-.pull-16, .pull-17, .pull-18, .pull-19, .pull-2, .pull-20, .pull-21, 
-.pull-22, .pull-23, .pull-24, .pull-3, .pull-4, .pull-5, .pull-6, 
+.pull-1, .pull-10, .pull-11, .pull-12, .pull-13, .pull-14, .pull-15,
+.pull-16, .pull-17, .pull-18, .pull-19, .pull-2, .pull-20, .pull-21,
+.pull-22, .pull-23, .pull-24, .pull-3, .pull-4, .pull-5, .pull-6,
 .pull-7, .pull-8, .pull-9 {
   display: inline;
   float: left;
@@ -5291,7 +5291,7 @@ Any rule that uses a:hover will also work for .hoverlink, even if they have othe
 ... ''') #doctest: +NORMALIZE_WHITESPACE
 .comment a.user:hover,
 .comment .hoverlink.user {
-	font-weight: bold;
+    font-weight: bold;
 }
 
 
@@ -5309,7 +5309,7 @@ Sass generates only selectors that are likely to be useful.
 #admin .tabbar a,
 #admin .tabbar #demo .overview .fakelink,
 #demo .overview #admin .tabbar .fakelink {
-	font-weight: bold;
+    font-weight: bold;
 }
 
 --------------------------------------------------------------------------------
