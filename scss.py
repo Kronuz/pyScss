@@ -2905,8 +2905,7 @@ def _percentage(value):
 
 def _unitless(value):
     value = NumberValue(value)
-    value.units.clear()
-    return value
+    return not bool(value.unit)
 
 def _unquote(*args):
     return StringValue(' '.join([ StringValue(s).value for s in args ]))
