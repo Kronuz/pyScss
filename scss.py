@@ -1553,6 +1553,7 @@ class Scss(object):
         return __calculate_expr
 
     def do_glob_math(self, cont, context, options, rule, _dequote=False):
+        cont = str(cont)
         if '#{' not in cont:
             return cont
         cont = _expr_glob_re.sub(self._calculate_expr(context, options, rule, _dequote), cont)
@@ -2934,7 +2935,7 @@ def _type_of(obj): # -> bool, number, string, color, list
     return 'string'
 
 def _if(condition, if_true, if_false=''):
-    return if_true if bool(BooleanValue(condition)) else if_false
+    return if_true.__class__(if_true) if bool(condition) else if_true.__class__(if_false)
 
 def _unit(number): # -> px, em, cm, etc.
     unit = NumberValue(number).unit
@@ -3002,10 +3003,19 @@ def _enumerate(prefix, frm, through, separator='-'):
     separator = StringValue(separator).value
     frm = int(getattr(frm, 'value', frm))
     through = int(getattr(through, 'value', through))
-    ret = [ prefix + separator + str(i) for i in range(frm, through + 1) ]
+    if prefix:
+        ret = [ prefix + separator + str(i) for i in range(frm, through + 1) ]
+    else:
+        ret = [ NumberValue(i) for i in range(frm, through + 1) ]
     ret = dict(enumerate(ret))
     ret['_'] = ','
     return ret
+
+def _range(frm, through=None):
+    if not through:
+        through = frm
+        frm = 0
+    return _enumerate(None, frm, through)
 
 ################################################################################
 # Specific to pyScss parser functions:
@@ -3651,6 +3661,8 @@ fnct = {
     'headers:2': _headers,
     'enumerate:3': _enumerate,
     'enumerate:4': _enumerate,
+    'range:1': _range,
+    'range:2': _range,
 
     'percentage:1': _percentage,
     'unitless:1': _unitless,
@@ -3713,7 +3725,7 @@ def call(name, args, R, is_function=True):
     except KeyError:
         sp = args and args.value.get('_') or ''
         if is_function:
-            if _name not in ('url',):
+            if _name not in ('url', 'mask', 'rotate'):
                 err = "Error: Required function not found: %s" % _fn_a
                 print >>sys.stderr, err
             _args = (sp + ' ').join( to_str(v) for n,v in s if isinstance(n, int) )
