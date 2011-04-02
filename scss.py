@@ -64,6 +64,7 @@ ASSETS_ROOT = os.path.join(PROJECT_ROOT, 'static/assets/')
 STATIC_URL = '/static/'
 ASSETS_URL = '/static/assets/'
 VERBOSITY = 1
+DEBUG = 0
 ################################################################################
 
 try:
@@ -781,9 +782,27 @@ class Scss(object):
             ####################################################################
             if c_property.startswith('@'):
                 code, name = (c_property.split(None, 1)+[''])[:2]
+                code = code.lower()
                 if code == '@warn':
                     name = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
                     err = "Warning: %s" % dequote(to_str(name))
+                    print >>sys.stderr, err
+                elif code == '@print':
+                    name = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
+                    err = "%s" % dequote(to_str(name))
+                    print >>sys.stderr, err
+                elif code == '@raw':
+                    name = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
+                    print >>sys.stderr, repr(name)
+                elif code == '@debug':
+                    global DEBUG
+                    name = name.strip()
+                    if name.lower() in ('1', 'true', 't', 'yes', 'y', 'on'):
+                        name = 1
+                    elif name.lower() in ('0', 'false', 'f', 'no', 'n', 'off'):
+                        name = 0
+                    DEBUG = name
+                    err = "Debug mode is %s" % ('On' if DEBUG else 'Off')
                     print >>sys.stderr, err
                 elif code == '@option':
                     self._settle_options(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name)
@@ -1175,6 +1194,8 @@ class Scss(object):
             if value:
                 value = value.strip()
                 value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
+            if DEBUG:
+                print >>sys.stderr, '>',value
             _prop = (scope or '') + prop
             if is_var or prop.startswith('$') and value is not None:
                 if isinstance(value, basestring):
@@ -2787,7 +2808,8 @@ def __compass_slice(lst, start_index, end_index=None):
     return ListValue(ret)
 
 def _first_value_of(*lst):
-    return ListValue(lst).first()
+    ret = ListValue(lst).first()
+    return ret.__class__(ret)
 
 def _nth(lst, n=1):
     """
@@ -2810,7 +2832,7 @@ def _nth(lst, n=1):
             ret = lst[n]
         except:
             ret = ''
-    return StringValue(ret)
+    return ret.__class__(ret)
 
 def _join(lst1, lst2, separator=None):
     ret = ListValue(lst1)
@@ -4170,10 +4192,12 @@ def eval_expr(expr, rule, raw=False):
             #print >>sys.stderr, '==',val,'=='
             return val
     except SyntaxError:
-        return#@@@#
+        if not DEBUG:
+            return#@@@#
         raise
     except:
-        return#@@@#
+        if not DEBUG:
+            return#@@@#
         raise
 __doc__ += """
 >>> css = Scss()
