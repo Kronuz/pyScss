@@ -567,11 +567,12 @@ class Scss(object):
                             thin = None
         if depth > 0:
             if not skip:
-                #FIXME: raise exception (block not closed!)
                 _selectors = str[init:start].strip()
                 _codestr = str[start+1:].strip()
                 if _selectors:
                     yield _selectors, _codestr
+                err = "Error: Block no closed '%s'" % glob_path
+                print >>sys.stderr, err #FIXME: raise exception? (block not closed!)
                 return
         losestr = str[lose:]
         for _property in losestr.split(';'):
@@ -1696,7 +1697,7 @@ def _hsla2(color, a=None):
 
 def _ie_hex_str(color):
     c = ColorValue(color).value
-    return StringValue('#%02X%02X%02X%02X' % (c[3]*255, c[0], c[1], c[2]))
+    return StringValue('#%02X%02X%02X%02X' % (round(c[3]*255), round(c[0]), round(c[1]), round(c[2])))
 
 def _hsl(h, s, l, type='hsl'):
     return _hsla(h, s, l, 1.0, type)
@@ -2675,9 +2676,7 @@ def _image_width(image):
             size = image.size
             width = size[0]
             sprite_images[file] = size
-    ret = NumberValue(width)
-    ret.units = { 'px': _units_weights.get('px', 1), '_': 'px' }
-    return ret
+    return NumberValue(width, 'px')
 
 def _image_height(image):
     """
@@ -2707,9 +2706,7 @@ def _image_height(image):
             size = image.size
             height = size[1]
             sprite_images[file] = size
-    ret = NumberValue(height)
-    ret.units['px'] = _units_weights.get('px', 1)
-    return ret
+    return NumberValue(height, 'px')
 
 ################################################################################
 def _opposite_position(*p):
@@ -2731,8 +2728,7 @@ def _opposite_position(*p):
         vrt = 'center'
     if hrz == vrt:
         vrt = None
-    ret = ListValue(list(v for v in (hrz, vrt) if v is not None))
-    return ret
+    return ListValue(list(v for v in (hrz, vrt) if v is not None))
 
 def _grad_point(*p):
     pos = set()
@@ -2747,8 +2743,7 @@ def _grad_point(*p):
         vrt = NumberValue(0, '%')
     elif 'bottom' in pos:
         vrt = NumberValue(1, '%')
-    ret = ListValue(list(v for v in (hrz, vrt) if v is not None))
-    return ret
+    return ListValue(list(v for v in (hrz, vrt) if v is not None))
 
 
 ################################################################################
@@ -2850,12 +2845,9 @@ def _length(*lst):
     return NumberValue(len(lst))
 
 def _append(lst, val, separator=None):
-    ret = ListValue(lst)
-    ret.value[len(ret.value)] = val
-    if separator is not None:
-        separator = StringValue(separator).value
-        if separator:
-            ret.value['_'] = separator
+    separator = separator and StringValue(separator).value
+    ret = ListValue(lst, separator)
+    ret.value[len(ret)] = val
     return ret
 
 ################################################################################
@@ -2891,9 +2883,7 @@ def _prefix(prefix, *args):
                 args[i] = to_fnct()
     if len(args) == 1:
         return args[0]
-    ret = ListValue(args)
-    ret.value['_'] = ','
-    return ret
+    return ListValue(args, ',')
 
 def __moz(*args):
     return _prefix('_moz', *args)
@@ -2928,7 +2918,7 @@ def _percentage(value):
 
 def _unitless(value):
     value = NumberValue(value)
-    return not bool(value.unit)
+    return BooleanValue(not bool(value.unit))
 
 def _unquote(*args):
     return StringValue(' '.join([ StringValue(s).value for s in args ]))
@@ -2954,7 +2944,7 @@ def _type_of(obj): # -> bool, number, string, color, list
         return StringValue('color')
     if isinstance(obj, ListValue):
         return StringValue('list')
-    return 'string'
+    return StringValue('string')
 
 def _if(condition, if_true, if_false=''):
     return if_true.__class__(if_true) if bool(condition) else if_true.__class__(if_false)
@@ -3331,7 +3321,7 @@ class NumberValue(Value):
         return unit
 
 class ListValue(Value):
-    def __init__(self, tokens):
+    def __init__(self, tokens, separator=None):
         self.tokens = tokens
         if tokens is None:
             self.value = {}
@@ -3346,15 +3336,17 @@ class ListValue(Value):
         elif isinstance(tokens, (list, tuple)):
             self.value = dict(enumerate(tokens))
         else:
-            sp = None
             lst = [ i for i in to_str(tokens).split() if i ]
             if len(lst) == 1:
                 lst = [ i.strip() for i in lst[0].split(',') if i.strip() ]
                 if len(lst) > 1:
-                    sp = ','
+                    separator = ',' if separator is None else separator
             self.value = dict(enumerate(lst))
-            if sp:
-                self.value['_'] = ','
+        if separator is None:
+            separator = self.value.pop('_', None)
+        if separator:
+            self.value['_'] = separator
+            
     @classmethod
     def _do_cmps(cls, first, second, op):
         first = ListValue(first)
