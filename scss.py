@@ -3129,7 +3129,8 @@ class Value(object):
         return self.value and True or False
     def __add__(self, other):
         return self._do_op(self, other, operator.__add__)
-    __radd__ = __add__
+    def __radd__(self, other):
+        return self._do_op(other, self, operator.__add__)
     def __div__(self, other):
         return self._do_op(self, other, operator.__div__)
     def __rdiv__(self, other):
@@ -3140,7 +3141,8 @@ class Value(object):
         return self._do_op(other, self, operator.__sub__)
     def __mul__(self, other):
         return self._do_op(self, other, operator.__mul__)
-    __rmul__ = __mul__
+    def __rmul__(self, other):
+        return self._do_op(other, self, operator.__mul__)
     def convert_to(self, type):
         return self.value.convert_to(type)
     def merge(self, obj):
@@ -3182,6 +3184,25 @@ class BooleanValue(Value):
         return op(first, second)
     @classmethod
     def _do_op(cls, first, second, op):
+        if isinstance(first, ListValue) and isinstance(second, ListValue):
+            ret = ListValue(first)
+            for k,v in ret.items():
+                try:
+                    ret.value[k] = op(ret.value[k], second.value[k])
+                except KeyError:
+                    pass
+            return ret
+        if isinstance(first, ListValue):
+            ret = ListValue(first)
+            for k,v in ret.items():
+                ret.value[k] = op(ret.value[k], second)
+            return ret
+        if isinstance(second, ListValue):
+            ret = ListValue(second)
+            for k,v in ret.items():
+                ret.value[k] = op(first, ret.value[k])
+            return ret
+
         first = BooleanValue(first)
         second = BooleanValue(second)
         val = op(first.value, second.value)
@@ -3245,29 +3266,6 @@ class NumberValue(Value):
             return op(first_type, second_type)
     @classmethod
     def _do_op(cls, first, second, op):
-        if op == operator.__mul__:
-            if isinstance(first, basestring):
-                first = StringValue(first)
-            elif not isinstance(first, ListValue) and not isinstance(first, QuotedStringValue):
-                first = NumberValue(first)
-            if isinstance(second, basestring):
-                second = StringValue(second)
-            elif not isinstance(second, ListValue) and not isinstance(second, QuotedStringValue):
-                second = NumberValue(second)
-            if isinstance(first, NumberValue) and isinstance(second, QuotedStringValue):
-                first.value = int(first.value)
-                val = op(second.value, first.value)
-                return second.__class__(val)
-            if isinstance(first, QuotedStringValue) and isinstance(second, NumberValue):
-                second.value = int(second.value)
-                val = op(first.value, second.value)
-                return first.__class__(val)
-        else:
-            if not isinstance(first, ListValue):
-                first = NumberValue(first)
-            if not isinstance(second, ListValue):
-                second = NumberValue(second)
-
         if isinstance(first, ListValue) and isinstance(second, ListValue):
             ret = ListValue(first)
             for k,v in ret.items():
@@ -3276,17 +3274,39 @@ class NumberValue(Value):
                 except KeyError:
                     pass
             return ret
-        elif isinstance(first, ListValue):
+        if isinstance(first, ListValue):
             ret = ListValue(first)
             for k,v in ret.items():
                 ret.value[k] = op(ret.value[k], second)
             return ret
-        elif isinstance(second, ListValue):
+        if isinstance(second, ListValue):
             ret = ListValue(second)
             for k,v in ret.items():
                 ret.value[k] = op(first, ret.value[k])
             return ret
-            
+
+        if isinstance(first, basestring):
+            first = StringValue(first)
+        elif isinstance(first, (int, float)):
+            first = NumberValue(first)
+        if isinstance(second, basestring):
+            second = StringValue(second)
+        elif isinstance(second, (int, float)):
+            second = NumberValue(second)
+
+        if op == operator.__mul__:
+            if isinstance(first, NumberValue) and isinstance(second, QuotedStringValue):
+                first.value = int(first.value)
+                val = op(second.value, first.value)
+                return second.__class__(val)
+            if isinstance(first, QuotedStringValue) and isinstance(second, NumberValue):
+                second.value = int(second.value)
+                val = op(first.value, second.value)
+                return first.__class__(val)
+
+        if not isinstance(first, NumberValue) or not isinstance(second, NumberValue):
+            return op(first.value if isinstance(first, NumberValue) else first, second.value if isinstance(second, NumberValue) else second)
+
         first_unit = first.unit
         second_unit = second.unit
         if op == operator.__add__ or op == operator.__sub__:
@@ -3512,6 +3532,25 @@ class ColorValue(Value):
         return op(first.value, second.value)
     @classmethod
     def _do_op(cls, first, second, op):
+        if isinstance(first, ListValue) and isinstance(second, ListValue):
+            ret = ListValue(first)
+            for k,v in ret.items():
+                try:
+                    ret.value[k] = op(ret.value[k], second.value[k])
+                except KeyError:
+                    pass
+            return ret
+        if isinstance(first, ListValue):
+            ret = ListValue(first)
+            for k,v in ret.items():
+                ret.value[k] = op(ret.value[k], second)
+            return ret
+        if isinstance(second, ListValue):
+            ret = ListValue(second)
+            for k,v in ret.items():
+                ret.value[k] = op(first, ret.value[k])
+            return ret
+
         first = ColorValue(first)
         second = ColorValue(second)
         val = [ op(first.value[i], second.value[i]) for i in range(4) ]
@@ -3567,6 +3606,25 @@ class QuotedStringValue(Value):
         return op(first.value, second.value)
     @classmethod
     def _do_op(cls, first, second, op):
+        if isinstance(first, ListValue) and isinstance(second, ListValue):
+            ret = ListValue(first)
+            for k,v in ret.items():
+                try:
+                    ret.value[k] = op(ret.value[k], second.value[k])
+                except KeyError:
+                    pass
+            return ret
+        if isinstance(first, ListValue):
+            ret = ListValue(first)
+            for k,v in ret.items():
+                ret.value[k] = op(ret.value[k], second)
+            return ret
+        if isinstance(second, ListValue):
+            ret = ListValue(second)
+            for k,v in ret.items():
+                ret.value[k] = op(first, ret.value[k])
+            return ret
+
         first = QuotedStringValue(first)
         first_value = first.value
         if op == operator.__mul__:
@@ -3588,6 +3646,8 @@ class StringValue(QuotedStringValue):
     def __str__(self):
         return self.value
     def __add__(self, other):
+        if isinstance(other, ListValue):
+            return self._do_op(self, other, operator.__add__)
         string_class = StringValue
         if self.__class__ == QuotedStringValue or other.__class__ == QuotedStringValue:
             string_class = QuotedStringValue
@@ -3596,6 +3656,8 @@ class StringValue(QuotedStringValue):
             return string_class(self.value + '+' + other.value)
         return string_class(self.value + other.value)
     def __radd__(self, other):
+        if isinstance(other, ListValue):
+            return self._do_op(other, self, operator.__add__)
         string_class = StringValue
         if self.__class__ == QuotedStringValue or other.__class__ == QuotedStringValue:
             string_class = QuotedStringValue
