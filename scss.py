@@ -571,7 +571,7 @@ class Scss(object):
                 _codestr = str[start+1:].strip()
                 if _selectors:
                     yield _selectors, _codestr
-                err = "Error: Block no closed '%s'" % glob_path
+                err = "Error: Block never closed '%s'" % _selectors
                 print >>sys.stderr, err #FIXME: raise exception? (block not closed!)
                 return
         losestr = str[lose:]
