@@ -2622,7 +2622,7 @@ def _image_url(image, dst_color=None, src_color=None):
         file_name, file_ext = os.path.splitext(os.path.normpath(file).replace('\\', '_').replace('/', '_'))
         key = (filetime, src_color, dst_color)
         key = file_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
-        asset_file = key + '.' + file_ext
+        asset_file = key + file_ext
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
 
         if os.path.exists(asset_path):
@@ -3246,10 +3246,14 @@ class NumberValue(Value):
     @classmethod
     def _do_op(cls, first, second, op):
         if op == operator.__mul__:
-            first = StringValue(first) if isinstance(first, basestring) else first
-            first = NumberValue(first) if not isinstance(first, QuotedStringValue) else first
-            second = StringValue(second) if isinstance(second, basestring) else second
-            second = NumberValue(second) if not isinstance(second, QuotedStringValue) else second
+            if isinstance(first, basestring):
+                first = StringValue(first)
+            elif not isinstance(first, ListValue) and not isinstance(first, QuotedStringValue):
+                first = NumberValue(first)
+            if isinstance(second, basestring):
+                second = StringValue(second)
+            elif not isinstance(second, ListValue) and not isinstance(second, QuotedStringValue):
+                second = NumberValue(second)
             if isinstance(first, NumberValue) and isinstance(second, QuotedStringValue):
                 first.value = int(first.value)
                 val = op(second.value, first.value)
@@ -3259,9 +3263,30 @@ class NumberValue(Value):
                 val = op(first.value, second.value)
                 return first.__class__(val)
         else:
-            first = NumberValue(first)
-            second = NumberValue(second)
+            if not isinstance(first, ListValue):
+                first = NumberValue(first)
+            if not isinstance(second, ListValue):
+                second = NumberValue(second)
 
+        if isinstance(first, ListValue) and isinstance(second, ListValue):
+            ret = ListValue(first)
+            for k,v in ret.items():
+                try:
+                    ret.value[k] = op(ret.value[k], second.value[k])
+                except KeyError:
+                    pass
+            return ret
+        elif isinstance(first, ListValue):
+            ret = ListValue(first)
+            for k,v in ret.items():
+                ret.value[k] = op(ret.value[k], second)
+            return ret
+        elif isinstance(second, ListValue):
+            ret = ListValue(second)
+            for k,v in ret.items():
+                ret.value[k] = op(first, ret.value[k])
+            return ret
+            
         first_unit = first.unit
         second_unit = second.unit
         if op == operator.__add__ or op == operator.__sub__:
@@ -3352,6 +3377,26 @@ class ListValue(Value):
         first = ListValue(first)
         second = ListValue(second)
         return op(first.value, second.value)
+    @classmethod
+    def _do_op(cls, first, second, op):
+        if isinstance(first, ListValue) and isinstance(second, ListValue):
+            ret = ListValue(first)
+            for k,v in ret.items():
+                try:
+                    ret.value[k] = op(ret.value[k], second.value[k])
+                except KeyError:
+                    pass
+            return ret
+        if isinstance(first, ListValue):
+            ret = ListValue(first)
+            for k,v in ret.items():
+                ret.value[k] = op(ret.value[k], second)
+            return ret
+        if isinstance(second, ListValue):
+            ret = ListValue(second)
+            for k,v in ret.items():
+                ret.value[k] = op(first, ret.value[k])
+            return ret
     def _reorder_list(self, lst):
         return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
     def __nonzero__(self):
