@@ -16,7 +16,7 @@ def interpolate(v, R):
 def call(fn, args, R, function=True):
     print 'call: ',fn, args
     return args
-#'(?:'+'|'.join(_units)+')(?![-\w])'
+#'(?<!\\s)(?:'+'|'.join(_units)+')(?![-\\w])'
 ## Grammar compiled using Yapps:
 %%
 parser Calculator:
@@ -30,23 +30,24 @@ parser Calculator:
     token ADD: "[+]"
     token SUB: "-\s"
     token SIGN: "-(?![a-zA-Z_])"
-    token AND: "'(?<![-\w])and(?![-\w])'"
-    token OR: "'(?<![-\w])or(?![-\w])'"
-    token NOT: "'(?<![-\w])not(?![-\w])'"
-    token EQ: "=="
+    token AND: "(?<![-\w])and(?![-\w])"
+    token OR: "(?<![-\w])or(?![-\w])"
+    token NOT: "(?<![-\w])not(?![-\w])"
     token NE: "!="
     token INV: "!"
+    token EQ: "=="
     token LE: "<="
     token GE: ">="
     token LT: "<"
     token GT: ">"
     token STR: "'[^']*'"
     token QSTR: '"[^"]*"'
-    token UNITS: "(?:px|cm|mm|hz|%)(?![-\w])"
+    token UNITS: "(?<!\s)(?:px|cm|mm|hz|%)(?![-\w])"
     token NUM: "(?:\d+(?:\.\d*)?|\.\d+)"
-    token BOOL: "'(?<![-\w])(?:true|false)(?![-\w])'"
+    token BOOL: "(?<![-\w])(?:true|false)(?![-\w])"
     token COLOR: "#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])"
     token VAR: "\$[-a-zA-Z0-9_]+"
+    token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
     token ID: "[-a-zA-Z_][-a-zA-Z0-9_]*"
     rule goal<<R>>:         expr_lst<<R>>                   {{ v = expr_lst.first() if len(expr_lst) == 1 else expr_lst }}
                               END                           {{ return v }}
@@ -101,12 +102,12 @@ parser Calculator:
                               ]                             {{ return v }}
     rule atom<<R>>:         LPAR expr_lst<<R>> RPAR         {{ return expr_lst.first() if len(expr_lst) == 1 else expr_lst }}
                               |
-                              ID                            {{ v = ID }}
-                              [                             {{ v = None }}
-                                  LPAR [
-                                      expr_lst<<R>>         {{ v = expr_lst }}
-                                  ] RPAR                    {{ return call(ID, v, R) }}
-                              ]                             {{ return v }}
+                              ID                            {{ return ID }}
+                              |
+                              FNCT                          {{ v = None }}
+                              LPAR [
+                                  expr_lst<<R>>             {{ v = expr_lst }}
+                              ] RPAR                        {{ return call(FNCT, v, R) }}
                               |
                               NUM                           {{ return NumberValue(ParserValue(NUM)) }}
                               |

@@ -571,7 +571,12 @@ class Scss(object):
                 _codestr = str[start+1:].strip()
                 if _selectors:
                     yield _selectors, _codestr
-                err = "Error: Block never closed '%s'" % _selectors
+                if par:
+                    err = "Error: Missing closing parenthesis somewhere in block: '%s'" % _selectors
+                elif instr:
+                    err = "Error: Missing closing string somewhere in block: '%s'" % _selectors
+                else:
+                    err = "Error: Block never closed: '%s'" % _selectors
                 print >>sys.stderr, err #FIXME: raise exception? (block not closed!)
                 return
         losestr = str[lose:]
@@ -1195,20 +1200,22 @@ class Scss(object):
             if value:
                 value = value.strip()
                 value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
-            if DEBUG:
-                print >>sys.stderr, '>',value
             _prop = (scope or '') + prop
             if is_var or prop.startswith('$') and value is not None:
                 if isinstance(value, basestring):
                     if '!default' in value:
-                        value = value.replace('!default', '').replace('  ', ' ').strip()
+                        if _prop in rule[CONTEXT]:
+                            value = None
+                        else:
+                            value = value.replace('!default', '').replace('  ', ' ').strip()
                 elif isinstance(value, ListValue):
+                    value = ListValue(value)
                     for k, v in value.value.items():
                         if v == '!default':
-                            del value.value[k]
                             if _prop in rule[CONTEXT]:
                                 value = None
                             else:
+                                del value.value[k]
                                 value = value.first() if len(value) == 1 else value
                             break
                 if value is not None:
@@ -1635,13 +1642,10 @@ def to_float(num):
     if isinstance(num, (float, int)):
         return float(num)
     num = to_str(num)
-    try:
-        if num and num[-1] == '%':
-            return float(num[:-1]) / 100.0
-        else:
-            return float(num)
-    except ValueError:
-        return 0.0
+    if num and num[-1] == '%':
+        return float(num[:-1]) / 100.0
+    else:
+        return float(num)
 
 hex2rgba = {
     9: lambda c: (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), int(c[7:9], 16)),
@@ -3236,11 +3240,11 @@ class NumberValue(Value):
                 else:
                     self.value = to_float(tokens)
             except ValueError:
-                self.value = 0.0
+                raise ValueError("Value is not a Number!")
         elif isinstance(tokens, (int, float)):
             self.value = float(tokens)
         else:
-            self.value = 0.0
+            raise ValueError("Value is not a Number!")
         if type is not None:
             self.units = { type: _units_weights.get(type, 1), '_': type }
     def __repr__(self):
@@ -3256,8 +3260,11 @@ class NumberValue(Value):
         return val
     @classmethod
     def _do_cmps(cls, first, second, op):
-        first = NumberValue(first)
-        second = NumberValue(second)
+        try:
+            first = NumberValue(first)
+            second = NumberValue(second)
+        except ValueError:
+            return op(getattr(first, 'value', first), getattr(second, 'value', second))
         first_type = _conv_type.get(first.unit)
         second_type = _conv_type.get(second.unit)
         if first_type == second_type or first_type is None or second_type is None:
@@ -3386,6 +3393,8 @@ class ListValue(Value):
                 lst = [ i.strip() for i in lst[0].split(',') if i.strip() ]
                 if len(lst) > 1:
                     separator = ',' if separator is None else separator
+                else:
+                    lst = [ tokens ]
             self.value = dict(enumerate(lst))
         if separator is None:
             separator = self.value.pop('_', None)
@@ -3394,8 +3403,11 @@ class ListValue(Value):
             
     @classmethod
     def _do_cmps(cls, first, second, op):
-        first = ListValue(first)
-        second = ListValue(second)
+        try:
+            first = ListValue(first)
+            second = ListValue(second)
+        except ValueError:
+            return op(getattr(first, 'value', first), getattr(second, 'value', second))
         return op(first.value, second.value)
     @classmethod
     def _do_op(cls, first, second, op):
@@ -3490,8 +3502,8 @@ class ColorValue(Value):
                                 self.value = tuple(col)
                                 self.types = { type: 1 }
                             except:
-                                pass
-                        if type in ('hsl', 'hsla'):
+                                raise ValueError("Value is not a Color!")
+                        elif type in ('hsl', 'hsla'):
                             c = colors.split(',')
                             try:
                                 c = [ to_float(c[i]) for i in range(4) ]
@@ -3500,9 +3512,9 @@ class ColorValue(Value):
                                 self.value = tuple([ c * 255.0 for c in colorsys.hls_to_rgb(col[0], 0.999999 if col[2] == 1 else col[2], 0.999999 if col[1] == 1 else col[1]) ] + [ col[3] ])
                                 self.types = { type: 1 }
                             except:
-                                pass
+                                raise ValueError("Value is not a Number!")
                     except:
-                        pass
+                        raise ValueError("Value is not a Number!")
     def __repr__(self):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.types))
     def __str__(self):
@@ -3527,8 +3539,11 @@ class ColorValue(Value):
         return 'rgba(%d, %d, %d, %s)' % (round(c[0]), round(c[1]), round(c[2]), to_str(c[3]))
     @classmethod
     def _do_cmps(cls, first, second, op):
-        first = ColorValue(first)
-        second = ColorValue(second)
+        try:
+            first = ColorValue(first)
+            second = ColorValue(second)
+        except ValueError:
+            return op(getattr(first, 'value', first), getattr(second, 'value', second))
         return op(first.value, second.value)
     @classmethod
     def _do_op(cls, first, second, op):
@@ -4020,7 +4035,7 @@ class Parser(object):
         self._scanner.rewind(self._pos)
 
 ################################################################################
-#'(?:'+'|'.join(_units)+')(?![-\w])'
+#'(?<!\\s)(?:'+'|'.join(_units)+')(?![-\w])'
 ## Grammar compiled using Yapps:
 class CalculatorScanner(Scanner):
     patterns = [
@@ -4035,9 +4050,9 @@ class CalculatorScanner(Scanner):
         ('ADD', re.compile('[+]')),
         ('SUB', re.compile('-\\s')),
         ('SIGN', re.compile('-(?![a-zA-Z_])')),
-        ('AND', re.compile('(?<![-\w])and(?![-\w])')),
-        ('OR', re.compile('(?<![-\w])or(?![-\w])')),
-        ('NOT', re.compile('(?<![-\w])not(?![-\w])')),
+        ('AND', re.compile('(?<![-\\w])and(?![-\\w])')),
+        ('OR', re.compile('(?<![-\\w])or(?![-\\w])')),
+        ('NOT', re.compile('(?<![-\\w])not(?![-\\w])')),
         ('NE', re.compile('!=')),
         ('INV', re.compile('!')),
         ('EQ', re.compile('==')),
@@ -4047,11 +4062,12 @@ class CalculatorScanner(Scanner):
         ('GT', re.compile('>')),
         ('STR', re.compile("'[^']*'")),
         ('QSTR', re.compile('"[^"]*"')),
-        ('UNITS', re.compile('(?:'+'|'.join(_units)+')(?![-\w])')),
+        ('UNITS', re.compile('(?<!\\s)(?:'+'|'.join(_units)+')(?![-\\w])')),
         ('NUM', re.compile('(?:\\d+(?:\\.\\d*)?|\\.\\d+)')),
-        ('BOOL', re.compile('(?<![-\w])(?:true|false)(?![-\w])')),
+        ('BOOL', re.compile('(?<![-\\w])(?:true|false)(?![-\\w])')),
         ('COLOR', re.compile('#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])')),
         ('VAR', re.compile('\\$[-a-zA-Z0-9_]+')),
+        ('FNCT', re.compile('[-a-zA-Z_][-a-zA-Z0-9_]*(?=\\()')),
         ('ID', re.compile('[-a-zA-Z_][-a-zA-Z0-9_]*')),
     ]
     def __init__(self):
@@ -4189,16 +4205,16 @@ class Calculator(Parser):
             return expr_lst.first() if len(expr_lst) == 1 else expr_lst
         elif _token_ == 'ID':
             ID = self._scan('ID')
-            v = ID
-            if self._peek(self.atom_rsts) == 'LPAR':
-                v = None
-                LPAR = self._scan('LPAR')
-                if self._peek(self.atom_rsts_) != 'RPAR':
-                    expr_lst = self.expr_lst(R)
-                    v = expr_lst
-                RPAR = self._scan('RPAR')
-                return call(ID, v, R)
-            return v
+            return ID
+        elif _token_ == 'FNCT':
+            FNCT = self._scan('FNCT')
+            v = None
+            LPAR = self._scan('LPAR')
+            if self._peek(self.atom_rsts) != 'RPAR':
+                expr_lst = self.expr_lst(R)
+                v = expr_lst
+            RPAR = self._scan('RPAR')
+            return call(FNCT, v, R)
         elif _token_ == 'NUM':
             NUM = self._scan('NUM')
             return NumberValue(ParserValue(NUM))
@@ -4225,8 +4241,7 @@ class Calculator(Parser):
             if self._peek(self.expr_lst_rsts_) == '":"':
                 self._scan('":"')
                 n = VAR
-            else:
-                self._rewind()
+            else: self._rewind()
         expr_slst = self.expr_slst(R)
         v = { n or 0: expr_slst }
         while self._peek(self.expr_lst_rsts__) == 'COMMA':
@@ -4251,26 +4266,26 @@ class Calculator(Parser):
             v[len(v)] = expr
         return ListValue(ParserValue(v)) if len(v) > 1 else v[0]
 
-    not_test_rsts_ = set(['AND', 'LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
+    not_test_rsts_ = set(['AND', 'LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
     m_expr_chks = set(['MUL', 'DIV'])
-    comparison_rsts = set(['LPAR', 'QSTR', 'RPAR', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'ADD', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'INV', 'GE', 'BOOL', 'NOT', 'OR'])
-    atom_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'VAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
+    comparison_rsts = set(['LPAR', 'QSTR', 'RPAR', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'ADD', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'INV', 'GE', 'BOOL', 'NOT', 'OR'])
+    atom_rsts = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'NOT', 'ADD', 'NUM', 'BOOL', 'FNCT', 'STR', 'VAR', 'RPAR', 'ID'])
     not_test_chks = set(['NOT', 'INV'])
-    u_expr_chks = set(['LPAR', 'COLOR', 'QSTR', 'NUM', 'BOOL', 'STR', 'VAR', 'ID'])
-    m_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
-    expr_lst_rsts_ = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'BOOL', '":"', 'STR', 'NOT', 'ID'])
-    expr_lst_rsts = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'NOT', 'ADD', 'NUM', 'BOOL', 'STR', 'VAR', 'ID'])
-    and_test_rsts = set(['AND', 'LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
-    u_expr_rsts_ = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'VAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
-    u_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'ADD', 'NUM', 'BOOL', 'STR', 'VAR', 'ID'])
-    expr_rsts = set(['LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
-    not_test_rsts = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'BOOL', 'STR', 'NOT', 'ID'])
-    atom_rsts_ = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'NOT', 'ADD', 'NUM', 'BOOL', 'STR', 'VAR', 'RPAR', 'ID'])
+    u_expr_chks = set(['LPAR', 'COLOR', 'QSTR', 'NUM', 'BOOL', 'FNCT', 'STR', 'VAR', 'ID'])
+    m_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
+    expr_lst_rsts_ = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'BOOL', '":"', 'STR', 'NOT', 'ID', 'FNCT'])
+    expr_lst_rsts = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'NOT', 'ADD', 'NUM', 'BOOL', 'FNCT', 'STR', 'VAR', 'ID'])
+    and_test_rsts = set(['AND', 'LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
+    u_expr_rsts_ = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'VAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
+    u_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'ADD', 'NUM', 'BOOL', 'FNCT', 'STR', 'VAR', 'ID'])
+    expr_rsts = set(['LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
+    not_test_rsts = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'BOOL', 'FNCT', 'STR', 'NOT', 'ID'])
     comparison_chks = set(['GT', 'GE', 'NE', 'LT', 'LE', 'EQ'])
-    expr_slst_rsts = set(['LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'RPAR', 'VAR', 'ADD', 'NUM', 'COMMA', 'STR', 'NOT', 'BOOL', 'SIGN', 'ID'])
+    expr_slst_rsts = set(['LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'RPAR', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'BOOL', 'SIGN', 'ID'])
     a_expr_chks = set(['ADD', 'SUB'])
-    a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
+    a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
     expr_lst_rsts__ = set(['END', 'COMMA', 'RPAR'])
+
 
     expr_lst_rsts_ = None
 
