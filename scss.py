@@ -2037,9 +2037,9 @@ def _radial_gradient(*args):
     color_stops = args
     position_and_angle = None
     shape_and_size = None
-    if isinstance(args[0], (StringValue, NumberValue)):
+    if isinstance(args[0], (StringValue, NumberValue, basestring)):
         position_and_angle = args[0]
-        if isinstance(args[1], (StringValue, NumberValue)):
+        if isinstance(args[1], (StringValue, NumberValue, basestring)):
             shape_and_size = args[1]
             color_stops = args[2:]
         else:
@@ -2090,14 +2090,13 @@ def _radial_gradient(*args):
 def _linear_gradient(*args):
     color_stops = args
     position_and_angle = None
-    if isinstance(args[0], (StringValue, NumberValue)):
+    if isinstance(args[0], (StringValue, NumberValue, basestring)):
         position_and_angle = args[0]
         color_stops = args[1:]
-
     color_stops = __color_stops(False, *color_stops)
 
     args = [
-        position_and_angle if position_and_angle is not None else None,
+        _position(position_and_angle) if position_and_angle is not None else None,
     ]
     args.extend('%s %s' % (c, to_str(s)) for s,c in color_stops)
     to__s = 'linear-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
@@ -2118,7 +2117,7 @@ def _linear_gradient(*args):
     def to__webkit():
         args = [
             'linear',
-            position_and_angle or 'center top',
+            _position(position_and_angle or 'center top'),
             _opposite_position(position_and_angle or 'center top'),
         ]
         args.extend('color-stop(%s, %s)' % (to_str(s), c) for s,c in color_stops)
@@ -2713,26 +2712,32 @@ def _image_height(image):
     return NumberValue(height, 'px')
 
 ################################################################################
-def _opposite_position(*p):
+def __position(opposite, *p):
     pos = set()
     hrz = vrt = None
     for _p in p:
         pos.update(StringValue(_p).value.split())
     if 'left' in pos:
-        hrz = 'right'
+        hrz = 'right' if opposite else 'left'
     elif 'right' in pos:
-        hrz = 'left'
-    elif 'center' in pos:
+        hrz = 'left' if opposite else 'right'
+    else:
         hrz = 'center'
     if 'top' in pos:
-        vrt = 'bottom'
+        vrt = 'bottom' if opposite else 'top'
     elif 'bottom' in pos:
-        vrt = 'top'
-    elif 'center' in pos:
+        vrt = 'top' if opposite else 'bottom'
+    else:
         vrt = 'center'
     if hrz == vrt:
         vrt = None
     return ListValue(list(v for v in (hrz, vrt) if v is not None))
+
+def _position(*p):
+    return __position(False, *p)
+
+def _opposite_position(*p):
+    return __position(True, *p)
 
 def _grad_point(*p):
     pos = set()
