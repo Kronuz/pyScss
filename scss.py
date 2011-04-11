@@ -36,8 +36,8 @@ xCSS:
 
 """
 
-VERSION_INFO = (1, 0, 5)
-BUILD_INFO = "pyScss v1.0 (20110319)"
+VERSION_INFO = (1, 0, 6)
+BUILD_INFO = "pyScss v1.0 (20110411)"
 AUTHOR = "German M. Bravo (Kronuz)"
 AUTHOR_EMAIL = 'german.mb@gmail.com'
 URL = 'http://github.com/Kronuz/pyScss'
@@ -5470,7 +5470,7 @@ Sass generates only selectors that are likely to be useful.
 """
 
 def usage():
-    print "Usage: ",sys.argv[0]," [options]\n"
+    print "Usage: %s [options] [file]\n" % sys.argv[0]
     print "Description:"
     print "Converts Scss files to CSS.\n"
     print "Options:"
@@ -5479,6 +5479,7 @@ def usage():
     print "    -I, --load-path PATH             Add a scss import path."
     print "    -S, --static-root PATH           Static root path (Where images and static resources are located)"
     print "    -A, --assets-root PATH           Assets root path (Sprite images will be created here)"
+    print "    -o, --output                     Output filename"
     print "    -?, -h, --help                   Show this message"
     print "    -v, --version                    Print version"
     sys.exit(2)
@@ -5488,7 +5489,7 @@ def main():
     try:
         import atexit
         import readline
-        histfile = os.path.join(os.environ["HOME"], ".scss-history")
+        histfile = os.path.expanduser('~/.scss-history')
         try:
             readline.read_history_file(histfile)
         except IOError:
@@ -5498,7 +5499,7 @@ def main():
         pass
     try:
         # parse options
-        opts, args = getopt.getopt(sys.argv[1:], '?hvtiI:S:A:', ['help', 'version', 'time', 'test', 'interactive', 'load-path=', 'static-root=', 'assets-root='])
+        opts, operands = getopt.getopt(sys.argv[1:], '?hvtiI:S:A:o:', ['help', 'version', 'time', 'test', 'interactive', 'load-path=', 'static-root=', 'assets-root=', 'output='])
     except getopt.GetoptError, err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -5506,12 +5507,15 @@ def main():
     else:
         global LOAD_PATHS, VERBOSITY, STATIC_ROOT, ASSETS_ROOT
         VERBOSITY = 0
+        output = sys.stdout
         load_paths = [ p.strip() for p in LOAD_PATHS.split(',') ]
         for o, a in opts:
             if o in ('-S', '--static-root'):
                 STATIC_ROOT = a
             elif o in ('-A', '--assets-root'):
                 ASSETS_ROOT = a
+            elif o in ('-o', '--output'):
+                output = open(a, 'wt')
             elif o in ('-I', '--load-path'):
                 for p in a.replace(';', ',').split(','):
                     p = p.strip()
@@ -5632,7 +5636,12 @@ def main():
             print 'Bye!'
         else:
             css = Scss()
-            sys.stdout.write(css.compile(sys.stdin.read()))
+            if operands:
+                for operand in operands:
+                    input = open(operand, 'rt')
+                    output.write(css.compile(input.read()))
+            else:
+                output.write(css.compile(sys.stdin.read()))
             for f, t in profiling.items():
                 print >>sys.stderr, '%s took %0.3fs' % (f, t)
 if __name__ == "__main__":
