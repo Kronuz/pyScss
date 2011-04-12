@@ -840,8 +840,10 @@ class Scss(object):
                     _media = (media or []) +  [ name ]
                     rule[CODESTR] = self.construct + ' {' + c_codestr + '}'
                     self.manage_children(rule, p_selectors, p_parents, p_children, scope, _media)
-                else:
+                elif c_codestr is None:
                     rule[PROPERTIES].append((c_property, None))
+                elif scope is None: # needs to have no scope to crawl down the nested rules
+                    self._nest_rules(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr)
             ####################################################################
             # Properties
             elif c_codestr is None:
@@ -1495,7 +1497,7 @@ class Scss(object):
                         for k, v in context.items():
                             result += _tb + _tb + k + ' = ' + v + ';' + nl
                         result += _tb + '*/' + nl
-                result += self._print_properties(properties, scope, [old_property], sc, sp, _tb, nl)
+                result += self._print_properties(properties, scope, [old_property], sc, sp, _tb, nl, wrap)
 
         if open_media:
             _tb = tb
@@ -1515,12 +1517,17 @@ class Scss(object):
 
         return result + '\n'
 
-    def _print_properties(self, properties, scope=None, old_property=None, sc=True, sp=' ', _tb='', nl='\n'):
+    def _print_properties(self, properties, scope=None, old_property=None, sc=True, sp=' ', _tb='', nl='\n', wrap=None):
+        if wrap is None:
+            wrap = textwrap.TextWrapper(break_long_words=False)
+            wrap.wordsep_re = re.compile(r'(?<=,)(\s*)')
+            wrap = wrap.wrap
         result = ''
         old_property = [None] if old_property is None else old_property
         scope = set() if scope is None else scope
         for prop, value in properties:
             if value is not None:
+                if nl: value = (nl + _tb + _tb).join(wrap(value))
                 property = prop + ':' + sp + value
             else:
                 property = prop
@@ -3866,7 +3873,7 @@ def call(name, args, R, is_function=True):
     except KeyError:
         sp = args and args.value.get('_') or ''
         if is_function:
-            if _name not in ('url', 'mask', 'rotate'):
+            if _name not in ('url', 'mask', 'rotate', 'format'):
                 err = "Error: Required function not found: %s" % _fn_a
                 print >>sys.stderr, err
             _args = (sp + ' ').join( to_str(v) for n,v in s if isinstance(n, int) )
