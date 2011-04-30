@@ -381,8 +381,40 @@ OPTIONS = 5
 SELECTORS = 6
 PROPERTIES = 7
 PATH = 8
-FINAL = 9
-MEDIA = 10
+FILE = 9
+FINAL = 10
+MEDIA = 11
+RULE_VARS = {
+    'FILEID': FILEID,
+    'POSITION': POSITION,
+    'CODESTR': CODESTR,
+    'DEPS': DEPS,
+    'CONTEXT': CONTEXT,
+    'OPTIONS': OPTIONS,
+    'SELECTORS': SELECTORS,
+    'PROPERTIES': PROPERTIES,
+    'PATH': PATH,
+    'FILE': FILE,
+    'FINAL': FINAL,
+    'MEDIA': MEDIA,
+}
+def spawn_rule(rule=None, **kwargs):
+    """
+    FILEID, POSITION, CODESTR, DEPS, CONTEXT, OPTIONS, SELECTORS, PROPERTIES, PATH, FILE, FINAL, MEDIA
+    """
+    if rule is None:
+        rule = [ None ] * len(RULE_VARS)
+        rule[DEPS] = set()
+        rule[SELECTORS] = ''
+        rule[PROPERTIES] = []
+        rule[PATH] = './'
+        rule[FILE] = ''
+        rule[FINAL] = False
+    else:
+        rule = list(rule)
+    for k, v in kwargs.items():
+        rule[RULE_VARS[k.upper()]] = v
+    return rule
 
 def print_timing(level=0):
     def _print_timing(func):
@@ -732,7 +764,7 @@ class Scss(object):
 
     def parse_scss_string(self, fileid, str):
         str = self.load_string(str)
-        rule = [ fileid, None, str, set(), self._scss_vars, self._scss_opts, '', [], './', False, None ]
+        rule = spawn_rule(fileid=fileid, codestr=str, context=self._scss_vars, options=self._scss_opts, file=fileid)
         self.children.append(rule)
         return str
 
@@ -991,21 +1023,25 @@ class Scss(object):
                         load_paths = []
                         i_codestr = None
                         for path in [ './' ] + LOAD_PATHS.split(','):
-                            for basepath in [ './', rule[PATH] ]:
+                            for basepath in [ './', os.path.dirname(rule[PATH]) ]:
                                 i_codestr = None
                                 full_path = os.path.realpath(os.path.join(path, basepath, dirname))
                                 if full_path not in load_paths:
                                     try:
-                                        i_codestr = open(os.path.join(full_path, '_'+filename+'.scss')).read()
+                                        full_filename = os.path.join(full_path, '_'+filename+'.scss')
+                                        i_codestr = open(full_filename).read()
                                     except:
                                         try:
-                                            i_codestr = open(os.path.join(full_path, filename+'.scss')).read()
+                                            full_filename = os.path.join(full_path, filename+'.scss')
+                                            i_codestr = open(full_filename).read()
                                         except:
                                             try:
-                                                i_codestr = open(os.path.join(full_path, '_'+filename)).read()
+                                                full_filename = os.path.join(full_path, '_'+filename)
+                                                i_codestr = open(full_filename).read()
                                             except:
                                                 try:
-                                                    i_codestr = open(os.path.join(full_path, filename)).read()
+                                                    full_filename = os.path.join(full_path, filename)
+                                                    i_codestr = open(full_filename).read()
                                                 except:
                                                     pass
                                     if i_codestr is not None:
@@ -1021,9 +1057,7 @@ class Scss(object):
                         err = "Warning: File to import not found or unreadable: '" + filename + "'\nLoad paths:\n\t" + "\n\t".join(load_paths)
                         print >>sys.stderr, err
                     else:
-                        _rule = list(rule)
-                        _rule[CODESTR] = i_codestr
-                        _rule[PATH] = full_path
+                        _rule = spawn_rule(rule, codestr=i_codestr, path=full_filename, file=name)
                         self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
                         rule[OPTIONS]['@import ' + name] = True
         else:
@@ -1260,7 +1294,7 @@ class Scss(object):
                 if parents:
                     better_selectors += ' extends ' + '&'.join(sorted(parents))
 
-            _rule = [ rule[FILEID], None, c_codestr, set(), rule[CONTEXT].copy(), rule[OPTIONS].copy(), better_selectors, [], rule[PATH], False, media ]
+            _rule = spawn_rule(fileid=rule[FILEID], codestr=c_codestr, context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=better_selectors, path=rule[PATH], file=rule[FILE], media=media)
             p_children.appendleft(_rule)
 
     @print_timing(4)
@@ -1405,17 +1439,16 @@ class Scss(object):
         css_files = set()
         old_fileid = None
         for rule in self.rules:
-            if rule[POSITION] is not None:
-                fileid, position, codestr, deps, context, options, selectors, properties, path, final, media = rule
-                #print >>sys.stderr, fileid, position, [ c for c in context if c[1] != '_' ], options.keys(), selectors, deps
-                if properties:
-                    self._rules.setdefault(fileid, [])
-                    self._rules[fileid].append(rule)
-                    if old_fileid != fileid:
-                        old_fileid = fileid
-                        if fileid not in css_files:
-                            css_files.add(fileid)
-                            self.css_files.append(fileid)
+            #print >>sys.stderr, rule[FILEID], rule[POSITION], [ c for c in rule[CONTEXT] if c[1] != '_' ], rule[OPTIONS].keys(), rule[SELECTORS], rule[DEPS]
+            if rule[POSITION] is not None and rule[PROPERTIES]:
+                fileid = rule[FILEID]
+                self._rules.setdefault(fileid, [])
+                self._rules[fileid].append(rule)
+                if old_fileid != fileid:
+                    old_fileid = fileid
+                    if fileid not in css_files:
+                        css_files.add(fileid)
+                        self.css_files.append(fileid)
 
     @print_timing(3)
     def create_css(self, fileid=None):
@@ -1451,9 +1484,10 @@ class Scss(object):
 
         result = ''
         for rule in rules:
-            fileid, position, codestr, deps, context, options, selectors, properties, path, final, media = rule
-            #print >>sys.stderr, fileid, media, position, [ c for c in context if not c.startswith('$__') ], options.keys(), selectors, deps
-            if position is not None and properties:
+            #print >>sys.stderr, rule[FILEID], rule[MEDIA], rule[POSITION], [ c for c in rule[CONTEXT] if not c.startswith('$__') ], rule[OPTIONS].keys(), rule[SELECTORS], rule[DEPS]
+            if rule[POSITION] is not None and rule[PROPERTIES]:
+                selectors = rule[SELECTORS]
+                media = rule[MEDIA]
                 _tb = tb if old_media else ''
                 if old_media != media and media is not None:
                     if open_selectors:
@@ -1490,14 +1524,14 @@ class Scss(object):
                     scope = set()
                 if selectors:
                     _tb += tb
-                if options.get('verbosity', 0) > 1:
-                    result += _tb + '/* file: ' + fileid + ' */' + nl
-                    if context:
+                if rule[OPTIONS].get('verbosity', 0) > 1:
+                    result += _tb + '/* file: ' + rule[FILEID] + ' */' + nl
+                    if rule[CONTEXT]:
                         result += _tb + '/* vars:' + nl
-                        for k, v in context.items():
+                        for k, v in rule[CONTEXT].items():
                             result += _tb + _tb + k + ' = ' + v + ';' + nl
                         result += _tb + '*/' + nl
-                result += self._print_properties(properties, scope, [old_property], sc, sp, _tb, nl, wrap)
+                result += self._print_properties(rule[PROPERTIES], scope, [old_property], sc, sp, _tb, nl, wrap)
 
         if open_media:
             _tb = tb
@@ -2542,7 +2576,8 @@ def _sprite_url(map):
         print >>sys.stderr, err
     if sprite_map:
         url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
-        return QuotedStringValue(url)
+        url = "url(%s)" % escape(url)
+        return StringValue(url)
     return StringValue(None)
 
 def _sprite_position(map, sprite, offset_x=None, offset_y=None):
@@ -3874,7 +3909,7 @@ def call(name, args, R, is_function=True):
         sp = args and args.value.get('_') or ''
         if is_function:
             if _name not in ('url', 'mask', 'rotate', 'format'):
-                err = "Error: Required function not found: %s" % _fn_a
+                err = "Error: Required function not found (\"%s\"): %s" % (R[FILE], _fn_a)
                 print >>sys.stderr, err
             _args = (sp + ' ').join( to_str(v) for n,v in s if isinstance(n, int) )
             _kwargs = (sp + ' ').join( '%s: %s' % (n, to_str(v)) for n,v in s if not isinstance(n, int) and n != '_' )
