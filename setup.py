@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from setuptools import setup
 
-from scss import PROJECT, URL, VERSION, AUTHOR, AUTHOR_EMAIL, LICENSE, DOWNLOAD_URL
+from pyScss.scss_meta import PROJECT, URL, VERSION, AUTHOR, AUTHOR_EMAIL, LICENSE, DOWNLOAD_URL
 
 def read(fname):
     import os
@@ -9,6 +9,13 @@ def read(fname):
         return open(os.path.join(os.path.dirname( __file__ ), fname)).read().strip()
     except IOError:
         return ''
+
+extra = {}
+import sys
+if sys.version_info >= (3, 0):
+    extra.update(
+        use_2to3=True,
+    )
 
 setup(name=PROJECT,
     version=VERSION,
@@ -18,9 +25,7 @@ setup(name=PROJECT,
     author_email=AUTHOR_EMAIL,
     url=URL,
     download_url=DOWNLOAD_URL,
-    py_modules=[
-        'scss',
-    ],
+    packages=['pyScss'],
     license=LICENSE,
     keywords='css oocss xcss sass scss less precompiler',
     classifiers=["Development Status :: 5 - Production/Stable",
@@ -28,8 +33,14 @@ setup(name=PROJECT,
                  "License :: OSI Approved :: MIT License",
                  "Operating System :: OS Independent",
                  "Programming Language :: Python",
+                 "Programming Language :: Python :: 3",
                  "Topic :: Software Development :: Code Generators",
                  "Topic :: Text Processing :: Markup",
                  "Topic :: Software Development :: Libraries :: Python Modules"
                  ],
+    entry_points = """
+    [console_scripts]
+    pyScss = pyScss.scss:main
+    """,
+    **extra
     )

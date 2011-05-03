@@ -36,17 +36,10 @@ xCSS:
 
 """
 
-VERSION_INFO = (1, 0, 6)
-BUILD_INFO = "pyScss v1.0 (20110411)"
-AUTHOR = "German M. Bravo (Kronuz)"
-AUTHOR_EMAIL = 'german.mb@gmail.com'
-URL = 'http://github.com/Kronuz/pyScss'
-DOWNLOAD_URL = 'http://github.com/Kronuz/pyScss/tarball/v1.0'
-LICENSE = "MIT"
-PROJECT = "pyScss"
+from scss_meta import BUILD_INFO, PROJECT, VERSION, AUTHOR, AUTHOR_EMAIL, LICENSE
 
 __project__ = PROJECT
-__version__ = VERSION = '.'.join(str(i) for i in VERSION_INFO)
+__version__ = VERSION
 __author__ = AUTHOR + ' <' + AUTHOR_EMAIL + '>'
 __license__ = LICENSE
 
@@ -5680,8 +5673,8 @@ def main():
             css = Scss()
             if operands:
                 for operand in operands:
-                    input = open(operand, 'rt')
-                    output.write(css.compile(input.read()))
+                    finput = open(operand, 'rt')
+                    output.write(css.compile(finput.read()))
             else:
                 output.write(css.compile(sys.stdin.read()))
             for f, t in profiling.items():
