@@ -1,6 +1,6 @@
 Metadata-Version: 1.0
 Name: pyScss
-Version: 1.0.6
+Version: 1.0.7
 Summary: pyScss, a Scss compiler for Python
 Home-page: http://github.com/Kronuz/pyScss
 Author: German M. Bravo (Kronuz)
@@ -317,6 +317,7 @@ Classifier: Intended Audience :: Developers
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
 Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
 Classifier: Topic :: Software Development :: Code Generators
 Classifier: Topic :: Text Processing :: Markup
 Classifier: Topic :: Software Development :: Libraries :: Python Modules

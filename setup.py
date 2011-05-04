@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from setuptools import setup
 
-from pyScss.scss_meta import PROJECT, URL, VERSION, AUTHOR, AUTHOR_EMAIL, LICENSE, DOWNLOAD_URL
+from pyscss.scss_meta import PROJECT, URL, VERSION, AUTHOR, AUTHOR_EMAIL, LICENSE, DOWNLOAD_URL
 
 def read(fname):
     import os
@@ -25,7 +25,7 @@ setup(name=PROJECT,
     author_email=AUTHOR_EMAIL,
     url=URL,
     download_url=DOWNLOAD_URL,
-    packages=['pyScss'],
+    packages=['pyscss'],
     license=LICENSE,
     keywords='css oocss xcss sass scss less precompiler',
     classifiers=["Development Status :: 5 - Production/Stable",
@@ -40,7 +40,7 @@ setup(name=PROJECT,
                  ],
     entry_points = """
     [console_scripts]
-    pyScss = pyScss.scss:main
+    pyscss = pyscss.scss:main
     """,
     **extra
     )

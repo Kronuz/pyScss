@@ -44,8 +44,8 @@ xCSS:
 
 """
 
-VERSION_INFO = (1, 0, 6)
-DATE_INFO = (2011, 4,  11) # YEAR, MONTH, DAY
+VERSION_INFO = (1, 0, 7)
+DATE_INFO = (2011, 5,  4) # YEAR, MONTH, DAY
 VERSION = '.'.join(str(i) for i in VERSION_INFO)
 REVISION = '%04d%02d%02d' % DATE_INFO
 BUILD_INFO = "pyScss v" + VERSION + " ("+REVISION+")"
