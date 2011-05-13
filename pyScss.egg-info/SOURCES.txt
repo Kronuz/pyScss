@@ -8,6 +8,5 @@ pyScss.egg-info/SOURCES.txt
 pyScss.egg-info/dependency_links.txt
 pyScss.egg-info/entry_points.txt
 pyScss.egg-info/top_level.txt
-pyscss/__init__.py
-pyscss/scss.py
-pyscss/scss_meta.py
+scss/__init__.py
+scss/scss_meta.py

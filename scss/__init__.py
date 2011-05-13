@@ -2374,7 +2374,7 @@ def _sprite_map(g, **kwargs):
                     offset += sizes[i][0] + spacing[1]
 
             if dst_color:
-                src_color = ColorValue(src_color).value[:3] if src_color else (255, 0, 255)
+                src_color = ColorValue(src_color).value[:3] if src_color else (0, 0, 0)
                 dst_color = list(ColorValue(dst_color).value[:3])
                 pixdata = new_image.load()
                 for y in xrange(new_image.size[1]):
@@ -2654,7 +2654,7 @@ def _image_url(image, dst_color=None, src_color=None):
             filetime = 'NA'
     BASE_URL = STATIC_URL
     if path:
-        src_color = tuple( int(round(c)) for c in ColorValue(src_color).value[:3] ) if src_color else (255, 0, 255)
+        src_color = tuple( int(round(c)) for c in ColorValue(src_color).value[:3] ) if src_color else (0, 0, 0)
         dst_color = [ int(round(c)) for c in ColorValue(dst_color).value[:3] ]
 
         file_name, file_ext = os.path.splitext(os.path.normpath(file).replace('\\', '_').replace('/', '_'))

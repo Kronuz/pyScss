@@ -1,0 +1,7 @@
+Changelog
+=========
+
+1.0.8 - May 13, 2011
+    + Changed source color ($src-color) default to black.
+    + Moved the module filename to __init__.py and module renamed back to scss.
+

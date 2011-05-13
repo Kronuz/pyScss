@@ -1,4 +1,4 @@
 
     [console_scripts]
-    pyscss = pyscss.scss:main
+    pyscss = scss:main
     
