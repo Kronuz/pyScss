@@ -66,7 +66,7 @@ Interactive mode::
 
 	python scss.py --interactive
 
-You can customize some settings, check out example_settings.py for a complete example:
+You can customize some settings, check out example_settings.py for a complete example::
 
     # Create a file named "scss_settings.py" within your pyScss script
     # Name is important, or it won't work
