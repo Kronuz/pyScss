@@ -46,18 +46,22 @@ __license__ = LICENSE
 ################################################################################
 # Configuration:
 import os
-PROJECT_ROOT = os.path.normpath(os.path.dirname(os.path.abspath(__file__)))
-# Sass @import load_paths:
-LOAD_PATHS = os.path.join(PROJECT_ROOT, 'sass/frameworks/')
-# Assets path, where new sprite files are created:
-STATIC_ROOT = os.path.join(PROJECT_ROOT, 'static/')
-# Assets path, where new sprite files are created:
-ASSETS_ROOT = os.path.join(PROJECT_ROOT, 'static/assets/')
-# Urls for the static and assets:
-STATIC_URL = '/static/'
-ASSETS_URL = '/static/assets/'
-VERBOSITY = 1
-DEBUG = 0
+# Load default settings
+from scss.settings import *
+# Then override with custom ones, if any
+try:
+    from scss import settings as cfg_
+    from scss_settings import *
+    # Update related cfg vars
+    if SASS_FRAMEWORKS != cfg_.SASS_FRAMEWORKS:
+        LOAD_PATHS = os.path.join(PROJECT_ROOT, SASS_FRAMEWORKS[1:])
+    if STATIC_URL != cfg_.STATIC_URL:
+        STATIC_ROOT = os.path.join(PROJECT_ROOT, STATIC_URL[1:])
+    if ASSETS_URL != cfg_.ASSETS_URL:
+        ASSETS_ROOT = os.path.join(PROJECT_ROOT, ASSETS_URL[1:])
+    del cfg_
+except ImportError:
+    pass
 ################################################################################
 
 try:
@@ -3440,7 +3444,7 @@ class ListValue(Value):
             separator = self.value.pop('_', None)
         if separator:
             self.value['_'] = separator
-            
+
     @classmethod
     def _do_cmps(cls, first, second, op):
         try:

@@ -66,6 +66,18 @@ Interactive mode::
 
 	python scss.py --interactive
 
+You can customize some settings, check out example_settings.py for a complete example:
+
+    # Create a file named "scss_settings.py" within your pyScss script
+    # Name is important, or it won't work
+
+    # Let's say we want to customize the STATIC_URL and ASSETS_URL
+    # These two require to begin with a "/" character.
+    STATIC_URL = "/my_cool_static/"
+    ASSETS_URL = STATIC_URL + "/my_assetz/"
+
+    # Done!
+
 Examples
 ========
 #. **Nested Rules**
