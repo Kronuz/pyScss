@@ -63,11 +63,3 @@ PROJECT_ROOT = os.path.normpath(os.path.dirname(os.path.abspath(__file__)))
 SASS_FRAMEWORKS = '/sass/frameworks/'
 STATIC_URL = '/static/'
 ASSETS_URL = '/static/assets/'
-
-## User non-configurable settings
-# Sass @import load_paths:
-LOAD_PATHS = os.path.join(PROJECT_ROOT, SASS_FRAMEWORKS[1:])
-# Assets path, where new sprite files are created:
-STATIC_ROOT = os.path.join(PROJECT_ROOT, STATIC_URL[1:])
-# Assets path, where new sprite files are created:
-ASSETS_ROOT = os.path.join(PROJECT_ROOT, ASSETS_URL[1:])

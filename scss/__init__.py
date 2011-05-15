@@ -50,18 +50,16 @@ import os
 from scss.settings import *
 # Then override with custom ones, if any
 try:
-    from scss import settings as cfg_
     from scss_settings import *
-    # Update related cfg vars
-    if SASS_FRAMEWORKS != cfg_.SASS_FRAMEWORKS:
-        LOAD_PATHS = os.path.join(PROJECT_ROOT, SASS_FRAMEWORKS[1:])
-    if STATIC_URL != cfg_.STATIC_URL:
-        STATIC_ROOT = os.path.join(PROJECT_ROOT, STATIC_URL[1:])
-    if ASSETS_URL != cfg_.ASSETS_URL:
-        ASSETS_ROOT = os.path.join(PROJECT_ROOT, ASSETS_URL[1:])
-    del cfg_
 except ImportError:
     pass
+finally:
+    # Sass @import load_paths:
+    LOAD_PATHS = os.path.join(PROJECT_ROOT, SASS_FRAMEWORKS[1:])
+    # Static path, where media files are usually stored:
+    STATIC_ROOT = os.path.join(PROJECT_ROOT, STATIC_URL[1:])
+    # Assets path, where new sprite files are created:
+    ASSETS_ROOT = os.path.join(PROJECT_ROOT, ASSETS_URL[1:])
 ################################################################################
 
 try:
@@ -3444,7 +3442,6 @@ class ListValue(Value):
             separator = self.value.pop('_', None)
         if separator:
             self.value['_'] = separator
-
     @classmethod
     def _do_cmps(cls, first, second, op):
         try:
