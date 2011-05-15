@@ -46,6 +46,8 @@ __license__ = LICENSE
 ################################################################################
 # Configuration:
 import os
+# Main project root
+PROJECT_ROOT = os.path.normpath(os.path.dirname(os.path.abspath(__file__)))
 # Load default settings
 from scss.settings import *
 # Then override with custom ones, if any

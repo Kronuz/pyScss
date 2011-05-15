@@ -46,19 +46,11 @@ __all__ = [
     "SASS_FRAMEWORKS",
     "STATIC_URL",
     "ASSETS_URL",
-    "PROJECT_ROOT",
-    "LOAD_PATHS",
-    "STATIC_ROOT",
-    "ASSETS_ROOT",
 ]
-
-import os
 
 ## User configurable settings
 VERBOSITY = 1
 DEBUG = 0
-# Main project root
-PROJECT_ROOT = os.path.normpath(os.path.dirname(os.path.abspath(__file__)))
 # Urls for sass frameworks, static and assets:
 SASS_FRAMEWORKS = '/sass/frameworks/'
 STATIC_URL = '/static/'
