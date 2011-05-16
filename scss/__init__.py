@@ -2144,6 +2144,10 @@ def _linear_gradient(*args):
         return StringValue('-pie-' + to__s)
     ret.to__pie = to__pie
 
+    def to__ms():
+           return StringValue('-ms-' + to__s)
+    ret.to__ms = to__ms
+
     def to__css2():
         return StringValue('')
     ret.to__css2 = to__css2
