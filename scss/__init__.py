@@ -1482,7 +1482,7 @@ class Scss(object):
                 selectors = rule[SELECTORS]
                 media = rule[MEDIA]
                 _tb = tb if old_media else ''
-                if old_media != media and media is not None:
+                if old_media != media or media is not None:
                     if open_selectors:
                         if not sc:
                             if result[-1] == ';':
@@ -1501,7 +1501,7 @@ class Scss(object):
                     old_media = media
                     old_selectors = None # force entrance to add a new selector
                 _tb = tb if media else ''
-                if old_selectors != selectors and selectors is not None:
+                if old_selectors != selectors or selectors is not None:
                     if open_selectors:
                         if not sc:
                             if result[-1] == ';':
@@ -5466,6 +5466,30 @@ Issue #10 test
   color: yelow;
 }
 
+Issue #21 test
+>>> print css.compile('''
+... @option compress:no, short_colors: no;
+... h2 {
+...     background: green;
+...     @media screen{
+...         background:blue;
+...     }
+... }
+... h1 {
+...     background:yellow;
+... }
+... ''') #doctest: +NORMALIZE_WHITESPACE
+h2 {
+  background: #008000;
+}
+@media screen {
+  h2 {
+    background: blue;
+  }
+}
+h1 {
+  background: yellow;
+}
 """
 """
 ADVANCED STUFF, NOT SUPPORTED (FROM SASS):
