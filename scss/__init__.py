@@ -2037,7 +2037,7 @@ def __color_stops(percentages, *args):
 
 def _grad_color_stops(*args):
     color_stops = __color_stops(True, *args)
-    ret = ', '.join([ 'color-stop(%s, %s)' % (to_str(s), c) for s,c in color_stops ])
+    ret = ', '.join([ 'color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops ])
     return StringValue(ret)
 
 def __grad_end_position(radial, color_stops):
@@ -2059,12 +2059,12 @@ def _grad_end_position(*color_stops):
 
 def _color_stops(*args):
     color_stops = __color_stops(False, *args)
-    ret = ', '.join([ '%s %s' % (c, to_str(s)) for s,c in color_stops ])
+    ret = ', '.join([ '%s %s' % (c, to_str(s)) for s, c in color_stops ])
     return StringValue(ret)
 
 def _color_stops_in_percentages(*args):
     color_stops = __color_stops(True, *args)
-    ret = ', '.join([ '%s %s' % (c, to_str(s)) for s,c in color_stops ])
+    ret = ', '.join([ '%s %s' % (c, to_str(s)) for s, c in color_stops ])
     return StringValue(ret)
 
 def _radial_gradient(*args):
@@ -2085,7 +2085,7 @@ def _radial_gradient(*args):
         position_and_angle if position_and_angle is not None else None,
         shape_and_size if shape_and_size is not None else None,
     ]
-    args.extend('%s %s' % (c, to_str(s)) for s,c in color_stops)
+    args.extend('%s %s' % (c, to_str(s)) for s, c in color_stops)
     to__s = 'radial-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
     ret = StringValue(to__s)
 
@@ -2110,7 +2110,7 @@ def _radial_gradient(*args):
             _grad_point(position_and_angle) if position_and_angle is not None else 'center',
             __grad_end_position(True, color_stops),
         ]
-        args.extend('color-stop(%s, %s)' % (to_str(s), c) for s,c in color_stops)
+        args.extend('color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops)
         ret = '-webkit-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
         return StringValue(ret)
     ret.to__webkit = to__webkit
@@ -2132,7 +2132,7 @@ def _linear_gradient(*args):
     args = [
         _position(position_and_angle) if position_and_angle is not None else None,
     ]
-    args.extend('%s %s' % (c, to_str(s)) for s,c in color_stops)
+    args.extend('%s %s' % (c, to_str(s)) for s, c in color_stops)
     to__s = 'linear-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
     ret = StringValue(to__s)
 
@@ -2145,8 +2145,12 @@ def _linear_gradient(*args):
     ret.to__pie = to__pie
 
     def to__ms():
-           return StringValue('-ms-' + to__s)
+        return StringValue('-ms-' + to__s)
     ret.to__ms = to__ms
+
+    def to__o():
+        return StringValue('-o-' + to__s)
+    ret.to__o = to__o
 
     def to__css2():
         return StringValue('')
@@ -2158,7 +2162,7 @@ def _linear_gradient(*args):
             _position(position_and_angle or 'center top'),
             _opposite_position(position_and_angle or 'center top'),
         ]
-        args.extend('color-stop(%s, %s)' % (to_str(s), c) for s,c in color_stops)
+        args.extend('color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops)
         ret = '-webkit-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
         return StringValue(ret)
     ret.to__webkit = to__webkit
@@ -2202,7 +2206,7 @@ def _linear_svg_gradient(*args):
     return StringValue(inline)
 
 def __color_stops_svg(color_stops):
-    ret = ''.join('<stop offset="%s" stop-color="%s"/>' % (to_str(s), c) for s,c in color_stops )
+    ret = ''.join('<stop offset="%s" stop-color="%s"/>' % (to_str(s), c) for s, c in color_stops)
     return ret
 
 def __svg_template(gradient):
@@ -2593,12 +2597,22 @@ def _sprite_position(map, sprite, offset_x=None, offset_y=None):
         err = "Error: No sprite found: %s in %s" % (sprite_name, sprite_map['*n*'])
         print >>sys.stderr, err
     if sprite:
-        x = NumberValue(offset_x or 0, 'px')
-        y = NumberValue(offset_y or 0, 'px')
-        if not x or (x <= -1 or x >= 1) and x.unit != '%':
-            x -= sprite[2]
-        if not y or (y <= -1 or y >= 1) and y.unit != '%':
-            y -= sprite[3]
+        x = None
+        if offset_x is not None and not isinstance(offset_x, NumberValue):
+            x = str(offset_x)
+        if x not in ('left', 'right', 'center'):
+            if x: offset_x = None
+            x = NumberValue(offset_x or 0, 'px')
+            if not x or (x <= -1 or x >= 1) and x.unit != '%':
+                x -= sprite[2]
+        y = None
+        if offset_y is not None and not isinstance(offset_y, NumberValue):
+            y = str(offset_y)
+        if y not in ('top', 'bottom', 'center'):
+            if y: offset_y = None
+            y = NumberValue(offset_y or 0, 'px')
+            if not y or (y <= -1 or y >= 1) and y.unit != '%':
+                y -= sprite[3]
         pos = '%s %s' % (x, y)
         return StringValue(pos)
     return StringValue('0 0')
@@ -3444,7 +3458,7 @@ class ListValue(Value):
             separator = self.value.pop('_', None)
         if separator:
             self.value['_'] = separator
-            
+
     @classmethod
     def _do_cmps(cls, first, second, op):
         try:
