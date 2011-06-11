@@ -46,18 +46,22 @@ __license__ = LICENSE
 ################################################################################
 # Configuration:
 import os
+# Main project root
 PROJECT_ROOT = os.path.normpath(os.path.dirname(os.path.abspath(__file__)))
-# Sass @import load_paths:
-LOAD_PATHS = os.path.join(PROJECT_ROOT, 'sass/frameworks/')
-# Assets path, where new sprite files are created:
-STATIC_ROOT = os.path.join(PROJECT_ROOT, 'static/')
-# Assets path, where new sprite files are created:
-ASSETS_ROOT = os.path.join(PROJECT_ROOT, 'static/assets/')
-# Urls for the static and assets:
-STATIC_URL = '/static/'
-ASSETS_URL = '/static/assets/'
-VERBOSITY = 1
-DEBUG = 0
+# Load default settings
+from scss.settings import *
+# Then override with custom ones, if any
+try:
+    from scss_settings import *
+except ImportError:
+    pass
+finally:
+    # Sass @import load_paths:
+    LOAD_PATHS = os.path.join(PROJECT_ROOT, SASS_FRAMEWORKS[1:])
+    # Static path, where media files are usually stored:
+    STATIC_ROOT = os.path.join(PROJECT_ROOT, STATIC_URL[1:])
+    # Assets path, where new sprite files are created:
+    ASSETS_ROOT = os.path.join(PROJECT_ROOT, ASSETS_URL[1:])
 ################################################################################
 
 try:
@@ -3444,7 +3448,6 @@ class ListValue(Value):
             separator = self.value.pop('_', None)
         if separator:
             self.value['_'] = separator
-            
     @classmethod
     def _do_cmps(cls, first, second, op):
         try:
