@@ -4371,7 +4371,7 @@ def eval_expr(expr, rule, raw=False):
         if not DEBUG:
             return#@@@#
         raise
-__doc__ += """
+__doc__ = """
 >>> css = Scss()
 
 VARIABLES
