@@ -60,6 +60,9 @@ VERBOSITY = 1
 DEBUG = 0
 ################################################################################
 
+import logging
+log = logging.getLogger(__name__)
+
 try:
     import cPickle as pickle
 except ImportError:
@@ -597,12 +600,12 @@ class Scss(object):
                 if _selectors:
                     yield _selectors, _codestr
                 if par:
-                    err = "Error: Missing closing parenthesis somewhere in block: '%s'" % _selectors
+                    log.error("Missing closing parenthesis somewhere in block: '%s'", _selectors)
                 elif instr:
-                    err = "Error: Missing closing string somewhere in block: '%s'" % _selectors
+                    log.error("Missing closing string somewhere in block: '%s'", _selectors)
                 else:
-                    err = "Error: Block never closed: '%s'" % _selectors
-                print >>sys.stderr, err #FIXME: raise exception? (block not closed!)
+                    log.error("Block never closed: '%s'", _selectors)
+                #FIXME: raise exception? (block not closed!)
                 return
         losestr = str[lose:]
         for _property in losestr.split(';'):
@@ -816,15 +819,13 @@ class Scss(object):
                 code = code.lower()
                 if code == '@warn':
                     name = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
-                    err = "Warning: %s" % dequote(to_str(name))
-                    print >>sys.stderr, err
+                    log.warn(dequote(to_str(name)))
                 elif code == '@print':
                     name = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
-                    err = "%s" % dequote(to_str(name))
-                    print >>sys.stderr, err
+                    log.info(dequote(to_str(name)))
                 elif code == '@raw':
                     name = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
-                    print >>sys.stderr, repr(name)
+                    log.info(repr(name))
                 elif code == '@debug':
                     global DEBUG
                     name = name.strip()
@@ -833,8 +834,7 @@ class Scss(object):
                     elif name.lower() in ('0', 'false', 'f', 'no', 'n', 'off'):
                         name = 0
                     DEBUG = name
-                    err = "Debug mode is %s" % ('On' if DEBUG else 'Off')
-                    print >>sys.stderr, err
+                    log.info("Debug mode is %s", 'On' if DEBUG else 'Off')
                 elif code == '@option':
                     self._settle_options(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name)
                 elif code == '@import':
@@ -992,8 +992,7 @@ class Scss(object):
             _rule[CONTEXT].update(m_vars)
             self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
         else:
-            err = "Error: Required mixin not found: %s:%d" % (funct, num_args)
-            print >>sys.stderr, err
+            log.error("Required mixin not found: %s:%d", funct, num_args)
 
     @print_timing(10)
     def _do_import(self, rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name):
@@ -1047,8 +1046,7 @@ class Scss(object):
                             i_codestr = self._do_magic_import(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name)
                         i_codestr = self._scss_files[name] = i_codestr and self.load_string(i_codestr)
                     if i_codestr is None:
-                        err = "Warning: File to import not found or unreadable: '" + filename + "'\nLoad paths:\n\t" + "\n\t".join(load_paths)
-                        print >>sys.stderr, err
+                        log.warn("File to import not found or unreadable: '%s'\nLoad paths:\n\t%s", filename, "\n\t".join(load_paths))
                     else:
                         _rule = spawn_rule(rule, codestr=i_codestr, path=full_filename, file=name)
                         self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
@@ -1138,7 +1136,7 @@ class Scss(object):
         """
         if code != '@if':
             if '@if' not in rule[OPTIONS]:
-                print >>sys.stderr, "Warning: @else with no @if!"
+                log.warn("@else with no @if!")
             val = not rule[OPTIONS].get('@if', True)
             name = c_property[9:].strip()
         else:
@@ -1157,7 +1155,7 @@ class Scss(object):
         Implements @else
         """
         if '@if' not in rule[OPTIONS]:
-            print >>sys.stderr, "Warning: @else with no @if!"
+            log.warn("@else with no @if!")
         val = rule[OPTIONS].get('@if', True)
         if not val:
             rule[CODESTR] = c_codestr
@@ -1398,8 +1396,7 @@ class Scss(object):
                     parents = self.link_with_parents(parent, selectors, rules)
 
                     if parents is None:
-                        err = "Warning: Parent rule not found: %s" % parent
-                        print >>sys.stderr, err
+                        log.warn("Parent rule not found: %s", parent)
                     else:
                         # from the parent, inherit the context and the options:
                         new_context = {}
@@ -2047,8 +2044,7 @@ def __grad_position(index, default, radial, color_stops):
     try:
         stops = NumberValue(color_stops[index][0])
         if radial and stops.unit != 'px' and (index == 0 or index == -1 or index == len(color_stops) -1):
-            err = "Warning: Webkit only supports pixels for the start and end stops for radial gradients. Got %s" % stops
-            print >>sys.stderr, err
+            log.warn("Webkit only supports pixels for the start and end stops for radial gradients. Got %s", stops)
     except IndexError:
         stops = NumberValue(default)
     return stops
@@ -2094,7 +2090,7 @@ def _radial_gradient(*args):
     ret.to__moz = to__moz
 
     def to__pie():
-        print >>sys.stderr, "Warning: PIE does not support radial-gradient."
+        log.warn("PIE does not support radial-gradient.")
         return StringValue('-pie-radial-gradient(unsupported)')
     ret.to__pie = to__pie
 
@@ -2278,8 +2274,7 @@ def _sprite_map(g, **kwargs):
             rfiles = [ (f[len(STATIC_ROOT):], s) for f, s in files ]
 
         if not files:
-            err = "Error: nothing found at '%s'" % glob_path
-            print >>sys.stderr, err
+            log.error("Nothing found at '%s'", glob_path)
             return StringValue(None)
 
         times = []
@@ -2392,9 +2387,8 @@ def _sprite_map(g, **kwargs):
 
             try:
                 new_image.save(asset_path)
-            except IOError, e:
-                err = "Error: %s" % e
-                print >>sys.stderr, err
+            except IOError:
+                log.exception("Error while saving image")
             filetime = int(time.mktime(datetime.datetime.now().timetuple()))
 
             url = '%s%s?_=%s' % (ASSETS_URL, asset_file, filetime)
@@ -2464,9 +2458,8 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
         try:
             new_image.save(asset_path)
-        except IOError, e:
-            err = "Error: %s" % e
-            print >>sys.stderr, err
+        except IOError:
+            log.exception("Error while saving image")
             inline = True # Retry inline version
         url = '%s%s' % (ASSETS_URL, asset_file)
     if inline:
@@ -2508,8 +2501,7 @@ def _sprite_map_name(map):
     map = StringValue(map).value
     sprite_map = sprite_maps.get(map)
     if not sprite_map:
-        err = "Error: No sprite map found: %s" % map
-        print >>sys.stderr, err
+        log.error("No sprite map found: %s", map)
     if sprite_map:
         return StringValue(sprite_map['*n*'])
     return StringValue(None)
@@ -2525,11 +2517,9 @@ def _sprite_file(map, sprite):
     sprite_map = sprite_maps.get(map)
     sprite = sprite_map and sprite_map.get(sprite_name)
     if not sprite_map:
-        err = "Error: No sprite map found: %s" % map
-        print >>sys.stderr, err
+        log.error("No sprite map found: %s", map)
     elif not sprite:
-        err = "Error: No sprite found: %s in %s" % (sprite_name, sprite_map['*n*'])
-        print >>sys.stderr, err
+        log.error("No sprite found: %s in %s", sprite_name, sprite_map['*n*'])
     if sprite:
         return QuotedStringValue(sprite[1][0])
     return StringValue(None)
@@ -2549,11 +2539,9 @@ def _sprite(map, sprite, offset_x=None, offset_y=None):
     sprite_map = sprite_maps.get(map)
     sprite = sprite_map and sprite_map.get(sprite_name)
     if not sprite_map:
-        err = "Error: No sprite map found: %s" % map
-        print >>sys.stderr, err
+        log.error("No sprite map found: %s", map)
     elif not sprite:
-        err = "Error: No sprite found: %s in %s" % (sprite_name, sprite_map['*n*'])
-        print >>sys.stderr, err
+        log.error("No sprite found: %s in %s", sprite_name, sprite_map['*n*'])
     if sprite:
         url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
         x = NumberValue(offset_x or 0, 'px')
@@ -2573,8 +2561,7 @@ def _sprite_url(map):
     map = StringValue(map).value
     sprite_map = sprite_maps.get(map)
     if not sprite_map:
-        err = "Error: No sprite map found: %s" % map
-        print >>sys.stderr, err
+        log.error("No sprite map found: %s", map)
     if sprite_map:
         url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
         url = "url(%s)" % escape(url)
@@ -2591,11 +2578,9 @@ def _sprite_position(map, sprite, offset_x=None, offset_y=None):
     sprite_map = sprite_maps.get(map)
     sprite = sprite_map and sprite_map.get(sprite_name)
     if not sprite_map:
-        err = "Error: No sprite map found: %s" % map
-        print >>sys.stderr, err
+        log.error("No sprite map found: %s", map)
     elif not sprite:
-        err = "Error: No sprite found: %s in %s" % (sprite_name, sprite_map['*n*'])
-        print >>sys.stderr, err
+        log.error("No sprite found: %s in %s", sprite_name, sprite_map['*n*'])
     if sprite:
         x = None
         if offset_x is not None and not isinstance(offset_x, NumberValue):
@@ -2698,9 +2683,8 @@ def _image_url(image, dst_color=None, src_color=None):
                 image.save(asset_path)
                 file = asset_file
                 BASE_URL = ASSETS_URL
-            except IOError, e:
-                err = "Error: %s" % e
-                print >>sys.stderr, err
+            except IOError:
+                log.exception("Error while saving image")
     url = 'url("%s%s?_=%s")' % (BASE_URL, file, filetime)
     return StringValue(url)
 
@@ -3920,8 +3904,7 @@ def call(name, args, R, is_function=True):
         sp = args and args.value.get('_') or ''
         if is_function:
             if _name not in ('url', 'mask', 'rotate', 'format'):
-                err = "Error: Required function not found (\"%s\"): %s" % (R[FILE], _fn_a)
-                print >>sys.stderr, err
+                log.error("Required function not found (\"%s\"): %s", R[FILE], _fn_a)
             _args = (sp + ' ').join( to_str(v) for n,v in s if isinstance(n, int) )
             _kwargs = (sp + ' ').join( '%s: %s' % (n, to_str(v)) for n,v in s if not isinstance(n, int) and n != '_' )
             if _args and _kwargs:
@@ -5722,4 +5705,5 @@ def main():
             for f, t in profiling.items():
                 print >>sys.stderr, '%s took %0.3fs' % (f, t)
 if __name__ == "__main__":
+    logging.basicConfig(format='%(levelname)s: %(message)s')
     main()
