@@ -5529,23 +5529,30 @@ Sass generates only selectors that are likely to be useful.
 --------------------------------------------------------------------------------
 """
 
-def usage():
-    print "Usage: %s [options] [file]\n" % sys.argv[0]
-    print "Description:"
-    print "Converts Scss files to CSS.\n"
-    print "Options:"
-    print "        --time                       Display compilation times."
-    print "    -i, --interactive                Run an interactive Scss shell."
-    print "    -I, --load-path PATH             Add a scss import path."
-    print "    -S, --static-root PATH           Static root path (Where images and static resources are located)"
-    print "    -A, --assets-root PATH           Assets root path (Sprite images will be created here)"
-    print "    -o, --output                     Output filename"
-    print "    -?, -h, --help                   Show this message"
-    print "    -v, --version                    Print version"
-    sys.exit(2)
-
 def main():
-    import getopt
+    from optparse import OptionParser
+
+    parser = OptionParser(usage="Usage: %prog [options] [file]",
+                          description="Converts Scss files to CSS.")
+    parser.add_option("--time",
+                      help="Display compliation times.")
+    parser.add_option("-i", "--interactive", action="store_true",
+                      help="Run an interactive Scss shell.")
+    parser.add_option("-I", "--load-path", metavar="PATH", dest="load_path",
+                      help="Add a scss import path.")
+    parser.add_option("-S", "--static-root", metavar="PATH", dest="static_root",
+                      help="Static root path (Where images and static resources are located)")
+    parser.add_option("-A", "--assets-root", metavar="PATH", dest="assets_root",
+                      help="Assets root path (Sprite images will be created here)")
+    parser.add_option("-o", "--output", # FIXME: Add "FILE" metavar?
+                      help="Output filename")
+    parser.add_option("-v", "--version", action="store_true",
+                      help="Print version")
+    parser.add_option("-t", "--test", action="store_true")
+    # FIXME: Help is provided, but only with -h and --help. pyScss uses -?, too.
+
+    (options, args) = parser.parse_args()
+
     try:
         import atexit
         import readline
@@ -5557,153 +5564,142 @@ def main():
         atexit.register(readline.write_history_file, histfile)
     except ImportError:
         pass
-    try:
-        # parse options
-        opts, operands = getopt.getopt(sys.argv[1:], '?hvtiI:S:A:o:', ['help', 'version', 'time', 'test', 'interactive', 'load-path=', 'static-root=', 'assets-root=', 'output='])
-    except getopt.GetoptError, err:
-        # print help information and exit:
-        print str(err) # will print something like "option -a not recognized"
-        usage()
-    else:
-        global LOAD_PATHS, VERBOSITY, STATIC_ROOT, ASSETS_ROOT
-        VERBOSITY = 0
-        output = sys.stdout
-        load_paths = [ p.strip() for p in LOAD_PATHS.split(',') ]
-        for o, a in opts:
-            if o in ('-S', '--static-root'):
-                STATIC_ROOT = a
-            elif o in ('-A', '--assets-root'):
-                ASSETS_ROOT = a
-            elif o in ('-o', '--output'):
-                output = open(a, 'wt')
-            elif o in ('-I', '--load-path'):
-                for p in a.replace(';', ',').split(','):
-                    p = p.strip()
-                    if p and p not in load_paths:
-                        load_paths.append(p)
-            elif o == '--time':
-                VERBOSITY = 2
-        LOAD_PATHS = ','.join(load_paths)
-        opts = dict(opts)
-        if '-t' in opts or '--test' in opts:
-            import doctest
-            doctest.testmod()
-        elif '-h' in opts or '--help' in opts:
-            usage()
-        elif '-v' in opts or '--version' in opts:
-            print BUILD_INFO
-            sys.exit(2)
-        elif '-i' in opts or '--interactive' in opts:
-            from pprint import pprint
-            css = Scss()
-            context = css._scss_vars
-            options = css._scss_opts
-            rule = [ None, None, '', set(), context, options, '', [], './', False, None ]
-            print 'Welcome to ' + BUILD_INFO + " interactive shell"
-            while True:
-                try: s = raw_input('>>> ').strip()
-                except EOFError: print ''; break
-                except KeyboardInterrupt: print''; break
-                if s in ('exit', 'quit'): break
-                for s in s.split(';'):
-                    s = css.load_string(s.strip())
-                    if not s:
+
+    global LOAD_PATHS, VERBOSITY, STATIC_ROOT, ASSETS_ROOT
+    VERBOSITY = 0
+    output = sys.stdout
+    load_paths = [p.strip() for p in LOAD_PATHS.split(',')]
+
+    if options.static_root is not None:
+        STATIC_ROOT = options.static_root
+    if options.assets_root is not None:
+        ASSETS_ROOT = options.assets_root
+    if options.load_path is not None:
+        for p in options.load_path.replace(';', ',').split(','):
+            p = p.strip()
+            if p and p not in load_paths:
+                load_paths.append(p)
+    LOAD_PATHS = ','.join(load_paths)
+
+    if options.test:
+        import doctest
+        doctest.testmod()
+    elif options.version:
+        print BUILD_INFO
+        sys.exit(2)
+    elif options.interactive:
+        from pprint import pprint
+        css = Scss()
+        context = css._scss_vars
+        options = css._scss_opts
+        rule = [ None, None, '', set(), context, options, '', [], './', False, None ]
+        print 'Welcome to ' + BUILD_INFO + " interactive shell"
+        while True:
+            try: s = raw_input('>>> ').strip()
+            except EOFError: print ''; break
+            except KeyboardInterrupt: print''; break
+            if s in ('exit', 'quit'): break
+            for s in s.split(';'):
+                s = css.load_string(s.strip())
+                if not s:
+                    continue
+                elif s.startswith('@'):
+                    properties = []
+                    children = deque()
+                    rule = [ 'string', None, s, set(), context, options, '', properties, './', False, None ]
+                    code, name = (s.split(None, 1)+[''])[:2]
+                    if code == '@option':
+                        css._settle_options(rule, [''], set(), children, None, None, s, None, code, name)
                         continue
-                    elif s.startswith('@'):
-                        properties = []
-                        children = deque()
-                        rule = [ 'string', None, s, set(), context, options, '', properties, './', False, None ]
-                        code, name = (s.split(None, 1)+[''])[:2]
-                        if code == '@option':
-                            css._settle_options(rule, [''], set(), children, None, None, s, None, code, name)
-                            continue
-                        elif code == '@import':
-                            css._do_import(rule, [''], set(), children, None, None, s, None, code, name)
-                            continue
-                        elif code == '@include':
-                            final_cont = ''
-                            css._do_include(rule, [''], set(), children, None, None, s, None, code, name)
-                            code = css._print_properties(properties).rstrip('\n')
+                    elif code == '@import':
+                        css._do_import(rule, [''], set(), children, None, None, s, None, code, name)
+                        continue
+                    elif code == '@include':
+                        final_cont = ''
+                        css._do_include(rule, [''], set(), children, None, None, s, None, code, name)
+                        code = css._print_properties(properties).rstrip('\n')
+                        if code:
+                            final_cont += code
+                        if children:
+                            css.children.extendleft(children)
+                            css.parse_children()
+                            code = css._create_css(css.rules).rstrip('\n')
                             if code:
                                 final_cont += code
-                            if children:
-                                css.children.extendleft(children)
-                                css.parse_children()
-                                code = css._create_css(css.rules).rstrip('\n')
-                                if code:
-                                    final_cont += code
-                            final_cont = css.post_process(final_cont)
-                            print final_cont
-                            continue
-                    elif s == 'ls' or s.startswith('show(') or s.startswith('show ') or s.startswith('ls(') or s.startswith('ls '):
-                        m = re.match(r'(?:show|ls)(\()?\s*([^,/\\) ]*)(?:[,/\\ ]([^,/\\ )]+))*(?(1)\))', s, re.IGNORECASE)
-                        if m:
-                            name = m.group(2)
-                            code = m.group(3)
-                            name = name and name.strip().rstrip('s') # remove last 's' as in functions
-                            code = code and code.strip()
-                            if not name:
-                                pprint(sorted(['vars', 'options', 'mixins', 'functions']))
-                            elif name in ('v', 'var', 'variable'):
-                                if code == '*':
-                                    d = dict((k, v) for k, v in context.items())
-                                    pprint(d)
-                                elif code:
-                                    d = dict((k, v) for k, v in context.items() if code in k)
-                                    pprint(d)
-                                else:
-                                    d = dict((k, v) for k, v in context.items() if k.startswith('$') and not k.startswith('$__'))
-                                    pprint(d)
-                            elif name in ('o', 'opt', 'option'):
-                                if code == '*':
-                                    d = dict((k, v) for k, v in options.items())
-                                    pprint(d)
-                                elif code:
-                                    d = dict((k, v) for k, v in options.items() if code in k)
-                                    pprint(d)
-                                else:
-                                    d = dict((k, v) for k, v in options.items() if not k.startswith('@'))
-                                    pprint(d)
-                            elif name in ('m', 'mix', 'mixin', 'f', 'func', 'funct', 'function'):
-                                if name.startswith('m'): name = 'mixin'
-                                elif name.startswith('f'): name = 'function'
-                                if code == '*':
-                                    d = dict((k[len(name)+2:], v) for k, v in options.items() if k.startswith('@' + name + ' '))
-                                    pprint(sorted(d))
-                                elif code:
-                                    d = dict((k, v) for k, v in options.items() if k.startswith('@' + name + ' ') and code in k)
-                                    seen = set()
-                                    for k, mixin in d.items():
-                                        mixin = getattr(mixin, 'mixin', mixin)
-                                        fn_name, _, _ = k.partition(':')
-                                        if fn_name not in seen:
-                                            seen.add(fn_name)
-                                            print fn_name + '(' + ', '.join( p + (': ' + mixin[1].get(p) if p in mixin[1] else '') for p in mixin[0] ) + ') {'
-                                            print '  ' + '\n  '.join(l for l in mixin[2].split('\n'))
-                                            print '}'
-                                else:
-                                    d = dict((k[len(name)+2:].split(':')[0], v) for k, v in options.items() if k.startswith('@' + name + ' '))
-                                    pprint(sorted(d))
-                            continue
-                    elif s.startswith('$') and (':' in s or '=' in s):
-                        prop, value = [ a.strip() for a in _prop_split_re.split(s, 1) ]
-                        value = css.calculate(value, context, options, rule)
-                        context[prop] = value
+                        final_cont = css.post_process(final_cont)
+                        print final_cont
                         continue
-                    s = to_str(css.calculate(s, context, options, rule))
-                    s = css.post_process(s)
-                    print s
-            print 'Bye!'
+                elif s == 'ls' or s.startswith('show(') or s.startswith('show ') or s.startswith('ls(') or s.startswith('ls '):
+                    m = re.match(r'(?:show|ls)(\()?\s*([^,/\\) ]*)(?:[,/\\ ]([^,/\\ )]+))*(?(1)\))', s, re.IGNORECASE)
+                    if m:
+                        name = m.group(2)
+                        code = m.group(3)
+                        name = name and name.strip().rstrip('s') # remove last 's' as in functions
+                        code = code and code.strip()
+                        if not name:
+                            pprint(sorted(['vars', 'options', 'mixins', 'functions']))
+                        elif name in ('v', 'var', 'variable'):
+                            if code == '*':
+                                d = dict((k, v) for k, v in context.items())
+                                pprint(d)
+                            elif code:
+                                d = dict((k, v) for k, v in context.items() if code in k)
+                                pprint(d)
+                            else:
+                                d = dict((k, v) for k, v in context.items() if k.startswith('$') and not k.startswith('$__'))
+                                pprint(d)
+                        elif name in ('o', 'opt', 'option'):
+                            if code == '*':
+                                d = dict((k, v) for k, v in options.items())
+                                pprint(d)
+                            elif code:
+                                d = dict((k, v) for k, v in options.items() if code in k)
+                                pprint(d)
+                            else:
+                                d = dict((k, v) for k, v in options.items() if not k.startswith('@'))
+                                pprint(d)
+                        elif name in ('m', 'mix', 'mixin', 'f', 'func', 'funct', 'function'):
+                            if name.startswith('m'): name = 'mixin'
+                            elif name.startswith('f'): name = 'function'
+                            if code == '*':
+                                d = dict((k[len(name)+2:], v) for k, v in options.items() if k.startswith('@' + name + ' '))
+                                pprint(sorted(d))
+                            elif code:
+                                d = dict((k, v) for k, v in options.items() if k.startswith('@' + name + ' ') and code in k)
+                                seen = set()
+                                for k, mixin in d.items():
+                                    mixin = getattr(mixin, 'mixin', mixin)
+                                    fn_name, _, _ = k.partition(':')
+                                    if fn_name not in seen:
+                                        seen.add(fn_name)
+                                        print fn_name + '(' + ', '.join( p + (': ' + mixin[1].get(p) if p in mixin[1] else '') for p in mixin[0] ) + ') {'
+                                        print '  ' + '\n  '.join(l for l in mixin[2].split('\n'))
+                                        print '}'
+                            else:
+                                d = dict((k[len(name)+2:].split(':')[0], v) for k, v in options.items() if k.startswith('@' + name + ' '))
+                                pprint(sorted(d))
+                        continue
+                elif s.startswith('$') and (':' in s or '=' in s):
+                    prop, value = [ a.strip() for a in _prop_split_re.split(s, 1) ]
+                    value = css.calculate(value, context, options, rule)
+                    context[prop] = value
+                    continue
+                s = to_str(css.calculate(s, context, options, rule))
+                s = css.post_process(s)
+                print s
+        print 'Bye!'
+    else:
+        css = Scss()
+        if args:
+            for path in args:
+                finput = open(path, 'rt')
+                output.write(css.compile(finput.read()))
         else:
-            css = Scss()
-            if operands:
-                for operand in operands:
-                    finput = open(operand, 'rt')
-                    output.write(css.compile(finput.read()))
-            else:
-                output.write(css.compile(sys.stdin.read()))
-            for f, t in profiling.items():
-                print >>sys.stderr, '%s took %0.3fs' % (f, t)
+            output.write(css.compile(sys.stdin.read()))
+
+        for f, t in profiling.items():
+            print >>sys.stderr, '%s took %03fs' % (f, t)
+
 if __name__ == "__main__":
     logging.basicConfig(format='%(levelname)s: %(message)s')
     main()
