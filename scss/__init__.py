@@ -5578,6 +5578,8 @@ def main():
 
     if options.time:
         VERBOSITY = 2
+    if options.output is not None:
+        output = open(options.output, 'wt')
     if options.static_root is not None:
         STATIC_ROOT = options.static_root
     if options.assets_root is not None:
