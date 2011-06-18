@@ -5535,22 +5535,22 @@ def main():
     parser = OptionParser(usage="Usage: %prog [options] [file]",
                           description="Converts Scss files to CSS.",
                           add_help_option=False)
-    parser.add_option("--time", action="store_true",
-                      help="Display compliation times.")
     parser.add_option("-i", "--interactive", action="store_true",
-                      help="Run an interactive Scss shell.")
+                      help="Run an interactive Scss shell")
     parser.add_option("-o", "--output", metavar="FILE",
                       help="Write output to FILE")
-    parser.add_option("-v", "--version", action="store_true",
-                      help="Print version")
+    parser.add_option("--time", action="store_true",
+                      help="Display compliation times")
     parser.add_option("-t", "--test", action="store_true", help=SUPPRESS_HELP)
     parser.add_option("-?", action="help", help=SUPPRESS_HELP)
     parser.add_option("-h", "--help", action="help",
                       help="Show this message and exit")
+    parser.add_option("-v", "--version", action="store_true",
+                      help="Print version")
 
     paths_group = OptionGroup(parser, "Resource Paths")
     paths_group.add_option("-I", "--load-path", metavar="PATH", dest="load_path",
-                      help="Add a scss import path.")
+                      help="Add a scss import path")
     paths_group.add_option("-S", "--static-root", metavar="PATH", dest="static_root",
                       help="Static root path (Where images and static resources are located)")
     paths_group.add_option("-A", "--assets-root", metavar="PATH", dest="assets_root",
