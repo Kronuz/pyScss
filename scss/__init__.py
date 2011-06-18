@@ -5546,7 +5546,7 @@ def main():
     parser.add_option("-h", "--help", action="help",
                       help="Show this message and exit")
     parser.add_option("-v", "--version", action="store_true",
-                      help="Print version")
+                      help="Print version and exit")
 
     paths_group = OptionGroup(parser, "Resource Paths")
     paths_group.add_option("-I", "--load-path", metavar="PATH", dest="load_path",
