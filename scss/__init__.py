@@ -5530,7 +5530,7 @@ Sass generates only selectors that are likely to be useful.
 """
 
 def main():
-    from optparse import OptionParser, SUPPRESS_HELP
+    from optparse import OptionGroup, OptionParser, SUPPRESS_HELP
 
     parser = OptionParser(usage="Usage: %prog [options] [file]",
                           description="Converts Scss files to CSS.")
@@ -5538,18 +5538,21 @@ def main():
                       help="Display compliation times.")
     parser.add_option("-i", "--interactive", action="store_true",
                       help="Run an interactive Scss shell.")
-    parser.add_option("-I", "--load-path", metavar="PATH", dest="load_path",
-                      help="Add a scss import path.")
-    parser.add_option("-S", "--static-root", metavar="PATH", dest="static_root",
-                      help="Static root path (Where images and static resources are located)")
-    parser.add_option("-A", "--assets-root", metavar="PATH", dest="assets_root",
-                      help="Assets root path (Sprite images will be created here)")
-    parser.add_option("-o", "--output", # FIXME: Add "FILE" metavar?
-                      help="Output filename")
+    parser.add_option("-o", "--output", metavar="FILE",
+                      help="Write output to FILE")
     parser.add_option("-v", "--version", action="store_true",
                       help="Print version")
     parser.add_option("-t", "--test", action="store_true", help=SUPPRESS_HELP)
     parser.add_option("-?", action="help", help=SUPPRESS_HELP)
+
+    paths_group = OptionGroup(parser, "Resource Paths")
+    paths_group.add_option("-I", "--load-path", metavar="PATH", dest="load_path",
+                      help="Add a scss import path.")
+    paths_group.add_option("-S", "--static-root", metavar="PATH", dest="static_root",
+                      help="Static root path (Where images and static resources are located)")
+    paths_group.add_option("-A", "--assets-root", metavar="PATH", dest="assets_root",
+                      help="Assets root path (Sprite images will be created here)")
+    parser.add_option_group(paths_group)
 
     (options, args) = parser.parse_args()
 
