@@ -5534,7 +5534,7 @@ def main():
 
     parser = OptionParser(usage="Usage: %prog [options] [file]",
                           description="Converts Scss files to CSS.")
-    parser.add_option("--time",
+    parser.add_option("--time", action="store_true",
                       help="Display compliation times.")
     parser.add_option("-i", "--interactive", action="store_true",
                       help="Run an interactive Scss shell.")
@@ -5570,6 +5570,8 @@ def main():
     output = sys.stdout
     load_paths = [p.strip() for p in LOAD_PATHS.split(',')]
 
+    if options.time:
+        VERBOSITY = 2
     if options.static_root is not None:
         STATIC_ROOT = options.static_root
     if options.assets_root is not None:
