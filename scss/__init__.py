@@ -5530,7 +5530,7 @@ Sass generates only selectors that are likely to be useful.
 """
 
 def main():
-    from optparse import OptionParser
+    from optparse import OptionParser, SUPPRESS_HELP
 
     parser = OptionParser(usage="Usage: %prog [options] [file]",
                           description="Converts Scss files to CSS.")
@@ -5548,8 +5548,8 @@ def main():
                       help="Output filename")
     parser.add_option("-v", "--version", action="store_true",
                       help="Print version")
-    parser.add_option("-t", "--test", action="store_true")
-    # FIXME: Help is provided, but only with -h and --help. pyScss uses -?, too.
+    parser.add_option("-t", "--test", action="store_true", help=SUPPRESS_HELP)
+    parser.add_option("-?", action="help", help=SUPPRESS_HELP)
 
     (options, args) = parser.parse_args()
 
