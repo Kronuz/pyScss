@@ -5562,7 +5562,6 @@ def main():
     # General runtime configuration
     global LOAD_PATHS, VERBOSITY, STATIC_ROOT, ASSETS_ROOT
     VERBOSITY = 0
-    load_paths = [p.strip() for p in LOAD_PATHS.split(',')]
 
     if options.time:
         VERBOSITY = 2
@@ -5571,11 +5570,12 @@ def main():
     if options.assets_root is not None:
         ASSETS_ROOT = options.assets_root
     if options.load_path is not None:
+        load_paths = [p.strip() for p in LOAD_PATHS.split(',')]
         for p in options.load_path.replace(';', ',').split(','):
             p = p.strip()
             if p and p not in load_paths:
                 load_paths.append(p)
-    LOAD_PATHS = ','.join(load_paths)
+        LOAD_PATHS = ','.join(load_paths)
 
     # Execution modes
     if options.test:
