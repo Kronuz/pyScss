@@ -5559,15 +5559,13 @@ def main():
 
     (options, args) = parser.parse_args()
 
+    # General runtime configuration
     global LOAD_PATHS, VERBOSITY, STATIC_ROOT, ASSETS_ROOT
     VERBOSITY = 0
-    output = sys.stdout
     load_paths = [p.strip() for p in LOAD_PATHS.split(',')]
 
     if options.time:
         VERBOSITY = 2
-    if options.output is not None:
-        output = open(options.output, 'wt')
     if options.static_root is not None:
         STATIC_ROOT = options.static_root
     if options.assets_root is not None:
@@ -5579,6 +5577,7 @@ def main():
                 load_paths.append(p)
     LOAD_PATHS = ','.join(load_paths)
 
+    # Execution modes
     if options.test:
         import doctest
         doctest.testmod()
@@ -5698,6 +5697,11 @@ def main():
                 print s
         print 'Bye!'
     else:
+        if options.output is not None:
+            output = open(options.output, 'wt')
+        else:
+            output = sys.stdout
+
         css = Scss()
         if args:
             for path in args:
