@@ -5594,7 +5594,6 @@ def main():
         doctest.testmod()
     elif options.version:
         print BUILD_INFO
-        sys.exit(2)
     elif options.interactive:
         from pprint import pprint
         css = Scss()
