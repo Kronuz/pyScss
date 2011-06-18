@@ -5559,18 +5559,6 @@ def main():
 
     (options, args) = parser.parse_args()
 
-    try:
-        import atexit
-        import readline
-        histfile = os.path.expanduser('~/.scss-history')
-        try:
-            readline.read_history_file(histfile)
-        except IOError:
-            pass
-        atexit.register(readline.write_history_file, histfile)
-    except ImportError:
-        pass
-
     global LOAD_PATHS, VERBOSITY, STATIC_ROOT, ASSETS_ROOT
     VERBOSITY = 0
     output = sys.stdout
@@ -5598,6 +5586,18 @@ def main():
         print BUILD_INFO
     elif options.interactive:
         from pprint import pprint
+        try:
+            import atexit
+            import readline
+            histfile = os.path.expanduser('~/.scss-history')
+            try:
+                readline.read_history_file(histfile)
+            except IOError:
+                pass
+            atexit.register(readline.write_history_file, histfile)
+        except ImportError:
+            pass
+
         css = Scss()
         context = css._scss_vars
         options = css._scss_opts
