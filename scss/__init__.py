@@ -5533,7 +5533,8 @@ def main():
     from optparse import OptionGroup, OptionParser, SUPPRESS_HELP
 
     parser = OptionParser(usage="Usage: %prog [options] [file]",
-                          description="Converts Scss files to CSS.")
+                          description="Converts Scss files to CSS.",
+                          add_help_option=False)
     parser.add_option("--time", action="store_true",
                       help="Display compliation times.")
     parser.add_option("-i", "--interactive", action="store_true",
@@ -5544,6 +5545,8 @@ def main():
                       help="Print version")
     parser.add_option("-t", "--test", action="store_true", help=SUPPRESS_HELP)
     parser.add_option("-?", action="help", help=SUPPRESS_HELP)
+    parser.add_option("-h", "--help", action="help",
+                      help="Show this message and exit")
 
     paths_group = OptionGroup(parser, "Resource Paths")
     paths_group.add_option("-I", "--load-path", metavar="PATH", dest="load_path",
