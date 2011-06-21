@@ -48,7 +48,7 @@ __license__ = LICENSE
 import os
 PROJECT_ROOT = os.path.normpath(os.path.dirname(os.path.abspath(__file__)))
 # Sass @import load_paths:
-LOAD_PATHS = os.path.join(PROJECT_ROOT, 'sass/frameworks/')
+LOAD_PATHS = [os.path.join(PROJECT_ROOT, 'sass/frameworks/')]
 # Assets path, where new sprite files are created:
 STATIC_ROOT = os.path.join(PROJECT_ROOT, 'static/')
 # Assets path, where new sprite files are created:
@@ -1014,7 +1014,7 @@ class Scss(object):
                         dirname = os.path.dirname(name)
                         load_paths = []
                         i_codestr = None
-                        for path in [ './' ] + LOAD_PATHS.split(','):
+                        for path in [ './' ] + LOAD_PATHS:
                             for basepath in [ './', os.path.dirname(rule[PATH]) ]:
                                 i_codestr = None
                                 full_path = os.path.realpath(os.path.join(path, basepath, dirname))
@@ -5571,13 +5571,9 @@ def main():
     if options.assets_root is not None:
         ASSETS_ROOT = options.assets_root
     if options.load_paths is not None:
-        load_paths = [p.strip() for p in LOAD_PATHS.split(',')]
         for path_param in options.load_paths:
-            for p in path_param.replace(';', ',').split(','):
-                p = p.strip()
-                if p and p not in load_paths:
-                    load_paths.append(p)
-        LOAD_PATHS = ','.join(load_paths)
+            if path_param not in LOAD_PATHS:
+                LOAD_PATHS.append(path_param)
 
     # Execution modes
     if options.test:
