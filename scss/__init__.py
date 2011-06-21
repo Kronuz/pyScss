@@ -5549,8 +5549,9 @@ def main():
                       help="Print version and exit")
 
     paths_group = OptionGroup(parser, "Resource Paths")
-    paths_group.add_option("-I", "--load-path", metavar="PATH", dest="load_path",
-                      help="Add a scss import path")
+    paths_group.add_option("-I", "--load-path", metavar="PATH",
+                      action="append", dest="load_paths",
+                      help="Add a scss import path, may be given multiple times")
     paths_group.add_option("-S", "--static-root", metavar="PATH", dest="static_root",
                       help="Static root path (Where images and static resources are located)")
     paths_group.add_option("-A", "--assets-root", metavar="PATH", dest="assets_root",
@@ -5569,12 +5570,13 @@ def main():
         STATIC_ROOT = options.static_root
     if options.assets_root is not None:
         ASSETS_ROOT = options.assets_root
-    if options.load_path is not None:
+    if options.load_paths is not None:
         load_paths = [p.strip() for p in LOAD_PATHS.split(',')]
-        for p in options.load_path.replace(';', ',').split(','):
-            p = p.strip()
-            if p and p not in load_paths:
-                load_paths.append(p)
+        for path_param in options.load_paths:
+            for p in path_param.replace(';', ',').split(','):
+                p = p.strip()
+                if p and p not in load_paths:
+                    load_paths.append(p)
         LOAD_PATHS = ','.join(load_paths)
 
     # Execution modes
