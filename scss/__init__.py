@@ -1014,7 +1014,15 @@ class Scss(object):
                         dirname = os.path.dirname(name)
                         load_paths = []
                         i_codestr = None
-                        for path in [ './' ] + LOAD_PATHS.split(','):
+
+                        # TODO: Convert global LOAD_PATHS to a list. Use it directly.
+                        # Doing the above will break backwards compatibility!
+                        if hasattr(LOAD_PATHS, 'split'):
+                            load_path_list = LOAD_PATHS.split(',') # Old style
+                        else:
+                            load_path_list = LOAD_PATHS # New style
+
+                        for path in [ './' ] + load_path_list:
                             for basepath in [ './', os.path.dirname(rule[PATH]) ]:
                                 i_codestr = None
                                 full_path = os.path.realpath(os.path.join(path, basepath, dirname))
@@ -5571,13 +5579,24 @@ def main():
     if options.assets_root is not None:
         ASSETS_ROOT = options.assets_root
     if options.load_paths is not None:
-        load_paths = [p.strip() for p in LOAD_PATHS.split(',')]
+        # TODO: Convert global LOAD_PATHS to a list. Use it directly.
+        # Doing the above will break backwards compatibility!
+        if hasattr(LOAD_PATHS, 'split'):
+            load_path_list = [p.strip() for p in LOAD_PATHS.split(',')]
+        else:
+            load_path_list = list(LOAD_PATHS)
+
         for path_param in options.load_paths:
             for p in path_param.replace(';', ',').split(','):
                 p = p.strip()
-                if p and p not in load_paths:
-                    load_paths.append(p)
-        LOAD_PATHS = ','.join(load_paths)
+                if p and p not in load_path_list:
+                    load_path_list.append(p)
+
+        # TODO: Remove this once global LOAD_PATHS is a list.
+        if hasattr(LOAD_PATHS, 'split'):
+            LOAD_PATHS = ','.join(load_path_list)
+        else:
+            LOAD_PATHS = load_path_list
 
     # Execution modes
     if options.test:
