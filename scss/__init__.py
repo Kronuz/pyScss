@@ -1648,10 +1648,14 @@ try:
     import cStringIO as StringIO
 except:
     import StringIO
+
 try:
     from PIL import Image, ImageDraw
 except ImportError:
-    Image = None
+    try:
+        import Image, ImageDraw
+    except:
+        Image = None
 
 ################################################################################
 
@@ -4352,6 +4356,7 @@ def eval_expr(expr, rule, raw=False):
         raise
     except:
         if not DEBUG:
+            log.exception("Exception!")
             return#@@@#
         raise
 __doc__ = """
