@@ -5554,6 +5554,9 @@ def main():
     parser.add_option("--time", action="store_true",
                       help="Display compliation times")
     parser.add_option("-t", "--test", action="store_true", help=SUPPRESS_HELP)
+    parser.add_option("-C", "--no-compress", action="store_false",
+                      dest="compress", default=True,
+                      help="Don't minify outputted CSS")
     parser.add_option("-?", action="help", help=SUPPRESS_HELP)
     parser.add_option("-h", "--help", action="help",
                       help="Show this message and exit")
@@ -5715,6 +5718,7 @@ def main():
             output = sys.stdout
 
         css = Scss()
+        css.scss_opts['compress'] = options.compress
         if args:
             for path in args:
                 finput = open(path, 'rt')
