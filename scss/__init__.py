@@ -972,6 +972,11 @@ class Scss(object):
             if param:
                 new_params[varname] = param
         mixin = rule[OPTIONS].get('@mixin ' + funct + ':' + str(num_args))
+        if not mixin:
+            # Fallback to single parmeter:
+            mixin = rule[OPTIONS].get('@mixin ' + funct + ':1')
+            if mixin and all(map(lambda o: isinstance(o, int), new_params.keys())):
+                new_params = {0: ', '.join(new_params.values())}
         if mixin:
             m_params = mixin[0]
             m_vars = mixin[1].copy()
