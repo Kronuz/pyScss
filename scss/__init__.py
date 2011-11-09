@@ -5734,16 +5734,16 @@ def main():
                 self.css.scss_opts['compress'] = options.compress
                 self.output = options.output
 
-            def valid(self, path):
+            def is_valid(self, path):
                 return os.path.isfile(path) and path.endswith(".scss") and not os.path.basename(path).startswith("_")
 
             def process(self, path):
                 if os.path.isdir(path):
                     for f in os.listdir(path):
                         full = os.path.join(path, f)
-                        if self.valid(full):
+                        if self.is_valid(full):
                             self.compile(full)
-                elif self.valid(path):
+                elif self.is_valid(path):
                     self.compile(path)
 
             def compile(self, src_path):
