@@ -5759,7 +5759,7 @@ def main():
                 else:
                     dest_path = os.path.join(os.path.dirname(src_path), fname)
 
-                log.info("Compiling %s => %s" % (src_path, dest_path))
+                print ("Compiling %s => %s" % (src_path, dest_path))
                 with open(src_path) as src_file, open(dest_path, 'w') as dest_file:
                     dest_file.write(self.css.compile(src_file.read()))
 
