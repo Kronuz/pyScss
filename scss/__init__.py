@@ -2245,6 +2245,10 @@ def _radial_gradient(*args):
     ret.to__css2 = to__css2
 
     def to__webkit():
+        return StringValue('-webkit-' + to__s)
+    ret.to__webkit = to__webkit
+
+    def to__owg():
         args = [
             'radial',
             _grad_point(position_and_angle) if position_and_angle is not None else 'center',
@@ -2255,7 +2259,7 @@ def _radial_gradient(*args):
         args.extend('color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops)
         ret = '-webkit-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
         return StringValue(ret)
-    ret.to__webkit = to__webkit
+    ret.to__owg = to__owg
 
     def to__svg():
         return _radial_svg_gradient(color_stops, position_and_angle or 'center')
@@ -2300,6 +2304,10 @@ def _linear_gradient(*args):
     ret.to__css2 = to__css2
 
     def to__webkit():
+        return StringValue('-webkit-' + to__s)
+    ret.to__webkit = to__webkit
+
+    def to__owg():
         args = [
             'linear',
             _position(position_and_angle or 'center top'),
@@ -2308,7 +2316,7 @@ def _linear_gradient(*args):
         args.extend('color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops)
         ret = '-webkit-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
         return StringValue(ret)
-    ret.to__webkit = to__webkit
+    ret.to__owg = to__owg
 
     def to__svg():
         return _linear_svg_gradient(color_stops, position_and_angle or 'top')
@@ -3156,6 +3164,8 @@ def __pie(*args):
 def __webkit(*args):
     return _prefix('_webkit', *args)
 
+def __owg(*args):
+    return _prefix('_owg', *args)
 
 def __khtml(*args):
     return _prefix('_khtml', *args)
@@ -4160,6 +4170,7 @@ fnct = {
     '-css2:n': __css2,
     '-pie:n': __pie,
     '-webkit:n': __webkit,
+    '-owg:n': __owg,
     '-ms:n': __ms,
     '-o:n': __o,
 
