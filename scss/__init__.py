@@ -5778,8 +5778,9 @@ def main():
                     dest_path = os.path.join(os.path.dirname(src_path), fname)
 
                 print ("Compiling %s => %s" % (src_path, dest_path))
-                with open(src_path) as src_file, open(dest_path, 'w') as dest_file:
-                    dest_file.write(self.css.compile(src_file.read()))
+                src_file = open(src_path)
+                dest_file = open(dest_path, 'w')
+                dest_file.write(self.css.compile(src_file.read()))
 
             def on_moved(self, event):
                 super(ScssEventHandler, self).on_moved(event)
