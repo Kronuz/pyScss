@@ -5549,8 +5549,12 @@ def main():
                           add_help_option=False)
     parser.add_option("-i", "--interactive", action="store_true",
                       help="Run an interactive Scss shell")
-    parser.add_option("-o", "--output", metavar="FILE",
-                      help="Write output to FILE")
+    parser.add_option("-w", "--watch", metavar="DIR",
+                      help="Watch the files in DIR, and recompile when they change")
+    parser.add_option("-r", "--recursive", action="store_true",
+                      help="Also watch directories inside of the watch directory")
+    parser.add_option("-o", "--output", metavar="PATH",
+                      help="Write output to PATH (a directory if using watch, a file otherwise)")
     parser.add_option("--time", action="store_true",
                       help="Display compliation times")
     parser.add_option("-t", "--test", action="store_true", help=SUPPRESS_HELP)
@@ -5711,6 +5715,77 @@ def main():
                 s = css.post_process(s)
                 print s
         print 'Bye!'
+    elif options.watch:
+        import time
+        try:
+            from watchdog.observers import Observer
+            from watchdog.events import PatternMatchingEventHandler
+        except ImportError:
+            sys.stderr.write("Using watch functionality requires the `watchdog` library: http://pypi.python.org/pypi/watchdog/")
+            sys.exit(1)
+        if options.output and not os.path.isdir(options.output):
+            sys.stderr.write("watch file output directory is invalid: '%s'" % (options.output))
+            sys.exit(2)
+
+        class ScssEventHandler(PatternMatchingEventHandler):
+            def __init__(self, *args, **kwargs):
+                super(ScssEventHandler, self).__init__(*args, **kwargs)
+                self.css = Scss()
+                self.css.scss_opts['compress'] = options.compress
+                self.output = options.output
+
+            def is_valid(self, path):
+                return os.path.isfile(path) and path.endswith(".scss") and not os.path.basename(path).startswith("_")
+
+            def process(self, path):
+                if os.path.isdir(path):
+                    for f in os.listdir(path):
+                        full = os.path.join(path, f)
+                        if self.is_valid(full):
+                            self.compile(full)
+                elif self.is_valid(path):
+                    self.compile(path)
+
+            def compile(self, src_path):
+                fname = os.path.basename(src_path)
+                if fname.endswith(".scss"):
+                    fname = fname[:-5] + ".css"
+                else:
+                    # you didn't give me a file of the correct type!
+                    return False
+
+                if self.output:
+                    dest_path = os.path.join(self.output, fname)
+                else:
+                    dest_path = os.path.join(os.path.dirname(src_path), fname)
+
+                print ("Compiling %s => %s" % (src_path, dest_path))
+                with open(src_path) as src_file, open(dest_path, 'w') as dest_file:
+                    dest_file.write(self.css.compile(src_file.read()))
+
+            def on_moved(self, event):
+                super(ScssEventHandler, self).on_moved(event)
+                self.process(event.dest_path)
+
+            def on_created(self, event):
+                super(ScssEventHandler, self).on_created(event)
+                self.process(event.src_path)
+
+            def on_modified(self, event):
+                super(ScssEventHandler, self).on_modified(event)
+                self.process(event.src_path)
+
+        event_handler = ScssEventHandler(patterns="*.scss")
+        observer = Observer()
+        observer.schedule(event_handler, path=options.watch, recursive=options.recursive)
+        observer.start()
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            observer.stop()
+        observer.join()
+
     else:
         if options.output is not None:
             output = open(options.output, 'wt')
