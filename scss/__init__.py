@@ -380,8 +380,9 @@ SELECTORS = 6
 PROPERTIES = 7
 PATH = 8
 FILE = 9
-FINAL = 10
-MEDIA = 11
+LINE = 10
+FINAL = 11
+MEDIA = 12
 RULE_VARS = {
     'FILEID': FILEID,
     'POSITION': POSITION,
@@ -393,12 +394,13 @@ RULE_VARS = {
     'PROPERTIES': PROPERTIES,
     'PATH': PATH,
     'FILE': FILE,
+    'LINE': LINE,
     'FINAL': FINAL,
     'MEDIA': MEDIA,
 }
 def spawn_rule(rule=None, **kwargs):
     """
-    FILEID, POSITION, CODESTR, DEPS, CONTEXT, OPTIONS, SELECTORS, PROPERTIES, PATH, FILE, FINAL, MEDIA
+    FILEID, POSITION, CODESTR, DEPS, CONTEXT, OPTIONS, SELECTORS, PROPERTIES, PATH, FILE, LINE, FINAL, MEDIA
     """
     if rule is None:
         rule = [ None ] * len(RULE_VARS)
@@ -407,6 +409,7 @@ def spawn_rule(rule=None, **kwargs):
         rule[PROPERTIES] = []
         rule[PATH] = './'
         rule[FILE] = ''
+        rule[LINE] = 0
         rule[FINAL] = False
     else:
         rule = list(rule)
@@ -999,7 +1002,7 @@ class Scss(object):
             _rule[CONTEXT].update(m_vars)
             self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
         else:
-            log.error("Required mixin not found: %s:%d", funct, num_args)
+            log.error("Required mixin not found (\"%s\":%d): %s:%d", rule[FILE], rule[LINE], funct, num_args)
 
     @print_timing(10)
     def _do_import(self, rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name):
@@ -1292,7 +1295,7 @@ class Scss(object):
                 if parents:
                     better_selectors += ' extends ' + '&'.join(sorted(parents))
 
-            _rule = spawn_rule(fileid=rule[FILEID], codestr=c_codestr, context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=better_selectors, path=rule[PATH], file=rule[FILE], media=media)
+            _rule = spawn_rule(fileid=rule[FILEID], codestr=c_codestr, context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=better_selectors, path=rule[PATH], file=rule[FILE], line=rule[LINE], media=media)
             p_children.appendleft(_rule)
 
     @print_timing(4)
@@ -3057,11 +3060,20 @@ def _headers(frm=None, to=None):
             frm = 1
             to = 6
         else:
-            to = int(getattr(frm, 'value', frm))
             frm = 1
+            try:
+                to = int(getattr(frm, 'value', frm))
+            except ValueError:
+                to = 6
     else:
-        frm = 1 if frm is None else int(getattr(frm, 'value', frm))
-        to = 6 if to is None else int(getattr(to, 'value', to))
+        try:
+            frm = 1 if frm is None else int(getattr(frm, 'value', frm))
+        except ValueError:
+            frm = 1
+        try:
+            to = 6 if to is None else int(getattr(to, 'value', to))
+        except ValueError:
+            to = 6
     ret = [ 'h' + str(i) for i in range(frm, to + 1) ]
     ret = dict(enumerate(ret))
     ret['_'] = ','
@@ -3070,8 +3082,14 @@ def _headers(frm=None, to=None):
 def _enumerate(prefix, frm, through, separator='-'):
     prefix = StringValue(prefix).value
     separator = StringValue(separator).value
-    frm = int(getattr(frm, 'value', frm))
-    through = int(getattr(through, 'value', through))
+    try:
+        frm = int(getattr(frm, 'value', frm))
+    except ValueError:
+        frm = 0
+    try:
+        through = int(getattr(through, 'value', through))
+    except ValueError:
+        through = frm
     if prefix:
         ret = [ prefix + separator + str(i) for i in range(frm, through + 1) ]
     else:
@@ -3915,7 +3933,7 @@ def call(name, args, R, is_function=True):
         sp = args and args.value.get('_') or ''
         if is_function:
             if not _css_function_re.match(_name):
-                log.error("Required function not found (\"%s\"): %s", R[FILE], _fn_a)
+                log.error("Required function not found (\"%s\":%d): %s", R[FILE], R[LINE], _fn_a)
             _args = (sp + ' ').join( to_str(v) for n,v in s if isinstance(n, int) )
             _kwargs = (sp + ' ').join( '%s: %s' % (n, to_str(v)) for n,v in s if not isinstance(n, int) and n != '_' )
             if _args and _kwargs:
