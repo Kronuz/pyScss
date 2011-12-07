@@ -324,6 +324,7 @@ _sl_comment_re = re.compile(r'(?<!\w{2}:)\/\/.*')
 _zero_units_re = re.compile(r'\b0(' + '|'.join(map(re.escape, _units)) + r')(?!\w)', re.IGNORECASE)
 _zero_re = re.compile(r'\b0\.(?=\d)')
 
+_variable_re = re.compile('^\\$[-a-zA-Z0-9_]+$')
 _interpolate_re = re.compile(r'(#\{\s*)?(\$[-\w]+)(?(1)\s*\})')
 _spaces_re = re.compile(r'\s+')
 _expand_rules_space_re = re.compile(r'\s*{')
@@ -1153,7 +1154,7 @@ class Scss(object):
             val = True
         if val:
             val = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
-            val = bool(False if not val or val in('0', 'false',) else val)
+            val = bool(False if not val or val in('0', 'false',) or (isinstance(val, basestring) and _variable_re.match(val)) else val)
             if val:
                 rule[CODESTR] = c_codestr
                 self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
@@ -3004,10 +3005,13 @@ def _type_of(obj): # -> bool, number, string, color, list
         return StringValue('color')
     if isinstance(obj, ListValue):
         return StringValue('list')
+    if isinstance(obj, basestring) and _variable_re.match(obj):
+        return StringValue('undefined')
     return StringValue('string')
 
 def _if(condition, if_true, if_false=''):
-    return if_true.__class__(if_true) if bool(condition) else if_true.__class__(if_false)
+    condition = bool(False if not condition or condition in('0', 'false',) or (isinstance(condition, basestring) and _variable_re.match(condition)) else condition)
+    return if_true.__class__(if_true) if condition else if_true.__class__(if_false)
 
 def _unit(number): # -> px, em, cm, etc.
     unit = NumberValue(number).unit
@@ -3201,7 +3205,7 @@ class Value(object):
     def __rxor__(self, other):
         return self._do_bitops(other, self, operator.__rxor__)
     def __nonzero__(self):
-        return self.value and True or False
+        return bool(self.value)
     def __add__(self, other):
         return self._do_op(self, other, operator.__add__)
     def __radd__(self, other):
