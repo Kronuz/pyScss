@@ -3094,23 +3094,28 @@ def _enumerate(prefix, frm, through, separator='-'):
     try:
         frm = int(getattr(frm, 'value', frm))
     except ValueError:
-        frm = 0
+        frm = 1
     try:
         through = int(getattr(through, 'value', through))
     except ValueError:
         through = frm
-    if prefix:
-        ret = [ prefix + separator + str(i) for i in range(frm, through + 1) ]
+    if frm > through:
+        frm, through = through, frm
+        rev = reversed
     else:
-        ret = [ NumberValue(i) for i in range(frm, through + 1) ]
+        rev = lambda x: x
+    if prefix:
+        ret = [ prefix + separator + str(i) for i in rev(range(frm, through + 1)) ]
+    else:
+        ret = [ NumberValue(i) for i in rev(range(frm, through + 1)) ]
     ret = dict(enumerate(ret))
     ret['_'] = ','
     return ret
 
 def _range(frm, through=None):
-    if not through:
+    if through is None:
         through = frm
-        frm = 0
+        frm = 1
     return _enumerate(None, frm, through)
 
 ################################################################################
