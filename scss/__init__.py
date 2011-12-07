@@ -2905,6 +2905,8 @@ def _join(lst1, lst2, separator=None):
     return ret
 
 def _length(*lst):
+    if len(lst) == 1 and isinstance(lst[0], ListValue):
+        return NumberValue(len(lst[0]))
     lst = ListValue(lst)
     return NumberValue(len(lst))
 
