@@ -1004,7 +1004,7 @@ class Scss(object):
             _rule[CONTEXT].update(m_vars)
             self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
         else:
-            log.error("Required mixin not found (\"%s\":%d): %s:%d", rule[FILE], rule[LINE], funct, num_args)
+            log.error("Required mixin not found (\"%s\":%d): %s:%d", rule[FILE] or '<unknown>', rule[LINE] or 0, funct, num_args)
 
     @print_timing(10)
     def _do_import(self, rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name):
@@ -3939,7 +3939,7 @@ def call(name, args, R, is_function=True):
         sp = args and args.value.get('_') or ''
         if is_function:
             if not _css_function_re.match(_name):
-                log.error("Required function not found (\"%s\":%d): %s", R[FILE], R[LINE], _fn_a)
+                log.error("Required function not found (\"%s\":%d): %s", R[FILE] or '<unknown>', R[LINE] or 0, _fn_a)
             _args = (sp + ' ').join( to_str(v) for n,v in s if isinstance(n, int) )
             _kwargs = (sp + ' ').join( '%s: %s' % (n, to_str(v)) for n,v in s if not isinstance(n, int) and n != '_' )
             if _args and _kwargs:
@@ -4387,7 +4387,7 @@ def eval_expr(expr, rule, raw=False):
         raise
     except:
         if not DEBUG:
-            log.exception("Exception!")
+            log.exception("Exception rised! (\"%s\":%d)" % (rule[FILE] or '<unknown>', rule[LINE] or 0,))
             return#@@@#
         raise
 __doc__ = """
