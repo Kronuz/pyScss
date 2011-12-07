@@ -2874,14 +2874,15 @@ def _nth(lst, n=1):
     Return the Nth item in the string
     """
     n = StringValue(n).value
+    lst = ListValue(lst).value
     try:
         n = int(float(n)) - 1
+        n = n % len(lst)
     except:
         if n.lower() == 'first':
             n = 0
         elif n.lower() == 'last':
             n = -1
-    lst = ListValue(lst).value
     try:
         ret = lst[n]
     except KeyError:
