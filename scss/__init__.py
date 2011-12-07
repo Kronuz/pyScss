@@ -960,6 +960,7 @@ class Scss(object):
         """
         funct, params, _ = name.partition('(')
         funct = funct.strip()
+        funct = self.do_glob_math(funct, rule[CONTEXT], rule[OPTIONS], rule, True)
         params = split_params(depar(params + _))
         new_params = {}
         num_args = 0
@@ -1234,6 +1235,7 @@ class Scss(object):
         except IndexError:
             is_var = False
         prop = prop.strip()
+        prop = self.do_glob_math(prop, rule[CONTEXT], rule[OPTIONS], rule, True)
         if prop:
             if value:
                 value = value.strip()
@@ -5730,6 +5732,7 @@ def main():
                         continue
                 elif s.startswith('$') and (':' in s or '=' in s):
                     prop, value = [ a.strip() for a in _prop_split_re.split(s, 1) ]
+                    prop = css.do_glob_math(prop, context, options, rule, True)
                     value = css.calculate(value, context, options, rule)
                     context[prop] = value
                     continue
