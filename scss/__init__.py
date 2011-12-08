@@ -62,6 +62,7 @@ DEBUG = 0
 
 import logging
 log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 try:
     import cPickle as pickle
