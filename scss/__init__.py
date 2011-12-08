@@ -293,11 +293,16 @@ _default_scss_vars = {
 _default_scss_opts = {
     'verbosity': VERBOSITY,
     'compress': 1,
-    'compress_short_colors': 1, # Converts things like #RRGGBB to #RGB
-    'compress_reverse_colors': 1, # Gets the shortest name of all for colors
-    'short_colors': 0, # Converts things like #RRGGBB to #RGB
-    'reverse_colors': 0, # Gets the shortest name of all for colors
+    'compress_short_colors': 1,  # Converts things like #RRGGBB to #RGB
+    'compress_reverse_colors': 1,  # Gets the shortest name of all for colors
+    'short_colors': 0,  # Converts things like #RRGGBB to #RGB
+    'reverse_colors': 0,  # Gets the shortest name of all for colors
 }
+
+SEPARATOR = '\x00'
+_nl_re = re.compile(r'\n', re.MULTILINE)
+_nl_num_re = re.compile(r'\n.+' + SEPARATOR, re.MULTILINE)
+_nl_num_nl_re = re.compile(r'\n.+' + SEPARATOR + r'\s*\n', re.MULTILINE)
 
 _short_color_re = re.compile(r'(?<!\w)#([a-f0-9])\1([a-f0-9])\2([a-f0-9])\3\b', re.IGNORECASE)
 _long_color_re = re.compile(r'(?<!\w)#([a-f0-9]){2}([a-f0-9]){2}([a-f0-9]){2}\b', re.IGNORECASE)
@@ -313,8 +318,8 @@ for long_k, v in _colors.items():
     _reverse_colors[short_k] = k
     _reverse_colors[rgb_k] = k
     _reverse_colors[rgba_k] = k
-_reverse_colors_re = re.compile(r'(?<![-\w.:#$])(' + '|'.join(map(re.escape, _reverse_colors))+r')(?![-\w])', re.IGNORECASE)
-_colors_re = re.compile(r'(?<![-\w.:#$])(' + '|'.join(map(re.escape, _colors))+r')(?![-\w])', re.IGNORECASE)
+_reverse_colors_re = re.compile(r'(?<![-\w.:#$])(' + '|'.join(map(re.escape, _reverse_colors)) + r')(?![-\w])', re.IGNORECASE)
+_colors_re = re.compile(r'(?<![-\w.:#$])(' + '|'.join(map(re.escape, _colors)) + r')(?![-\w])', re.IGNORECASE)
 
 _expr_glob_re = re.compile(r'''
     \#\{(.*?)\}                   # Global Interpolation only
@@ -332,7 +337,7 @@ _expand_rules_space_re = re.compile(r'\s*{')
 _collapse_properties_space_re = re.compile(r'([:#])\s*{')
 
 _strings_re = re.compile(r'([\'"]).*?\1')
-_blocks_re = re.compile(r'[{},;()\'"]|\n+|$')
+_blocks_re = re.compile(r'[{},;()\'"\n]')
 
 _prop_split_re = re.compile(r'[:=]')
 _skip_word_re = re.compile(r'-?[\w\s#.,:%]*$|[\w\-#.,:%]*$', re.MULTILINE)
@@ -382,7 +387,7 @@ SELECTORS = 6
 PROPERTIES = 7
 PATH = 8
 FILE = 9
-LINE = 10
+LINENO = 10
 FINAL = 11
 MEDIA = 12
 RULE_VARS = {
@@ -396,28 +401,28 @@ RULE_VARS = {
     'PROPERTIES': PROPERTIES,
     'PATH': PATH,
     'FILE': FILE,
-    'LINE': LINE,
+    'LINENO': LINENO,
     'FINAL': FINAL,
     'MEDIA': MEDIA,
 }
+
+
 def spawn_rule(rule=None, **kwargs):
-    """
-    FILEID, POSITION, CODESTR, DEPS, CONTEXT, OPTIONS, SELECTORS, PROPERTIES, PATH, FILE, LINE, FINAL, MEDIA
-    """
     if rule is None:
-        rule = [ None ] * len(RULE_VARS)
+        rule = [None] * len(RULE_VARS)
         rule[DEPS] = set()
         rule[SELECTORS] = ''
         rule[PROPERTIES] = []
         rule[PATH] = './'
-        rule[FILE] = ''
-        rule[LINE] = 0
+        rule[FILE] = '<unknown>'
+        rule[LINENO] = 0
         rule[FINAL] = False
     else:
         rule = list(rule)
     for k, v in kwargs.items():
         rule[RULE_VARS[k.upper()]] = v
     return rule
+
 
 def print_timing(level=0):
     def _print_timing(func):
@@ -428,7 +433,7 @@ def print_timing(level=0):
                     res = func(*arg)
                     t2 = time.time()
                     profiling.setdefault(func.func_name, 0)
-                    profiling[func.func_name] += (t2-t1)
+                    profiling[func.func_name] += (t2 - t1)
                     return res
                 else:
                     return func(*arg)
@@ -436,6 +441,7 @@ def print_timing(level=0):
         else:
             return func
     return _print_timing
+
 
 def split_params(params):
     params = params.split(',') or []
@@ -456,16 +462,19 @@ def split_params(params):
         params = final_params
     return params
 
+
 def dequote(str):
     if str and str[0] in ('"', "'") and str[-1] == str[0]:
         str = str[1:-1]
         str = unescape(str)
     return str
 
+
 def depar(str):
     while str and str[0] == '(' and str[-1] == ')':
         str = str[1:-1]
     return str
+
 
 class Scss(object):
     # configuration:
@@ -531,6 +540,22 @@ class Scss(object):
         `(` and `)`.
         Returns the "lose" code that's not part of the block as a third item.
         """
+        def _strip_selprop(selprop, lineno):
+            _lineno, _sep, selprop = selprop.partition(SEPARATOR)
+            if _sep == SEPARATOR:
+                lineno = _lineno.strip()
+            else:
+                selprop = _lineno
+            selprop = _nl_num_re.sub('\n', selprop)
+            selprop = selprop.strip()
+            return selprop, lineno
+
+        def _strip(selprop):
+            selprop, _ = _strip_selprop(selprop, 0)
+            return selprop
+
+        lineno = 0
+
         par = 0
         instr = None
         depth = 0
@@ -540,8 +565,10 @@ class Scss(object):
         start = end = None
 
         for m in _blocks_re.finditer(str):
-            i = m.end(0) - 1
-            if m.start(0) == m.end(0):
+            _s = m.start(0)
+            _e = m.end(0)
+            i = _e - 1
+            if _s == _e:
                 break
             if instr is not None:
                 if str[i] == instr:
@@ -557,18 +584,18 @@ class Scss(object):
             elif not par and not instr:
                 if str[i] == '{':
                     if depth == 0:
-                        if i > 0 and str[i-1] == '#':
+                        if i > 0 and str[i - 1] == '#':
                             skip = True
                         else:
                             start = i
-                            if thin is not None and str[thin:i-1].strip():
+                            if thin is not None and _strip(str[thin:i - 1]):
                                 init = thin
                             if lose < init:
                                 losestr = str[lose:init]
                                 for _property in losestr.split(';'):
-                                    _property = _property.strip();
+                                    _property, lineno = _strip_selprop(_property, lineno)
                                     if _property:
-                                        yield _property, None
+                                        yield lineno, _property, None
                                 lose = init
                             thin = None
                     depth += 1
@@ -578,10 +605,10 @@ class Scss(object):
                         if depth == 0:
                             if not skip:
                                 end = i
-                                _selectors = str[init:start].strip()
-                                _codestr = str[start+1:end].strip()
+                                _selectors, lineno = _strip_selprop(str[init:start], lineno)
+                                _codestr = str[start + 1:end].strip()
                                 if _selectors:
-                                    yield _selectors, _codestr
+                                    yield lineno, _selectors, _codestr
                                 init = safe = lose = end + 1
                                 thin = None
                             skip = False
@@ -590,22 +617,22 @@ class Scss(object):
                         init = safe = i + 1
                         thin = None
                     elif str[i] == ',':
-                        if thin is not None and str[thin:i-1].strip():
+                        if thin is not None and _strip(str[thin:i - 1]):
                             init = thin
                         thin = None
                         safe = i + 1
                     elif str[i] == '\n':
-                        if thin is None and str[safe:i-1].strip():
+                        if thin is None and _strip(str[safe:i - 1]):
                             thin = i + 1
-                        elif thin is not None and str[thin:i-1].strip():
+                        elif thin is not None and _strip(str[thin:i - 1]):
                             init = i + 1
                             thin = None
         if depth > 0:
             if not skip:
-                _selectors = str[init:start].strip()
-                _codestr = str[start+1:].strip()
+                _selectors, lineno = _strip_selprop(str[init:start], lineno)
+                _codestr = str[start + 1:].strip()
                 if _selectors:
-                    yield _selectors, _codestr
+                    yield lineno, _selectors, _codestr
                 if par:
                     log.error("Missing closing parenthesis somewhere in block: '%s'", _selectors)
                 elif instr:
@@ -616,9 +643,9 @@ class Scss(object):
                 return
         losestr = str[lose:]
         for _property in losestr.split(';'):
-            _property = _property.strip();
+            _property, lineno = _strip_selprop(_property, lineno)
             if _property:
-                yield _property, None
+                yield lineno, _property, None
 
     def normalize_selectors(self, _selectors, extra_selectors=None, extra_parents=None):
         """
@@ -678,6 +705,7 @@ class Scss(object):
                             break
                         v = _v
                     flat_context[k] = v
+
                 # Interpolate variables:
                 def _av(m):
                     v = flat_context.get(m.group(2))
@@ -685,9 +713,9 @@ class Scss(object):
                         v = to_str(v)
                         if _dequote and m.group(1):
                             v = dequote(v)
-                        if ' ' in v: #FIXME: Perhaps this "if" block is no longer needed?:
+                        if ' ' in v:  # FIXME: Perhaps this "if" block is no longer needed?:
                             try:
-                                if cont[m.start()-1] != '(' or cont[m.end()] != ')':
+                                if cont[m.start() - 1] != '(' or cont[m.end()] != ')':
                                     v = '(' + depar(v) + ')'
                                 else:
                                     v = depar(v)
@@ -698,6 +726,7 @@ class Scss(object):
                     else:
                         v = m.group(0)
                     return v
+
                 cont = _interpolate_re.sub(_av, cont)
         if options is not None:
             # ...apply math:
@@ -709,11 +738,11 @@ class Scss(object):
         self.reset()
 
         if input_scss is not None:
-            self._scss_files = { 'string': input_scss }
+            self._scss_files = {'string': input_scss}
 
         # Compile
         for fileid, str in self._scss_files.iteritems():
-            self._scss_files[fileid] = self.parse_scss_string(fileid, str)
+            self._scss_files[fileid] = self.parse_scss_string(fileid, str, fileid)
 
         # this will manage rule: child objects inside of a node
         self.parse_children()
@@ -738,9 +767,21 @@ class Scss(object):
         return final_cont
     compile = Compilation
 
-    def load_string(self, str):
-        # protects content: "..." strings
+    def load_string(self, str, filename):
+        filename = filename.encode('utf-8')
 
+        str += '\n'
+        cnt = {'cnt': 1}
+
+        def _cnt(m):
+            cnt['cnt'] += 1
+            return "\n%s:%d" % (filename, cnt['cnt']) + SEPARATOR
+        str = '%s:%d' % (filename, 1) + SEPARATOR + _nl_re.sub(_cnt, str)
+
+        # remove empty lines
+        str = _nl_num_nl_re.sub('\n', str)
+
+        # protects content: "..." strings
         str = _strings_re.sub(lambda m: _reverse_safe_strings_re.sub(lambda n: _reverse_safe_strings[n.group(0)], m.group(0)), str)
 
         # removes multiple line comments
@@ -765,9 +806,9 @@ class Scss(object):
 
         return str
 
-    def parse_scss_string(self, fileid, str):
-        str = self.load_string(str)
-        rule = spawn_rule(fileid=fileid, codestr=str, context=self._scss_vars, options=self._scss_opts, file=fileid)
+    def parse_scss_string(self, fileid, str, filename):
+        str = self.load_string(str, filename)
+        rule = spawn_rule(fileid=fileid, codestr=str, context=self._scss_vars, options=self._scss_opts, file=filename)
         self.children.append(rule)
         return str
 
@@ -806,23 +847,26 @@ class Scss(object):
 
     @print_timing(4)
     def manage_children(self, rule, p_selectors, p_parents, p_children, scope, media):
-        for c_property, c_codestr in self.locate_blocks(rule[CODESTR]):
+        for c_lineno, c_property, c_codestr in self.locate_blocks(rule[CODESTR]):
+            if '@return' in rule[OPTIONS]:
+                return
             # Rules preprocessing...
-            if c_property.startswith('+'): # expands a '+' at the beginning of a rule as @include
+            if c_property.startswith('+'):  # expands a '+' at the beginning of a rule as @include
                 c_property = '@include ' + c_property[1:]
                 try:
                     if '(' not in c_property or c_property.index(':') < c_property.index('('):
                         c_property = c_property.replace(':', '(', 1)
-                        if '(' in c_property: c_property += ')'
+                        if '(' in c_property:
+                            c_property += ')'
                 except ValueError:
                     pass
-            elif c_property.startswith('='): # expands a '=' at the beginning of a rule as @mixin
+            elif c_property.startswith('='):  # expands a '=' at the beginning of a rule as @mixin
                 c_property = '@mixin' + c_property[1:]
-            elif c_property == '@prototype ': # Remove '@prototype '
+            elif c_property == '@prototype ':  # Remove '@prototype '
                 c_property = c_property[11:]
             ####################################################################
             if c_property.startswith('@'):
-                code, name = (c_property.split(None, 1)+[''])[:2]
+                code, name = (c_property.split(None, 1) + [''])[:2]
                 code = code.lower()
                 if code == '@warn':
                     name = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
@@ -843,56 +887,57 @@ class Scss(object):
                     DEBUG = name
                     log.info("Debug mode is %s", 'On' if DEBUG else 'Off')
                 elif code == '@option':
-                    self._settle_options(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name)
+                    self._settle_options(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@import':
-                    self._do_import(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name)
+                    self._do_import(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@extend':
                     name = self.apply_vars(name, rule[CONTEXT], rule[OPTIONS], rule)
                     p_parents.update(p.strip() for p in name.replace(',', '&').split('&'))
                     p_parents.discard('')
                 elif c_codestr is not None and code in ('@mixin', '@function'):
-                    self._do_functions(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name)
+                    self._do_functions(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@return':
                     ret = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
                     rule[OPTIONS]['@return'] = ret
-                    return
                 elif code == '@include':
-                    self._do_include(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name)
+                    self._do_include(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif c_codestr is not None and (code == '@if' or c_property.startswith('@else if ')):
-                    self._do_if(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name)
+                    self._do_if(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif c_codestr is not None and code == '@else':
-                    self._do_else(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name)
+                    self._do_else(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif c_codestr is not None and code == '@for':
-                    self._do_for(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name)
+                    self._do_for(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif c_codestr is not None and code == '@each':
-                    self._do_each(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name)
+                    self._do_each(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                # elif c_codestr is not None and code == '@while':
+                #     self._do_while(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif c_codestr is not None and code in ('@variables', '@vars'):
-                    self._get_variables(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr)
+                    self._get_variables(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
                 elif c_codestr is not None and code == '@media':
-                    _media = (media or []) +  [ name ]
+                    _media = (media or []) + [name]
                     rule[CODESTR] = self.construct + ' {' + c_codestr + '}'
                     self.manage_children(rule, p_selectors, p_parents, p_children, scope, _media)
                 elif c_codestr is None:
                     rule[PROPERTIES].append((c_property, None))
-                elif scope is None: # needs to have no scope to crawl down the nested rules
-                    self._nest_rules(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr)
+                elif scope is None:  # needs to have no scope to crawl down the nested rules
+                    self._nest_rules(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
             ####################################################################
             # Properties
             elif c_codestr is None:
-                self._get_properties(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr)
+                self._get_properties(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
             # Nested properties
             elif c_property.endswith(':'):
                 rule[CODESTR] = c_codestr
                 self.manage_children(rule, p_selectors, p_parents, p_children, (scope or '') + c_property[:-1] + '-', media)
             ####################################################################
             # Nested rules
-            elif scope is None: # needs to have no scope to crawl down the nested rules
-                self._nest_rules(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr)
+            elif scope is None:  # needs to have no scope to crawl down the nested rules
+                self._nest_rules(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
 
     @print_timing(10)
-    def _settle_options(self, rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name):
+    def _settle_options(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         for option in name.split(','):
-            option, value = (option.split(':', 1)+[''])[:2]
+            option, value = (option.split(':', 1) + [''])[:2]
             option = option.strip().lower()
             value = value.strip()
             if option:
@@ -903,7 +948,7 @@ class Scss(object):
                 rule[OPTIONS][option] = value
 
     @print_timing(10)
-    def _do_functions(self, rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name):
+    def _do_functions(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @mixin and @function
         """
@@ -925,7 +970,7 @@ class Scss(object):
             context = rule[CONTEXT].copy()
             for p in new_params:
                 context.pop(p, None)
-            mixin = [ list(new_params), defaults, self.apply_vars(c_codestr, context, None, rule) ]
+            mixin = [list(new_params), defaults, self.apply_vars(c_codestr, context, None, rule)]
             if code == '@function':
                 def _call(mixin):
                     def __call(R, *args, **kwargs):
@@ -937,9 +982,9 @@ class Scss(object):
                             m_vars[m_params[i]] = str(a)
                         m_vars.update(kwargs)
                         _options = rule[OPTIONS].copy()
-                        _rule = [ '', R[SELECTORS], m_codestr, set(), m_vars, _options, '', [], './', False, R[MEDIA] ]
+                        _rule = spawn_rule(R, codestr=m_codestr, context=m_vars, options=_options, deps=set(), properties=[], final=False, lineno=c_lineno)
                         self.manage_children(_rule, p_selectors, p_parents, p_children, (scope or '') + '', R[MEDIA])
-                        ret = _options.pop('@return', '')
+                        ret = _rule[OPTIONS].pop('@return', '')
                         return ret
                     return __call
                 _mixin = _call(mixin)
@@ -955,7 +1000,7 @@ class Scss(object):
                 rule[OPTIONS][code + ' ' + funct + ':0'] = mixin
 
     @print_timing(10)
-    def _do_include(self, rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name):
+    def _do_include(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @include, for @mixins
         """
@@ -999,26 +1044,25 @@ class Scss(object):
                     if isinstance(m_vars[p], basestring):
                         value = self.calculate(m_vars[p], m_vars, rule[OPTIONS], rule)
                         m_vars[p] = value
-            _rule = list(rule)
-            _rule[CODESTR] = m_codestr
-            _rule[CONTEXT] = rule[CONTEXT].copy()
-            _rule[CONTEXT].update(m_vars)
+            _context = rule[CONTEXT].copy()
+            _context.update(m_vars)
+            _rule = spawn_rule(rule, codestr=m_codestr, context=_context, lineno=c_lineno)
             self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
         else:
-            log.error("Required mixin not found (\"%s\":%d): %s:%d", rule[FILE] or '<unknown>', rule[LINE] or 0, funct, num_args)
+            log.error("(%s) Required mixin not found: %s:%d", rule[LINENO] or 0, funct, num_args)
 
     @print_timing(10)
-    def _do_import(self, rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name):
+    def _do_import(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @import
         Load and import mixins and functions and rules
         """
         i_codestr = None
-        if '..' not in name and '://' not in name and 'url(' not in name: # Protect against going to prohibited places...
+        if '..' not in name and '://' not in name and 'url(' not in name:  # Protect against going to prohibited places...
             names = name.split(',')
             for name in names:
                 name = dequote(name.strip())
-                if '@import ' + name not in rule[OPTIONS]: # If already imported in this scope, skip...
+                if '@import ' + name not in rule[OPTIONS]:  # If already imported in this scope, skip...
                     try:
                         raise KeyError
                         i_codestr = self._scss_files[name]
@@ -1027,21 +1071,21 @@ class Scss(object):
                         dirname = os.path.dirname(name)
                         load_paths = []
                         i_codestr = None
-                        for path in [ './' ] + LOAD_PATHS.split(','):
-                            for basepath in [ './', os.path.dirname(rule[PATH]) ]:
+                        for path in ['./'] + LOAD_PATHS.split(','):
+                            for basepath in ['./', os.path.dirname(rule[PATH])]:
                                 i_codestr = None
                                 full_path = os.path.realpath(os.path.join(path, basepath, dirname))
                                 if full_path not in load_paths:
                                     try:
-                                        full_filename = os.path.join(full_path, '_'+filename+'.scss')
+                                        full_filename = os.path.join(full_path, '_' + filename + '.scss')
                                         i_codestr = open(full_filename).read()
                                     except:
                                         try:
-                                            full_filename = os.path.join(full_path, filename+'.scss')
+                                            full_filename = os.path.join(full_path, filename + '.scss')
                                             i_codestr = open(full_filename).read()
                                         except:
                                             try:
-                                                full_filename = os.path.join(full_path, '_'+filename)
+                                                full_filename = os.path.join(full_path, '_' + filename)
                                                 i_codestr = open(full_filename).read()
                                             except:
                                                 try:
@@ -1056,19 +1100,19 @@ class Scss(object):
                             if i_codestr is not None:
                                 break
                         if i_codestr is None:
-                            i_codestr = self._do_magic_import(rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name)
-                        i_codestr = self._scss_files[name] = i_codestr and self.load_string(i_codestr)
+                            i_codestr = self._do_magic_import(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                        i_codestr = self._scss_files[name] = i_codestr and self.load_string(i_codestr, full_filename)
                     if i_codestr is None:
                         log.warn("File to import not found or unreadable: '%s'\nLoad paths:\n\t%s", filename, "\n\t".join(load_paths))
                     else:
-                        _rule = spawn_rule(rule, codestr=i_codestr, path=full_filename, file=name)
+                        _rule = spawn_rule(rule, codestr=i_codestr, path=full_filename, file=name, lineno=c_lineno)
                         self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
                         rule[OPTIONS]['@import ' + name] = True
         else:
             rule[PROPERTIES].append((c_property, None))
 
     @print_timing(10)
-    def _do_magic_import(self, rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name):
+    def _do_magic_import(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @import for sprite-maps
         Imports magic sprite map directories
@@ -1078,12 +1122,13 @@ class Scss(object):
         else:
             glob_path = os.path.join(STATIC_ROOT, name)
             files = glob.glob(glob_path)
-            files = sorted( (file[len(STATIC_ROOT):], None) for file in files )
+            files = sorted((file[len(STATIC_ROOT):], None) for file in files)
 
         if files:
             # Build magic context
             map_name = os.path.normpath(os.path.dirname(name)).replace('\\', '_').replace('/', '_')
             kwargs = {}
+
             def setdefault(var, val):
                 _var = '$' + map_name + '-' + var
                 if _var in rule[CONTEXT]:
@@ -1092,12 +1137,13 @@ class Scss(object):
                     rule[CONTEXT][_var] = val
                     kwargs[var] = interpolate(val, rule)
                 return rule[CONTEXT][_var]
+
             setdefault('sprite-base-class', StringValue('.' + map_name + '-sprite'))
             setdefault('sprite-dimensions', BooleanValue(False))
             position = setdefault('position', NumberValue(0, '%'))
             spacing = setdefault('spacing', NumberValue(0))
             repeat = setdefault('repeat', StringValue('no-repeat'))
-            names = tuple( os.path.splitext(os.path.basename(file))[0] for file, storage in files )
+            names = tuple(os.path.splitext(os.path.basename(file))[0] for file, storage in files)
             for n in names:
                 setdefault(n + '-position', position)
                 setdefault(n + '-spacing', spacing)
@@ -1139,17 +1185,17 @@ class Scss(object):
                 @mixin all-%(map_name)s-sprites($dimensions: $%(map_name)s-sprite-dimensions) {
                     @include %(map_name)s-sprites(%(sprites)s, $dimensions);
                 }
-            ''' % { 'map_name': map_name, 'sprites': ' '.join(names) }
+            ''' % {'map_name': map_name, 'sprites': ' '.join(names)}
             return ret
 
     @print_timing(10)
-    def _do_if(self, rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name):
+    def _do_if(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @if and @else if
         """
         if code != '@if':
             if '@if' not in rule[OPTIONS]:
-                log.warn("@else with no @if!")
+                log.error("(%s) @else with no @if (1)", rule[LINENO] or 0)
             val = not rule[OPTIONS].get('@if', True)
             name = c_property[9:].strip()
         else:
@@ -1163,50 +1209,59 @@ class Scss(object):
             rule[OPTIONS]['@if'] = val
 
     @print_timing(10)
-    def _do_else(self, rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name):
+    def _do_else(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @else
         """
         if '@if' not in rule[OPTIONS]:
-            log.warn("@else with no @if!")
-        val = rule[OPTIONS].get('@if', True)
+            log.error("(%s) @else with no @if (2)", rule[LINENO] or 0)
+        val = rule[OPTIONS].pop('@if', True)
         if not val:
             rule[CODESTR] = c_codestr
             self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
 
     @print_timing(10)
-    def _do_for(self, rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name):
+    def _do_for(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @for
         """
         var, _, name = name.partition('from')
-        start, _, end = name.partition('through')
-        if not end:
-            start, _, end = start.partition('to')
-        start = self.calculate(start, rule[CONTEXT], rule[OPTIONS], rule)
-        end = self.calculate(end, rule[CONTEXT], rule[OPTIONS], rule)
+        frm, _, through = name.partition('through')
+        if not through:
+            frm, _, through = frm.partition('to')
+        frm = self.calculate(frm, rule[CONTEXT], rule[OPTIONS], rule)
+        through = self.calculate(through, rule[CONTEXT], rule[OPTIONS], rule)
         try:
-            start = int(float(start))
-            end = int(float(end))
+            frm = int(float(frm))
+            through = int(float(through))
         except ValueError:
             pass
         else:
+            if frm > through:
+                frm, through = through, frm
+                rev = reversed
+            else:
+                rev = lambda x: x
             var = var.strip()
-            for i in range(start, end + 1):
+            var = self.do_glob_math(var, rule[CONTEXT], rule[OPTIONS], rule, True)
+
+            for i in rev(range(frm, through + 1)):
                 rule[CODESTR] = c_codestr
                 rule[CONTEXT][var] = str(i)
                 self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
 
     @print_timing(10)
-    def _do_each(self, rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr, code, name):
+    def _do_each(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @each
         """
         var, _, name = name.partition('in')
         name = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
         if name:
-            var = var.strip()
             name = ListValue(name)
+            var = var.strip()
+            var = self.do_glob_math(var, rule[CONTEXT], rule[OPTIONS], rule, True)
+
             for n, v in name.items():
                 v = to_str(v)
                 rule[CODESTR] = c_codestr
@@ -1215,8 +1270,26 @@ class Scss(object):
                     rule[CONTEXT][n] = v
                 self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
 
+    # @print_timing(10)
+    # def _do_while(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    #     THIS DOES NOT WORK AS MODIFICATION OF INNER VARIABLES ARE NOT KNOWN AT THIS POINT!!
+    #     """
+    #     Implements @while
+    #     """
+    #     first_val = None
+    #     while True:
+    #         val = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
+    #         val = bool(False if not val or val in('0', 'false',) or (isinstance(val, basestring) and _variable_re.match(val)) else val)
+    #         if first_val is None:
+    #             first_val = val
+    #         if not val:
+    #             break
+    #         rule[CODESTR] = c_codestr
+    #         self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+    #     rule[OPTIONS]['@if'] = first_val
+
     @print_timing(10)
-    def _get_variables(self, rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr):
+    def _get_variables(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr):
         """
         Implements @variables and @vars
         """
@@ -1226,11 +1299,11 @@ class Scss(object):
         self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
 
     @print_timing(10)
-    def _get_properties(self, rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr):
+    def _get_properties(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr):
         """
         Implements properties and variables extraction
         """
-        prop, value = (_prop_split_re.split(c_property, 1)+[None])[:2]
+        prop, value = (_prop_split_re.split(c_property, 1) + [None])[:2]
         try:
             is_var = (c_property[len(prop)] == '=')
         except IndexError:
@@ -1266,7 +1339,7 @@ class Scss(object):
                 rule[PROPERTIES].append((_prop, to_str(value) if value is not None else None))
 
     @print_timing(10)
-    def _nest_rules(self, rule, p_selectors, p_parents, p_children, scope, media, c_property, c_codestr):
+    def _nest_rules(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr):
         """
         Implements Nested CSS rules
         """
@@ -1285,7 +1358,7 @@ class Scss(object):
                 for p_selector in p_selectors:
                     if c_selector == self.construct:
                         better_selectors.add(p_selector)
-                    elif '&' in c_selector: # Parent References
+                    elif '&' in c_selector:  # Parent References
                         better_selectors.add(c_selector.replace('&', p_selector))
                     elif p_selector:
                         better_selectors.add(p_selector + ' ' + c_selector)
@@ -1299,7 +1372,8 @@ class Scss(object):
                 if parents:
                     better_selectors += ' extends ' + '&'.join(sorted(parents))
 
-            _rule = spawn_rule(fileid=rule[FILEID], codestr=c_codestr, context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=better_selectors, path=rule[PATH], file=rule[FILE], line=rule[LINE], media=media)
+            _rule = spawn_rule(rule, codestr=c_codestr, deps=set(), context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=better_selectors, properties=[], final=False, media=media, lineno=c_lineno)
+
             p_children.appendleft(_rule)
 
     @print_timing(4)
@@ -1361,12 +1435,12 @@ class Scss(object):
                 deps = set()
                 # save child dependencies:
                 for c_rule in c_rules or []:
-                    c_rule[SELECTORS] = c_selectors # re-set the SELECTORS for the rules
+                    c_rule[SELECTORS] = c_selectors  # re-set the SELECTORS for the rules
                     deps.add(c_rule[POSITION])
 
                 for p_rule in p_rules:
-                    p_rule[SELECTORS] = new_selectors # re-set the SELECTORS for the rules
-                    p_rule[DEPS].update(deps) # position is the "index" of the object
+                    p_rule[SELECTORS] = new_selectors  # re-set the SELECTORS for the rules
+                    p_rule[DEPS].update(deps)  # position is the "index" of the object
 
         return parent_found
 
@@ -1387,7 +1461,7 @@ class Scss(object):
                     new_selectors = selectors + ' extends ' + parent
                     self.parts.setdefault(new_selectors, [])
                     self.parts[new_selectors].extend(rules)
-                    rules = [] # further rules extending other parents will be empty
+                    rules = []  # further rules extending other parents will be empty
 
         cnt = 0
         parents_left = True
@@ -1399,7 +1473,7 @@ class Scss(object):
                 if parent:
                     parents_left = True
                     if _selectors not in self.parts:
-                        continue # Nodes might have been renamed while linking parents...
+                        continue  # Nodes might have been renamed while linking parents...
 
                     rules = self.parts[_selectors]
 
@@ -1431,7 +1505,7 @@ class Scss(object):
         # order rules according with their dependencies
         for rule in self.rules:
             if rule[POSITION] is not None:
-                rule[DEPS].add(rule[POSITION]+1)
+                rule[DEPS].add(rule[POSITION] + 1)
                 # This moves the rules just above the topmost dependency during the sorted() below:
                 rule[POSITION] = min(rule[DEPS])
         self.rules = sorted(self.rules, key=lambda o: o[POSITION])
@@ -1497,31 +1571,32 @@ class Scss(object):
                     if open_selectors:
                         if not sc:
                             if result[-1] == ';':
-                                result = result [:-1]
+                                result = result[:-1]
                         result += _tb + '}' + nl
                         open_selectors = False
                     if open_media:
                         if not sc:
                             if result[-1] == ';':
-                                result = result [:-1]
+                                result = result[:-1]
                         result += '}' + nl
                         open_media = False
                     if media:
                         result += '@media ' + (' and ').join(set(media)) + sp + '{' + nl
                         open_media = True
                     old_media = media
-                    old_selectors = None # force entrance to add a new selector
+                    old_selectors = None  # force entrance to add a new selector
                 _tb = tb if media else ''
                 if old_selectors != selectors or selectors is not None:
                     if open_selectors:
                         if not sc:
                             if result[-1] == ';':
-                                result = result [:-1]
+                                result = result[:-1]
                         result += _tb + '}' + nl
                         open_selectors = False
                     if selectors:
                         selector = (',' + sp).join(selectors.split(',')) + sp + '{'
-                        if nl: selector = nl.join(wrap(selector))
+                        if nl:
+                            selector = nl.join(wrap(selector))
                         result += _tb + selector + nl
                         open_selectors = True
                     old_selectors = selectors
@@ -1544,13 +1619,13 @@ class Scss(object):
         if open_selectors:
             if not sc:
                 if result[-1] == ';':
-                    result = result [:-1]
+                    result = result[:-1]
             result += _tb + '}' + nl
 
         if open_media:
             if not sc:
                 if result[-1] == ';':
-                    result = result [:-1]
+                    result = result[:-1]
             result += '}' + nl
 
         return result + '\n'
@@ -1565,7 +1640,8 @@ class Scss(object):
         scope = set() if scope is None else scope
         for prop, value in properties:
             if value is not None:
-                if nl: value = (nl + _tb + _tb).join(wrap(value))
+                if nl:
+                    value = (nl + _tb + _tb).join(wrap(value))
                 property = prop + ':' + sp + value
             else:
                 property = prop
@@ -1637,10 +1713,10 @@ class Scss(object):
     def post_process(self, cont):
         compress = self._scss_opts.get('compress', 1) and 'compress_' or ''
         # short colors:
-        if self._scss_opts.get(compress+'short_colors', 1):
+        if self._scss_opts.get(compress + 'short_colors', 1):
             cont = _short_color_re.sub(r'#\1\2\3', cont)
         # color names:
-        if self._scss_opts.get(compress+'reverse_colors', 1):
+        if self._scss_opts.get(compress + 'reverse_colors', 1):
             cont = _reverse_colors_re.sub(lambda m: _reverse_colors[m.group(0).lower()], cont)
         if compress:
             # zero units out (i.e. 0px or 0em -> 0):
@@ -1648,6 +1724,7 @@ class Scss(object):
             # remove zeros before decimal point (i.e. 0.3 -> .3)
             cont = _zero_re.sub('.', cont)
         return cont
+
 
 import hashlib
 import base64
@@ -1671,13 +1748,15 @@ except ImportError:
     except:
         Image = None
 
+
 ################################################################################
+
 
 def to_str(num):
     if isinstance(num, dict):
         s = sorted(num.items())
         sp = num.get('_', '')
-        return (sp + ' ').join( to_str(v) for n,v in s if n != '_' )
+        return (sp + ' ').join(to_str(v) for n, v in s if n != '_')
     elif isinstance(num, float):
         num = ('%0.03f' % round(num, 3)).rstrip('0').rstrip('.')
         return num
@@ -1686,6 +1765,7 @@ def to_str(num):
     elif num is None:
         return ''
     return str(num)
+
 
 def to_float(num):
     if isinstance(num, (float, int)):
@@ -1696,79 +1776,94 @@ def to_float(num):
     else:
         return float(num)
 
+
 hex2rgba = {
     9: lambda c: (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), int(c[7:9], 16)),
     7: lambda c: (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), 1.0),
-    5: lambda c: (int(c[1]*2, 16), int(c[2]*2, 16), int(c[3]*2, 16), int(c[4]*2, 16)),
-    4: lambda c: (int(c[1]*2, 16), int(c[2]*2, 16), int(c[3]*2, 16), 1.0),
+    5: lambda c: (int(c[1] * 2, 16), int(c[2] * 2, 16), int(c[3] * 2, 16), int(c[4] * 2, 16)),
+    4: lambda c: (int(c[1] * 2, 16), int(c[2] * 2, 16), int(c[3] * 2, 16), 1.0),
 }
+
 
 def escape(str):
     return re.sub(r'''(["'])''', r'\\\1', str)
 
+
 def unescape(str):
     return re.sub(r'''\\(['"])''', r'\1', str)
+
 
 ################################################################################
 # Sass/Compass Library Functions:
 
+
 def _rgb(r, g, b, type='rgb'):
     return _rgba(r, g, b, 1.0, type)
+
 
 def _rgba(r, g, b, a, type='rgba'):
     c = NumberValue(r), NumberValue(g), NumberValue(b), NumberValue(a)
 
-    col = [ c[i].value * 255.0 if (c[i].unit == '%' or c[i].value > 0 and c[i].value <= 1) else
+    col = [c[i].value * 255.0 if (c[i].unit == '%' or c[i].value > 0 and c[i].value <= 1) else
             0.0 if c[i].value < 0 else
             255.0 if c[i].value > 255 else
             c[i].value
             for i in range(3)
           ]
-    col += [ 0.0 if c[3].value < 0 else 1.0 if c[3].value > 1 else c[3].value ]
-    col += [ type ]
+    col += [0.0 if c[3].value < 0 else 1.0 if c[3].value > 1 else c[3].value]
+    col += [type]
     return ColorValue(col)
+
 
 def _color_type(color, a, type):
     color = ColorValue(color).value
     a = NumberValue(a).value if a is not None else color[3]
     col = list(color[:3])
-    col += [ 0.0 if a < 0 else 1.0 if a > 1 else a ]
-    col += [ type ]
+    col += [0.0 if a < 0 else 1.0 if a > 1 else a]
+    col += [type]
     return ColorValue(col)
+
 
 def _rgb2(color):
     return _color_type(color, 1.0, 'rgb')
 
+
 def _rgba2(color, a=None):
     return _color_type(color, a, 'rgba')
+
 
 def _hsl2(color):
     return _color_type(color, 1.0, 'hsl')
 
+
 def _hsla2(color, a=None):
     return _color_type(color, a, 'hsla')
 
+
 def _ie_hex_str(color):
     c = ColorValue(color).value
-    return StringValue('#%02X%02X%02X%02X' % (round(c[3]*255), round(c[0]), round(c[1]), round(c[2])))
+    return StringValue('#%02X%02X%02X%02X' % (round(c[3] * 255), round(c[0]), round(c[1]), round(c[2])))
+
 
 def _hsl(h, s, l, type='hsl'):
     return _hsla(h, s, l, 1.0, type)
 
+
 def _hsla(h, s, l, a, type='hsla'):
     c = NumberValue(h), NumberValue(s), NumberValue(l), NumberValue(a)
-    col = [ c[0] if (c[0].unit == '%' and c[0].value > 0 and c[0].value <= 1) else (c[0].value % 360.0) / 360.0 ]
-    col += [ 0.0 if cl <= 0 else 1.0 if cl >= 1.0 else cl
+    col = [c[0] if (c[0].unit == '%' and c[0].value > 0 and c[0].value <= 1) else (c[0].value % 360.0) / 360.0]
+    col += [0.0 if cl <= 0 else 1.0 if cl >= 1.0 else cl
             for cl in [
                 c[i].value if (c[i].unit == '%' or c[i].value > 0 and c[i].value <= 1) else
                 c[i].value / 100.0
                 for i in range(1, 4)
               ]
            ]
-    col += [ type ]
-    c = [ c * 255.0 for c in colorsys.hls_to_rgb(col[0], 0.999999 if col[2] == 1 else col[2], 0.999999 if col[1] == 1 else col[1]) ] + [ col[3], type ]
+    col += [type]
+    c = [c * 255.0 for c in colorsys.hls_to_rgb(col[0], 0.999999 if col[2] == 1 else col[2], 0.999999 if col[1] == 1 else col[1])] + [col[3], type]
     col = ColorValue(c)
     return col
+
 
 def __rgba_op(op, color, r, g, b, a):
     color = ColorValue(color)
@@ -1780,18 +1875,21 @@ def __rgba_op(op, color, r, g, b, a):
         None if a is None else NumberValue(a).value,
     ]
     # Do the additions:
-    c = [ op(c[i], a[i]) if op is not None and a[i] is not None else a[i] if a[i] is not None else c[i] for i in range(4) ]
+    c = [op(c[i], a[i]) if op is not None and a[i] is not None else a[i] if a[i] is not None else c[i] for i in range(4)]
     # Validations:
     r = 255.0, 255.0, 255.0, 1.0
-    c = [ 0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4) ]
+    c = [0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4)]
     color.value = tuple(c)
     return color
+
 
 def _opacify(color, amount):
     return __rgba_op(operator.__add__, color, 0, 0, 0, amount)
 
+
 def _transparentize(color, amount):
     return __rgba_op(operator.__sub__, color, 0, 0, 0, amount)
+
 
 def __hsl_op(op, color, h, s, l):
     color = ColorValue(color)
@@ -1808,36 +1906,44 @@ def __hsl_op(op, color, h, s, l):
     h, l, s = list(colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0))
     c = h, s, l
     # Do the additions:
-    c = [ 0.0 if c[i] < 0 else 1.0 if c[i] > 1 else op(c[i], a[i]) if op is not None and a[i] is not None else a[i] if a[i] is not None else c[i] for i in range(3) ]
+    c = [0.0 if c[i] < 0 else 1.0 if c[i] > 1 else op(c[i], a[i]) if op is not None and a[i] is not None else a[i] if a[i] is not None else c[i] for i in range(3)]
     # Validations:
     c[0] = (c[0] * 360.0) % 360
     r = 360.0, 1.0, 1.0
-    c = [ 0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(3) ]
+    c = [0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(3)]
     # Convert back to RGB:
     c = colorsys.hls_to_rgb(c[0] / 360.0, 0.999999 if c[2] == 1 else c[2], 0.999999 if c[1] == 1 else c[1])
     color.value = (c[0] * 255.0, c[1] * 255.0, c[2] * 255.0, color.value[3])
     return color
 
+
 def _lighten(color, amount):
     return __hsl_op(operator.__add__, color, 0, 0, amount)
+
 
 def _darken(color, amount):
     return __hsl_op(operator.__sub__, color, 0, 0, amount)
 
+
 def _saturate(color, amount):
     return __hsl_op(operator.__add__, color, 0, amount, 0)
+
 
 def _desaturate(color, amount):
     return __hsl_op(operator.__sub__, color, 0, amount, 0)
 
+
 def _grayscale(color):
     return __hsl_op(operator.__sub__, color, 0, 100.0, 0)
+
 
 def _adjust_hue(color, degrees):
     return __hsl_op(operator.__add__, color, degrees, 0, 0)
 
+
 def _complement(color):
     return __hsl_op(operator.__add__, color, 180.0, 0, 0)
+
 
 def _invert(color):
     """
@@ -1851,17 +1957,22 @@ def _invert(color):
     c[2] = 255.0 - c[2]
     return col
 
+
 def _adjust_lightness(color, amount):
     return __hsl_op(operator.__add__, color, 0, 0, amount)
+
 
 def _adjust_saturation(color, amount):
     return __hsl_op(operator.__add__, color, 0, amount, 0)
 
+
 def _scale_lightness(color, amount):
     return __hsl_op(operator.__mul__, color, 0, 0, amount)
 
+
 def _scale_saturation(color, amount):
     return __hsl_op(operator.__mul__, color, 0, amount, 0)
+
 
 def _asc_color(op, color, saturation=None, lightness=None, red=None, green=None, blue=None, alpha=None):
     if lightness or saturation:
@@ -1870,14 +1981,18 @@ def _asc_color(op, color, saturation=None, lightness=None, red=None, green=None,
         color = __rgba_op(op, color, red, green, blue, alpha)
     return color
 
+
 def _adjust_color(color, saturation=None, lightness=None, red=None, green=None, blue=None, alpha=None):
     return _asc_color(operator.__add__, color, saturation, lightness, red, green, blue, alpha)
+
 
 def _scale_color(color, saturation=None, lightness=None, red=None, green=None, blue=None, alpha=None):
     return _asc_color(operator.__mul__, color, saturation, lightness, red, green, blue, alpha)
 
+
 def _change_color(color, saturation=None, lightness=None, red=None, green=None, blue=None, alpha=None):
     return _asc_color(None, color, saturation, lightness, red, green, blue, alpha)
+
 
 def _mix(color1, color2, weight=None):
     """
@@ -1937,45 +2052,58 @@ def _mix(color1, color2, weight=None):
     w1 = ((w if (w * a == -1) else (w + a) / (1 + w * a)) + 1) / 2.0
 
     w2 = 1 - w1
-    q = [ w1, w1, w1, p ]
-    r = [ w2, w2, w2, 1 - p ]
+    q = [w1, w1, w1, p]
+    r = [w2, w2, w2, 1 - p]
 
     color = ColorValue(None).merge(c1).merge(c2)
-    color.value = [ c1[i] * q[i] + c2[i] * r[i] for i in range(4) ]
+    color.value = [c1[i] * q[i] + c2[i] * r[i] for i in range(4)]
 
     return color
+
 
 def _red(color):
     c = ColorValue(color).value
     return NumberValue(c[0])
+
+
 def _green(color):
     c = ColorValue(color).value
     return NumberValue(c[1])
+
+
 def _blue(color):
     c = ColorValue(color).value
     return NumberValue(c[2])
+
+
 def _alpha(color):
     c = ColorValue(color).value
     return NumberValue(c[3])
+
 
 def _hue(color):
     c = ColorValue(color).value
     h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
     ret = NumberValue(h * 360.0)
-    ret.units = { 'deg': _units_weights.get('deg', 1), '_': 'deg' }
+    ret.units = {'deg': _units_weights.get('deg', 1), '_': 'deg'}
     return ret
+
+
 def _saturation(color):
     c = ColorValue(color).value
     h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
     ret = NumberValue(s)
-    ret.units = { '%': _units_weights.get('%', 1), '_': '%' }
+    ret.units = {'%': _units_weights.get('%', 1), '_': '%'}
     return ret
+
+
 def _lightness(color):
     c = ColorValue(color).value
     h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
     ret = NumberValue(l)
-    ret.units = { '%': _units_weights.get('%', 1), '_': '%' }
+    ret.units = {'%': _units_weights.get('%', 1), '_': '%'}
     return ret
+
 
 def __color_stops(percentages, *args):
     if len(args) == 1:
@@ -2025,12 +2153,12 @@ def __color_stops(percentages, *args):
         max_stops = max(s and (s.value if s.unit != '%' else None) or None for s in stops)
     else:
         max_stops = max(s and (s if s.unit != '%' else None) or None for s in stops)
-    stops = [ s and (s.value / max_stops if s.unit != '%' else s.value) for s in stops ]
+    stops = [s and (s.value / max_stops if s.unit != '%' else s.value) for s in stops]
     stops[0] = 0
 
     init = 0
     start = None
-    for i, s in enumerate(stops+[1.0]):
+    for i, s in enumerate(stops + [1.0]):
         if s is None:
             if start is None:
                 start = i
@@ -2045,41 +2173,48 @@ def __color_stops(percentages, *args):
             start = None
 
     if not max_stops or percentages:
-        stops = [ NumberValue(s, '%') for s in stops ]
+        stops = [NumberValue(s, '%') for s in stops]
     else:
-        stops = [ s * max_stops for s in stops ]
+        stops = [s * max_stops for s in stops]
     return zip(stops, colors)
+
 
 def _grad_color_stops(*args):
     color_stops = __color_stops(True, *args)
-    ret = ', '.join([ 'color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops ])
+    ret = ', '.join(['color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops])
     return StringValue(ret)
+
 
 def __grad_end_position(radial, color_stops):
     return __grad_position(-1, 100, radial, color_stops)
 
+
 def __grad_position(index, default, radial, color_stops):
     try:
         stops = NumberValue(color_stops[index][0])
-        if radial and stops.unit != 'px' and (index == 0 or index == -1 or index == len(color_stops) -1):
+        if radial and stops.unit != 'px' and (index == 0 or index == -1 or index == len(color_stops) - 1):
             log.warn("Webkit only supports pixels for the start and end stops for radial gradients. Got %s", stops)
     except IndexError:
         stops = NumberValue(default)
     return stops
 
+
 def _grad_end_position(*color_stops):
     color_stops = __color_stops(False, *color_stops)
     return NumberValue(__grad_end_position(False, color_stops))
 
+
 def _color_stops(*args):
     color_stops = __color_stops(False, *args)
-    ret = ', '.join([ '%s %s' % (c, to_str(s)) for s, c in color_stops ])
+    ret = ', '.join(['%s %s' % (c, to_str(s)) for s, c in color_stops])
     return StringValue(ret)
+
 
 def _color_stops_in_percentages(*args):
     color_stops = __color_stops(True, *args)
-    ret = ', '.join([ '%s %s' % (c, to_str(s)) for s, c in color_stops ])
+    ret = ', '.join(['%s %s' % (c, to_str(s)) for s, c in color_stops])
     return StringValue(ret)
+
 
 def _radial_gradient(*args):
     color_stops = args
@@ -2135,6 +2270,7 @@ def _radial_gradient(*args):
 
     return ret
 
+
 def _linear_gradient(*args):
     color_stops = args
     position_and_angle = None
@@ -2187,6 +2323,7 @@ def _linear_gradient(*args):
 
     return ret
 
+
 def _radial_svg_gradient(*args):
     color_stops = args
     center = None
@@ -2202,6 +2339,7 @@ def _radial_svg_gradient(*args):
     url = 'data:' + 'image/svg+xml' + ';base64,' + base64.b64encode(svg)
     inline = 'url("%s")' % escape(url)
     return StringValue(inline)
+
 
 def _linear_svg_gradient(*args):
     color_stops = args
@@ -2219,9 +2357,11 @@ def _linear_svg_gradient(*args):
     inline = 'url("%s")' % escape(url)
     return StringValue(inline)
 
+
 def __color_stops_svg(color_stops):
     ret = ''.join('<stop offset="%s" stop-color="%s"/>' % (to_str(s), c) for s, c in color_stops)
     return ret
+
 
 def __svg_template(gradient):
     ret = '<?xml version="1.0" encoding="utf-8"?>\
@@ -2230,6 +2370,7 @@ def __svg_template(gradient):
 <rect x="0" y="0" width="100%%" height="100%%" fill="url(#grad)" />\
 </svg>' % gradient
     return ret
+
 
 def __linear_svg(color_stops, x1, y1, x2, y2):
     gradient = '<linearGradient id="grad" x1="%s" y1="%s" x2="%s" y2="%s">%s</linearGradient>' % (
@@ -2241,8 +2382,9 @@ def __linear_svg(color_stops, x1, y1, x2, y2):
     )
     return __svg_template(gradient)
 
+
 def __radial_svg(color_stops, cx, cy, r):
-    gradient = '<radialGradient id="grad" gradientUnits="userSpaceOnUse" cx="%s" cy="%s" r="%s">%s</radialGradient>' %(
+    gradient = '<radialGradient id="grad" gradientUnits="userSpaceOnUse" cx="%s" cy="%s" r="%s">%s</radialGradient>' % (
         to_str(NumberValue(cx)),
         to_str(NumberValue(cy)),
         to_str(NumberValue(r)),
@@ -2250,10 +2392,13 @@ def __radial_svg(color_stops, cx, cy, r):
     )
     return __svg_template(gradient)
 
+
 ################################################################################
 # Compass like functionality for sprites and images:
 sprite_maps = {}
 sprite_images = {}
+
+
 def _sprite_map(g, **kwargs):
     """
     Generates a sprite map from the files matching the glob pattern.
@@ -2266,7 +2411,7 @@ def _sprite_map(g, **kwargs):
 
     if g in sprite_maps:
         sprite_maps[glob]['*'] = datetime.datetime.now()
-    elif '..' not in g: # Protect against going to prohibited places...
+    elif '..' not in g:  # Protect against going to prohibited places...
         vertical = (kwargs.get('direction', 'vertical') == 'vertical')
         offset_x = NumberValue(kwargs.get('offset_x', 0))
         offset_y = NumberValue(kwargs.get('offset_y', 0))
@@ -2275,12 +2420,12 @@ def _sprite_map(g, **kwargs):
         dst_color = kwargs.get('dst_color')
         src_color = kwargs.get('src_color')
         if position and position > -1 and position < 1:
-            position.units = { '%': _units_weights.get('%', 1), '_': '%' }
+            position.units = {'%': _units_weights.get('%', 1), '_': '%'}
         spacing = kwargs.get('spacing', 0)
         if isinstance(spacing, ListValue):
-            spacing = [ int(NumberValue(v).value) for n,v in spacing.items() ]
+            spacing = [int(NumberValue(v).value) for n, v in spacing.items()]
         else:
-            spacing = [ int(NumberValue(spacing).value) ]
+            spacing = [int(NumberValue(spacing).value)]
         spacing = (spacing * 4)[:4]
 
         if callable(STATIC_ROOT):
@@ -2288,8 +2433,8 @@ def _sprite_map(g, **kwargs):
         else:
             glob_path = os.path.join(STATIC_ROOT, g)
             files = glob.glob(glob_path)
-            files = sorted( (f, None) for f in files )
-            rfiles = [ (f[len(STATIC_ROOT):], s) for f, s in files ]
+            files = sorted((f, None) for f in files)
+            rfiles = [(f[len(STATIC_ROOT):], s) for f, s in files]
 
         if not files:
             log.error("Nothing found at '%s'", glob_path)
@@ -2304,7 +2449,7 @@ def _sprite_map(g, **kwargs):
                 times.append(int(os.path.getmtime(file)))
 
         map_name = os.path.normpath(os.path.dirname(g)).replace('\\', '_').replace('/', '_')
-        key = list(zip(*files)[0]) + times + [ repr(kwargs) ]
+        key = list(zip(*files)[0]) + times + [repr(kwargs)]
         key = map_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
@@ -2313,8 +2458,8 @@ def _sprite_map(g, **kwargs):
             asset, map, sizes = pickle.load(open(asset_path + '.cache'))
             sprite_maps[asset] = map
         else:
-            images = tuple( Image.open(storage.open(file)) if storage is not None else Image.open(file) for file, storage in files )
-            names = tuple( os.path.splitext(os.path.basename(file))[0] for file, storage in files )
+            images = tuple(Image.open(storage.open(file)) if storage is not None else Image.open(file) for file, storage in files)
+            names = tuple(os.path.splitext(os.path.basename(file))[0] for file, storage in files)
             positions = []
             spacings = []
             tot_spacings = []
@@ -2326,16 +2471,16 @@ def _sprite_map(g, **kwargs):
                 else:
                     _position = NumberValue(_position)
                     if _position and _position > -1 and _position < 1:
-                        _position.units = { '%': _units_weights.get('%', 1), '_': '%' }
+                        _position.units = {'%': _units_weights.get('%', 1), '_': '%'}
                 positions.append(_position)
                 _spacing = kwargs.get(name + '_spacing')
                 if _spacing is None:
                     _spacing = spacing
                 else:
                     if isinstance(_spacing, ListValue):
-                        _spacing = [ int(NumberValue(v).value) for n,v in _spacing.items() ]
+                        _spacing = [int(NumberValue(v).value) for n, v in _spacing.items()]
                     else:
-                        _spacing = [ int(NumberValue(_spacing).value) ]
+                        _spacing = [int(NumberValue(_spacing).value)]
                     _spacing = (_spacing * 4)[:4]
                 spacings.append(_spacing)
                 if _position and _position.unit != '%':
@@ -2347,7 +2492,7 @@ def _sprite_map(g, **kwargs):
                             tot_spacings.append((_spacing[0] + _position, _spacing[1], _spacing[2], _spacing[3]))
                 else:
                     tot_spacings.append(_spacing)
-            sizes = tuple( image.size for image in images )
+            sizes = tuple(image.size for image in images)
 
             _spacings = zip(*tot_spacings)
             if vertical:
@@ -2358,9 +2503,9 @@ def _sprite_map(g, **kwargs):
                 height = max(zip(*sizes)[1]) + max(_spacings[0]) + max(_spacings[2])
 
             new_image = Image.new(
-                mode = 'RGBA',
-                size = (width, height),
-                color = (0, 0, 0, 0)
+                mode='RGBA',
+                size=(width, height),
+                color=(0, 0, 0, 0)
             )
 
             offsets_x = []
@@ -2401,7 +2546,7 @@ def _sprite_map(g, **kwargs):
                 for y in xrange(new_image.size[1]):
                     for x in xrange(new_image.size[0]):
                         if pixdata[x, y][:3] == src_color:
-                            pixdata[x, y] = tuple(dst_color + [ pixdata[x, y][3] ])
+                            pixdata[x, y] = tuple(dst_color + [pixdata[x, y][3]])
 
             try:
                 new_image.save(asset_path)
@@ -2429,6 +2574,7 @@ def _sprite_map(g, **kwargs):
     ret = StringValue(asset)
     return ret
 
+
 def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=None, baseline_color=None, background_color=None, inline=False):
     if not Image:
         raise Exception("Images manipulation require PIL")
@@ -2455,9 +2601,9 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
         raise ValueError
     _full_width = (_left_gutter + _width + _right_gutter)
     new_image = Image.new(
-        mode = 'RGBA',
-        size = (_full_width * int(columns), _height),
-        color = background_color
+        mode='RGBA',
+        size=(_full_width * int(columns), _height),
+        color=background_color
     )
     draw = ImageDraw.Draw(new_image)
     for i in range(int(columns)):
@@ -2466,10 +2612,13 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
         draw.rectangle((0, _height - 1, _full_width * int(columns) - 1, _height - 1),  fill=baseline_color)
     if not inline:
         grid_name = 'grid_'
-        if left_gutter: grid_name += str(int(left_gutter)) + '+'
+        if left_gutter:
+            grid_name += str(int(left_gutter)) + '+'
         grid_name += str(int(width))
-        if right_gutter: grid_name += '+' + str(int(right_gutter))
-        if height and height > 1: grid_name += 'x' + str(int(height))
+        if right_gutter:
+            grid_name += '+' + str(int(right_gutter))
+        if height and height > 1:
+            grid_name += 'x' + str(int(height))
         key = (columns, grid_color, baseline_color, background_color)
         key = grid_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
@@ -2478,7 +2627,7 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
             new_image.save(asset_path)
         except IOError:
             log.exception("Error while saving image")
-            inline = True # Retry inline version
+            inline = True  # Retry inline version
         url = '%s%s' % (ASSETS_URL, asset_file)
     if inline:
         output = StringIO.StringIO()
@@ -2489,6 +2638,7 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
     inline = 'url("%s")' % escape(url)
     return StringValue(inline)
 
+
 def _image_color(color, width=1, height=1):
     if not Image:
         raise Exception("Images manipulation require PIL")
@@ -2498,9 +2648,9 @@ def _image_color(color, width=1, height=1):
     if w <= 0 or h <= 0:
         raise ValueError
     new_image = Image.new(
-        mode = 'RGB' if c[3] == 1 else 'RGBA',
-        size = (w, h),
-        color = (c[0], c[1], c[2], int(c[3] * 255.0))
+        mode='RGB' if c[3] == 1 else 'RGBA',
+        size=(w, h),
+        color=(c[0], c[1], c[2], int(c[3] * 255.0))
     )
     output = StringIO.StringIO()
     new_image.save(output, format='PNG')
@@ -2510,6 +2660,7 @@ def _image_color(color, width=1, height=1):
     url = 'data:' + mime_type + ';base64,' + base64.b64encode(contents)
     inline = 'url("%s")' % escape(url)
     return StringValue(inline)
+
 
 def _sprite_map_name(map):
     """
@@ -2523,6 +2674,7 @@ def _sprite_map_name(map):
     if sprite_map:
         return StringValue(sprite_map['*n*'])
     return StringValue(None)
+
 
 def _sprite_file(map, sprite):
     """
@@ -2542,10 +2694,12 @@ def _sprite_file(map, sprite):
         return QuotedStringValue(sprite[1][0])
     return StringValue(None)
 
+
 def _sprites(map):
     map = StringValue(map).value
     sprite_map = sprite_maps.get(map, {})
     return ListValue(sorted(s for s in sprite_map if not s.startswith('*')))
+
 
 def _sprite(map, sprite, offset_x=None, offset_y=None):
     """
@@ -2572,6 +2726,7 @@ def _sprite(map, sprite, offset_x=None, offset_y=None):
         return StringValue(pos)
     return StringValue('0 0')
 
+
 def _sprite_url(map):
     """
     Returns a url to the sprite image.
@@ -2585,6 +2740,7 @@ def _sprite_url(map):
         url = "url(%s)" % escape(url)
         return StringValue(url)
     return StringValue(None)
+
 
 def _sprite_position(map, sprite, offset_x=None, offset_y=None):
     """
@@ -2604,7 +2760,8 @@ def _sprite_position(map, sprite, offset_x=None, offset_y=None):
         if offset_x is not None and not isinstance(offset_x, NumberValue):
             x = str(offset_x)
         if x not in ('left', 'right', 'center'):
-            if x: offset_x = None
+            if x:
+                offset_x = None
             x = NumberValue(offset_x or 0, 'px')
             if not x or (x <= -1 or x >= 1) and x.unit != '%':
                 x -= sprite[2]
@@ -2612,13 +2769,15 @@ def _sprite_position(map, sprite, offset_x=None, offset_y=None):
         if offset_y is not None and not isinstance(offset_y, NumberValue):
             y = str(offset_y)
         if y not in ('top', 'bottom', 'center'):
-            if y: offset_y = None
+            if y:
+                offset_y = None
             y = NumberValue(offset_y or 0, 'px')
             if not y or (y <= -1 or y >= 1) and y.unit != '%':
                 y -= sprite[3]
         pos = '%s %s' % (x, y)
         return StringValue(pos)
     return StringValue('0 0')
+
 
 def _inline_image(image, mime_type=None):
     """
@@ -2645,6 +2804,7 @@ def _inline_image(image, mime_type=None):
     url = url = '%s%s?_=%s' % (STATIC_URL, file, 'NA')
     inline = 'url("%s")' % escape(url)
     return StringValue(inline)
+
 
 def _image_url(image, dst_color=None, src_color=None):
     """
@@ -2675,8 +2835,8 @@ def _image_url(image, dst_color=None, src_color=None):
             filetime = 'NA'
     BASE_URL = STATIC_URL
     if path:
-        src_color = tuple( int(round(c)) for c in ColorValue(src_color).value[:3] ) if src_color else (0, 0, 0)
-        dst_color = [ int(round(c)) for c in ColorValue(dst_color).value[:3] ]
+        src_color = tuple(int(round(c)) for c in ColorValue(src_color).value[:3]) if src_color else (0, 0, 0)
+        dst_color = [int(round(c)) for c in ColorValue(dst_color).value[:3]]
 
         file_name, file_ext = os.path.splitext(os.path.normpath(file).replace('\\', '_').replace('/', '_'))
         key = (filetime, src_color, dst_color)
@@ -2695,7 +2855,7 @@ def _image_url(image, dst_color=None, src_color=None):
             for y in xrange(image.size[1]):
                 for x in xrange(image.size[0]):
                     if pixdata[x, y][:3] == src_color:
-                        new_color = tuple(dst_color + [ pixdata[x, y][3] ])
+                        new_color = tuple(dst_color + [pixdata[x, y][3]])
                         pixdata[x, y] = new_color
             try:
                 image.save(asset_path)
@@ -2705,6 +2865,7 @@ def _image_url(image, dst_color=None, src_color=None):
                 log.exception("Error while saving image")
     url = 'url("%s%s?_=%s")' % (BASE_URL, file, filetime)
     return StringValue(url)
+
 
 def _image_width(image):
     """
@@ -2736,6 +2897,7 @@ def _image_width(image):
             sprite_images[file] = size
     return NumberValue(width, 'px')
 
+
 def _image_height(image):
     """
     Returns the height of the image found at the path supplied by `image`
@@ -2766,7 +2928,10 @@ def _image_height(image):
             sprite_images[file] = size
     return NumberValue(height, 'px')
 
+
 ################################################################################
+
+
 def __position(opposite, *p):
     pos = set()
     hrz = vrt = None
@@ -2788,11 +2953,14 @@ def __position(opposite, *p):
         vrt = None
     return ListValue(list(v for v in (hrz, vrt) if v is not None))
 
+
 def _position(*p):
     return __position(False, *p)
 
+
 def _opposite_position(*p):
     return __position(True, *p)
+
 
 def _grad_point(*p):
     pos = set()
@@ -2812,11 +2980,13 @@ def _grad_point(*p):
 
 ################################################################################
 
+
 def __compass_list(*args):
     if len(args) == 1:
         return ListValue(args[0])
     else:
         return ListValue(args)
+
 
 def __compass_space_list(*lst):
     """
@@ -2827,12 +2997,14 @@ def __compass_space_list(*lst):
     ret.value.pop('_', None)
     return ret
 
+
 def _blank(*objs):
     """Returns true when the object is false, an empty string, or an empty list"""
     for o in objs:
         if bool(o):
             return BooleanValue(False)
     return BooleanValue(True)
+
 
 def _compact(*args):
     """Returns a new list after removing any non-true values"""
@@ -2853,6 +3025,7 @@ def _compact(*args):
                 ret[i] = item
     return ListValue(ret)
 
+
 def __compass_slice(lst, start_index, end_index=None):
     start_index = NumberValue(start_index).value
     end_index = NumberValue(end_index).value if end_index is not None else None
@@ -2866,9 +3039,11 @@ def __compass_slice(lst, start_index, end_index=None):
             ret[i] = item
     return ListValue(ret)
 
+
 def _first_value_of(*lst):
     ret = ListValue(lst).first()
     return ret.__class__(ret)
+
 
 def _nth(lst, n=1):
     """
@@ -2887,23 +3062,25 @@ def _nth(lst, n=1):
     try:
         ret = lst[n]
     except KeyError:
-        lst = [ v for k,v in sorted(lst.items()) if isinstance(k, int) ]
+        lst = [v for k, v in sorted(lst.items()) if isinstance(k, int)]
         try:
             ret = lst[n]
         except:
             ret = ''
     return ret.__class__(ret)
 
+
 def _join(lst1, lst2, separator=None):
     ret = ListValue(lst1)
     lst2 = ListValue(lst2).value
     lst_len = len(ret.value)
-    ret.value.update((k + lst_len if isinstance(k, int) else k, v) for k,v in lst2.items())
+    ret.value.update((k + lst_len if isinstance(k, int) else k, v) for k, v in lst2.items())
     if separator is not None:
         separator = StringValue(separator).value
         if separator:
             ret.value['_'] = separator
     return ret
+
 
 def _length(*lst):
     if len(lst) == 1 and isinstance(lst[0], ListValue):
@@ -2911,13 +3088,16 @@ def _length(*lst):
     lst = ListValue(lst)
     return NumberValue(len(lst))
 
+
 def _append(lst, val, separator=None):
     separator = separator and StringValue(separator).value
     ret = ListValue(lst, separator)
     ret.value[len(ret)] = val
     return ret
 
+
 ################################################################################
+
 
 def _prefixed(prefix, *args):
     to_fnct_str = 'to_' + to_str(prefix).replace('-', '_')
@@ -2930,6 +3110,7 @@ def _prefixed(prefix, *args):
             if hasattr(arg, to_fnct_str):
                 return BooleanValue(True)
     return BooleanValue(False)
+
 
 def _prefix(prefix, *args):
     to_fnct_str = 'to_' + to_str(prefix).replace('-', '_')
@@ -2952,49 +3133,63 @@ def _prefix(prefix, *args):
         return args[0]
     return ListValue(args, ',')
 
+
 def __moz(*args):
     return _prefix('_moz', *args)
+
 
 def __svg(*args):
     return _prefix('_svg', *args)
 
+
 def __css2(*args):
     return _prefix('_css2', *args)
+
 
 def __pie(*args):
     return _prefix('_pie', *args)
 
+
 def __webkit(*args):
     return _prefix('_webkit', *args)
+
 
 def __khtml(*args):
     return _prefix('_khtml', *args)
 
+
 def __ms(*args):
     return _prefix('_ms', *args)
+
 
 def __o(*args):
     return _prefix('_o', *args)
 
 ################################################################################
 
+
 def _percentage(value):
     value = NumberValue(value)
-    value.units = { '%': _units_weights.get('%', 1), '_': '%' }
+    value.units = {'%': _units_weights.get('%', 1), '_': '%'}
     return value
+
 
 def _unitless(value):
     value = NumberValue(value)
     return BooleanValue(not bool(value.unit))
 
+
 def _unquote(*args):
-    return StringValue(' '.join([ StringValue(s).value for s in args ]))
+    return StringValue(' '.join([StringValue(s).value for s in args]))
+
 
 def _quote(*args):
-    return QuotedStringValue(' '.join([ StringValue(s).value for s in args ]))
+    return QuotedStringValue(' '.join([StringValue(s).value for s in args]))
+
 
 def _pi():
     return NumberValue(math.pi)
+
 
 def _comparable(number1, number2):
     n1, n2 = NumberValue(number1), NumberValue(number2)
@@ -3002,7 +3197,8 @@ def _comparable(number1, number2):
     type2 = _conv_type.get(n2.unit)
     return BooleanValue(type1 == type2)
 
-def _type_of(obj): # -> bool, number, string, color, list
+
+def _type_of(obj):  # -> bool, number, string, color, list
     if isinstance(obj, BooleanValue):
         return StringValue('bool')
     if isinstance(obj, NumberValue):
@@ -3015,13 +3211,16 @@ def _type_of(obj): # -> bool, number, string, color, list
         return StringValue('undefined')
     return StringValue('string')
 
+
 def _if(condition, if_true, if_false=''):
     condition = bool(False if not condition or condition in('0', 'false',) or (isinstance(condition, basestring) and _variable_re.match(condition)) else condition)
     return if_true.__class__(if_true) if condition else if_true.__class__(if_false)
 
-def _unit(number): # -> px, em, cm, etc.
+
+def _unit(number):  # -> px, em, cm, etc.
     unit = NumberValue(number).unit
     return StringValue(unit)
+
 
 __elements_of_type = {
     'block': dict(enumerate(sorted(['address', 'article', 'aside', 'blockquote', 'center', 'dd', 'dialog', 'dir', 'div', 'dl', 'dt', 'fieldset', 'figure', 'footer', 'form', 'frameset', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'isindex', 'menu', 'nav', 'noframes', 'noscript', 'ol', 'p', 'pre', 'section', 'ul']))),
@@ -3035,14 +3234,17 @@ __elements_of_type = {
     'table-cell': dict(enumerate(sorted(['td', 'th']))),
     'html5': dict(enumerate(sorted(['article', 'aside', 'dialog', 'figure', 'footer', 'header', 'hgroup', 'nav', 'section']))),
 }
+
+
 def _elements_of_type(display):
     d = StringValue(display)
     ret = __elements_of_type.get(d.value, [])
     ret['_'] = ','
     return ListValue(ret)
 
+
 def _nest(*arguments):
-    ret = [ s.strip() for s in StringValue(arguments[0]).value.split(',') if s.strip() ]
+    ret = [s.strip() for s in StringValue(arguments[0]).value.split(',') if s.strip()]
     for arg in arguments[1:]:
         new_ret = []
         for s in StringValue(arg).value.split(','):
@@ -3056,13 +3258,15 @@ def _nest(*arguments):
     ret['_'] = ','
     return ret
 
+
 def _append_selector(selector, to_append):
     selector = StringValue(selector)
     to_append = StringValue(to_append).value.strip()
-    ret = sorted(set(s.strip()+to_append for s in selector.value.split(',') if s.strip()))
+    ret = sorted(set(s.strip() + to_append for s in selector.value.split(',') if s.strip()))
     ret = dict(enumerate(ret))
     ret['_'] = ','
     return ret
+
 
 def _headers(frm=None, to=None):
     if frm and to is None:
@@ -3084,10 +3288,11 @@ def _headers(frm=None, to=None):
             to = 6 if to is None else int(getattr(to, 'value', to))
         except ValueError:
             to = 6
-    ret = [ 'h' + str(i) for i in range(frm, to + 1) ]
+    ret = ['h' + str(i) for i in range(frm, to + 1)]
     ret = dict(enumerate(ret))
     ret['_'] = ','
     return ret
+
 
 def _enumerate(prefix, frm, through, separator='-'):
     prefix = StringValue(prefix).value
@@ -3106,12 +3311,13 @@ def _enumerate(prefix, frm, through, separator='-'):
     else:
         rev = lambda x: x
     if prefix:
-        ret = [ prefix + separator + str(i) for i in rev(range(frm, through + 1)) ]
+        ret = [prefix + separator + str(i) for i in rev(range(frm, through + 1))]
     else:
-        ret = [ NumberValue(i) for i in rev(range(frm, through + 1)) ]
+        ret = [NumberValue(i) for i in rev(range(frm, through + 1))]
     ret = dict(enumerate(ret))
     ret['_'] = ','
     return ret
+
 
 def _range(frm, through=None):
     if through is None:
@@ -3119,11 +3325,14 @@ def _range(frm, through=None):
         frm = 1
     return _enumerate(None, frm, through)
 
+
 ################################################################################
 # Specific to pyScss parser functions:
 
+
 def _convert_to(value, type):
     return value.convert_to(type)
+
 
 def _inv(sign, value):
     if isinstance(value, NumberValue):
@@ -3134,11 +3343,15 @@ def _inv(sign, value):
     val.value = sign + val.value
     return val
 
+
+################################################################################
 # pyScss data types:
+
 
 class ParserValue(object):
     def __init__(self, value):
         self.value = value
+
 
 class Value(object):
     @staticmethod
@@ -3150,6 +3363,7 @@ class Value(object):
                 yield (it.next(), it.next())
             except StopIteration:
                 break
+
     @staticmethod
     def _merge_type(a, b):
         if a.__class__ == b.__class__:
@@ -3157,6 +3371,7 @@ class Value(object):
         if isinstance(a, QuotedStringValue) or isinstance(b, QuotedStringValue):
             return QuotedStringValue
         return StringValue
+
     @staticmethod
     def _wrap(fn):
         """
@@ -3179,68 +3394,96 @@ class Value(object):
             merged.value = fn(*_args)
             return merged
         return _func
+
     @classmethod
     def _do_bitops(cls, first, second, op):
         first = StringValue(first)
         second = StringValue(second)
         k = op(first.value, second.value)
         return first if first.value == k else second
+
     def __repr__(self):
         return '<%s: %s>' % (self.__class__.__name__, repr(self.value))
+
     def __lt__(self, other):
         return self._do_cmps(self, other, operator.__lt__)
+
     def __le__(self, other):
         return self._do_cmps(self, other, operator.__le__)
+
     def __eq__(self, other):
         return self._do_cmps(self, other, operator.__eq__)
+
     def __ne__(self, other):
         return self._do_cmps(self, other, operator.__ne__)
+
     def __gt__(self, other):
         return self._do_cmps(self, other, operator.__gt__)
+
     def __ge__(self, other):
         return self._do_cmps(self, other, operator.__ge__)
+
     def __cmp__(self, other):
         return self._do_cmps(self, other, operator.__cmp__)
+
     def __rcmp__(self, other):
         return self._do_cmps(other, self, operator.__cmp__)
+
     def __and__(self, other):
         return self._do_bitops(self, other, operator.__and__)
+
     def __or__(self, other):
         return self._do_bitops(self, other, operator.__or__)
+
     def __xor__(self, other):
         return self._do_bitops(self, other, operator.__xor__)
+
     def __rand__(self, other):
         return self._do_bitops(other, self, operator.__rand__)
+
     def __ror__(self, other):
         return self._do_bitops(other, self, operator.__ror__)
+
     def __rxor__(self, other):
         return self._do_bitops(other, self, operator.__rxor__)
+
     def __nonzero__(self):
         return bool(self.value)
+
     def __add__(self, other):
         return self._do_op(self, other, operator.__add__)
+
     def __radd__(self, other):
         return self._do_op(other, self, operator.__add__)
+
     def __div__(self, other):
         return self._do_op(self, other, operator.__div__)
+
     def __rdiv__(self, other):
         return self._do_op(other, self, operator.__div__)
+
     def __sub__(self, other):
         return self._do_op(self, other, operator.__sub__)
+
     def __rsub__(self, other):
         return self._do_op(other, self, operator.__sub__)
+
     def __mul__(self, other):
         return self._do_op(self, other, operator.__mul__)
+
     def __rmul__(self, other):
         return self._do_op(other, self, operator.__mul__)
+
     def convert_to(self, type):
         return self.value.convert_to(type)
+
     def merge(self, obj):
         if isinstance(obj, Value):
             self.value = obj.value
         else:
             self.value = obj
         return self
+
 
 class BooleanValue(Value):
     def __init__(self, tokens):
@@ -3257,8 +3500,10 @@ class BooleanValue(Value):
             self.value = bool(tokens)
         else:
             self.value = to_str(tokens).lower() in ('true', '1', 'on', 'yes', 't', 'y') or bool(tokens)
+
     def __str__(self):
         return 'true' if self.value else 'false'
+
     @classmethod
     def _do_cmps(cls, first, second, op):
         first = first.value if isinstance(first, Value) else first
@@ -3272,11 +3517,12 @@ class BooleanValue(Value):
         elif second in ('false', '0', 'off', 'no', 'f', 'n'):
             second = False
         return op(first, second)
+
     @classmethod
     def _do_op(cls, first, second, op):
         if isinstance(first, ListValue) and isinstance(second, ListValue):
             ret = ListValue(first)
-            for k,v in ret.items():
+            for k, v in ret.items():
                 try:
                     ret.value[k] = op(ret.value[k], second.value[k])
                 except KeyError:
@@ -3284,12 +3530,12 @@ class BooleanValue(Value):
             return ret
         if isinstance(first, ListValue):
             ret = ListValue(first)
-            for k,v in ret.items():
+            for k, v in ret.items():
                 ret.value[k] = op(ret.value[k], second)
             return ret
         if isinstance(second, ListValue):
             ret = ListValue(second)
-            for k,v in ret.items():
+            for k, v in ret.items():
                 ret.value[k] = op(first, ret.value[k])
             return ret
 
@@ -3299,10 +3545,12 @@ class BooleanValue(Value):
         ret = BooleanValue(None).merge(first).merge(second)
         ret.value = val
         return ret
+
     def merge(self, obj):
         obj = BooleanValue(obj)
         self.value = obj.value
         return self
+
 
 class NumberValue(Value):
     def __init__(self, tokens, type=None):
@@ -3322,7 +3570,7 @@ class NumberValue(Value):
             try:
                 if tokens and tokens[-1] == '%':
                     self.value = to_float(tokens[:-1]) / 100.0
-                    self.units = { '%': _units_weights.get('%', 1), '_': '%' }
+                    self.units = {'%': _units_weights.get('%', 1), '_': '%'}
                 else:
                     self.value = to_float(tokens)
             except ValueError:
@@ -3332,18 +3580,23 @@ class NumberValue(Value):
         else:
             raise ValueError("Value is not a Number!")
         if type is not None:
-            self.units = { type: _units_weights.get(type, 1), '_': type }
+            self.units = {type: _units_weights.get(type, 1), '_': type}
+
     def __repr__(self):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.units))
+
     def __int__(self):
         return int(self.value)
+
     def __float__(self):
         return float(self.value)
+
     def __str__(self):
         unit = self.unit
         val = self.value / _conv_factor.get(unit, 1.0)
         val = to_str(val) + unit
         return val
+
     @classmethod
     def _do_cmps(cls, first, second, op):
         try:
@@ -3357,11 +3610,12 @@ class NumberValue(Value):
             return op(first.value, second.value)
         else:
             return op(first_type, second_type)
+
     @classmethod
     def _do_op(cls, first, second, op):
         if isinstance(first, ListValue) and isinstance(second, ListValue):
             ret = ListValue(first)
-            for k,v in ret.items():
+            for k, v in ret.items():
                 try:
                     ret.value[k] = op(ret.value[k], second.value[k])
                 except KeyError:
@@ -3369,12 +3623,12 @@ class NumberValue(Value):
             return ret
         if isinstance(first, ListValue):
             ret = ListValue(first)
-            for k,v in ret.items():
+            for k, v in ret.items():
                 ret.value[k] = op(ret.value[k], second)
             return ret
         if isinstance(second, ListValue):
             ret = ListValue(second)
-            for k,v in ret.items():
+            for k, v in ret.items():
                 ret.value[k] = op(first, ret.value[k])
             return ret
 
@@ -3404,12 +3658,12 @@ class NumberValue(Value):
         second_unit = second.unit
         if op == operator.__add__ or op == operator.__sub__:
             if first_unit == '%' and not second_unit:
-                second.units = { '%': _units_weights.get('%', 1), '_': '%' }
+                second.units = {'%': _units_weights.get('%', 1), '_': '%'}
                 second.value /= 100.0
             elif first_unit == '%' and second_unit != '%':
                 first = NumberValue(second) * first.value
             elif second_unit == '%' and not first_unit:
-                first.units = { '%': _units_weights.get('%', 1), '_': '%' }
+                first.units = {'%': _units_weights.get('%', 1), '_': '%'}
                 first.value /= 100.0
             elif second_unit == '%' and first_unit != '%':
                 second = NumberValue(first) * second.value
@@ -3420,6 +3674,7 @@ class NumberValue(Value):
         ret = ret.merge(second)
         ret.value = val
         return ret
+
     def merge(self, obj):
         obj = NumberValue(obj)
         self.value = obj.value
@@ -3431,6 +3686,7 @@ class NumberValue(Value):
         if _units_weights.get(self.units.get('_'), 1) <= _units_weights.get(unit, 1):
             self.units['_'] = unit
         return self
+
     def convert_to(self, type):
         val = self.value
         if not self.unit:
@@ -3438,8 +3694,9 @@ class NumberValue(Value):
         ret = NumberValue(val)
         if type == 'deg':
             ret.value = ret.value % 360.0
-        ret.units = { type: _units_weights.get(type, 1), '_': type }
+        ret.units = {type: _units_weights.get(type, 1), '_': type}
         return ret
+
     @property
     def unit(self):
         unit = ''
@@ -3448,7 +3705,7 @@ class NumberValue(Value):
                 units = self.units.copy()
                 _unit = units.pop('_')
                 units.setdefault(_unit, 0)
-                units[_unit] += _units_weights.get(_unit, 1) # Give more weight to the first unit ever set
+                units[_unit] += _units_weights.get(_unit, 1)  # Give more weight to the first unit ever set
             else:
                 units = self.units
             units = sorted(units, key=units.get)
@@ -3457,6 +3714,7 @@ class NumberValue(Value):
                 if unit:
                     break
         return unit
+
 
 class ListValue(Value):
     def __init__(self, tokens, separator=None):
@@ -3468,19 +3726,19 @@ class ListValue(Value):
         elif isinstance(tokens, ListValue):
             self.value = tokens.value.copy()
         elif isinstance(tokens, Value):
-            self.value = { 0: tokens }
+            self.value = {0: tokens}
         elif isinstance(tokens, dict):
             self.value = self._reorder_list(tokens)
         elif isinstance(tokens, (list, tuple)):
             self.value = dict(enumerate(tokens))
         else:
-            lst = [ i for i in to_str(tokens).split() if i ]
+            lst = [i for i in to_str(tokens).split() if i]
             if len(lst) == 1:
-                lst = [ i.strip() for i in lst[0].split(',') if i.strip() ]
+                lst = [i.strip() for i in lst[0].split(',') if i.strip()]
                 if len(lst) > 1:
                     separator = ',' if separator is None else separator
                 else:
-                    lst = [ tokens ]
+                    lst = [tokens]
             self.value = dict(enumerate(lst))
         if separator is None:
             separator = self.value.pop('_', None)
@@ -3495,11 +3753,12 @@ class ListValue(Value):
         except ValueError:
             return op(getattr(first, 'value', first), getattr(second, 'value', second))
         return op(first.value, second.value)
+
     @classmethod
     def _do_op(cls, first, second, op):
         if isinstance(first, ListValue) and isinstance(second, ListValue):
             ret = ListValue(first)
-            for k,v in ret.items():
+            for k, v in ret.items():
                 try:
                     ret.value[k] = op(ret.value[k], second.value[k])
                 except KeyError:
@@ -3507,37 +3766,49 @@ class ListValue(Value):
             return ret
         if isinstance(first, ListValue):
             ret = ListValue(first)
-            for k,v in ret.items():
+            for k, v in ret.items():
                 ret.value[k] = op(ret.value[k], second)
             return ret
         if isinstance(second, ListValue):
             ret = ListValue(second)
-            for k,v in ret.items():
+
+            for k, v in ret.items():
                 ret.value[k] = op(first, ret.value[k])
             return ret
+
     def _reorder_list(self, lst):
         return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
+
     def __nonzero__(self):
         return len(self)
+
     def __len__(self):
         return len(self.value) - (1 if '_' in self.value else 0)
+
     def __str__(self):
         return to_str(self.value)
+
     def __tuple__(self):
         return tuple(sorted((k, v) for k, v in self.value.items() if k != '_'))
+
     def __iter__(self):
         return iter(self.values())
+
     def values(self):
         return zip(*self.items())[1]
+
     def keys(self):
         return zip(*self.items())[1]
+
     def items(self):
         return sorted((k, v) for k, v in self.value.items() if k != '_')
+
     def first(self):
         try:
             return self.items()[0][1]
         except IndexError:
             return None
+
 
 class ColorValue(Value):
     def __init__(self, tokens):
@@ -3549,7 +3820,7 @@ class ColorValue(Value):
         elif isinstance(tokens, ParserValue):
             hex = tokens.value
             self.value = hex2rgba[len(hex)](hex)
-            self.types = { 'rgba': 1 }
+            self.types = {'rgba': 1}
         elif isinstance(tokens, ColorValue):
             self.value = tokens.value
             self.types = tokens.types.copy()
@@ -3559,11 +3830,11 @@ class ColorValue(Value):
         elif isinstance(tokens, (list, tuple)):
             c = tokens[:4]
             r = 255.0, 255.0, 255.0, 1.0
-            c = [ 0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4) ]
+            c = [0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4)]
             self.value = tuple(c)
             type = tokens[-1]
             if type in ('rgb', 'rgba', 'hsl', 'hsla'):
-                self.types = { type: 1 }
+                self.types = {type: 1}
         elif isinstance(tokens, (int, float)):
             val = float(tokens)
             self.value = (val, val, val, 1)
@@ -3582,27 +3853,29 @@ class ColorValue(Value):
                         if type in ('rgb', 'rgba'):
                             c = tuple(colors.split(','))
                             try:
-                                c = [ to_float(c[i]) for i in range(4) ]
-                                col = [ 0.0 if c[i] < 0 else 255.0 if c[i] > 255 else c[i] for i in range(3) ]
-                                col += [ 0.0 if c[3] < 0 else 1.0 if c[3] > 1 else c[3] ]
+                                c = [to_float(c[i]) for i in range(4)]
+                                col = [0.0 if c[i] < 0 else 255.0 if c[i] > 255 else c[i] for i in range(3)]
+                                col += [0.0 if c[3] < 0 else 1.0 if c[3] > 1 else c[3]]
                                 self.value = tuple(col)
-                                self.types = { type: 1 }
+                                self.types = {type: 1}
                             except:
                                 raise ValueError("Value is not a Color!")
                         elif type in ('hsl', 'hsla'):
                             c = colors.split(',')
                             try:
-                                c = [ to_float(c[i]) for i in range(4) ]
-                                col = [ c[0] % 360.0 ] / 360.0
-                                col += [ 0.0 if c[i] < 0 else 1.0 if c[i] > 1 else c[i] for i in range(1,4) ]
-                                self.value = tuple([ c * 255.0 for c in colorsys.hls_to_rgb(col[0], 0.999999 if col[2] == 1 else col[2], 0.999999 if col[1] == 1 else col[1]) ] + [ col[3] ])
-                                self.types = { type: 1 }
+                                c = [to_float(c[i]) for i in range(4)]
+                                col = [c[0] % 360.0] / 360.0
+                                col += [0.0 if c[i] < 0 else 1.0 if c[i] > 1 else c[i] for i in range(1, 4)]
+                                self.value = tuple([c * 255.0 for c in colorsys.hls_to_rgb(col[0], 0.999999 if col[2] == 1 else col[2], 0.999999 if col[1] == 1 else col[1])] + [col[3]])
+                                self.types = {type: 1}
                             except:
                                 raise ValueError("Value is not a Number!")
                     except:
                         raise ValueError("Value is not a Number!")
+
     def __repr__(self):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.types))
+
     def __str__(self):
         type = self.type
         c = self.value
@@ -3618,11 +3891,12 @@ class ColorValue(Value):
         _, _, b = b.partition('.')
         if c[3] == 1:
             if len(r) > 2 or len(g) > 2 or len(b) > 2:
-                return 'rgb(%s%%, %s%%, %s%%)' % (to_str(c[0]*100.0/255.0), to_str(c[1]*100.0/255.0), to_str(c[2]*100.0/255.0))
+                return 'rgb(%s%%, %s%%, %s%%)' % (to_str(c[0] * 100.0 / 255.0), to_str(c[1] * 100.0 / 255.0), to_str(c[2] * 100.0 / 255.0))
             return '#%02x%02x%02x' % (round(c[0]), round(c[1]), round(c[2]))
         if len(r) > 2 or len(g) > 2 or len(b) > 2:
-            return 'rgba(%s%%, %s%%, %s%%, %s)' % (to_str(c[0]*100.0/255.0), to_str(c[1]*100.0/255.0), to_str(c[2]*100.0/255.0), to_str(c[3]))
+            return 'rgba(%s%%, %s%%, %s%%, %s)' % (to_str(c[0] * 100.0 / 255.0), to_str(c[1] * 100.0 / 255.0), to_str(c[2] * 100.0 / 255.0), to_str(c[3]))
         return 'rgba(%d, %d, %d, %s)' % (round(c[0]), round(c[1]), round(c[2]), to_str(c[3]))
+
     @classmethod
     def _do_cmps(cls, first, second, op):
         try:
@@ -3631,11 +3905,12 @@ class ColorValue(Value):
         except ValueError:
             return op(getattr(first, 'value', first), getattr(second, 'value', second))
         return op(first.value, second.value)
+
     @classmethod
     def _do_op(cls, first, second, op):
         if isinstance(first, ListValue) and isinstance(second, ListValue):
             ret = ListValue(first)
-            for k,v in ret.items():
+            for k, v in ret.items():
                 try:
                     ret.value[k] = op(ret.value[k], second.value[k])
                 except KeyError:
@@ -3643,25 +3918,26 @@ class ColorValue(Value):
             return ret
         if isinstance(first, ListValue):
             ret = ListValue(first)
-            for k,v in ret.items():
+            for k, v in ret.items():
                 ret.value[k] = op(ret.value[k], second)
             return ret
         if isinstance(second, ListValue):
             ret = ListValue(second)
-            for k,v in ret.items():
+            for k, v in ret.items():
                 ret.value[k] = op(first, ret.value[k])
             return ret
 
         first = ColorValue(first)
         second = ColorValue(second)
-        val = [ op(first.value[i], second.value[i]) for i in range(4) ]
+        val = [op(first.value[i], second.value[i]) for i in range(4)]
         val[3] = (first.value[3] + second.value[3]) / 2
         c = val
         r = 255.0, 255.0, 255.0, 1.0
-        c = [ 0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4) ]
+        c = [0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4)]
         ret = ColorValue(None).merge(first).merge(second)
         ret.value = tuple(c)
         return ret
+
     def merge(self, obj):
         obj = ColorValue(obj)
         self.value = obj.value
@@ -3669,11 +3945,13 @@ class ColorValue(Value):
             self.types.setdefault(type, 0)
             self.types[type] += val
         return self
+
     def convert_to(self, type):
         val = self.value
         ret = ColorValue(val)
         ret.types[type] = 1
         return ret
+
     @property
     def type(self):
         type = ''
@@ -3684,6 +3962,7 @@ class ColorValue(Value):
                 if type:
                     break
         return type
+
 
 class QuotedStringValue(Value):
     def __init__(self, tokens):
@@ -3696,20 +3975,24 @@ class QuotedStringValue(Value):
             self.value = tokens.value
         else:
             self.value = to_str(tokens)
+
     def convert_to(self, type):
         return QuotedStringValue(self.value + type)
+
     def __str__(self):
         return '"%s"' % escape(self.value)
+
     @classmethod
     def _do_cmps(cls, first, second, op):
         first = QuotedStringValue(first)
         second = QuotedStringValue(second)
         return op(first.value, second.value)
+
     @classmethod
     def _do_op(cls, first, second, op):
         if isinstance(first, ListValue) and isinstance(second, ListValue):
             ret = ListValue(first)
-            for k,v in ret.items():
+            for k, v in ret.items():
                 try:
                     ret.value[k] = op(ret.value[k], second.value[k])
                 except KeyError:
@@ -3717,12 +4000,12 @@ class QuotedStringValue(Value):
             return ret
         if isinstance(first, ListValue):
             ret = ListValue(first)
-            for k,v in ret.items():
+            for k, v in ret.items():
                 ret.value[k] = op(ret.value[k], second)
             return ret
         if isinstance(second, ListValue):
             ret = ListValue(second)
-            for k,v in ret.items():
+            for k, v in ret.items():
                 ret.value[k] = op(first, ret.value[k])
             return ret
 
@@ -3738,14 +4021,17 @@ class QuotedStringValue(Value):
         ret = QuotedStringValue(None).merge(first).merge(second)
         ret.value = val
         return ret
+
     def merge(self, obj):
         obj = QuotedStringValue(obj)
         self.value = obj.value
         return self
 
+
 class StringValue(QuotedStringValue):
     def __str__(self):
         return self.value
+
     def __add__(self, other):
         if isinstance(other, ListValue):
             return self._do_op(self, other, operator.__add__)
@@ -3756,6 +4042,7 @@ class StringValue(QuotedStringValue):
         if not isinstance(other, (QuotedStringValue, basestring)):
             return string_class(self.value + '+' + other.value)
         return string_class(self.value + other.value)
+
     def __radd__(self, other):
         if isinstance(other, ListValue):
             return self._do_op(other, self, operator.__add__)
@@ -3909,7 +4196,8 @@ fnct = {
     'pi:0': _pi,
 }
 for u in _units:
-    fnct[u+':2'] = _convert_to
+    fnct[u + ':2'] = _convert_to
+
 
 def interpolate(v, R):
     C, O = R[CONTEXT], R[OPTIONS]
@@ -3920,13 +4208,14 @@ def interpolate(v, R):
             vi = _vi
     return vi
 
+
 def call(name, args, R, is_function=True):
     C, O = R[CONTEXT], R[OPTIONS]
     # Function call:
     _name = name.replace('_', '-')
     s = args and args.value.items() or []
-    _args = [ v for n,v in s if isinstance(n, int) ]
-    _kwargs = dict( (str(n[1:]).replace('-', '_'), v) for n,v in s if not isinstance(n, int) and n != '_' )
+    _args = [v for n, v in s if isinstance(n, int)]
+    _kwargs = dict((str(n[1:]).replace('-', '_'), v) for n, v in s if not isinstance(n, int) and n != '_')
     _fn_a = '%s:%d' % (_name, len(_args))
     #print >>sys.stderr, '#', _fn_a, _args, _kwargs
     _fn_n = '%s:n' % _name
@@ -3948,19 +4237,21 @@ def call(name, args, R, is_function=True):
         sp = args and args.value.get('_') or ''
         if is_function:
             if not _css_function_re.match(_name):
-                log.error("Required function not found (\"%s\":%d): %s", R[FILE] or '<unknown>', R[LINE] or 0, _fn_a)
-            _args = (sp + ' ').join( to_str(v) for n,v in s if isinstance(n, int) )
-            _kwargs = (sp + ' ').join( '%s: %s' % (n, to_str(v)) for n,v in s if not isinstance(n, int) and n != '_' )
+                log.error("(%s) Required function not found: %s", R[LINENO] or 0, _fn_a)
+            _args = (sp + ' ').join(to_str(v) for n, v in s if isinstance(n, int))
+            _kwargs = (sp + ' ').join('%s: %s' % (n, to_str(v)) for n, v in s if not isinstance(n, int) and n != '_')
             if _args and _kwargs:
                 _args += (sp + ' ')
             # Function not found, simply write it as a string:
             node = StringValue(name + '(' + _args + _kwargs + ')')
         else:
-            node = StringValue((sp + ' ').join( str(v) for n,v in s if n != '_' ))
+            node = StringValue((sp + ' ').join(str(v) for n, v in s if n != '_'))
     return node
+
 
 ################################################################################
 # Parser
+
 
 class SyntaxError(Exception):
     """
@@ -3970,15 +4261,20 @@ class SyntaxError(Exception):
         Exception.__init__(self)
         self.pos = pos
         self.msg = msg
+
     def __repr__(self):
-        if self.pos < 0: return "#<syntax-error>"
-        else: return "SyntaxError[@ char %s: %s]" % (repr(self.pos), self.msg)
+        if self.pos < 0:
+            return "#<syntax-error>"
+        else:
+            return "SyntaxError[@ char %s: %s]" % (repr(self.pos), self.msg)
+
 
 class NoMoreTokens(Exception):
     """
     Another exception object, for when we run out of tokens
     """
     pass
+
 
 class Scanner(object):
     def __init__(self, patterns, ignore, input=None):
@@ -3996,7 +4292,7 @@ class Scanner(object):
         if patterns is not None:
             self.patterns = []
             for k, r in patterns:
-                self.patterns.append( (k, re.compile(r)) )
+                self.patterns.append((k, re.compile(r)))
 
     def reset(self, input):
         self.tokens = []
@@ -4020,7 +4316,7 @@ class Scanner(object):
         are allowed, or 0 for any token.
         """
         tokens_len = len(self.tokens)
-        if i == tokens_len: # We are at the end, ge the next...
+        if i == tokens_len:  # We are at the end, ge the next...
             tokens_len += self.scan(restrict)
         if i < tokens_len:
             if restrict and self.restrictions[i] and restrict > self.restrictions[i]:
@@ -4088,6 +4384,7 @@ class Scanner(object):
                 break
         return 0
 
+
 class Parser(object):
     def __init__(self, scanner):
         self._scanner = scanner
@@ -4119,8 +4416,9 @@ class Parser(object):
         self._pos -= min(n, self._pos)
         self._scanner.rewind(self._pos)
 
+
 ################################################################################
-#'(?<!\\s)(?:'+'|'.join(_units)+')(?![-\w])'
+#'(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'
 ## Grammar compiled using Yapps:
 class CalculatorScanner(Scanner):
     patterns = [
@@ -4147,7 +4445,7 @@ class CalculatorScanner(Scanner):
         ('GT', re.compile('>')),
         ('STR', re.compile("'[^']*'")),
         ('QSTR', re.compile('"[^"]*"')),
-        ('UNITS', re.compile('(?<!\\s)(?:'+'|'.join(_units)+')(?![-\\w])')),
+        ('UNITS', re.compile('(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])')),
         ('NUM', re.compile('(?:\\d+(?:\\.\\d*)?|\\.\\d+)')),
         ('BOOL', re.compile('(?<![-\\w])(?:true|false)(?![-\\w])')),
         ('COLOR', re.compile('#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])')),
@@ -4375,6 +4673,8 @@ class Calculator(Parser):
     expr_lst_rsts_ = None
 
 ### Grammar ends.
+################################################################################
+
 
 def eval_expr(expr, rule, raw=False):
     #print >>sys.stderr, '>>',expr,'<<'
@@ -4396,7 +4696,7 @@ def eval_expr(expr, rule, raw=False):
         raise
     except:
         if not DEBUG:
-            log.exception("Exception rised! (\"%s\":%d)" % (rule[FILE] or '<unknown>', rule[LINE] or 0,))
+            log.exception("(%s) Exception rised!" % (rule[LINENO] or 0,))
             return#@@@#
         raise
 __doc__ = """
@@ -5574,6 +5874,7 @@ Sass generates only selectors that are likely to be useful.
 --------------------------------------------------------------------------------
 """
 
+
 def main():
     from optparse import OptionGroup, OptionParser, SUPPRESS_HELP
 
@@ -5652,22 +5953,28 @@ def main():
         css = Scss()
         context = css._scss_vars
         options = css._scss_opts
-        rule = [ None, None, '', set(), context, options, '', [], './', False, None ]
+        rule = spawn_rule(context=context, options=options)
         print 'Welcome to ' + BUILD_INFO + " interactive shell"
         while True:
-            try: s = raw_input('>>> ').strip()
-            except EOFError: print ''; break
-            except KeyboardInterrupt: print''; break
-            if s in ('exit', 'quit'): break
+            try:
+                s = raw_input('>>> ').strip()
+            except EOFError:
+                print
+                break
+            except KeyboardInterrupt:
+                print
+                break
+            if s in ('exit', 'quit'):
+                break
             for s in s.split(';'):
-                s = css.load_string(s.strip())
+                s = css.load_string(s.strip(), '<console>')
                 if not s:
                     continue
                 elif s.startswith('@'):
                     properties = []
                     children = deque()
-                    rule = [ 'string', None, s, set(), context, options, '', properties, './', False, None ]
-                    code, name = (s.split(None, 1)+[''])[:2]
+                    spawn_rule(fileid='string', context=context, options=options, properties=properties)
+                    code, name = (s.split(None, 1) + [''])[:2]
                     if code == '@option':
                         css._settle_options(rule, [''], set(), children, None, None, s, None, code, name)
                         continue
@@ -5694,7 +6001,7 @@ def main():
                     if m:
                         name = m.group(2)
                         code = m.group(3)
-                        name = name and name.strip().rstrip('s') # remove last 's' as in functions
+                        name = name and name.strip().rstrip('s')  # remove last 's' as in functions
                         code = code and code.strip()
                         if not name:
                             pprint(sorted(['vars', 'options', 'mixins', 'functions']))
@@ -5719,10 +6026,12 @@ def main():
                                 d = dict((k, v) for k, v in options.items() if not k.startswith('@'))
                                 pprint(d)
                         elif name in ('m', 'mix', 'mixin', 'f', 'func', 'funct', 'function'):
-                            if name.startswith('m'): name = 'mixin'
-                            elif name.startswith('f'): name = 'function'
+                            if name.startswith('m'):
+                                name = 'mixin'
+                            elif name.startswith('f'):
+                                name = 'function'
                             if code == '*':
-                                d = dict((k[len(name)+2:], v) for k, v in options.items() if k.startswith('@' + name + ' '))
+                                d = dict((k[len(name) + 2:], v) for k, v in options.items() if k.startswith('@' + name + ' '))
                                 pprint(sorted(d))
                             elif code:
                                 d = dict((k, v) for k, v in options.items() if k.startswith('@' + name + ' ') and code in k)
@@ -5732,15 +6041,15 @@ def main():
                                     fn_name, _, _ = k.partition(':')
                                     if fn_name not in seen:
                                         seen.add(fn_name)
-                                        print fn_name + '(' + ', '.join( p + (': ' + mixin[1].get(p) if p in mixin[1] else '') for p in mixin[0] ) + ') {'
+                                        print fn_name + '(' + ', '.join(p + (': ' + mixin[1].get(p) if p in mixin[1] else '') for p in mixin[0]) + ') {'
                                         print '  ' + '\n  '.join(l for l in mixin[2].split('\n'))
                                         print '}'
                             else:
-                                d = dict((k[len(name)+2:].split(':')[0], v) for k, v in options.items() if k.startswith('@' + name + ' '))
+                                d = dict((k[len(name) + 2:].split(':')[0], v) for k, v in options.items() if k.startswith('@' + name + ' '))
                                 pprint(sorted(d))
                         continue
                 elif s.startswith('$') and (':' in s or '=' in s):
-                    prop, value = [ a.strip() for a in _prop_split_re.split(s, 1) ]
+                    prop, value = [a.strip() for a in _prop_split_re.split(s, 1)]
                     prop = css.do_glob_math(prop, context, options, rule, True)
                     value = css.calculate(value, context, options, rule)
                     context[prop] = value
