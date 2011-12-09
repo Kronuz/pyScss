@@ -3083,6 +3083,13 @@ def _length(*lst):
     return NumberValue(len(lst))
 
 
+def _max(*lst):
+    if len(lst) == 1 and isinstance(lst[0], ListValue):
+        lst = lst[0]
+    lst = ListValue(lst).value
+    return max(lst.values())
+
+
 def _append(lst, val, separator=None):
     separator = separator and StringValue(separator).value
     ret = ListValue(lst, separator)
@@ -4161,6 +4168,7 @@ fnct = {
     'compact:n': _compact,
     '-compass-slice:3': __compass_slice,
     'nth:2': _nth,
+    'max:n': _max,
     '-compass-nth:2': _nth,
     'first-value-of:n': _first_value_of,
     'join:2': _join,
