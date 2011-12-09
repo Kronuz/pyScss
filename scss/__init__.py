@@ -2975,10 +2975,9 @@ def _grad_point(*p):
 
 
 def __compass_list(*args):
-    if len(args) == 1:
-        return ListValue(args[0])
-    else:
-        return ListValue(args)
+    if len(args) == 1 and isinstance(args[0], ListValue):
+        args = args[0]
+    return ListValue(args)
 
 
 def __compass_space_list(*lst):
@@ -3034,6 +3033,8 @@ def __compass_slice(lst, start_index, end_index=None):
 
 
 def _first_value_of(*lst):
+    if len(lst) == 1 and isinstance(lst[0], ListValue):
+        lst = lst[0]
     ret = ListValue(lst).first()
     return ret.__class__(ret)
 
@@ -3077,7 +3078,7 @@ def _join(lst1, lst2, separator=None):
 
 def _length(*lst):
     if len(lst) == 1 and isinstance(lst[0], ListValue):
-        return NumberValue(len(lst[0]))
+        lst = lst[0]
     lst = ListValue(lst)
     return NumberValue(len(lst))
 
@@ -3085,7 +3086,9 @@ def _length(*lst):
 def _append(lst, val, separator=None):
     separator = separator and StringValue(separator).value
     ret = ListValue(lst, separator)
-    ret.value[len(ret)] = val
+    val = ListValue(val)
+    for v in val:
+        ret.value[len(ret)] = v
     return ret
 
 
@@ -3237,10 +3240,18 @@ def _elements_of_type(display):
 
 
 def _nest(*arguments):
-    ret = [s.strip() for s in StringValue(arguments[0]).value.split(',') if s.strip()]
+    if isinstance(arguments[0], ListValue):
+        lst = arguments[0].values()
+    else:
+        lst = StringValue(arguments[0]).value.split(',')
+    ret = [s.strip() for s in lst if s.strip()]
     for arg in arguments[1:]:
+        if isinstance(arg, ListValue):
+            lst = arg.values()
+        else:
+            lst = StringValue(arg).value.split(',')
         new_ret = []
-        for s in StringValue(arg).value.split(','):
+        for s in lst:
             s = s.strip()
             if s:
                 for r in ret:
@@ -3253,9 +3264,12 @@ def _nest(*arguments):
 
 
 def _append_selector(selector, to_append):
-    selector = StringValue(selector)
+    if isinstance(selector, ListValue):
+        lst = selector.values()
+    else:
+        lst = StringValue(selector).value.split(',')
     to_append = StringValue(to_append).value.strip()
-    ret = sorted(set(s.strip() + to_append for s in selector.value.split(',') if s.strip()))
+    ret = sorted(set(s.strip() + to_append for s in lst if s.strip()))
     ret = dict(enumerate(ret))
     ret['_'] = ','
     return ret
