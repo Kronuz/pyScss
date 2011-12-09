@@ -554,7 +554,7 @@ class Scss(object):
             selprop, _ = _strip_selprop(selprop, 0)
             return selprop
 
-        lineno = 0
+        lineno = "<unknown>:0"
 
         par = 0
         instr = None
@@ -634,11 +634,11 @@ class Scss(object):
                 if _selectors:
                     yield lineno, _selectors, _codestr
                 if par:
-                    log.error("Missing closing parenthesis somewhere in block: '%s'", _selectors)
+                    log.error("(%s) Missing closing parenthesis somewhere in block: '%s'", lineno, _selectors)
                 elif instr:
-                    log.error("Missing closing string somewhere in block: '%s'", _selectors)
+                    log.error("(%s) Missing closing string somewhere in block: '%s'", lineno, _selectors)
                 else:
-                    log.error("Block never closed: '%s'", _selectors)
+                    log.error("(%s) Block never closed: '%s'", lineno, _selectors)
                 #FIXME: raise exception? (block not closed!)
                 return
         losestr = str[lose:]
@@ -767,16 +767,17 @@ class Scss(object):
         return final_cont
     compile = Compilation
 
-    def load_string(self, str, filename):
-        filename = filename.encode('utf-8')
+    def load_string(self, str, filename=None):
+        if filename is not None:
+            filename = filename.encode('utf-8')
 
-        str += '\n'
-        cnt = {'cnt': 1}
+            str += '\n'
+            cnt = {'cnt': 1}
 
-        def _cnt(m):
-            cnt['cnt'] += 1
-            return "\n%s:%d" % (filename, cnt['cnt']) + SEPARATOR
-        str = '%s:%d' % (filename, 1) + SEPARATOR + _nl_re.sub(_cnt, str)
+            def _cnt(m):
+                cnt['cnt'] += 1
+                return "\n%s:%d" % (filename, cnt['cnt']) + SEPARATOR
+            str = '%s:%d' % (filename, 1) + SEPARATOR + _nl_re.sub(_cnt, str)
 
         # remove empty lines
         str = _nl_num_nl_re.sub('\n', str)
@@ -5967,7 +5968,7 @@ def main():
             if s in ('exit', 'quit'):
                 break
             for s in s.split(';'):
-                s = css.load_string(s.strip(), '<console>')
+                s = css.load_string(s.strip())
                 if not s:
                     continue
                 elif s.startswith('@'):
