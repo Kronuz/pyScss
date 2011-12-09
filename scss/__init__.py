@@ -3863,7 +3863,8 @@ class ColorValue(Value):
                 except ValueError:
                     try:
                         hex.replace(' ', '').lower()
-                        type, _, colors = hex.partition('(').rstrip(')')
+                        type, _, colors = hex.partition('(')
+                        colors = colors.rstrip(')')
                         if type in ('rgb', 'rgba'):
                             c = tuple(colors.split(','))
                             try:
