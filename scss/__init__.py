@@ -713,14 +713,6 @@ class Scss(object):
                         v = to_str(v)
                         if _dequote and m.group(1):
                             v = dequote(v)
-                        if ' ' in v:  # FIXME: Perhaps this "if" block is no longer needed?:
-                            try:
-                                if cont[m.start() - 1] != '(' or cont[m.end()] != ')':
-                                    v = '(' + depar(v) + ')'
-                                else:
-                                    v = depar(v)
-                            except IndexError:
-                                v = '(' + depar(v) + ')'
                     elif v is not None:
                         v = to_str(v)
                     else:
