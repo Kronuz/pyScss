@@ -686,11 +686,11 @@ class Scss(object):
         return ','.join(sorted(selectors))
 
     def apply_vars(self, cont, context, options=None, rule=None, _dequote=False):
-        if '$' in cont:
+        if isinstance(cont, basestring) and '$' in cont:
             if cont in context:
                 # Optimization: the full cont is a variable in the context,
                 # flatten the interpolation and use it:
-                while cont in context:
+                while isinstance(cont, basestring) and cont in context:
                     _cont = context[cont]
                     if _cont == cont:
                         break
@@ -699,7 +699,7 @@ class Scss(object):
                 # Flatten the context (no variables mapping to variables)
                 flat_context = {}
                 for k, v in context.items():
-                    while v in context:
+                    while isinstance(v, basestring) and v in context:
                         _v = context[v]
                         if _v == v:
                             break
