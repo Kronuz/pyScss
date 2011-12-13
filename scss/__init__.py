@@ -5864,6 +5864,21 @@ h2 {
 h1 {
   background: yellow;
 }
+
+Issue #32 test
+>>> print css.compile('''
+... @option compress:no, short_colors: no;
+... @media (max-width:1024px) {
+...   .wrap {
+...     padding: 10px 0;
+...   }
+... }
+... ''') #doctest: +NORMALIZE_WHITESPACE
+@media (max-width:1024px) {
+  .wrap {
+    padding: 10px 0;
+  }
+}
 """
 """
 ADVANCED STUFF, NOT SUPPORTED (FROM SASS):
