@@ -973,7 +973,7 @@ class Scss(object):
                         m_vars.update(mixin[1])
                         m_codestr = mixin[2]
                         for i, a in enumerate(args):
-                            m_vars[m_params[i]] = str(a)
+                            m_vars[m_params[i]] = unicode(a)
                         m_vars.update(kwargs)
                         _options = rule[OPTIONS].copy()
                         _rule = spawn_rule(R, codestr=m_codestr, context=m_vars, options=_options, deps=set(), properties=[], final=False, lineno=c_lineno)
@@ -986,7 +986,7 @@ class Scss(object):
                 mixin = _mixin
             # Insert as many @mixin options as the default parameters:
             while len(new_params):
-                rule[OPTIONS][code + ' ' + funct + ':' + str(len(new_params))] = mixin
+                rule[OPTIONS][code + ' ' + funct + ':' + unicode(len(new_params))] = mixin
                 param = new_params.pop()
                 if param not in defaults:
                     break
@@ -1016,7 +1016,7 @@ class Scss(object):
                     num_args += 1
             if param:
                 new_params[varname] = param
-        mixin = rule[OPTIONS].get('@mixin ' + funct + ':' + str(num_args))
+        mixin = rule[OPTIONS].get('@mixin ' + funct + ':' + unicode(num_args))
         if not mixin:
             # Fallback to single parmeter:
             mixin = rule[OPTIONS].get('@mixin ' + funct + ':1')
@@ -1241,7 +1241,7 @@ class Scss(object):
 
             for i in rev(range(frm, through + 1)):
                 rule[CODESTR] = c_codestr
-                rule[CONTEXT][var] = str(i)
+                rule[CONTEXT][var] = unicode(i)
                 self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
 
     @print_timing(10)
@@ -1697,7 +1697,7 @@ class Scss(object):
         return __calculate_expr
 
     def do_glob_math(self, cont, context, options, rule, _dequote=False):
-        cont = str(cont)
+        cont = unicode(cont)
         if '#{' not in cont:
             return cont
         cont = _expr_glob_re.sub(self._calculate_expr(context, options, rule, _dequote), cont)
@@ -1758,7 +1758,7 @@ def to_str(num):
         return 'true' if num else 'false'
     elif num is None:
         return ''
-    return str(num)
+    return unicode(num)
 
 
 def to_float(num):
@@ -2246,6 +2246,10 @@ def _radial_gradient(*args):
     ret.to__css2 = to__css2
 
     def to__webkit():
+        return StringValue('-webkit-' + to__s)
+    ret.to__webkit = to__webkit
+
+    def to__owg():
         args = [
             'radial',
             _grad_point(position_and_angle) if position_and_angle is not None else 'center',
@@ -2256,7 +2260,7 @@ def _radial_gradient(*args):
         args.extend('color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops)
         ret = '-webkit-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
         return StringValue(ret)
-    ret.to__webkit = to__webkit
+    ret.to__owg = to__owg
 
     def to__svg():
         return _radial_svg_gradient(color_stops, position_and_angle or 'center')
@@ -2301,6 +2305,10 @@ def _linear_gradient(*args):
     ret.to__css2 = to__css2
 
     def to__webkit():
+        return StringValue('-webkit-' + to__s)
+    ret.to__webkit = to__webkit
+
+    def to__owg():
         args = [
             'linear',
             _position(position_and_angle or 'center top'),
@@ -2309,7 +2317,7 @@ def _linear_gradient(*args):
         args.extend('color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops)
         ret = '-webkit-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
         return StringValue(ret)
-    ret.to__webkit = to__webkit
+    ret.to__owg = to__owg
 
     def to__svg():
         return _linear_svg_gradient(color_stops, position_and_angle or 'top')
@@ -2607,12 +2615,12 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
     if not inline:
         grid_name = 'grid_'
         if left_gutter:
-            grid_name += str(int(left_gutter)) + '+'
-        grid_name += str(int(width))
+            grid_name += unicode(int(left_gutter)) + '+'
+        grid_name += unicode(int(width))
         if right_gutter:
-            grid_name += '+' + str(int(right_gutter))
+            grid_name += '+' + unicode(int(right_gutter))
         if height and height > 1:
-            grid_name += 'x' + str(int(height))
+            grid_name += 'x' + unicode(int(height))
         key = (columns, grid_color, baseline_color, background_color)
         key = grid_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
@@ -2752,7 +2760,7 @@ def _sprite_position(map, sprite, offset_x=None, offset_y=None):
     if sprite:
         x = None
         if offset_x is not None and not isinstance(offset_x, NumberValue):
-            x = str(offset_x)
+            x = unicode(offset_x)
         if x not in ('left', 'right', 'center'):
             if x:
                 offset_x = None
@@ -2761,7 +2769,7 @@ def _sprite_position(map, sprite, offset_x=None, offset_y=None):
                 x -= sprite[2]
         y = None
         if offset_y is not None and not isinstance(offset_y, NumberValue):
-            y = str(offset_y)
+            y = unicode(offset_y)
         if y not in ('top', 'bottom', 'center'):
             if y:
                 offset_y = None
@@ -3157,6 +3165,8 @@ def __pie(*args):
 def __webkit(*args):
     return _prefix('_webkit', *args)
 
+def __owg(*args):
+    return _prefix('_owg', *args)
 
 def __khtml(*args):
     return _prefix('_khtml', *args)
@@ -3303,7 +3313,7 @@ def _headers(frm=None, to=None):
             to = 6 if to is None else int(getattr(to, 'value', to))
         except ValueError:
             to = 6
-    ret = ['h' + str(i) for i in range(frm, to + 1)]
+    ret = ['h' + unicode(i) for i in range(frm, to + 1)]
     ret = dict(enumerate(ret))
     ret['_'] = ','
     return ret
@@ -3326,7 +3336,7 @@ def _enumerate(prefix, frm, through, separator='-'):
     else:
         rev = lambda x: x
     if prefix:
-        ret = [prefix + separator + str(i) for i in rev(range(frm, through + 1))]
+        ret = [prefix + separator + unicode(i) for i in rev(range(frm, through + 1))]
     else:
         ret = [NumberValue(i) for i in rev(range(frm, through + 1))]
     ret = dict(enumerate(ret))
@@ -4161,6 +4171,7 @@ fnct = {
     '-css2:n': __css2,
     '-pie:n': __pie,
     '-webkit:n': __webkit,
+    '-owg:n': __owg,
     '-ms:n': __ms,
     '-o:n': __o,
 
@@ -4232,7 +4243,7 @@ def call(name, args, R, is_function=True):
     _name = name.replace('_', '-')
     s = args and args.value.items() or []
     _args = [v for n, v in s if isinstance(n, int)]
-    _kwargs = dict((str(n[1:]).replace('-', '_'), v) for n, v in s if not isinstance(n, int) and n != '_')
+    _kwargs = dict((unicode(n[1:]).replace('-', '_'), v) for n, v in s if not isinstance(n, int) and n != '_')
     _fn_a = '%s:%d' % (_name, len(_args))
     #print >>sys.stderr, '#', _fn_a, _args, _kwargs
     _fn_n = '%s:n' % _name
@@ -4262,7 +4273,7 @@ def call(name, args, R, is_function=True):
             # Function not found, simply write it as a string:
             node = StringValue(name + '(' + _args + _kwargs + ')')
         else:
-            node = StringValue((sp + ' ').join(str(v) for n, v in s if n != '_'))
+            node = StringValue((sp + ' ').join(unicode(v) for n, v in s if n != '_'))
     return node
 
 
