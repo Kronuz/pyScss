@@ -5879,6 +5879,18 @@ Issue #32 test
     padding: 10px 0;
   }
 }
+
+Issue #40 test
+>>> print css.compile('''
+... @option compress:no, short_colors: no;
+... a {
+...   background: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwA...");
+... }
+... ''') #doctest: +NORMALIZE_WHITESPACE
+a {
+  background: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwA...");
+}
+
 """
 """
 ADVANCED STUFF, NOT SUPPORTED (FROM SASS):
