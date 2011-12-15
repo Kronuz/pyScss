@@ -331,6 +331,7 @@ _sl_comment_re = re.compile(r'(?<!\w{2}:)\/\/.*')
 _zero_units_re = re.compile(r'\b0(' + '|'.join(map(re.escape, _zero_units)) + r')(?!\w)', re.IGNORECASE)
 _zero_re = re.compile(r'\b0\.(?=\d)')
 
+_escape_chars_re = re.compile(r'([^-a-zA-Z0-9_])')
 _variable_re = re.compile('^\\$[-a-zA-Z0-9_]+$')
 _interpolate_re = re.compile(r'(#\{\s*)?(\$[-\w]+)(?(1)\s*\})')
 _spaces_re = re.compile(r'\s+')
@@ -387,7 +388,7 @@ OPTIONS = 5
 SELECTORS = 6
 PROPERTIES = 7
 PATH = 8
-FILE = 9
+INDEX = 9
 LINENO = 10
 FINAL = 11
 MEDIA = 12
@@ -401,7 +402,7 @@ RULE_VARS = {
     'SELECTORS': SELECTORS,
     'PROPERTIES': PROPERTIES,
     'PATH': PATH,
-    'FILE': FILE,
+    'INDEX': INDEX,
     'LINENO': LINENO,
     'FINAL': FINAL,
     'MEDIA': MEDIA,
@@ -415,7 +416,7 @@ def spawn_rule(rule=None, **kwargs):
         rule[SELECTORS] = ''
         rule[PROPERTIES] = []
         rule[PATH] = './'
-        rule[FILE] = '<unknown>'
+        rule[INDEX] = {}
         rule[LINENO] = 0
         rule[FINAL] = False
     else:
@@ -482,7 +483,8 @@ class Scss(object):
     construct = 'self'
 
     def __init__(self):
-        self.scss_files = {}
+        self.scss_files = {}  # Files to be compiled ({file: content, ...})
+        self.scss_index = {0: '<unknown>:0'}
         self.scss_vars = _default_scss_vars.copy()
         self.scss_opts = _default_scss_opts.copy()
         self.reset()
@@ -499,6 +501,7 @@ class Scss(object):
         self._scss_vars = self.scss_vars.copy()
         self._scss_opts = self.scss_opts.copy()
         self._scss_files = self.scss_files.copy()
+        self._scss_index = self.scss_index.copy()
 
         self._contexts = {}
         self._replaces = {}
@@ -545,6 +548,7 @@ class Scss(object):
             _lineno, _sep, selprop = selprop.partition(SEPARATOR)
             if _sep == SEPARATOR:
                 lineno = _lineno.strip()
+                lineno = int(lineno) if lineno else 0
             else:
                 selprop = _lineno
             selprop = _nl_num_re.sub('\n', selprop)
@@ -555,7 +559,7 @@ class Scss(object):
             selprop, _ = _strip_selprop(selprop, 0)
             return selprop
 
-        lineno = "<unknown>:0"
+        lineno = 0
 
         par = 0
         instr = None
@@ -635,13 +639,11 @@ class Scss(object):
                 if _selectors:
                     yield lineno, _selectors, _codestr
                 if par:
-                    log.error("(%s) Missing closing parenthesis somewhere in block: '%s'", lineno, _selectors)
+                    raise Exception("Missing closing parenthesis somewhere in block: '%s'" % _selectors)
                 elif instr:
-                    log.error("(%s) Missing closing string somewhere in block: '%s'", lineno, _selectors)
+                    raise Exception("Missing closing string somewhere in block: '%s'" % _selectors)
                 else:
-                    log.error("(%s) Block never closed: '%s'", lineno, _selectors)
-                #FIXME: raise exception? (block not closed!)
-                return
+                    raise Exception("Block never closed: '%s'" % _selectors)
         losestr = str[lose:]
         for _property in losestr.split(';'):
             _property, lineno = _strip_selprop(_property, lineno)
@@ -731,7 +733,7 @@ class Scss(object):
         self.reset()
 
         if input_scss is not None:
-            self._scss_files = {'string': input_scss}
+            self._scss_files = {'<string>': input_scss}
 
         # Compile
         for fileid, str in self._scss_files.iteritems():
@@ -750,7 +752,7 @@ class Scss(object):
 
         final_cont = ''
         for fileid in self.css_files:
-            if fileid != 'string':
+            if fileid != '<string>':
                 final_cont += '/* Generated from: ' + fileid + ' */\n'
             fcont = self.create_css(fileid)
             final_cont += fcont
@@ -760,49 +762,60 @@ class Scss(object):
         return final_cont
     compile = Compilation
 
-    def load_string(self, str, filename=None):
+    def load_string(self, content, filename=None):
         if filename is not None:
             filename = filename.encode('utf-8')
 
-            str += '\n'
-            cnt = {'cnt': 1}
+            content += '\n'
+
+            idx = {
+                'next_id': len(self._scss_index),
+                'line': 1,
+            }
 
             def _cnt(m):
-                cnt['cnt'] += 1
-                return "\n%s:%d" % (filename, cnt['cnt']) + SEPARATOR
-            str = '%s:%d' % (filename, 1) + SEPARATOR + _nl_re.sub(_cnt, str)
+                idx['line'] += 1
+                lineno = '%s:%d' % (filename, idx['line'])
+                next_id = idx['next_id']
+                self._scss_index[next_id] = lineno
+                idx['next_id'] += 1
+                return '\n' + str(next_id) + SEPARATOR
+            lineno = '%s:%d' % (filename, idx['line'])
+            next_id = idx['next_id']
+            self._scss_index[next_id] = lineno
+            content = str(next_id) + SEPARATOR + _nl_re.sub(_cnt, content)
 
         # remove empty lines
-        str = _nl_num_nl_re.sub('\n', str)
+        content = _nl_num_nl_re.sub('\n', content)
 
         # protects content: "..." strings
-        str = _strings_re.sub(lambda m: _reverse_safe_strings_re.sub(lambda n: _reverse_safe_strings[n.group(0)], m.group(0)), str)
+        content = _strings_re.sub(lambda m: _reverse_safe_strings_re.sub(lambda n: _reverse_safe_strings[n.group(0)], m.group(0)), content)
 
         # removes multiple line comments
-        str = _ml_comment_re.sub('', str)
+        content = _ml_comment_re.sub('', content)
 
         # removes inline comments, but not :// (protocol)
-        str = _sl_comment_re.sub('', str)
+        content = _sl_comment_re.sub('', content)
 
-        str = _safe_strings_re.sub(lambda m: _safe_strings[m.group(0)], str)
+        content = _safe_strings_re.sub(lambda m: _safe_strings[m.group(0)], content)
 
         # expand the space in rules
-        str = _expand_rules_space_re.sub(' {', str)
+        content = _expand_rules_space_re.sub(' {', content)
 
         # collapse the space in properties blocks
-        str = _collapse_properties_space_re.sub(r'\1{', str)
+        content = _collapse_properties_space_re.sub(r'\1{', content)
 
         # to do math operations, we need to get the color's hex values (for color names):
         def _pp(m):
             v = m.group(0)
             return _colors.get(v, v)
-        str = _colors_re.sub(_pp, str)
+        content = _colors_re.sub(_pp, content)
 
-        return str
+        return content
 
     def parse_scss_string(self, fileid, str, filename):
         str = self.load_string(str, filename)
-        rule = spawn_rule(fileid=fileid, codestr=str, context=self._scss_vars, options=self._scss_opts, file=filename)
+        rule = spawn_rule(fileid=fileid, codestr=str, context=self._scss_vars, options=self._scss_opts, index=self._scss_index)
         self.children.append(rule)
         return str
 
@@ -912,7 +925,7 @@ class Scss(object):
                     rule[CODESTR] = self.construct + ' {' + c_codestr + '}'
                     self.manage_children(rule, p_selectors, p_parents, p_children, scope, _media)
                 elif c_codestr is None:
-                    rule[PROPERTIES].append((c_property, None))
+                    rule[PROPERTIES].append((c_lineno, c_property, None))
                 elif scope is None:  # needs to have no scope to crawl down the nested rules
                     self._nest_rules(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
             ####################################################################
@@ -1043,7 +1056,7 @@ class Scss(object):
             _rule = spawn_rule(rule, codestr=m_codestr, context=_context, lineno=c_lineno)
             self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
         else:
-            log.error("(%s) Required mixin not found: %s:%d", rule[LINENO] or 0, funct, num_args)
+            log.error("Required mixin not found: %s:%d (%s)", funct, num_args, rule[INDEX][rule[LINENO]])
 
     @print_timing(10)
     def _do_import(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
@@ -1099,11 +1112,11 @@ class Scss(object):
                     if i_codestr is None:
                         log.warn("File to import not found or unreadable: '%s'\nLoad paths:\n\t%s", filename, "\n\t".join(load_paths))
                     else:
-                        _rule = spawn_rule(rule, codestr=i_codestr, path=full_filename, file=name, lineno=c_lineno)
+                        _rule = spawn_rule(rule, codestr=i_codestr, path=full_filename, lineno=c_lineno)
                         self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
                         rule[OPTIONS]['@import ' + name] = True
         else:
-            rule[PROPERTIES].append((c_property, None))
+            rule[PROPERTIES].append((c_lineno, c_property, None))
 
     @print_timing(10)
     def _do_magic_import(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
@@ -1189,7 +1202,7 @@ class Scss(object):
         """
         if code != '@if':
             if '@if' not in rule[OPTIONS]:
-                log.error("(%s) @else with no @if (1)", rule[LINENO] or 0)
+                log.error("@else with no @if (%s)", rule[INDEX][rule[LINENO]])
             val = not rule[OPTIONS].get('@if', True)
             name = c_property[9:].strip()
         else:
@@ -1208,7 +1221,7 @@ class Scss(object):
         Implements @else
         """
         if '@if' not in rule[OPTIONS]:
-            log.error("(%s) @else with no @if (2)", rule[LINENO] or 0)
+            log.error("@else with no @if (%s", rule[INDEX][rule[LINENO]])
         val = rule[OPTIONS].pop('@if', True)
         if not val:
             rule[CODESTR] = c_codestr
@@ -1330,7 +1343,7 @@ class Scss(object):
                     rule[CONTEXT][_prop] = value
             else:
                 _prop = self.apply_vars(_prop, rule[CONTEXT], rule[OPTIONS], rule, True)
-                rule[PROPERTIES].append((_prop, to_str(value) if value is not None else None))
+                rule[PROPERTIES].append((c_lineno, _prop, to_str(value) if value is not None else None))
 
     @print_timing(10)
     def _nest_rules(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr):
@@ -1532,16 +1545,16 @@ class Scss(object):
         else:
             rules = self.rules
 
-        compress = self._scss_opts.get('compress', 1)
+        compress = self._scss_opts.get('compress', True)
         if compress:
             sc, sp, tb, nl = False, '', '', ''
         else:
             sc, sp, tb, nl = True, ' ', '  ', '\n'
 
         scope = set()
-        return self._create_css(rules, scope, sc, sp, tb, nl)
+        return self._create_css(rules, scope, sc, sp, tb, nl, not compress and self._scss_opts.get('debug_info', False))
 
-    def _create_css(self, rules, scope=None, sc=True, sp=' ', tb='  ', nl='\n'):
+    def _create_css(self, rules, scope=None, sc=True, sp=' ', tb='  ', nl='\n', debug_info=False):
         scope = set() if scope is None else scope
 
         open_selectors = False
@@ -1588,6 +1601,11 @@ class Scss(object):
                         result += _tb + '}' + nl
                         open_selectors = False
                     if selectors:
+                        if debug_info:
+                            filename, lineno = rule[INDEX][rule[LINENO]].rsplit(':', 1)
+                            filename = _escape_chars_re.sub(r'\\\1', filename)
+                            sass_debug_info = '@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}' % (filename, lineno)
+                            result += sass_debug_info + nl
                         selector = (',' + sp).join(selectors.split(',')) + sp + '{'
                         if nl:
                             selector = nl.join(wrap(selector))
@@ -1632,7 +1650,7 @@ class Scss(object):
         result = ''
         old_property = [None] if old_property is None else old_property
         scope = set() if scope is None else scope
-        for prop, value in properties:
+        for lineno, prop, value in properties:
             if value is not None:
                 if nl:
                     value = (nl + _tb + _tb).join(wrap(value))
@@ -3599,11 +3617,15 @@ class NumberValue(Value):
                 else:
                     self.value = to_float(tokens)
             except ValueError:
-                raise ValueError("Value is not a Number!")
+                raise ValueError("Value is not a Number! (%s)" % tokens)
         elif isinstance(tokens, (int, float)):
             self.value = float(tokens)
+        elif isinstance(tokens, (list, tuple)):
+            raise ValueError("Value is not a Number! (%r)" % list(tokens))
+        elif isinstance(tokens, (dict, ListValue)):
+            raise ValueError("Value is not a Number! (%r)" % tokens.values())
         else:
-            raise ValueError("Value is not a Number!")
+            raise ValueError("Value is not a Number! (%s)" % tokens)
         if type is not None:
             self.units = {type: _units_weights.get(type, 1), '_': type}
 
@@ -3666,7 +3688,12 @@ class NumberValue(Value):
         elif isinstance(second, (int, float)):
             second = NumberValue(second)
 
-        if op == operator.__mul__:
+        if op in (operator.__div__, operator.__sub__):
+            if isinstance(first, QuotedStringValue):
+                first = NumberValue(first)
+            if isinstance(second, QuotedStringValue):
+                second = NumberValue(second)
+        elif op == operator.__mul__:
             if isinstance(first, NumberValue) and isinstance(second, QuotedStringValue):
                 first.value = int(first.value)
                 val = op(second.value, first.value)
@@ -3895,9 +3922,9 @@ class ColorValue(Value):
                                 self.value = tuple([c * 255.0 for c in colorsys.hls_to_rgb(col[0], 0.999999 if col[2] == 1 else col[2], 0.999999 if col[1] == 1 else col[1])] + [col[3]])
                                 self.types = {type: 1}
                             except:
-                                raise ValueError("Value is not a Number!")
+                                raise ValueError("Value is not a Color!")
                     except:
-                        raise ValueError("Value is not a Number!")
+                        raise ValueError("Value is not a Color!")
 
     def __repr__(self):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.types))
@@ -4265,7 +4292,7 @@ def call(name, args, R, is_function=True):
         sp = args and args.value.get('_') or ''
         if is_function:
             if not _css_function_re.match(_name):
-                log.error("(%s) Required function not found: %s", R[LINENO] or 0, _fn_a)
+                log.error("Required function not found: %s (%s)", _fn_a, R[INDEX][R[LINENO]])
             _args = (sp + ' ').join(to_str(v) for n, v in s if isinstance(n, int))
             _kwargs = (sp + ' ').join('%s: %s' % (n, to_str(v)) for n, v in s if not isinstance(n, int) and n != '_')
             if _args and _kwargs:
@@ -4705,7 +4732,7 @@ class Calculator(Parser):
 
 
 def eval_expr(expr, rule, raw=False):
-    #print >>sys.stderr, '>>',expr,'<<'
+    # print >>sys.stderr, '>>',expr,'<<'
     val = None
     try:
         P = Calculator(CalculatorScanner())
@@ -4719,14 +4746,12 @@ def eval_expr(expr, rule, raw=False):
             #print >>sys.stderr, '==',val,'=='
             return val
     except SyntaxError:
-        if not DEBUG:
-            return#@@@#
-        raise
-    except:
-        if not DEBUG:
-            log.exception("(%s) Exception rised!" % (rule[LINENO] or 0,))
-            return#@@@#
-        raise
+        if DEBUG:
+            raise
+    except Exception as e:
+        log.error("Exception rised: %s in `%s' (%s)", e, expr, rule[INDEX][rule[LINENO]])
+        if DEBUG:
+            raise
 __doc__ = """
 >>> css = Scss()
 
@@ -5858,11 +5883,11 @@ h2 {
 }
 @media screen {
   h2 {
-    background: blue;
+    background: #0000ff;
   }
 }
 h1 {
-  background: yellow;
+  background: #ffff00;
 }
 
 Issue #32 test
@@ -6028,7 +6053,7 @@ def main():
                 elif s.startswith('@'):
                     properties = []
                     children = deque()
-                    spawn_rule(fileid='string', context=context, options=options, properties=properties)
+                    spawn_rule(fileid='<string>', context=context, options=options, properties=properties)
                     code, name = (s.split(None, 1) + [''])[:2]
                     if code == '@option':
                         css._settle_options(rule, [''], set(), children, None, None, s, None, code, name)
