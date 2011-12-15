@@ -465,17 +465,17 @@ def split_params(params):
     return params
 
 
-def dequote(str):
-    if str and str[0] in ('"', "'") and str[-1] == str[0]:
-        str = str[1:-1]
-        str = unescape(str)
-    return str
+def dequote(s):
+    if s and s[0] in ('"', "'") and s[-1] == s[0]:
+        s = s[1:-1]
+        s = unescape(s)
+    return s
 
 
-def depar(str):
-    while str and str[0] == '(' and str[-1] == ')':
-        str = str[1:-1]
-    return str
+def depar(s):
+    while s and s[0] == '(' and s[-1] == ')':
+        s = s[1:-1]
+    return s
 
 
 class Scss(object):
@@ -537,7 +537,7 @@ class Scss(object):
             start += 1
         return common
 
-    def locate_blocks(self, str):
+    def locate_blocks(self, codestr):
         """
         Returns all code blocks between `{` and `}` and a proper key
         that can be multilined as long as it's joined by `,` or enclosed in
@@ -569,34 +569,34 @@ class Scss(object):
         i = init = safe = lose = 0
         start = end = None
 
-        for m in _blocks_re.finditer(str):
+        for m in _blocks_re.finditer(codestr):
             _s = m.start(0)
             _e = m.end(0)
             i = _e - 1
             if _s == _e:
                 break
             if instr is not None:
-                if str[i] == instr:
+                if codestr[i] == instr:
                     instr = None
-            elif str[i] in ('"', "'"):
-                instr = str[i]
-            elif str[i] == '(':
+            elif codestr[i] in ('"', "'"):
+                instr = codestr[i]
+            elif codestr[i] == '(':
                 par += 1
                 thin = None
                 safe = i + 1
-            elif str[i] == ')':
+            elif codestr[i] == ')':
                 par -= 1
             elif not par and not instr:
-                if str[i] == '{':
+                if codestr[i] == '{':
                     if depth == 0:
-                        if i > 0 and str[i - 1] == '#':
+                        if i > 0 and codestr[i - 1] == '#':
                             skip = True
                         else:
                             start = i
-                            if thin is not None and _strip(str[thin:i - 1]):
+                            if thin is not None and _strip(codestr[thin:i - 1]):
                                 init = thin
                             if lose < init:
-                                losestr = str[lose:init]
+                                losestr = codestr[lose:init]
                                 for _property in losestr.split(';'):
                                     _property, lineno = _strip_selprop(_property, lineno)
                                     if _property:
@@ -604,38 +604,38 @@ class Scss(object):
                                 lose = init
                             thin = None
                     depth += 1
-                elif str[i] == '}':
+                elif codestr[i] == '}':
                     if depth > 0:
                         depth -= 1
                         if depth == 0:
                             if not skip:
                                 end = i
-                                _selectors, lineno = _strip_selprop(str[init:start], lineno)
-                                _codestr = str[start + 1:end].strip()
+                                _selectors, lineno = _strip_selprop(codestr[init:start], lineno)
+                                _codestr = codestr[start + 1:end].strip()
                                 if _selectors:
                                     yield lineno, _selectors, _codestr
                                 init = safe = lose = end + 1
                                 thin = None
                             skip = False
                 elif depth == 0:
-                    if str[i] == ';':
+                    if codestr[i] == ';':
                         init = safe = i + 1
                         thin = None
-                    elif str[i] == ',':
-                        if thin is not None and _strip(str[thin:i - 1]):
+                    elif codestr[i] == ',':
+                        if thin is not None and _strip(codestr[thin:i - 1]):
                             init = thin
                         thin = None
                         safe = i + 1
-                    elif str[i] == '\n':
-                        if thin is None and _strip(str[safe:i - 1]):
+                    elif codestr[i] == '\n':
+                        if thin is None and _strip(codestr[safe:i - 1]):
                             thin = i + 1
-                        elif thin is not None and _strip(str[thin:i - 1]):
+                        elif thin is not None and _strip(codestr[thin:i - 1]):
                             init = i + 1
                             thin = None
         if depth > 0:
             if not skip:
-                _selectors, lineno = _strip_selprop(str[init:start], lineno)
-                _codestr = str[start + 1:].strip()
+                _selectors, lineno = _strip_selprop(codestr[init:start], lineno)
+                _codestr = codestr[start + 1:].strip()
                 if _selectors:
                     yield lineno, _selectors, _codestr
                 if par:
@@ -644,7 +644,7 @@ class Scss(object):
                     raise Exception("Missing closing string somewhere in block: '%s'" % _selectors)
                 else:
                     raise Exception("Block never closed: '%s'" % _selectors)
-        losestr = str[lose:]
+        losestr = codestr[lose:]
         for _property in losestr.split(';'):
             _property, lineno = _strip_selprop(_property, lineno)
             if _property:
@@ -736,8 +736,11 @@ class Scss(object):
             self._scss_files = {'<string>': input_scss}
 
         # Compile
-        for fileid, str in self._scss_files.iteritems():
-            self._scss_files[fileid] = self.parse_scss_string(fileid, str, fileid)
+        for fileid, codestr in self._scss_files.iteritems():
+            codestr = self.load_string(codestr, fileid)
+            self._scss_files[fileid] = codestr
+            rule = spawn_rule(fileid=fileid, codestr=codestr, context=self._scss_vars, options=self._scss_opts, index=self._scss_index)
+            self.children.append(rule)
 
         # this will manage rule: child objects inside of a node
         self.parse_children()
@@ -762,11 +765,9 @@ class Scss(object):
         return final_cont
     compile = Compilation
 
-    def load_string(self, content, filename=None):
+    def load_string(self, codestr, filename=None):
         if filename is not None:
-            filename = filename.encode('utf-8')
-
-            content += '\n'
+            codestr += '\n'
 
             idx = {
                 'next_id': len(self._scss_index),
@@ -783,41 +784,35 @@ class Scss(object):
             lineno = '%s:%d' % (filename, idx['line'])
             next_id = idx['next_id']
             self._scss_index[next_id] = lineno
-            content = str(next_id) + SEPARATOR + _nl_re.sub(_cnt, content)
+            codestr = str(next_id) + SEPARATOR + _nl_re.sub(_cnt, codestr)
 
         # remove empty lines
-        content = _nl_num_nl_re.sub('\n', content)
+        codestr = _nl_num_nl_re.sub('\n', codestr)
 
-        # protects content: "..." strings
-        content = _strings_re.sub(lambda m: _reverse_safe_strings_re.sub(lambda n: _reverse_safe_strings[n.group(0)], m.group(0)), content)
+        # protects codestr: "..." strings
+        codestr = _strings_re.sub(lambda m: _reverse_safe_strings_re.sub(lambda n: _reverse_safe_strings[n.group(0)], m.group(0)), codestr)
 
         # removes multiple line comments
-        content = _ml_comment_re.sub('', content)
+        codestr = _ml_comment_re.sub('', codestr)
 
         # removes inline comments, but not :// (protocol)
-        content = _sl_comment_re.sub('', content)
+        codestr = _sl_comment_re.sub('', codestr)
 
-        content = _safe_strings_re.sub(lambda m: _safe_strings[m.group(0)], content)
+        codestr = _safe_strings_re.sub(lambda m: _safe_strings[m.group(0)], codestr)
 
         # expand the space in rules
-        content = _expand_rules_space_re.sub(' {', content)
+        codestr = _expand_rules_space_re.sub(' {', codestr)
 
         # collapse the space in properties blocks
-        content = _collapse_properties_space_re.sub(r'\1{', content)
+        codestr = _collapse_properties_space_re.sub(r'\1{', codestr)
 
         # to do math operations, we need to get the color's hex values (for color names):
         def _pp(m):
             v = m.group(0)
             return _colors.get(v, v)
-        content = _colors_re.sub(_pp, content)
+        codestr = _colors_re.sub(_pp, codestr)
 
-        return content
-
-    def parse_scss_string(self, fileid, str, filename):
-        str = self.load_string(str, filename)
-        rule = spawn_rule(fileid=fileid, codestr=str, context=self._scss_vars, options=self._scss_opts, index=self._scss_index)
-        self.children.append(rule)
-        return str
+        return codestr
 
     @print_timing(3)
     def parse_children(self):
@@ -999,7 +994,7 @@ class Scss(object):
                 mixin = _mixin
             # Insert as many @mixin options as the default parameters:
             while len(new_params):
-                rule[OPTIONS][code + ' ' + funct + ':' + str(len(new_params))] = mixin
+                rule[OPTIONS]['%s %s:%d' % (code, funct, len(new_params))] = mixin
                 param = new_params.pop()
                 if param not in defaults:
                     break
@@ -1029,10 +1024,10 @@ class Scss(object):
                     num_args += 1
             if param:
                 new_params[varname] = param
-        mixin = rule[OPTIONS].get('@mixin ' + funct + ':' + str(num_args))
+        mixin = rule[OPTIONS].get('@mixin %s:%s' % (funct, num_args))
         if not mixin:
             # Fallback to single parmeter:
-            mixin = rule[OPTIONS].get('@mixin ' + funct + ':1')
+            mixin = rule[OPTIONS].get('@mixin %s:1' % (funct,))
             if mixin and all(map(lambda o: isinstance(o, int), new_params.keys())):
                 new_params = {0: ', '.join(new_params.values())}
         if mixin:
@@ -1797,12 +1792,12 @@ hex2rgba = {
 }
 
 
-def escape(str):
-    return re.sub(r'''(["'])''', r'\\\1', str)
+def escape(s):
+    return re.sub(r'''(["'])''', r'\\\1', s)
 
 
-def unescape(str):
-    return re.sub(r'''\\(['"])''', r'\1', str)
+def unescape(s):
+    return re.sub(r'''\\(['"])''', r'\1', s)
 
 
 ################################################################################
