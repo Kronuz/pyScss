@@ -981,7 +981,7 @@ class Scss(object):
                         m_vars.update(mixin[1])
                         m_codestr = mixin[2]
                         for i, a in enumerate(args):
-                            m_vars[m_params[i]] = str(a)
+                            m_vars[m_params[i]] = a
                         m_vars.update(kwargs)
                         _options = rule[OPTIONS].copy()
                         _rule = spawn_rule(R, codestr=m_codestr, context=m_vars, options=_options, deps=set(), properties=[], final=False, lineno=c_lineno)
