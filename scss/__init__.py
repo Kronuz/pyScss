@@ -276,6 +276,10 @@ _reverse_safe_strings = dict((v, k) for k, v in _safe_strings.items())
 _safe_strings_re = re.compile('|'.join(map(re.escape, _safe_strings)))
 _reverse_safe_strings_re = re.compile('|'.join(map(re.escape, _reverse_safe_strings)))
 
+_default_scss_files = {}  # Files to be compiled ({file: content, ...})
+
+_default_scss_index = {0: '<unknown>:0'}
+
 _default_scss_vars = {
     # unsafe chars will be hidden as vars
     '$__doubleslash': '//',
@@ -482,11 +486,19 @@ class Scss(object):
     # configuration:
     construct = 'self'
 
-    def __init__(self):
-        self.scss_files = {}  # Files to be compiled ({file: content, ...})
-        self.scss_index = {0: '<unknown>:0'}
-        self.scss_vars = _default_scss_vars.copy()
-        self.scss_opts = _default_scss_opts.copy()
+    def __init__(self, scss_vars=None, scss_opts=None):
+        if scss_vars is None:
+            self.scss_vars = None
+        else:
+            self.scss_vars = _default_scss_vars.copy()
+            self.scss_vars.update(scss_vars)
+        if scss_opts is None:
+            self.scss_opts = None
+        else:
+            self.scss_opts = _default_scss_opts.copy()
+            self.scss_opts.update(scss_opts)
+        self.scss_files = None
+        self.scss_index = None
         self.reset()
 
     def clean(self):
@@ -498,10 +510,10 @@ class Scss(object):
     def reset(self, input_scss=None):
         # Initialize
         self.css_files = []
-        self._scss_vars = self.scss_vars.copy()
-        self._scss_opts = self.scss_opts.copy()
-        self._scss_files = self.scss_files.copy()
-        self._scss_index = self.scss_index.copy()
+        self._scss_vars = self.scss_vars.copy() if self.scss_vars is not None else _default_scss_vars.copy()
+        self._scss_opts = self.scss_opts.copy() if self.scss_opts is not None else _default_scss_opts.copy()
+        self._scss_files = self.scss_files.copy() if self.scss_files is not None else _default_scss_files.copy()
+        self._scss_index = self.scss_index.copy() if self.scss_index is not None else _default_scss_index.copy()
 
         self._contexts = {}
         self._replaces = {}
