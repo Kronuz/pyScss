@@ -486,11 +486,10 @@ class Scss(object):
     # configuration:
     construct = 'self'
 
-    def __init__(self, scss_vars=None, scss_opts=None):
+    def __init__(self, scss_vars=None, scss_opts=None, scss_files=None):
         self._scss_vars = scss_vars
         self._scss_opts = scss_opts
-        self._scss_files = None
-        self._scss_index = None
+        self._scss_files = scss_files
         self.reset()
 
     def clean(self):
@@ -503,34 +502,119 @@ class Scss(object):
         # Initialize
         self.css_files = []
 
-        if self._scss_vars is None:
-            self.scss_vars = _default_scss_vars.copy()
-        else:
-            self.scss_vars = _default_scss_vars.copy()
+        self.scss_vars = _default_scss_vars.copy()
+        if self._scss_vars is not None:
             self.scss_vars.update(self._scss_vars)
 
-        if self._scss_opts is None:
-            self.scss_opts = _default_scss_opts.copy()
-        else:
-            self.scss_opts = _default_scss_opts.copy()
+        self.scss_opts = _default_scss_opts.copy()
+        if self._scss_opts is not None:
             self.scss_opts.update(self._scss_opts)
 
-        if self._scss_files is None:
-            self.scss_files = _default_scss_files.copy()
-        else:
-            self.scss_files = _default_scss_files.copy()
-            self.scss_files.update(self._scss_files)
+        self.scss_files = {}
+        self._scss_files_order = []
+        for f, c in _default_scss_files.iteritems():
+            if f not in self.scss_files:
+                self._scss_files_order.append(f)
+            self.scss_files[f] = c
+        if self._scss_files is not None:
+            for f, c in self._scss_files.iteritems():
+                if f not in self.scss_files:
+                    self._scss_files_order.append(f)
+                self.scss_files[f] = c
 
-        if self._scss_index is None:
-            self.scss_index = _default_scss_index.copy()
-        else:
-            self.scss_index = _default_scss_index.copy()
-            self.scss_index.update(self._scss_index)
+        self._scss_index = _default_scss_index.copy()
 
         self._contexts = {}
         self._replaces = {}
 
         self.clean()
+
+    @print_timing(2)
+    def Compilation(self, input_scss=None):
+        if input_scss is not None:
+            self._scss_files = {'<string>': input_scss}
+
+        self.reset()
+
+        # Compile
+        for fileid in self._scss_files_order:
+            codestr = self.scss_files[fileid]
+            codestr = self.load_string(codestr, fileid)
+            self.scss_files[fileid] = codestr
+            rule = spawn_rule(fileid=fileid, codestr=codestr, context=self.scss_vars, options=self.scss_opts, index=self._scss_index)
+            self.children.append(rule)
+
+        # this will manage rule: child objects inside of a node
+        self.parse_children()
+
+        # this will manage rule: ' extends '
+        self.parse_extends()
+
+        # this will manage the order of the rules
+        self.manage_order()
+
+        self.parse_properties()
+
+        final_cont = ''
+        for fileid in self.css_files:
+            if fileid != '<string>':
+                final_cont += '/* Generated from: ' + fileid + ' */\n'
+            fcont = self.create_css(fileid)
+            final_cont += fcont
+
+        final_cont = self.post_process(final_cont)
+
+        return final_cont
+    compile = Compilation
+
+    def load_string(self, codestr, filename=None):
+        if filename is not None:
+            codestr += '\n'
+
+            idx = {
+                'next_id': len(self._scss_index),
+                'line': 1,
+            }
+
+            def _cnt(m):
+                idx['line'] += 1
+                lineno = '%s:%d' % (filename, idx['line'])
+                next_id = idx['next_id']
+                self._scss_index[next_id] = lineno
+                idx['next_id'] += 1
+                return '\n' + str(next_id) + SEPARATOR
+            lineno = '%s:%d' % (filename, idx['line'])
+            next_id = idx['next_id']
+            self._scss_index[next_id] = lineno
+            codestr = str(next_id) + SEPARATOR + _nl_re.sub(_cnt, codestr)
+
+        # remove empty lines
+        codestr = _nl_num_nl_re.sub('\n', codestr)
+
+        # protects codestr: "..." strings
+        codestr = _strings_re.sub(lambda m: _reverse_safe_strings_re.sub(lambda n: _reverse_safe_strings[n.group(0)], m.group(0)), codestr)
+
+        # removes multiple line comments
+        codestr = _ml_comment_re.sub('', codestr)
+
+        # removes inline comments, but not :// (protocol)
+        codestr = _sl_comment_re.sub('', codestr)
+
+        codestr = _safe_strings_re.sub(lambda m: _safe_strings[m.group(0)], codestr)
+
+        # expand the space in rules
+        codestr = _expand_rules_space_re.sub(' {', codestr)
+
+        # collapse the space in properties blocks
+        codestr = _collapse_properties_space_re.sub(r'\1{', codestr)
+
+        # to do math operations, we need to get the color's hex values (for color names):
+        def _pp(m):
+            v = m.group(0)
+            return _colors.get(v, v)
+        codestr = _colors_re.sub(_pp, codestr)
+
+        return codestr
 
     def longest_common_prefix(self, seq1, seq2):
         start = 0
@@ -751,92 +835,6 @@ class Scss(object):
             # ...apply math:
             cont = self.do_glob_math(cont, context, options, rule, _dequote)
         return cont
-
-    @print_timing(2)
-    def Compilation(self, input_scss=None):
-        if input_scss is not None:
-            self._scss_files = {'<string>': input_scss}
-
-        self.reset()
-
-        # Compile
-        for fileid, codestr in self.scss_files.iteritems():
-            codestr = self.load_string(codestr, fileid)
-            self.scss_files[fileid] = codestr
-            rule = spawn_rule(fileid=fileid, codestr=codestr, context=self.scss_vars, options=self.scss_opts, index=self.scss_index)
-            self.children.append(rule)
-
-        # this will manage rule: child objects inside of a node
-        self.parse_children()
-
-        # this will manage rule: ' extends '
-        self.parse_extends()
-
-        # this will manage the order of the rules
-        self.manage_order()
-
-        self.parse_properties()
-
-        final_cont = ''
-        for fileid in self.css_files:
-            if fileid != '<string>':
-                final_cont += '/* Generated from: ' + fileid + ' */\n'
-            fcont = self.create_css(fileid)
-            final_cont += fcont
-
-        final_cont = self.post_process(final_cont)
-
-        return final_cont
-    compile = Compilation
-
-    def load_string(self, codestr, filename=None):
-        if filename is not None:
-            codestr += '\n'
-
-            idx = {
-                'next_id': len(self.scss_index),
-                'line': 1,
-            }
-
-            def _cnt(m):
-                idx['line'] += 1
-                lineno = '%s:%d' % (filename, idx['line'])
-                next_id = idx['next_id']
-                self.scss_index[next_id] = lineno
-                idx['next_id'] += 1
-                return '\n' + str(next_id) + SEPARATOR
-            lineno = '%s:%d' % (filename, idx['line'])
-            next_id = idx['next_id']
-            self.scss_index[next_id] = lineno
-            codestr = str(next_id) + SEPARATOR + _nl_re.sub(_cnt, codestr)
-
-        # remove empty lines
-        codestr = _nl_num_nl_re.sub('\n', codestr)
-
-        # protects codestr: "..." strings
-        codestr = _strings_re.sub(lambda m: _reverse_safe_strings_re.sub(lambda n: _reverse_safe_strings[n.group(0)], m.group(0)), codestr)
-
-        # removes multiple line comments
-        codestr = _ml_comment_re.sub('', codestr)
-
-        # removes inline comments, but not :// (protocol)
-        codestr = _sl_comment_re.sub('', codestr)
-
-        codestr = _safe_strings_re.sub(lambda m: _safe_strings[m.group(0)], codestr)
-
-        # expand the space in rules
-        codestr = _expand_rules_space_re.sub(' {', codestr)
-
-        # collapse the space in properties blocks
-        codestr = _collapse_properties_space_re.sub(r'\1{', codestr)
-
-        # to do math operations, we need to get the color's hex values (for color names):
-        def _pp(m):
-            v = m.group(0)
-            return _colors.get(v, v)
-        codestr = _colors_re.sub(_pp, codestr)
-
-        return codestr
 
     @print_timing(3)
     def parse_children(self):
@@ -1128,6 +1126,8 @@ class Scss(object):
                         if i_codestr is None:
                             i_codestr = self._do_magic_import(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                         i_codestr = self.scss_files[name] = i_codestr and self.load_string(i_codestr, full_filename)
+                        if name not in self.scss_files:
+                            self._scss_files_order.append(name)
                     if i_codestr is None:
                         log.warn("File to import not found or unreadable: '%s'\nLoad paths:\n\t%s", filename, "\n\t".join(load_paths))
                     else:
