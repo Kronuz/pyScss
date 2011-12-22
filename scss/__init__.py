@@ -3338,23 +3338,39 @@ def _unit(number):  # -> px, em, cm, etc.
     return StringValue(unit)
 
 
+__elements_of_type_block = 'address, article, aside, blockquote, center, dd, details, dir, div, dl, dt, fieldset, figcaption, figure, footer, form, frameset, h1, h2, h3, h4, h5, h6, header, hgroup, hr, isindex, menu, nav, noframes, noscript, ol, p, pre, section, summary, ul'
+__elements_of_type_inline = 'a, abbr, acronym, audio, b, basefont, bdo, big, br, canvas, cite, code, command, datalist, dfn, em, embed, font, i, img, input, kbd, keygen, label, mark, meter, output, progress, q, rp, rt, ruby, s, samp, select, small, span, strike, strong, sub, sup, textarea, time, tt, u, var, video, wbr'
+__elements_of_type_table = 'table'
+__elements_of_type_list_item = 'li'
+__elements_of_type_table_row_group = 'tbody'
+__elements_of_type_table_header_group = 'thead'
+__elements_of_type_table_footer_group = 'tfoot'
+__elements_of_type_table_row = 'tr'
+__elements_of_type_table_cel = 'td, th'
+__elements_of_type_html5_block = 'article, aside, details, figcaption, figure, footer, header, hgroup, menu, nav, section, summary'
+__elements_of_type_html5_inline = 'audio, canvas, command, datalist, embed, keygen, mark, meter, output, progress, rp, rt, ruby, time, video, wbr'
+__elements_of_type_html5 = 'article, aside, audio, canvas, command, datalist, details, embed, figcaption, figure, footer, header, hgroup, keygen, mark, menu, meter, nav, output, progress, rp, rt, ruby, section, summary, time, video, wbr'
 __elements_of_type = {
-    'block': dict(enumerate(sorted(['address', 'article', 'aside', 'blockquote', 'center', 'dd', 'dialog', 'dir', 'div', 'dl', 'dt', 'fieldset', 'figure', 'footer', 'form', 'frameset', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'isindex', 'menu', 'nav', 'noframes', 'noscript', 'ol', 'p', 'pre', 'section', 'ul']))),
-    'inline': dict(enumerate(sorted(['a', 'abbr', 'acronym', 'b', 'basefont', 'bdo', 'big', 'br', 'cite', 'code', 'dfn', 'em', 'font', 'i', 'img', 'input', 'kbd', 'label', 'q', 's', 'samp', 'select', 'small', 'span', 'strike', 'strong', 'sub', 'sup', 'textarea', 'tt', 'u', 'var']))),
-    'table': dict(enumerate(sorted(['table']))),
-    'list-item': dict(enumerate(sorted(['li']))),
-    'table-row-group': dict(enumerate(sorted(['tbody']))),
-    'table-header-group': dict(enumerate(sorted(['thead']))),
-    'table-footer-group': dict(enumerate(sorted(['tfoot']))),
-    'table-row': dict(enumerate(sorted(['tr']))),
-    'table-cell': dict(enumerate(sorted(['td', 'th']))),
-    'html5': dict(enumerate(sorted(['article', 'aside', 'dialog', 'figure', 'footer', 'header', 'hgroup', 'nav', 'section']))),
+    'block': dict(enumerate(sorted(__elements_of_type_block.replace(' ', '').split(',')))),
+    'inline': dict(enumerate(sorted(__elements_of_type_inline.replace(' ', '').split(',')))),
+    'table': dict(enumerate(sorted(__elements_of_type_table.replace(' ', '').split(',')))),
+    'list-item': dict(enumerate(sorted(__elements_of_type_list_item.replace(' ', '').split(',')))),
+    'table-row-group': dict(enumerate(sorted(__elements_of_type_table_row_group.replace(' ', '').split(',')))),
+    'table-header-group': dict(enumerate(sorted(__elements_of_type_table_header_group.replace(' ', '').split(',')))),
+    'table-footer-group': dict(enumerate(sorted(__elements_of_type_table_footer_group.replace(' ', '').split(',')))),
+    'table-row': dict(enumerate(sorted(__elements_of_type_table_footer_group.replace(' ', '').split(',')))),
+    'table-cell': dict(enumerate(sorted(__elements_of_type_table_footer_group.replace(' ', '').split(',')))),
+    'html5-block': dict(enumerate(sorted(__elements_of_type_html5_block.replace(' ', '').split(',')))),
+    'html5-inline': dict(enumerate(sorted(__elements_of_type_html5_inline.replace(' ', '').split(',')))),
+    'html5': dict(enumerate(sorted(__elements_of_type_html5.replace(' ', '').split(',')))),
 }
 
 
 def _elements_of_type(display):
     d = StringValue(display)
-    ret = __elements_of_type.get(d.value, [])
+    ret = __elements_of_type.get(d.value, None)
+    if ret is None:
+        raise Exception("Elements of type '%s' not found!" % d.value)
     ret['_'] = ','
     return ListValue(ret)
 
