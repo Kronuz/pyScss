@@ -1,6 +1,6 @@
 To build the parser from the grammar do:
   `python ./yapps2.py grammar.g`
 
-This will produce `grammar.py`; to that file modify the UNITS to be: '(?:'+'|'.join(_units)+')(?![-\w])'
+This will produce `grammar.py`; to that file modify the UNITS to be: '(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'
 
-Paste the parser into scss.py
+Paste the parser into pyScss's relevant block.

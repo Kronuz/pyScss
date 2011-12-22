@@ -1,6 +1,6 @@
 # python yapps2.py grammar.g grammar.py
-def _reorder_list(lst):
-    return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
+
+
 _units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
           'grad', 'ms', 's', 'hz', 'khz', '%']
 ParserValue = lambda s: s
@@ -11,17 +11,28 @@ BooleanValue = lambda s: bool(s)
 ColorValue = lambda s: s
 ListValue = lambda s: s
 _inv = lambda s: s
+
+
+def _reorder_list(lst):
+    return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
+
+
 def interpolate(v, R):
     return v
+
+
 def call(fn, args, R, function=True):
-    print 'call: ',fn, args
+    print 'call: ', fn, args
     return args
-#'(?:'+'|'.join(_units)+')(?![-\\w])'
+
+################################################################################
+#'(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'
 ## Grammar compiled using Yapps:
 
-from string import *
 import re
+from string import *
 from yappsrt import *
+
 
 class CalculatorScanner(Scanner):
     patterns = [
@@ -48,7 +59,7 @@ class CalculatorScanner(Scanner):
         ('GT', re.compile('>')),
         ('STR', re.compile("'[^']*'")),
         ('QSTR', re.compile('"[^"]*"')),
-        ('UNITS', re.compile('(?:px|cm|mm|hz|%)(?![-\\w])')),
+        ('UNITS', re.compile('(?<!\\s)(?:px|cm|mm|hz|%)(?![-\\w])')),
         ('NUM', re.compile('(?:\\d+(?:\\.\\d*)?|\\.\\d+)')),
         ('BOOL', re.compile('(?<![-\\w])(?:true|false)(?![-\\w])')),
         ('COLOR', re.compile('#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])')),
@@ -56,8 +67,10 @@ class CalculatorScanner(Scanner):
         ('FNCT', re.compile('[-a-zA-Z_][-a-zA-Z0-9_]*(?=\\()')),
         ('ID', re.compile('[-a-zA-Z_][-a-zA-Z0-9_]*')),
     ]
+
     def __init__(self):
-        Scanner.__init__(self,None,['[ \r\t\n]+'])
+        Scanner.__init__(self, None, ['[ \r\t\n]+'])
+
 
 class Calculator(Parser):
     def goal(self, R):
@@ -89,18 +102,19 @@ class Calculator(Parser):
         if _token_ not in self.not_test_chks:
             comparison = self.comparison(R)
             return comparison
-        else:# in self.not_test_chks
+        else:  # in self.not_test_chks
             while 1:
                 _token_ = self._peek(self.not_test_chks)
                 if _token_ == 'NOT':
                     NOT = self._scan('NOT')
                     not_test = self.not_test(R)
                     v = not not_test
-                else:# == 'INV'
+                else:  # == 'INV'
                     INV = self._scan('INV')
                     not_test = self.not_test(R)
                     v = _inv('!', not_test)
-                if self._peek(self.not_test_rsts_) not in self.not_test_chks: break
+                if self._peek(self.not_test_rsts_) not in self.not_test_chks:
+                    break
             return v
 
     def comparison(self, R):
@@ -128,7 +142,7 @@ class Calculator(Parser):
                 EQ = self._scan('EQ')
                 a_expr = self.a_expr(R)
                 v = v == a_expr
-            else:# == 'NE'
+            else:  # == 'NE'
                 NE = self._scan('NE')
                 a_expr = self.a_expr(R)
                 v = v != a_expr
@@ -143,7 +157,7 @@ class Calculator(Parser):
                 ADD = self._scan('ADD')
                 m_expr = self.m_expr(R)
                 v = v + m_expr
-            else:# == 'SUB'
+            else:  # == 'SUB'
                 SUB = self._scan('SUB')
                 m_expr = self.m_expr(R)
                 v = v - m_expr
@@ -158,7 +172,7 @@ class Calculator(Parser):
                 MUL = self._scan('MUL')
                 u_expr = self.u_expr(R)
                 v = v * u_expr
-            else:# == 'DIV'
+            else:  # == 'DIV'
                 DIV = self._scan('DIV')
                 u_expr = self.u_expr(R)
                 v = v / u_expr
@@ -174,12 +188,12 @@ class Calculator(Parser):
             ADD = self._scan('ADD')
             u_expr = self.u_expr(R)
             return u_expr
-        else:# in self.u_expr_chks
+        else:  # in self.u_expr_chks
             atom = self.atom(R)
             v = atom
             if self._peek(self.u_expr_rsts_) == 'UNITS':
                 UNITS = self._scan('UNITS')
-                v = call(UNITS, ListValue(ParserValue({ 0: v, 1: UNITS })), R, False)
+                v = call(UNITS, ListValue(ParserValue({0: v, 1: UNITS})), R, False)
             return v
 
     def atom(self, R):
@@ -216,7 +230,7 @@ class Calculator(Parser):
         elif _token_ == 'COLOR':
             COLOR = self._scan('COLOR')
             return ColorValue(ParserValue(COLOR))
-        else:# == 'VAR'
+        else:  # == 'VAR'
             VAR = self._scan('VAR')
             return interpolate(VAR, R)
 
@@ -229,7 +243,7 @@ class Calculator(Parser):
                 n = VAR
             else: self._rewind()
         expr_slst = self.expr_slst(R)
-        v = { n or 0: expr_slst }
+        v = {n or 0: expr_slst}
         while self._peek(self.expr_lst_rsts__) == 'COMMA':
             n = None
             COMMA = self._scan('COMMA')
@@ -246,7 +260,7 @@ class Calculator(Parser):
 
     def expr_slst(self, R):
         expr = self.expr(R)
-        v = { 0: expr }
+        v = {0: expr}
         while self._peek(self.expr_slst_rsts) not in self.expr_lst_rsts__:
             expr = self.expr(R)
             v[len(v)] = expr
@@ -276,16 +290,23 @@ class Calculator(Parser):
     expr_lst_rsts_ = None
 
 ### Grammar ends.
+################################################################################
 
 P = Calculator(CalculatorScanner())
+
+
 def parse(rule, text, *args):
     P.reset(text)
     return wrap_error_reporter(P, rule, *args)
 
+
 if __name__ == '__main__':
     while True:
-        try: s = raw_input('>>> ')
-        except EOFError: break
-        if not s.strip(): break
+        try:
+            s = raw_input('>>> ')
+        except EOFError:
+            break
+        if not s.strip():
+            break
         print parse('goal', s, None)
     print 'Bye.'

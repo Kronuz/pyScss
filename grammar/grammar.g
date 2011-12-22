@@ -1,6 +1,6 @@
 # python yapps2.py grammar.g grammar.py
-def _reorder_list(lst):
-    return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
+
+
 _units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
           'grad', 'ms', 's', 'hz', 'khz', '%']
 ParserValue = lambda s: s
@@ -11,12 +11,22 @@ BooleanValue = lambda s: bool(s)
 ColorValue = lambda s: s
 ListValue = lambda s: s
 _inv = lambda s: s
+
+
+def _reorder_list(lst):
+    return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
+
+
 def interpolate(v, R):
     return v
+
+
 def call(fn, args, R, function=True):
-    print 'call: ',fn, args
+    print 'call: ', fn, args
     return args
-#'(?<!\\s)(?:'+'|'.join(_units)+')(?![-\\w])'
+
+################################################################################
+#'(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'
 ## Grammar compiled using Yapps:
 %%
 parser Calculator:
@@ -98,7 +108,7 @@ parser Calculator:
                               |
                               atom<<R>>                     {{ v = atom }}
                               [
-                                  UNITS                     {{ v = call(UNITS, ListValue(ParserValue({ 0: v, 1: UNITS })), R, False) }}
+                                  UNITS                     {{ v = call(UNITS, ListValue(ParserValue({0: v, 1: UNITS})), R, False) }}
                               ]                             {{ return v }}
     rule atom<<R>>:         LPAR expr_lst<<R>> RPAR         {{ return expr_lst.first() if len(expr_lst) == 1 else expr_lst }}
                               |
@@ -126,7 +136,7 @@ parser Calculator:
                                       ":"                   {{ n = VAR }}
                                   ]                         {{ else: self._rewind() }}
                               ]
-                              expr_slst<<R>>                {{ v = { n or 0: expr_slst } }}
+                              expr_slst<<R>>                {{ v = {n or 0: expr_slst} }}
                               (                             {{ n = None }}
                                   COMMA                     {{ v['_'] = COMMA }}
                                   [
@@ -136,7 +146,7 @@ parser Calculator:
                                   ]
                                   expr_slst<<R>>            {{ v[n or len(v)] = expr_slst }}
                               )*                            {{ return ListValue(ParserValue(v)) }}
-    rule expr_slst<<R>>:    expr<<R>>                       {{ v = { 0: expr } }}
+    rule expr_slst<<R>>:    expr<<R>>                       {{ v = {0: expr} }}
                               (
                                   expr<<R>>                 {{ v[len(v)] = expr }}
                               )*                            {{ return ListValue(ParserValue(v)) if len(v) > 1 else v[0] }}
@@ -144,16 +154,23 @@ parser Calculator:
     expr_lst_rsts_ = None
 
 ### Grammar ends.
+################################################################################
 
 P = Calculator(CalculatorScanner())
+
+
 def parse(rule, text, *args):
     P.reset(text)
     return wrap_error_reporter(P, rule, *args)
 
+
 if __name__ == '__main__':
     while True:
-        try: s = raw_input('>>> ')
-        except EOFError: break
-        if not s.strip(): break
+        try:
+            s = raw_input('>>> ')
+        except EOFError:
+            break
+        if not s.strip():
+            break
         print parse('goal', s, None)
     print 'Bye.'
