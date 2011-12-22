@@ -3203,6 +3203,13 @@ def _max(*lst):
     return max(lst.values())
 
 
+def _min(*lst):
+    if len(lst) == 1 and isinstance(lst[0], (list, tuple, ListValue)):
+        lst = ListValue(lst[0]).values()
+    lst = ListValue(lst).value
+    return min(lst.values())
+
+
 def _append(lst, val, separator=None):
     separator = separator and StringValue(separator).value
     ret = ListValue(lst, separator)
@@ -4316,6 +4323,7 @@ fnct = {
     '-compass-slice:3': __compass_slice,
     'nth:2': _nth,
     'max:n': _max,
+    'min:n': _min,
     '-compass-nth:2': _nth,
     'first-value-of:n': _first_value_of,
     'join:2': _join,
@@ -4875,7 +4883,6 @@ def eval_expr(expr, rule, raw=False):
         if DEBUG:
             raise
     except Exception as e:
-        raise
         log.error("Exception raised: %s in `%s' (%s)", e, expr, rule[INDEX][rule[LINENO]])
         if DEBUG:
             raise
