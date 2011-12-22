@@ -33,35 +33,35 @@ Sass:
 xCSS:
     (c) 2010 Anton Pawlik
     http://xcss.antpaw.org/docs/
-    
-    This file defines Meta data, according to PEP314 
+
+    This file defines Meta data, according to PEP314
     (http://www.python.org/dev/peps/pep-0314/) which is common to both pyScss
     and setup.py distutils.
-    
-    We create this here so this information can be compatible with BOTH 
+
+    We create this here so this information can be compatible with BOTH
     Python 2.x and Python 3.x so setup.py can use it when building pyScss
     for both Py3.x and Py2.x
 
 """
 
-VERSION_INFO = (1, 0, 8)
-DATE_INFO = (2011, 5,  13) # YEAR, MONTH, DAY
+VERSION_INFO = (1, 0, 9)
+DATE_INFO = (2011, 12,  22)  # YEAR, MONTH, DAY
 VERSION = '.'.join(str(i) for i in VERSION_INFO)
 REVISION = '%04d%02d%02d' % DATE_INFO
-BUILD_INFO = "pyScss v" + VERSION + " ("+REVISION+")"
+BUILD_INFO = "pyScss v" + VERSION + " (" + REVISION + ")"
 AUTHOR = "German M. Bravo (Kronuz)"
 AUTHOR_EMAIL = 'german.mb@gmail.com'
 URL = 'http://github.com/Kronuz/pyScss'
-DOWNLOAD_URL = 'http://github.com/Kronuz/pyScss/tarball/v1.0'
+DOWNLOAD_URL = 'http://github.com/Kronuz/pyScss/tarball/v1.0.9'
 LICENSE = "MIT"
 PROJECT = "pyScss"
 
 if __name__ == "__main__":
-    print('VERSION      = '+VERSION)
-    print('REVISION     = '+REVISION)
-    print('BUILD_INFO   = '+BUILD_INFO)
-    print('AUTHOR       = '+AUTHOR)
-    print('AUTHOR_EMAIL = '+AUTHOR_EMAIL)
-    print('URL          = '+URL)
-    print('LICENSE      = '+LICENSE)
-    print('PROJECT      = '+PROJECT)
+    print('VERSION      = ' + VERSION)
+    print('REVISION     = ' + REVISION)
+    print('BUILD_INFO   = ' + BUILD_INFO)
+    print('AUTHOR       = ' + AUTHOR)
+    print('AUTHOR_EMAIL = ' + AUTHOR_EMAIL)
+    print('URL          = ' + URL)
+    print('LICENSE      = ' + LICENSE)
+    print('PROJECT      = ' + PROJECT)

@@ -258,19 +258,6 @@ following `myfile.css`::
 
 	// Stuff goes here...
 
-Benchmarks
-==========
-pyScss has been optimized for speed. Compiling **Compass 0.11.beta.2**
-(`compass/doc-src/content/stylesheets/screen.scss`)
-
-...using **Sass 3.1.0.alpha.221**::
-
-	Compilation took 2.683s (w/o cache)
-	Compilation took 1.35s  (cached)
-
-...using **pyScss 1.0 beta**::
-
-	Compilation took 0.614s
 
 Bug tracker
 ===========

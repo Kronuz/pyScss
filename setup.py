@@ -3,12 +3,14 @@ from setuptools import setup
 
 from scss.scss_meta import PROJECT, URL, VERSION, AUTHOR, AUTHOR_EMAIL, LICENSE, DOWNLOAD_URL
 
+
 def read(fname):
     import os
     try:
-        return open(os.path.join(os.path.dirname( __file__ ), fname)).read().strip()
+        return open(os.path.join(os.path.dirname(__file__), fname)).read().strip()
     except IOError:
         return ''
+
 
 extra = {}
 import sys
@@ -16,6 +18,7 @@ if sys.version_info >= (3, 0):
     extra.update(
         use_2to3=True,
     )
+
 
 setup(name=PROJECT,
     version=VERSION,
@@ -38,7 +41,7 @@ setup(name=PROJECT,
                  "Topic :: Text Processing :: Markup",
                  "Topic :: Software Development :: Libraries :: Python Modules"
                  ],
-    entry_points = """
+    entry_points="""
     [console_scripts]
     pyscss = scss:main
     """,
