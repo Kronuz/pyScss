@@ -487,18 +487,10 @@ class Scss(object):
     construct = 'self'
 
     def __init__(self, scss_vars=None, scss_opts=None):
-        if scss_vars is None:
-            self.scss_vars = None
-        else:
-            self.scss_vars = _default_scss_vars.copy()
-            self.scss_vars.update(scss_vars)
-        if scss_opts is None:
-            self.scss_opts = None
-        else:
-            self.scss_opts = _default_scss_opts.copy()
-            self.scss_opts.update(scss_opts)
-        self.scss_files = None
-        self.scss_index = None
+        self._scss_vars = scss_vars
+        self._scss_opts = scss_opts
+        self._scss_files = None
+        self._scss_index = None
         self.reset()
 
     def clean(self):
@@ -510,10 +502,30 @@ class Scss(object):
     def reset(self, input_scss=None):
         # Initialize
         self.css_files = []
-        self._scss_vars = self.scss_vars.copy() if self.scss_vars is not None else _default_scss_vars.copy()
-        self._scss_opts = self.scss_opts.copy() if self.scss_opts is not None else _default_scss_opts.copy()
-        self._scss_files = self.scss_files.copy() if self.scss_files is not None else _default_scss_files.copy()
-        self._scss_index = self.scss_index.copy() if self.scss_index is not None else _default_scss_index.copy()
+
+        if self._scss_vars is None:
+            self.scss_vars = _default_scss_vars.copy()
+        else:
+            self.scss_vars = _default_scss_vars.copy()
+            self.scss_vars.update(self._scss_vars)
+
+        if self._scss_opts is None:
+            self.scss_opts = _default_scss_opts.copy()
+        else:
+            self.scss_opts = _default_scss_opts.copy()
+            self.scss_opts.update(self._scss_opts)
+
+        if self._scss_files is None:
+            self.scss_files = _default_scss_files.copy()
+        else:
+            self.scss_files = _default_scss_files.copy()
+            self.scss_files.update(self._scss_files)
+
+        if self._scss_index is None:
+            self.scss_index = _default_scss_index.copy()
+        else:
+            self.scss_index = _default_scss_index.copy()
+            self.scss_index.update(self._scss_index)
 
         self._contexts = {}
         self._replaces = {}
@@ -742,16 +754,16 @@ class Scss(object):
 
     @print_timing(2)
     def Compilation(self, input_scss=None):
-        self.reset()
-
         if input_scss is not None:
             self._scss_files = {'<string>': input_scss}
 
+        self.reset()
+
         # Compile
-        for fileid, codestr in self._scss_files.iteritems():
+        for fileid, codestr in self.scss_files.iteritems():
             codestr = self.load_string(codestr, fileid)
-            self._scss_files[fileid] = codestr
-            rule = spawn_rule(fileid=fileid, codestr=codestr, context=self._scss_vars, options=self._scss_opts, index=self._scss_index)
+            self.scss_files[fileid] = codestr
+            rule = spawn_rule(fileid=fileid, codestr=codestr, context=self.scss_vars, options=self.scss_opts, index=self.scss_index)
             self.children.append(rule)
 
         # this will manage rule: child objects inside of a node
@@ -782,7 +794,7 @@ class Scss(object):
             codestr += '\n'
 
             idx = {
-                'next_id': len(self._scss_index),
+                'next_id': len(self.scss_index),
                 'line': 1,
             }
 
@@ -790,12 +802,12 @@ class Scss(object):
                 idx['line'] += 1
                 lineno = '%s:%d' % (filename, idx['line'])
                 next_id = idx['next_id']
-                self._scss_index[next_id] = lineno
+                self.scss_index[next_id] = lineno
                 idx['next_id'] += 1
                 return '\n' + str(next_id) + SEPARATOR
             lineno = '%s:%d' % (filename, idx['line'])
             next_id = idx['next_id']
-            self._scss_index[next_id] = lineno
+            self.scss_index[next_id] = lineno
             codestr = str(next_id) + SEPARATOR + _nl_re.sub(_cnt, codestr)
 
         # remove empty lines
@@ -1079,7 +1091,7 @@ class Scss(object):
                 if '@import ' + name not in rule[OPTIONS]:  # If already imported in this scope, skip...
                     try:
                         raise KeyError
-                        i_codestr = self._scss_files[name]
+                        i_codestr = self.scss_files[name]
                     except KeyError:
                         filename = os.path.basename(name)
                         dirname = os.path.dirname(name)
@@ -1115,7 +1127,7 @@ class Scss(object):
                                 break
                         if i_codestr is None:
                             i_codestr = self._do_magic_import(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
-                        i_codestr = self._scss_files[name] = i_codestr and self.load_string(i_codestr, full_filename)
+                        i_codestr = self.scss_files[name] = i_codestr and self.load_string(i_codestr, full_filename)
                     if i_codestr is None:
                         log.warn("File to import not found or unreadable: '%s'\nLoad paths:\n\t%s", filename, "\n\t".join(load_paths))
                     else:
@@ -1552,14 +1564,14 @@ class Scss(object):
         else:
             rules = self.rules
 
-        compress = self._scss_opts.get('compress', True)
+        compress = self.scss_opts.get('compress', True)
         if compress:
             sc, sp, tb, nl = False, '', '', ''
         else:
             sc, sp, tb, nl = True, ' ', '  ', '\n'
 
         scope = set()
-        return self._create_css(rules, scope, sc, sp, tb, nl, not compress and self._scss_opts.get('debug_info', False))
+        return self._create_css(rules, scope, sc, sp, tb, nl, not compress and self.scss_opts.get('debug_info', False))
 
     def _create_css(self, rules, scope=None, sc=True, sp=' ', tb='  ', nl='\n', debug_info=False):
         scope = set() if scope is None else scope
@@ -1730,12 +1742,12 @@ class Scss(object):
 
     @print_timing(3)
     def post_process(self, cont):
-        compress = self._scss_opts.get('compress', 1) and 'compress_' or ''
+        compress = self.scss_opts.get('compress', 1) and 'compress_' or ''
         # short colors:
-        if self._scss_opts.get(compress + 'short_colors', 1):
+        if self.scss_opts.get(compress + 'short_colors', 1):
             cont = _short_color_re.sub(r'#\1\2\3', cont)
         # color names:
-        if self._scss_opts.get(compress + 'reverse_colors', 1):
+        if self.scss_opts.get(compress + 'reverse_colors', 1):
             cont = _reverse_colors_re.sub(lambda m: _reverse_colors[m.group(0).lower()], cont)
         if compress:
             # zero units out (i.e. 0px or 0em -> 0):
@@ -2126,9 +2138,9 @@ def _lightness(color):
 
 def __color_stops(percentages, *args):
     if len(args) == 1:
-        if isinstance(args[0], list):
-            return args[0]
-        elif isinstance(args[0], StringValue):
+        if isinstance(args[0], (list, tuple, ListValue)):
+            return ListValue(args[0]).values()
+        elif isinstance(args[0], (StringValue, basestring)):
             color_stops = []
             colors = split_params(args[0].value)
             for color in colors:
@@ -2199,6 +2211,8 @@ def __color_stops(percentages, *args):
 
 
 def _grad_color_stops(*args):
+    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
+        args = ListValue(args[0]).values()
     color_stops = __color_stops(True, *args)
     ret = ', '.join(['color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops])
     return StringValue(ret)
@@ -2224,18 +2238,24 @@ def _grad_end_position(*color_stops):
 
 
 def _color_stops(*args):
+    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
+        args = ListValue(args[0]).values()
     color_stops = __color_stops(False, *args)
     ret = ', '.join(['%s %s' % (c, to_str(s)) for s, c in color_stops])
     return StringValue(ret)
 
 
 def _color_stops_in_percentages(*args):
+    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
+        args = ListValue(args[0]).values()
     color_stops = __color_stops(True, *args)
     ret = ', '.join(['%s %s' % (c, to_str(s)) for s, c in color_stops])
     return StringValue(ret)
 
 
 def _radial_gradient(*args):
+    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
+        args = ListValue(args[0]).values()
     color_stops = args
     position_and_angle = None
     shape_and_size = None
@@ -2246,7 +2266,6 @@ def _radial_gradient(*args):
             color_stops = args[2:]
         else:
             color_stops = args[1:]
-
     color_stops = __color_stops(False, *color_stops)
 
     args = [
@@ -2295,6 +2314,8 @@ def _radial_gradient(*args):
 
 
 def _linear_gradient(*args):
+    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
+        args = ListValue(args[0]).values()
     color_stops = args
     position_and_angle = None
     if isinstance(args[0], (StringValue, NumberValue, basestring)):
@@ -2352,13 +2373,13 @@ def _linear_gradient(*args):
 
 
 def _radial_svg_gradient(*args):
+    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
+        args = ListValue(args[0]).values()
     color_stops = args
     center = None
-    if isinstance(args[-1], (StringValue, NumberValue)):
+    if isinstance(args[-1], (StringValue, NumberValue, basestring)):
         center = args[-1]
         color_stops = args[:-1]
-    if len(color_stops) == 1 and isinstance(color_stops[0], list):
-        color_stops = color_stops[0]
     color_stops = __color_stops(False, *color_stops)
     cx, cy = zip(*_grad_point(center).items())[1]
     r = __grad_end_position(True, color_stops)
@@ -2369,13 +2390,13 @@ def _radial_svg_gradient(*args):
 
 
 def _linear_svg_gradient(*args):
+    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
+        args = ListValue(args[0]).values()
     color_stops = args
     start = None
-    if isinstance(args[-1], (StringValue, NumberValue)):
+    if isinstance(args[-1], (StringValue, NumberValue, basestring)):
         start = args[-1]
         color_stops = args[:-1]
-    if len(color_stops) == 1 and isinstance(color_stops[0], list):
-        color_stops = color_stops[0]
     color_stops = __color_stops(False, *color_stops)
     x1, y1 = zip(*_grad_point(start).items())[1]
     x2, y2 = zip(*_grad_point(_opposite_position(start)).items())[1]
@@ -3009,8 +3030,8 @@ def _grad_point(*p):
 
 
 def __compass_list(*args):
-    if len(args) == 1 and isinstance(args[0], ListValue):
-        args = args[0]
+    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
+        args = ListValue(args[0]).values()
     return ListValue(args)
 
 
@@ -3067,8 +3088,8 @@ def __compass_slice(lst, start_index, end_index=None):
 
 
 def _first_value_of(*lst):
-    if len(lst) == 1 and isinstance(lst[0], ListValue):
-        lst = lst[0]
+    if len(lst) == 1 and isinstance(lst[0], (list, tuple, ListValue)):
+        lst = ListValue(lst[0]).values()
     ret = ListValue(lst).first()
     return ret.__class__(ret)
 
@@ -3111,15 +3132,15 @@ def _join(lst1, lst2, separator=None):
 
 
 def _length(*lst):
-    if len(lst) == 1 and isinstance(lst[0], ListValue):
-        lst = lst[0]
+    if len(lst) == 1 and isinstance(lst[0], (list, tuple, ListValue)):
+        lst = ListValue(lst[0]).values()
     lst = ListValue(lst)
     return NumberValue(len(lst))
 
 
 def _max(*lst):
-    if len(lst) == 1 and isinstance(lst[0], ListValue):
-        lst = lst[0]
+    if len(lst) == 1 and isinstance(lst[0], (list, tuple, ListValue)):
+        lst = ListValue(lst[0]).values()
     lst = ListValue(lst).value
     return max(lst.values())
 
@@ -5651,15 +5672,15 @@ a {
         background-color: green;
     }
 
-
->>> css.scss_files['first.css'] = '''
+>>> css._scss_files = {}
+>>> css._scss_files['first.css'] = '''
 ... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .specialClass extends .basicClass {
 ...     padding: 10px;
 ...     font-size: 14px;
 ... }
 ... '''
->>> css.scss_files['second.css'] = '''
+>>> css._scss_files['second.css'] = '''
 ... @option compress:no, short_colors:yes, reverse_colors:yes;
 ... .basicClass {
 ...     padding: 20px;
@@ -6038,8 +6059,8 @@ def main():
             pass
 
         css = Scss()
-        context = css._scss_vars
-        options = css._scss_opts
+        context = css.scss_vars
+        options = css.scss_opts
         rule = spawn_rule(context=context, options=options)
         print 'Welcome to ' + BUILD_INFO + " interactive shell"
         while True:
@@ -6160,8 +6181,9 @@ def main():
         class ScssEventHandler(PatternMatchingEventHandler):
             def __init__(self, *args, **kwargs):
                 super(ScssEventHandler, self).__init__(*args, **kwargs)
-                self.css = Scss()
-                self.css.scss_opts['compress'] = options.compress
+                self.css = Scss(scss_opts={
+                    'compress': options.compress
+                })
                 self.output = options.output
 
             def is_valid(self, path):
@@ -6223,8 +6245,9 @@ def main():
         else:
             output = sys.stdout
 
-        css = Scss()
-        css.scss_opts['compress'] = options.compress
+        css = Scss(scss_opts={
+            'compress': options.compress
+        })
         if args:
             for path in args:
                 finput = open(path, 'rt')
