@@ -1,6 +1,10 @@
 Changelog
 =========
 
+1.1.0 - Dec 22, 2011
+	+ Added min() and max() for lists.
+	+ Removed exception raise.
+
 1.0.9 - Dec 22, 2011
 	+ Optimizations in the scanner.
 	+ Added background-noise() for compass-recipes support.
