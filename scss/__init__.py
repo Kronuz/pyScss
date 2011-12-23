@@ -482,6 +482,143 @@ def depar(s):
     return s
 
 
+################################################################################
+# Scanner
+
+
+def _strip_selprop(selprop, lineno):
+    # Get the line number of the selector or property and strip all other
+    # line numbers that might still be there (from multiline selectors)
+    _lineno, _sep, selprop = selprop.partition(SEPARATOR)
+    if _sep == SEPARATOR:
+        _lineno = _lineno.strip()
+        lineno = int(_lineno) if _lineno else 0
+    else:
+        selprop = _lineno
+    selprop = _nl_num_re.sub('\n', selprop)
+    selprop = selprop.strip()
+    return selprop, lineno
+
+
+def _strip(selprop):
+    # Strip all line numbers, ignoring them in the way
+    selprop, _ = _strip_selprop(selprop, None)
+    return selprop
+
+
+################################################################################
+
+
+try:
+    from _scss import locate_blocks
+except ImportError:
+    def locate_blocks(codestr):
+        """
+        For processing CSS like strings.
+
+        Either returns all selectors (that can be "smart" multi-lined, as
+        long as it's joined by `,`, or enclosed in `(` and `)`) with its code block
+        (the one between `{` and `}`, which can be nested), or the "lose" code
+        (properties) that doesn't have any blocks.
+
+        threshold is the number of blank lines before selectors are broken into
+        pieces (properties).
+        """
+        lineno = 0
+
+        par = 0
+        instr = None
+        depth = 0
+        skip = False
+        thin = None
+        i = init = safe = lose = 0
+        start = end = None
+
+        for m in _blocks_re.finditer(codestr):
+            i = m.start(0)
+            c = codestr[i]
+            if instr is not None:
+                if c == instr:
+                    instr = None  # A string ends (FIXME: needs to accept escaped characters)
+            elif c in ('"', "'"):
+                instr = c  # A string starts
+            elif c == '(':  # parenthesis begins:
+                par += 1
+                thin = None
+                safe = i + 1
+            elif c == ')':  # parenthesis ends:
+                par -= 1
+            elif not par and not instr:
+                if c == '{':  # block begins:
+                    if depth == 0:
+                        if i > 0 and codestr[i - 1] == '#':  # Do not process #{...} as blocks!
+                            skip = True
+                        else:
+                            start = i
+                            if thin is not None and _strip(codestr[thin:i]):
+                                init = thin
+                            if lose < init:
+                                _property, lineno = _strip_selprop(codestr[lose:init], lineno)
+                                if _property:
+                                    yield lineno, _property, None
+                                lose = init
+                            thin = None
+                    depth += 1
+                elif c == '}':  # block ends:
+                    if depth > 0:
+                        depth -= 1
+                        if depth == 0:
+                            if not skip:
+                                end = i
+                                _selectors, lineno = _strip_selprop(codestr[init:start], lineno)
+                                _codestr = codestr[start + 1:end].strip()
+                                if _selectors:
+                                    yield lineno, _selectors, _codestr
+                                init = safe = lose = end + 1
+                                thin = None
+                            skip = False
+                elif depth == 0:
+                    if c == ';':  # End of property (or block):
+                        init = i
+                        if lose < init:
+                            _property, lineno = _strip_selprop(codestr[lose:init], lineno)
+                            if _property:
+                                yield lineno, _property, None
+                            init = safe = lose = i + 1
+                        thin = None
+                    elif c == ',':
+                        if thin is not None and _strip(codestr[thin:i]):
+                            init = thin
+                        thin = None
+                        safe = i + 1
+                    elif c == '\n':
+                        if thin is not None and _strip(codestr[thin:i]):
+                            init = thin
+                            thin = i + 1
+                        elif thin is None and _strip(codestr[safe:i]):
+                            thin = i + 1  # Step on thin ice, if it breaks, it breaks here
+        if depth > 0:
+            if not skip:
+                _selectors, lineno = _strip_selprop(codestr[init:start], lineno)
+                _codestr = codestr[start + 1:].strip()
+                if _selectors:
+                    yield lineno, _selectors, _codestr
+                if par:
+                    raise Exception("Missing closing parenthesis somewhere in block: '%s'" % _selectors)
+                elif instr:
+                    raise Exception("Missing closing string somewhere in block: '%s'" % _selectors)
+                else:
+                    raise Exception("Block never closed: '%s'" % _selectors)
+        losestr = codestr[lose:]
+        for _property in losestr.split(';'):
+            _property, lineno = _strip_selprop(_property, lineno)
+            if _property:
+                yield lineno, _property, None
+
+
+################################################################################
+
+
 class Scss(object):
     # configuration:
     construct = 'self'
@@ -647,118 +784,6 @@ class Scss(object):
             start += 1
         return common
 
-    def locate_blocks(self, codestr):
-        """
-        Returns all code blocks between `{` and `}` and a proper key
-        that can be multilined as long as it's joined by `,` or enclosed in
-        `(` and `)`.
-        Returns the "lose" code that's not part of the block as a third item.
-        """
-        def _strip_selprop(selprop, lineno):
-            _lineno, _sep, selprop = selprop.partition(SEPARATOR)
-            if _sep == SEPARATOR:
-                lineno = _lineno.strip()
-                lineno = int(lineno) if lineno else 0
-            else:
-                selprop = _lineno
-            selprop = _nl_num_re.sub('\n', selprop)
-            selprop = selprop.strip()
-            return selprop, lineno
-
-        def _strip(selprop):
-            selprop, _ = _strip_selprop(selprop, 0)
-            return selprop
-
-        lineno = 0
-
-        par = 0
-        instr = None
-        depth = 0
-        skip = False
-        thin = None
-        i = init = safe = lose = 0
-        start = end = None
-
-        for m in _blocks_re.finditer(codestr):
-            _s = m.start(0)
-            _e = m.end(0)
-            i = _e - 1
-            if _s == _e:
-                break
-            if instr is not None:
-                if codestr[i] == instr:
-                    instr = None
-            elif codestr[i] in ('"', "'"):
-                instr = codestr[i]
-            elif codestr[i] == '(':
-                par += 1
-                thin = None
-                safe = i + 1
-            elif codestr[i] == ')':
-                par -= 1
-            elif not par and not instr:
-                if codestr[i] == '{':
-                    if depth == 0:
-                        if i > 0 and codestr[i - 1] == '#':
-                            skip = True
-                        else:
-                            start = i
-                            if thin is not None and _strip(codestr[thin:i - 1]):
-                                init = thin
-                            if lose < init:
-                                losestr = codestr[lose:init]
-                                for _property in losestr.split(';'):
-                                    _property, lineno = _strip_selprop(_property, lineno)
-                                    if _property:
-                                        yield lineno, _property, None
-                                lose = init
-                            thin = None
-                    depth += 1
-                elif codestr[i] == '}':
-                    if depth > 0:
-                        depth -= 1
-                        if depth == 0:
-                            if not skip:
-                                end = i
-                                _selectors, lineno = _strip_selprop(codestr[init:start], lineno)
-                                _codestr = codestr[start + 1:end].strip()
-                                if _selectors:
-                                    yield lineno, _selectors, _codestr
-                                init = safe = lose = end + 1
-                                thin = None
-                            skip = False
-                elif depth == 0:
-                    if codestr[i] == ';':
-                        init = safe = i + 1
-                        thin = None
-                    elif codestr[i] == ',':
-                        if thin is not None and _strip(codestr[thin:i - 1]):
-                            init = thin
-                        thin = None
-                        safe = i + 1
-                    elif codestr[i] == '\n':
-                        if thin is None and _strip(codestr[safe:i - 1]):
-                            thin = i + 1
-                        elif thin is not None and _strip(codestr[thin:i - 1]):
-                            init = i + 1
-                            thin = None
-        if depth > 0:
-            if not skip:
-                _selectors, lineno = _strip_selprop(codestr[init:start], lineno)
-                _codestr = codestr[start + 1:].strip()
-                if _selectors:
-                    yield lineno, _selectors, _codestr
-                if par:
-                    raise Exception("Missing closing parenthesis somewhere in block: '%s'" % _selectors)
-                elif instr:
-                    raise Exception("Missing closing string somewhere in block: '%s'" % _selectors)
-                else:
-                    raise Exception("Block never closed: '%s'" % _selectors)
-        losestr = codestr[lose:]
-        for _property in losestr.split(';'):
-            _property, lineno = _strip_selprop(_property, lineno)
-            if _property:
-                yield lineno, _property, None
 
     def normalize_selectors(self, _selectors, extra_selectors=None, extra_parents=None):
         """
@@ -873,7 +898,7 @@ class Scss(object):
 
     @print_timing(4)
     def manage_children(self, rule, p_selectors, p_parents, p_children, scope, media):
-        for c_lineno, c_property, c_codestr in self.locate_blocks(rule[CODESTR]):
+        for c_lineno, c_property, c_codestr in locate_blocks(rule[CODESTR]):
             if '@return' in rule[OPTIONS]:
                 return
             # Rules preprocessing...

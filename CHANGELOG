@@ -1,5 +1,7 @@
 Changelog
 =========
+1.1.1 RC - ??
+	+ Added optional C module for an amazing boost in speed!
 
 1.1.0 - Dec 22, 2011
 	+ Added min() and max() for lists.

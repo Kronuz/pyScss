@@ -10,3 +10,4 @@ pyScss.egg-info/entry_points.txt
 pyScss.egg-info/top_level.txt
 scss/__init__.py
 scss/scss_meta.py
+scss/src/_scss.c
