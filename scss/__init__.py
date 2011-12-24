@@ -2935,7 +2935,7 @@ def _stylesheet_url(path, only_path=False, cache_buster=True):
             filetime = 'NA'
     BASE_URL = STATIC_URL
 
-    url = '%s%s' % BASE_URL, filepath
+    url = '%s%s' % (BASE_URL, filepath)
     if cache_buster:
         url += '?_=%s' % filetime
     if not only_path:
@@ -3073,7 +3073,7 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
                 path = open(asset_path, 'rb')
                 url = 'data:' + mime_type + ';base64,' + base64.b64encode(path.read())
             else:
-                url = '%s%s' % BASE_URL, filepath
+                url = '%s%s' % (BASE_URL, filepath)
                 if cache_buster:
                     filetime = int(os.path.getmtime(filepath))
                     url += '?_=%s' % filetime
