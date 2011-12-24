@@ -4,6 +4,7 @@
 ## Any suggestion from python wizards? :-)
 
 import re
+import sys
 from datetime import datetime
 
 import pstats
@@ -36,6 +37,10 @@ def profile(fn):
             stream.close()
         return res
     return wrapper
+
+DEBUG = False
+################################################################################
+# Helper functions
 
 
 SEPARATOR = '\x00'
@@ -101,7 +106,7 @@ SELPROP = 11
 
 
 def _start_string(codestr, ctx, i, c):
-    # print "_start_string"
+    if DEBUG: print "_start_string"
     # A string starts
     ctx[INSTR] = c
     return
@@ -109,7 +114,7 @@ def _start_string(codestr, ctx, i, c):
 
 
 def _end_string(codestr, ctx, i, c):
-    # print "_end_string"
+    if DEBUG: print "_end_string"
     # A string ends (FIXME: needs to accept escaped characters)
     ctx[INSTR] = None
     return
@@ -117,7 +122,7 @@ def _end_string(codestr, ctx, i, c):
 
 
 def _start_parenthesis(codestr, ctx, i, c):
-    # print "_start_parenthesis"
+    if DEBUG: print "_start_parenthesis"
     # parenthesis begins:
     ctx[PAR] += 1
     ctx[THIN] = None
@@ -127,16 +132,16 @@ def _start_parenthesis(codestr, ctx, i, c):
 
 
 def _end_parenthesis(codestr, ctx, i, c):
-    # print "_end_parenthesis"
+    if DEBUG: print "_end_parenthesis"
     ctx[PAR] -= 1
     return
     yield
 
 
 def _flush_properties(codestr, ctx, i, c):
-    # print "_flush_properties"
+    if DEBUG: print "_flush_properties"
     # Flush properties
-    if ctx[LOSE] < ctx[INIT]:
+    if ctx[LOSE] <= ctx[INIT]:
         _property, ctx[LINENO] = _strip_selprop(codestr[ctx[LOSE]:ctx[INIT]], ctx[LINENO])
         if _property:
             yield ctx[LINENO], _property, None
@@ -147,7 +152,7 @@ def _flush_properties(codestr, ctx, i, c):
 
 
 def _start_block1(codestr, ctx, i, c):
-    # print "_start_block1"
+    if DEBUG: print "_start_block1"
     # Start level-1 block
     if i > 0 and codestr[i - 1] == '#':  # Do not process #{...} as blocks!
         ctx[SKIP] = True
@@ -164,7 +169,7 @@ def _start_block1(codestr, ctx, i, c):
 
 
 def _start_block(codestr, ctx, i, c):
-    # print "_start_block"
+    if DEBUG: print "_start_block"
     # Start blocks:
     ctx[DEPTH] += 1
     return
@@ -172,7 +177,7 @@ def _start_block(codestr, ctx, i, c):
 
 
 def _end_block1(codestr, ctx, i, c):
-    # print "_end_block1"
+    if DEBUG: print "_end_block1"
     # End level-1 block:
     ctx[DEPTH] -= 1
     if not ctx[SKIP]:
@@ -190,7 +195,7 @@ def _end_block1(codestr, ctx, i, c):
 
 
 def _end_block(codestr, ctx, i, c):
-    # print "_end_block"
+    if DEBUG: print "_end_block"
     # Block ends:
     ctx[DEPTH] -= 1
     return
@@ -198,10 +203,10 @@ def _end_block(codestr, ctx, i, c):
 
 
 def _end_property(codestr, ctx, i, c):
-    # print "_end_property"
+    if DEBUG: print "_end_property"
     # End of property (or block):
     ctx[INIT] = i
-    if ctx[LOSE] < ctx[INIT]:
+    if ctx[LOSE] <= ctx[INIT]:
         _property, ctx[LINENO] = _strip_selprop(codestr[ctx[LOSE]:ctx[INIT]], ctx[LINENO])
         if _property:
             yield ctx[LINENO], _property, None
@@ -213,7 +218,7 @@ def _end_property(codestr, ctx, i, c):
 
 
 def _mark_safe(codestr, ctx, i, c):
-    # print "_mark_safe"
+    if DEBUG: print "_mark_safe"
     # We are on a safe zone
     if ctx[THIN] is not None and _strip(codestr[ctx[THIN]:i]):
         ctx[INIT] = ctx[THIN]
@@ -224,7 +229,7 @@ def _mark_safe(codestr, ctx, i, c):
 
 
 def _mark_thin(codestr, ctx, i, c):
-    # print "_mark_thin"
+    if DEBUG: print "_mark_thin"
     # Step on thin ice, if it breaks, it breaks here
     if ctx[THIN] is not None and _strip(codestr[ctx[THIN]:i]):
         ctx[INIT] = ctx[THIN]
@@ -235,7 +240,7 @@ def _mark_thin(codestr, ctx, i, c):
     yield
 
 
-fmap = {
+scss_function_map = {
     # (c, instr, par, depth)
     ('"', None, False, 0): _start_string,
     ("'", None, False, 0): _start_string,
@@ -271,6 +276,8 @@ fmap = {
     ("(", None, True, 2): _start_parenthesis,
 
     (")", None, True, 0): _end_parenthesis,
+    (")", None, True, 1): _end_parenthesis,
+    (")", None, True, 2): _end_parenthesis,
 
     ("{", None, False, 0): _start_block1,
     ("{", None, False, 1): _start_block,
@@ -308,7 +315,8 @@ def _locate_blocks_a(codestr):
     for m in _blocks_re.finditer(codestr):
         c = m.group()
 
-        fn = fmap.get((c, ctx[INSTR], ctx[PAR] != 0, 2 if ctx[DEPTH] > 1 else ctx[DEPTH]))
+        fn = scss_function_map.get((c, ctx[INSTR], ctx[PAR] != 0, 2 if ctx[DEPTH] > 1 else ctx[DEPTH]))
+        if DEBUG: print fn and ' > ' or '   ', fn and fn.__name__, (c, ctx[INSTR], ctx[PAR] != 0, 2 if ctx[DEPTH] > 1 else ctx[DEPTH])
         if fn:
             for y in fn(codestr, ctx, m.start(), c):
                 yield y
@@ -323,14 +331,17 @@ def _locate_blocks_a(codestr):
         exc = exc or "Block never closed: '%s'" % ctx[SELPROP]
         while ctx[DEPTH] > 0 and ctx[INIT] < codestr_end:
             c = '}'
-            fn = fmap.get((c, ctx[INSTR], ctx[PAR] != 0, 2 if ctx[DEPTH] > 1 else ctx[DEPTH]))
+            fn = scss_function_map.get((c, ctx[INSTR], ctx[PAR] != 0, 2 if ctx[DEPTH] > 1 else ctx[DEPTH]))
+            if DEBUG: print fn and ' > ' or ' ! ', fn and fn.__name__, (c, ctx[INSTR], ctx[PAR] != 0, 2 if ctx[DEPTH] > 1 else ctx[DEPTH])
             if fn:
                 for y in fn(codestr, ctx, m.start(), c):
                     yield y
 
-    while ctx[LOSE] < ctx[INIT]:
+    if ctx[INIT] < codestr_end:
+        ctx[INIT] = codestr_end
         c = None
-        fn = fmap.get((c, ctx[INSTR], ctx[PAR] != 0, 2 if ctx[DEPTH] > 1 else ctx[DEPTH]))
+        fn = scss_function_map.get((c, ctx[INSTR], ctx[PAR] != 0, 2 if ctx[DEPTH] > 1 else ctx[DEPTH]))
+        if DEBUG: print fn and ' > ' or ' ! ', fn and fn.__name__, (c, ctx[INSTR], ctx[PAR] != 0, 2 if ctx[DEPTH] > 1 else ctx[DEPTH])
         if fn:
             for y in fn(codestr, ctx, m.start(), c):
                 yield y
@@ -388,7 +399,7 @@ def _locate_blocks_b(codestr):
                         start = i
                         if thin is not None and _strip(codestr[thin:i]):
                             init = thin
-                        if lose < init:
+                        if lose <= init:
                             _property, lineno = _strip_selprop(codestr[lose:init], lineno)
                             if _property:
                                 yield lineno, _property, None
@@ -411,7 +422,7 @@ def _locate_blocks_b(codestr):
             elif depth == 0:
                 if c == ';':  # End of property (or block):
                     init = i
-                    if lose < init:
+                    if lose <= init:
                         _property, lineno = _strip_selprop(codestr[lose:init], lineno)
                         if _property:
                             yield lineno, _property, None
@@ -453,13 +464,10 @@ def _locate_blocks_b(codestr):
 try:
     from _scss import locate_blocks as _locate_blocks_c
 except ImportError:
-    pass
+    print >>sys.stderr, "Scanning acceleration disabled (_scss not found)!"
 
 
 ################################################################################
-
-
-locate_blocks = _locate_blocks_c
 
 
 codestr = """
@@ -496,13 +504,18 @@ however this is a selector (
 """
 verify = '\t----------------------------------------------------------------------\n\t>[1] \'simple\'\n\t----------------------------------------------------------------------\n\t>\t[3] \'block\'\n\t----------------------------------------------------------------------\n\t>[5] \'#{ignored}\'\n\t----------------------------------------------------------------------\n\t>[6] \'some,\\nselectors,\\nand multi-lined,\\nselectors\'\n\t----------------------------------------------------------------------\n\t>[10] \'with more\'\n\t----------------------------------------------------------------------\n\t>\t[12] \'the block in here\'\n\t----------------------------------------------------------------------\n\t>\t[13] \'can have, nested, selectors\'\n\t----------------------------------------------------------------------\n\t>\t\t[14] \'and properties in nested blocks\'\n\t----------------------------------------------------------------------\n\t>\t\t[15] \'and stuff with #{ ignored blocks }\'\n\t----------------------------------------------------------------------\n\t>\t[17] \'properties-can: "have strings with stuff like this: }"\'\n\t----------------------------------------------------------------------\n\t>[19] \'and other,\\nselectors\\ncan be turned into "lose"\\nproperties\'\n\t----------------------------------------------------------------------\n\t>[23] \'if no commas are found\\nhowever this is a selector (\\nas well as these things,\\nwhich are parameters\\nand can expand\\nany number of\\nlines)\'\n\t----------------------------------------------------------------------\n\t>\t[30] \'and this is its block\'\n'
 
+locate_blocks = _locate_blocks_a
 
-def process_block(codestr, level=0):
-    ret = ''
+
+def process_block(codestr, level=0, dump=False):
+    ret = '' if dump else None
     for lineno, selprop, block in locate_blocks(codestr):
-        ret += '\t%s\n\t>%s[%s] %s\n' % ('-' * 70, '\t' * level, lineno, repr(selprop))
+        if dump:
+            ret += '\t%s\n\t>%s[%s] %s\n' % ('-' * 70, '\t' * level, lineno, repr(selprop))
         if block:
-            ret += process_block(block, level + 1)
+            _ret = process_block(block, level + 1, dump)
+            if dump:
+                ret += _ret
     return ret
 
 
@@ -515,7 +528,7 @@ def profile_process_block(codestr):
 if __name__ == "__main__":
     codestr = load_string(codestr)
 
-    ret = process_block(codestr)
+    ret = process_block(codestr, dump=True)
     print "This is what `%s()` returned:" % locate_blocks.__name__
     # print repr(ret)
     print ret

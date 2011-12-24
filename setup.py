@@ -19,6 +19,39 @@ if sys.version_info >= (3, 0):
         use_2to3=True,
     )
 
+
+EXT_MODULES = [Extension('scss._scss', sources=['scss/src/_scss.c'], optional=True)]
+if '--with-accel' in sys.argv:
+    sys.argv.remove('--with-accel')
+if '--without-accel' in sys.argv:
+    sys.argv.remove('--without-accel')
+    EXT_MODULES = []
+if EXT_MODULES:
+    print
+    print '+------------------------------------------------------------------+'
+    print '|                                                                  |'
+    print '| pyScss, a Scss compiler for Python                               |'
+    print '| ==================================                               |'
+    print '|                                                                  |'
+    print '| This package comes with an acceleration module in C.             |'
+    print '|                                                                  |'
+    print '| By default,the acceleration module is compiled and installed.    |'
+    print '| Build and install without it by passing: --without-accel         |'
+    print '|                                                                  |'
+    print '+#################################################################-+'
+    print
+else:
+    print
+    print '+------------------------------------------------------------------+'
+    print '|                                                                  |'
+    print '| pyScss, a Scss compiler for Python                               |'
+    print '| ==================================                               |'
+    print '|                                                                  |'
+    print '| Acceleration module disabled by the user.                        |'
+    print '|                                                                  |'
+    print '+#################################################################-+'
+    print
+
 setup(name=PROJECT,
     version=VERSION,
     description=read('DESCRIPTION'),
@@ -41,9 +74,7 @@ setup(name=PROJECT,
         "Topic :: Text Processing :: Markup",
         "Topic :: Software Development :: Libraries :: Python Modules"
     ],
-    ext_modules=[
-        Extension('scss._scss', sources=['scss/src/_scss.c'], optional=True)
-    ],
+    ext_modules=EXT_MODULES,
     package_data={'scss': ['scss/tests.rst', 'LICENSE', 'CHANGELOG']},
     entry_points="""
     [console_scripts]

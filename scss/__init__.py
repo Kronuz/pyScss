@@ -305,7 +305,7 @@ _default_scss_opts = {
 }
 
 SEPARATOR = '\x00'
-_nl_re = re.compile(r'\n', re.MULTILINE)
+_nl_re = re.compile(r'\s*\n\s*', re.MULTILINE)
 _nl_num_re = re.compile(r'\n.+' + SEPARATOR, re.MULTILINE)
 _nl_num_nl_re = re.compile(r'\n.+' + SEPARATOR + r'\s*\n', re.MULTILINE)
 
@@ -486,32 +486,29 @@ def depar(s):
 # Scanner
 
 
-def _strip_selprop(selprop, lineno):
-    # Get the line number of the selector or property and strip all other
-    # line numbers that might still be there (from multiline selectors)
-    _lineno, _sep, selprop = selprop.partition(SEPARATOR)
-    if _sep == SEPARATOR:
-        _lineno = _lineno.strip()
-        lineno = int(_lineno) if _lineno else 0
-    else:
-        selprop = _lineno
-    selprop = _nl_num_re.sub('\n', selprop)
-    selprop = selprop.strip()
-    return selprop, lineno
-
-
-def _strip(selprop):
-    # Strip all line numbers, ignoring them in the way
-    selprop, _ = _strip_selprop(selprop, None)
-    return selprop
-
-
-################################################################################
-
-
 try:
     from _scss import locate_blocks
 except ImportError:
+    print >>sys.stderr, "Scanning acceleration disabled (_scss not found)!"
+
+    def _strip_selprop(selprop, lineno):
+        # Get the line number of the selector or property and strip all other
+        # line numbers that might still be there (from multiline selectors)
+        _lineno, _sep, selprop = selprop.partition(SEPARATOR)
+        if _sep == SEPARATOR:
+            _lineno = _lineno.strip()
+            lineno = int(_lineno) if _lineno else 0
+        else:
+            selprop = _lineno
+        selprop = _nl_num_re.sub('\n', selprop)
+        selprop = selprop.strip()
+        return selprop, lineno
+
+    def _strip(selprop):
+        # Strip all line numbers, ignoring them in the way
+        selprop, _ = _strip_selprop(selprop, None)
+        return selprop
+
     def locate_blocks(codestr):
         """
         For processing CSS like strings.
@@ -783,7 +780,6 @@ class Scss(object):
                 common = start + 1
             start += 1
         return common
-
 
     def normalize_selectors(self, _selectors, extra_selectors=None, extra_parents=None):
         """
@@ -1114,13 +1110,14 @@ class Scss(object):
             for name in names:
                 name = dequote(name.strip())
                 if '@import ' + name not in rule[OPTIONS]:  # If already imported in this scope, skip...
+                    unsupported = []
+                    load_paths = []
                     try:
                         raise KeyError
                         i_codestr = self.scss_files[name]
                     except KeyError:
                         filename = os.path.basename(name)
                         dirname = os.path.dirname(name)
-                        load_paths = []
                         i_codestr = None
                         for path in ['./'] + LOAD_PATHS.split(','):
                             for basepath in ['./', os.path.dirname(rule[PATH])]:
@@ -1128,21 +1125,25 @@ class Scss(object):
                                 full_path = os.path.realpath(os.path.join(path, basepath, dirname))
                                 if full_path not in load_paths:
                                     try:
-                                        full_filename = os.path.join(full_path, '_' + filename + '.scss')
-                                        i_codestr = open(full_filename).read()
-                                    except:
+                                        full_filename = os.path.join(full_path, '_' + filename)
+                                        i_codestr = open(full_filename + '.scss').read()
+                                    except IOError:
+                                        if os.path.exists(full_filename + '.sass'):
+                                            unsupported.append(full_filename + '.sass')
                                         try:
-                                            full_filename = os.path.join(full_path, filename + '.scss')
-                                            i_codestr = open(full_filename).read()
-                                        except:
+                                            full_filename = os.path.join(full_path, filename)
+                                            i_codestr = open(full_filename + '.scss').read()
+                                        except IOError:
+                                            if os.path.exists(full_filename + '.sass'):
+                                                unsupported.append(full_filename + '.sass')
                                             try:
                                                 full_filename = os.path.join(full_path, '_' + filename)
                                                 i_codestr = open(full_filename).read()
-                                            except:
+                                            except IOError:
                                                 try:
                                                     full_filename = os.path.join(full_path, filename)
                                                     i_codestr = open(full_filename).read()
-                                                except:
+                                                except IOError:
                                                     pass
                                     if i_codestr is not None:
                                         break
@@ -1156,7 +1157,9 @@ class Scss(object):
                         if name not in self.scss_files:
                             self._scss_files_order.append(name)
                     if i_codestr is None:
-                        log.warn("File to import not found or unreadable: '%s'\nLoad paths:\n\t%s", filename, "\n\t".join(load_paths))
+                        load_paths = load_paths and "\nLoad paths:\n\t%s" % "\n\t".join(load_paths) or ''
+                        unsupported = unsupported and "\nPossible matches (for unsupported file format SASS):\n\t%s" % "\n\t".join(unsupported) or ''
+                        log.warn("File to import not found or unreadable: '%s' (%s)%s%s", filename, rule[INDEX][rule[LINENO]], load_paths, unsupported)
                     else:
                         _rule = spawn_rule(rule, codestr=i_codestr, path=full_filename, lineno=c_lineno)
                         self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
@@ -1267,7 +1270,7 @@ class Scss(object):
         Implements @else
         """
         if '@if' not in rule[OPTIONS]:
-            log.error("@else with no @if (%s", rule[INDEX][rule[LINENO]])
+            log.error("@else with no @if (%s)", rule[INDEX][rule[LINENO]])
         val = rule[OPTIONS].pop('@if', True)
         if not val:
             rule[CODESTR] = c_codestr
@@ -2910,92 +2913,226 @@ def _background_noise(intensity=None, opacity=None, size=None, monochrome=False,
     return StringValue(inline)
 
 
-def _inline_image(image, mime_type=None):
+def _stylesheet_url(path, only_path=False, cache_buster=True):
     """
-    Embeds the contents of a file directly inside your stylesheet, eliminating
-    the need for another HTTP request. For small files such images or fonts,
-    this can be a performance benefit at the cost of a larger generated CSS
-    file.
+    Generates a path to an asset found relative to the project's css directory.
+    Passing a true value as the second argument will cause the only the path to
+    be returned instead of a `url()` function
     """
-    file = StringValue(image).value
-    mime_type = StringValue(mime_type).value or mimetypes.guess_type(file)[0]
-    path = None
+    filepath = StringValue(path).value
     if callable(STATIC_ROOT):
         try:
-            _file, _storage = list(STATIC_ROOT(file))[0]
-            path = _storage.open(_file)
-        except:
-            pass
-    else:
-        _path = os.path.join(STATIC_ROOT, file)
-        if os.path.exists(_path):
-            path = open(_path, 'rb')
-    if path:
-        url = 'data:' + mime_type + ';base64,' + base64.b64encode(path.read())
-    url = url = '%s%s?_=%s' % (STATIC_URL, file, 'NA')
-    inline = 'url("%s")' % escape(url)
-    return StringValue(inline)
-
-
-def _image_url(image, dst_color=None, src_color=None):
-    """
-    Generates a path to an asset found relative to the project's images
-    directory.
-    """
-    if src_color and dst_color:
-        if not Image:
-            raise Exception("Images manipulation require PIL")
-    file = StringValue(image).value
-    path = None
-    if callable(STATIC_ROOT):
-        try:
-            _file, _storage = list(STATIC_ROOT(file))[0]
+            _file, _storage = list(STATIC_ROOT(filepath))[0]
             d_obj = _storage.modified_time(_file)
             filetime = int(time.mktime(d_obj.timetuple()))
-            if dst_color:
+        except:
+            filetime = 'NA'
+    else:
+        _path = os.path.join(STATIC_ROOT, filepath)
+        if os.path.exists(_path):
+            filetime = int(os.path.getmtime(_path))
+        else:
+            filetime = 'NA'
+    BASE_URL = STATIC_URL
+
+    url = '%s%s' % BASE_URL, filepath
+    if cache_buster:
+        url += '?_=%s' % filetime
+    if not only_path:
+        url = 'url("%s")' % (url)
+    return StringValue(url)
+
+
+def __font_url(path, only_path=False, cache_buster=True, inline=False):
+    filepath = StringValue(path).value
+    path = None
+    if callable(STATIC_ROOT):
+        try:
+            _file, _storage = list(STATIC_ROOT(filepath))[0]
+            d_obj = _storage.modified_time(_file)
+            filetime = int(time.mktime(d_obj.timetuple()))
+            if inline:
                 path = _storage.open(_file)
         except:
             filetime = 'NA'
     else:
-        _path = os.path.join(STATIC_ROOT, file)
+        _path = os.path.join(STATIC_ROOT, filepath)
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
-            if dst_color:
+            if inline:
+                path = open(_path, 'rb')
+        else:
+            filetime = 'NA'
+    BASE_URL = STATIC_URL
+
+    if path and inline:
+        mime_type = mimetypes.guess_type(filepath)[0]
+        url = 'data:' + mime_type + ';base64,' + base64.b64encode(path.read())
+    else:
+        url = '%s%s' % (BASE_URL, filepath)
+        if cache_buster:
+            url += '?_=%s' % filetime
+
+    if not only_path:
+        url = 'url("%s")' % escape(url)
+    return StringValue(url)
+
+
+def __font_files(args, inline):
+    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
+        args = ListValue(args[0]).values()
+    n = 0
+    params = [[], []]
+    for arg in args:
+        if isinstance(arg, ListValue):
+            if len(arg) == 2:
+                if n % 2 == 1:
+                    params[1].append(None)
+                    n += 1
+                params[0].append(arg[0])
+                params[1].append(arg[1])
+                n += 2
+            else:
+                for arg2 in arg:
+                    params[n % 2].append(arg2)
+                    n += 1
+        else:
+            params[n % 2].append(arg)
+            n += 1
+    len0 = len(params[0])
+    len1 = len(params[1])
+    if len1 < len0:
+        params[1] += [None] * (len0 - len1)
+    elif len0 < len1:
+        params[0] += [None] * (len1 - len0)
+    fonts = []
+    for font, format in zip(params[0], params[1]):
+        if format:
+            fonts.append('%s format("%s")' % (__font_url(font, inline=inline), StringValue(format).value))
+        else:
+            fonts.append(__font_url(font, inline=inline))
+    return ListValue(fonts)
+
+
+def _font_url(path, only_path=False, cache_buster=True):
+    """
+    Generates a path to an asset found relative to the project's font directory.
+    Passing a true value as the second argument will cause the only the path to
+    be returned instead of a `url()` function
+    """
+    return __font_url(path, only_path, cache_buster, False)
+
+
+def _font_files(*args):
+    return __font_files(args, inline=False)
+
+
+def _inline_font_files(*args):
+    return __font_files(args, inline=True)
+
+
+def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_color=None, inline=False, mime_type=None):
+    if src_color and dst_color:
+        if not Image:
+            raise Exception("Images manipulation require PIL")
+    filepath = StringValue(path).value
+    mime_type = inline and (StringValue(mime_type).value or mimetypes.guess_type(filepath)[0])
+    path = None
+    if callable(STATIC_ROOT):
+        try:
+            _file, _storage = list(STATIC_ROOT(filepath))[0]
+            d_obj = _storage.modified_time(_file)
+            filetime = int(time.mktime(d_obj.timetuple()))
+            if inline or dst_color:
+                path = _storage.open(_file)
+        except:
+            filetime = 'NA'
+    else:
+        _path = os.path.join(STATIC_ROOT, filepath)
+        if os.path.exists(_path):
+            filetime = int(os.path.getmtime(_path))
+            if inline or dst_color:
                 path = open(_path, 'rb')
         else:
             filetime = 'NA'
     BASE_URL = STATIC_URL
     if path:
-        src_color = tuple(int(round(c)) for c in ColorValue(src_color).value[:3]) if src_color else (0, 0, 0)
-        dst_color = [int(round(c)) for c in ColorValue(dst_color).value[:3]]
+        src_color = src_color and tuple(int(round(c)) for c in ColorValue(src_color).value[:3]) if src_color else (0, 0, 0)
+        dst_color = dst_color and [int(round(c)) for c in ColorValue(dst_color).value[:3]]
 
-        file_name, file_ext = os.path.splitext(os.path.normpath(file).replace('\\', '_').replace('/', '_'))
+        file_name, file_ext = os.path.splitext(os.path.normpath(filepath).replace('\\', '_').replace('/', '_'))
         key = (filetime, src_color, dst_color)
         key = file_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + file_ext
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
 
         if os.path.exists(asset_path):
-            file = asset_file
+            filepath = asset_file
             BASE_URL = ASSETS_URL
-            filetime = int(os.path.getmtime(asset_path))
+            if inline:
+                path = open(asset_path, 'rb')
+                url = 'data:' + mime_type + ';base64,' + base64.b64encode(path.read())
+            else:
+                url = '%s%s' % BASE_URL, filepath
+                if cache_buster:
+                    filetime = int(os.path.getmtime(filepath))
+                    url += '?_=%s' % filetime
         else:
             image = Image.open(path)
             image = image.convert("RGBA")
-            pixdata = image.load()
-            for y in xrange(image.size[1]):
-                for x in xrange(image.size[0]):
-                    if pixdata[x, y][:3] == src_color:
-                        new_color = tuple(dst_color + [pixdata[x, y][3]])
-                        pixdata[x, y] = new_color
-            try:
-                image.save(asset_path)
-                file = asset_file
-                BASE_URL = ASSETS_URL
-            except IOError:
-                log.exception("Error while saving image")
-    url = 'url("%s%s?_=%s")' % (BASE_URL, file, filetime)
+            if dst_color:
+                pixdata = image.load()
+                for y in xrange(image.size[1]):
+                    for x in xrange(image.size[0]):
+                        if pixdata[x, y][:3] == src_color:
+                            new_color = tuple(dst_color + [pixdata[x, y][3]])
+                            pixdata[x, y] = new_color
+            if not inline:
+                try:
+                    image.save(asset_path)
+                    filepath = asset_file
+                    BASE_URL = ASSETS_URL
+                except IOError:
+                    log.exception("Error while saving image")
+                    inline = True  # Retry inline version
+                url = '%s%s' % (ASSETS_URL, asset_file)
+                if cache_buster:
+                    filetime = int(os.path.getmtime(asset_path))
+                    url += '?_=%s' % filetime
+            if inline:
+                output = StringIO.StringIO()
+                image.save(output, format='PNG')
+                contents = output.getvalue()
+                output.close()
+                url = 'data:' + mime_type + ';base64,' + base64.b64encode(contents)
+    else:
+        url = '%s%s' % (BASE_URL, filepath)
+        if cache_buster:
+            url += '?_=%s' % filetime
+
+    if not only_path:
+        url = 'url("%s")' % escape(url)
     return StringValue(url)
+
+
+def _inline_image(image, mime_type=None, dst_color=None, src_color=None):
+    """
+    Embeds the contents of a file directly inside your stylesheet, eliminating
+    the need for another HTTP request. For small files such images or fonts,
+    this can be a performance benefit at the cost of a larger generated CSS
+    file.
+    """
+    return __image_url(image, False, False, dst_color, src_color, True, mime_type)
+
+
+def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_color=None):
+    """
+    Generates a path to an asset found relative to the project's images
+    directory.
+    Passing a true value as the second argument will cause the only the path to
+    be returned instead of a `url()` function
+    """
+    return __image_url(path, only_path, cache_buster, dst_color, src_color, False, None)
 
 
 def _image_width(image):
@@ -4265,13 +4402,24 @@ fnct = {
     'background-noise:3': _background_noise,
     'background-noise:4': _background_noise,
 
-    'inline-image:1': _inline_image,
-    'inline-image:2': _inline_image,
     'image-url:1': _image_url,
     'image-url:2': _image_url,
     'image-url:3': _image_url,
+    'image-url:4': _image_url,
+    'image-url:5': _image_url,
+    'inline-image:1': _inline_image,
+    'inline-image:2': _inline_image,
     'image-width:1': _image_width,
     'image-height:1': _image_height,
+
+    'stylesheet-url:1': _stylesheet_url,
+    'stylesheet-url:2': _stylesheet_url,
+
+    'font-url:1': _font_url,
+    'font-url:2': _font_url,
+
+    'font-files:n': _font_files,
+    'inline-font-files:n': _inline_font_files,
 
     'opposite-position:n': _opposite_position,
     'grad-point:n': _grad_point,
@@ -4363,6 +4511,9 @@ fnct = {
     'headers:0': _headers,
     'headers:1': _headers,
     'headers:2': _headers,
+    'headings:0': _headers,
+    'headings:1': _headers,
+    'headings:2': _headers,
     'enumerate:3': _enumerate,
     'enumerate:4': _enumerate,
     'range:1': _range,
@@ -4940,7 +5091,7 @@ def main():
                       help="Print version and exit")
 
     paths_group = OptionGroup(parser, "Resource Paths")
-    paths_group.add_option("-I", "--load-path", metavar="PATH", dest="load_path",
+    paths_group.add_option("-I", "--load-path", metavar="PATH", action='append', dest="load_paths",
                       help="Add a scss import path")
     paths_group.add_option("-S", "--static-root", metavar="PATH", dest="static_root",
                       help="Static root path (Where images and static resources are located)")
@@ -4960,12 +5111,13 @@ def main():
         STATIC_ROOT = options.static_root
     if options.assets_root is not None:
         ASSETS_ROOT = options.assets_root
-    if options.load_path is not None:
+    if options.load_paths is not None:
         load_paths = [p.strip() for p in LOAD_PATHS.split(',')]
-        for p in options.load_path.replace(';', ',').split(','):
-            p = p.strip()
-            if p and p not in load_paths:
-                load_paths.append(p)
+        for load_path in options.load_paths:
+            for p in load_path.replace(os.pathsep, ',').replace(';', ',').split(','):
+                p = p.strip()
+                if p and p not in load_paths:
+                    load_paths.append(p)
         LOAD_PATHS = ','.join(load_paths)
 
     # Execution modes
