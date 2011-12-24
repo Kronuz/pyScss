@@ -3075,7 +3075,7 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
             else:
                 url = '%s%s' % (BASE_URL, filepath)
                 if cache_buster:
-                    filetime = int(os.path.getmtime(filepath))
+                    filetime = int(os.path.getmtime(asset_path))
                     url += '?_=%s' % filetime
         else:
             image = Image.open(path)
@@ -3092,12 +3092,13 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
                     image.save(asset_path)
                     filepath = asset_file
                     BASE_URL = ASSETS_URL
+                    if cache_buster:
+                        filetime = int(os.path.getmtime(asset_path))
                 except IOError:
                     log.exception("Error while saving image")
                     inline = True  # Retry inline version
                 url = '%s%s' % (ASSETS_URL, asset_file)
                 if cache_buster:
-                    filetime = int(os.path.getmtime(asset_path))
                     url += '?_=%s' % filetime
             if inline:
                 output = StringIO.StringIO()
