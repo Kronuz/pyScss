@@ -8,40 +8,20 @@
 * MIT license (http://www.opensource.org/licenses/mit-license.php)
 * Copyright (c) 2011 German M. Bravo (Kronuz), All rights reserved.
 */
-#include <Python.h>
+#import <stdio.h>
+#import <stdlib.h>
+#import <string.h>
 
-/* Counter type */
-staticforward PyTypeObject scss_BlockLocatorType;
+#if defined(_MSC_VER) // Microsoft compiler
+#    define DLLEXPORT __declspec(dllexport)
+#elif defined(__GNUC__) // GNU compiler
+#    define DLLEXPORT
+#else
+#    error Unknown compiler, donot know how to process dllexport
+#endif
 
 #undef DEBUG
-
-void reprl(char *str, int len) {
-	char c,
-		 *begin = str,
-		 *end = str + len;
-	PySys_WriteStderr("'");
-	while (begin < end) {
-		c = *begin;
-		if (len == -1 && !c) {
-			break;
-		} else if (c == '\r') {
-			PySys_WriteStderr("\\r");
-		} else if (c == '\n') {
-			PySys_WriteStderr("\\n");
-		} else if (c == '\t') {
-			PySys_WriteStderr("\\t");
-		} else if (c < ' ') {
-			PySys_WriteStderr("\\x%02x", c);
-		} else {
-			PySys_WriteStderr("%c", c);
-		}
-		begin++;
-	}
-	PySys_WriteStderr("'\n");
-}
-void repr(char *str, char *str2) {
-	reprl(str, (int)(str2 - str));
-}
+// #define DEBUG 1
 
 typedef struct {
 	int error;
@@ -53,7 +33,6 @@ typedef struct {
 } scss_Block;
 
 typedef struct {
-	PyObject_HEAD
 	char *exc;
 	char *_codestr;
 	char *codestr;
@@ -146,7 +125,7 @@ typedef void scss_Callback(scss_BlockLocator*);
 
 void _start_string(scss_BlockLocator *self) {
 	#ifdef DEBUG
-		PySys_WriteStderr("_start_string\n");
+		fprintf(stderr, "_start_string\n");
 	#endif
 	// A string starts
 	self->instr = *(self->codestr_ptr);
@@ -154,7 +133,7 @@ void _start_string(scss_BlockLocator *self) {
 
 void _end_string(scss_BlockLocator *self) {
 	#ifdef DEBUG
-		PySys_WriteStderr("_end_string\n");
+		fprintf(stderr, "_end_string\n");
 	#endif
 	// A string ends (FIXME: needs to accept escaped characters)
 	self->instr = 0;
@@ -162,7 +141,7 @@ void _end_string(scss_BlockLocator *self) {
 
 void _start_parenthesis(scss_BlockLocator *self) {
 	#ifdef DEBUG
-		PySys_WriteStderr("_start_parenthesis\n");
+		fprintf(stderr, "_start_parenthesis\n");
 	#endif
 	// parenthesis begins:
 	self->par++;
@@ -172,14 +151,14 @@ void _start_parenthesis(scss_BlockLocator *self) {
 
 void _end_parenthesis(scss_BlockLocator *self) {
 	#ifdef DEBUG
-		PySys_WriteStderr("_end_parenthesis\n");
+		fprintf(stderr, "_end_parenthesis\n");
 	#endif
 	self->par--;
 }
 
 void _flush_properties(scss_BlockLocator *self) {
 	#ifdef DEBUG
-		PySys_WriteStderr("_flush_properties\n");
+		fprintf(stderr, "_flush_properties\n");
 	#endif
 	// Flush properties
 	int len, lineno = -1;
@@ -203,7 +182,7 @@ void _flush_properties(scss_BlockLocator *self) {
 
 void _start_block1(scss_BlockLocator *self) {
 	#ifdef DEBUG
-		PySys_WriteStderr("_start_block1\n");
+		fprintf(stderr, "_start_block1\n");
 	#endif
 	// Start block:
 	if (self->codestr_ptr > self->codestr && *(self->codestr_ptr - 1) == '#') {
@@ -221,7 +200,7 @@ void _start_block1(scss_BlockLocator *self) {
 
 void _start_block(scss_BlockLocator *self) {
 	#ifdef DEBUG
-		PySys_WriteStderr("_start_block\n");
+		fprintf(stderr, "_start_block\n");
 	#endif
 	// Start block:
 	self->depth++;
@@ -229,7 +208,7 @@ void _start_block(scss_BlockLocator *self) {
 
 void _end_block1(scss_BlockLocator *self) {
 	#ifdef DEBUG
-		PySys_WriteStderr("_end_block1\n");
+		fprintf(stderr, "_end_block1\n");
 	#endif
 	// Block ends:
 	int len, lineno = -1;
@@ -256,7 +235,7 @@ void _end_block1(scss_BlockLocator *self) {
 
 void _end_block(scss_BlockLocator *self) {
 	#ifdef DEBUG
-		PySys_WriteStderr("_end_block\n");
+		fprintf(stderr, "_end_block\n");
 	#endif
 	// Block ends:
 	self->depth--;
@@ -264,7 +243,7 @@ void _end_block(scss_BlockLocator *self) {
 
 void _end_property(scss_BlockLocator *self) {
 	#ifdef DEBUG
-		PySys_WriteStderr("_end_property\n");
+		fprintf(stderr, "_end_property\n");
 	#endif
 	// End of property (or block):
 	int len, lineno = -1;
@@ -290,7 +269,7 @@ void _end_property(scss_BlockLocator *self) {
 
 void _mark_safe(scss_BlockLocator *self) {
 	#ifdef DEBUG
-		PySys_WriteStderr("_mark_safe\n");
+		fprintf(stderr, "_mark_safe\n");
 	#endif
 	// We are on a safe zone
 	if (self->thin != NULL && _strip(self->thin, self->codestr_ptr, NULL)) {
@@ -302,7 +281,7 @@ void _mark_safe(scss_BlockLocator *self) {
 
 void _mark_thin(scss_BlockLocator *self) {
 	#ifdef DEBUG
-		PySys_WriteStderr("_mark_thin\n");
+		fprintf(stderr, "_mark_thin\n");
 	#endif
 	// Step on thin ice, if it breaks, it breaks here
 	if (self->thin != NULL && _strip(self->thin, self->codestr_ptr, NULL)) {
@@ -379,21 +358,21 @@ void init_function_map(void) {
 	scss_function_map[0 + 256*0 + 256*256*0 + 256*256*2*1] = _flush_properties;
 	scss_function_map[0 + 256*0 + 256*256*0 + 256*256*2*2] = _flush_properties;
 	#ifdef DEBUG
-		PySys_WriteStderr("Scss function maps initialized!\n");
+		fprintf(stderr, "Scss function maps initialized!\n");
 	#endif
 }
 
 
 /* constructor */
 
-static PyObject *
-scss_BlockLocator_new(char *codestr, int codestr_sz)
+DLLEXPORT
+scss_BlockLocator *block_locator_create(const char *codestr, int codestr_sz)
 {
 	scss_BlockLocator *self;
 
 	init_function_map();
 
-	self = PyObject_New(scss_BlockLocator, &scss_BlockLocatorType);;
+	self = (scss_BlockLocator *)calloc(1, sizeof(scss_BlockLocator));
 	if (self) {
 		self->_codestr = (char *)malloc(codestr_sz);
 		memcpy(self->_codestr, codestr, codestr_sz);
@@ -415,15 +394,15 @@ scss_BlockLocator_new(char *codestr, int codestr_sz)
 		self->exc = NULL;
 
 		#ifdef DEBUG
-			PySys_WriteStderr("Scss BlockLocator object initialized! (%lu)\n", sizeof(scss_BlockLocator));
+			fprintf(stderr, "Scss BlockLocator object initialized! (%lu)\n", sizeof(scss_BlockLocator));
 		#endif
 	}
 
-	return (PyObject *)self;
+	return self;
 }
 
-static void
-scss_BlockLocator_rewind(scss_BlockLocator *self)
+DLLEXPORT
+void block_locator_rewind(scss_BlockLocator *self)
 {
 	free(self->codestr);
 	self->codestr = (char *)malloc(self->codestr_sz);
@@ -443,35 +422,28 @@ scss_BlockLocator_rewind(scss_BlockLocator *self)
 	self->exc = NULL;
 
 	#ifdef DEBUG
-		PySys_WriteStderr("Scss BlockLocator object rewound!\n");
+		fprintf(stderr, "Scss BlockLocator object rewound!\n");
 	#endif
 }
 
-static void
-scss_BlockLocator_dealloc(scss_BlockLocator *self)
+DLLEXPORT
+void block_locator_destroy(scss_BlockLocator *self)
 {
 	free(self->codestr);
 	free(self->_codestr);
 
-	self->ob_type->tp_free((PyObject*)self);
+	free(self);
 
 	#ifdef DEBUG
-		PySys_WriteStderr("Scss BlockLocator object destroyed!\n");
+		fprintf(stderr, "Scss BlockLocator object destroyed!\n");
 	#endif
 }
 
 
 /*****/
 
-scss_BlockLocator*
-scss_BlockLocator_iter(scss_BlockLocator *self)
-{
-	Py_INCREF(self);
-	return self;
-}
-
-PyObject*
-scss_BlockLocator_iternext(scss_BlockLocator *self)
+DLLEXPORT
+scss_Block* block_locator_next_block(scss_BlockLocator *self)
 {
 	scss_Callback *fn;
 	char c = 0;
@@ -507,19 +479,12 @@ scss_BlockLocator_iternext(scss_BlockLocator *self)
 		if (self->block.error) {
 			#ifdef DEBUG
 				if (self->block.error < 0) {
-					PySys_WriteStderr("Block found!\n");
+					fprintf(stderr, "Block found!\n");
 				} else {
-					PySys_WriteStderr("Exception!\n");
+					fprintf(stderr, "Exception!\n");
 				}
 			#endif
-			return Py_BuildValue(
-				"is#s#",
-				self->block.lineno,
-				self->block.selprop,
-				self->block.selprop_sz,
-				self->block.codestr,
-				self->block.codestr_sz
-			);
+			return &self->block;
 		}
 	}
 	if (self->par > 0) {
@@ -527,7 +492,7 @@ scss_BlockLocator_iternext(scss_BlockLocator *self)
 			self->block.error = 1;
 			self->exc = "Missing closing parenthesis somewhere in block";
 			#ifdef DEBUG
-				PySys_WriteStderr("%s\n", self->exc);
+				fprintf(stderr, "%s\n", self->exc);
 			#endif
 		}
 	} else if (self->instr != 0) {
@@ -535,7 +500,7 @@ scss_BlockLocator_iternext(scss_BlockLocator *self)
 			self->block.error = 2;
 			self->exc = "Missing closing string somewhere in block";
 			#ifdef DEBUG
-				PySys_WriteStderr("%s\n", self->exc);
+				fprintf(stderr, "%s\n", self->exc);
 			#endif
 		}
 	} else if (self->depth > 0) {
@@ -543,7 +508,7 @@ scss_BlockLocator_iternext(scss_BlockLocator *self)
 			self->block.error = 3;
 			self->exc = "Missing closing string somewhere in block";
 			#ifdef DEBUG
-				PySys_WriteStderr("%s\n", self->exc);
+				fprintf(stderr, "%s\n", self->exc);
 			#endif
 		}
 		if (self->init < codestr_end) {
@@ -557,94 +522,7 @@ scss_BlockLocator_iternext(scss_BlockLocator *self)
 		goto repeat;
 	}
 
-	scss_BlockLocator_rewind(self);
+	block_locator_rewind(self);
 
-	if (self->exc) {
-		PyErr_SetString(PyExc_Exception, self->exc);
-		return NULL;
-	}
-
-	/* Raising of standard StopIteration exception with empty value. */
-	PyErr_SetNone(PyExc_StopIteration);
-	return NULL;
-}
-
-
-/* Type definition */
-
-static PyTypeObject scss_BlockLocatorType = {
-	PyObject_HEAD_INIT(NULL)
-	0,                                         /* ob_size */
-	"scss._BlockLocator",                      /* tp_name */
-	sizeof(scss_BlockLocator),                 /* tp_basicsize */
-	0,                                         /* tp_itemsize */
-	(destructor)scss_BlockLocator_dealloc,     /* tp_dealloc */
-	0,                                         /* tp_print */
-	0,                                         /* tp_getattr */
-	0,                                         /* tp_setattr */
-	0,                                         /* tp_compare */
-	0,                                         /* tp_repr */
-	0,                                         /* tp_as_number */
-	0,                                         /* tp_as_sequence */
-	0,                                         /* tp_as_mapping */
-	0,                                         /* tp_hash  */
-	0,                                         /* tp_call */
-	0,                                         /* tp_str */
-	0,                                         /* tp_getattro */
-	0,                                         /* tp_setattro */
-	0,                                         /* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER, /* tp_flags */
-	"Internal BlockLocator iterator object.",  /* tp_doc */
-	0,                                         /* tp_traverse */
-	0,                                         /* tp_clear */
-	0,                                         /* tp_richcompare */
-	0,                                         /* tp_weaklistoffset */
-	(getiterfunc)scss_BlockLocator_iter,       /* tp_iter: __iter__() method */
-	(iternextfunc)scss_BlockLocator_iternext,  /* tp_iternext: next() method */
-};
-
-
-/* Python constructor */
-
-static PyObject *
-scss_locate_blocks(PyObject *self, PyObject *args)
-{
-	PyObject *result = NULL;
-
-	char *codestr;
-	int codestr_sz;
-
-	if (PyArg_ParseTuple(args, "s#", &codestr, &codestr_sz)) {
-		result = scss_BlockLocator_new(codestr, codestr_sz);
-	}
-
-	return result;
-}
-
-
-/* Module functions */
-
-static PyMethodDef scssMethods[] = {
-	{"locate_blocks",  scss_locate_blocks, METH_VARARGS, "Locate Scss blocks."},
-	{NULL, NULL, 0, NULL}        /* Sentinel */
-};
-
-
-/* Module init function */
-
-PyMODINIT_FUNC
-init_scss(void)
-{
-	PyObject* m;
-
-	scss_BlockLocatorType.tp_new = PyType_GenericNew;
-	if (PyType_Ready(&scss_BlockLocatorType) < 0)
-		return;
-
-	m = Py_InitModule("_scss", scssMethods);
-
-	init_function_map();
-
-	Py_INCREF(&scss_BlockLocatorType);
-	PyModule_AddObject(m, "_BlockLocator", (PyObject *)&scss_BlockLocatorType);
+	return &self->block;
 }

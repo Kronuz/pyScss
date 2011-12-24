@@ -461,10 +461,23 @@ def _locate_blocks_b(codestr):
 ################################################################################
 # Algorithm implemented in C:
 
+
 try:
     from _scss import locate_blocks as _locate_blocks_c
 except ImportError:
+    _locate_blocks_c = None
     print >>sys.stderr, "Scanning acceleration disabled (_scss not found)!"
+
+
+################################################################################
+# Algorithm implemented in C with CTypes:
+
+
+try:
+    from _scss_c import locate_blocks as _locate_blocks_d
+except ImportError:
+    _locate_blocks_d = None
+    print >>sys.stderr, "Scanning CTypes acceleration disabled (_scss_c not found)!"
 
 
 ################################################################################
@@ -504,40 +517,43 @@ however this is a selector (
 """
 verify = '\t----------------------------------------------------------------------\n\t>[1] \'simple\'\n\t----------------------------------------------------------------------\n\t>\t[3] \'block\'\n\t----------------------------------------------------------------------\n\t>[5] \'#{ignored}\'\n\t----------------------------------------------------------------------\n\t>[6] \'some,\\nselectors,\\nand multi-lined,\\nselectors\'\n\t----------------------------------------------------------------------\n\t>[10] \'with more\'\n\t----------------------------------------------------------------------\n\t>\t[12] \'the block in here\'\n\t----------------------------------------------------------------------\n\t>\t[13] \'can have, nested, selectors\'\n\t----------------------------------------------------------------------\n\t>\t\t[14] \'and properties in nested blocks\'\n\t----------------------------------------------------------------------\n\t>\t\t[15] \'and stuff with #{ ignored blocks }\'\n\t----------------------------------------------------------------------\n\t>\t[17] \'properties-can: "have strings with stuff like this: }"\'\n\t----------------------------------------------------------------------\n\t>[19] \'and other,\\nselectors\\ncan be turned into "lose"\\nproperties\'\n\t----------------------------------------------------------------------\n\t>[23] \'if no commas are found\\nhowever this is a selector (\\nas well as these things,\\nwhich are parameters\\nand can expand\\nany number of\\nlines)\'\n\t----------------------------------------------------------------------\n\t>\t[30] \'and this is its block\'\n'
 
-locate_blocks = _locate_blocks_a
 
-
-def process_block(codestr, level=0, dump=False):
+def process_block(locate_blocks, codestr, level=0, dump=False):
     ret = '' if dump else None
     for lineno, selprop, block in locate_blocks(codestr):
         if dump:
             ret += '\t%s\n\t>%s[%s] %s\n' % ('-' * 70, '\t' * level, lineno, repr(selprop))
         if block:
-            _ret = process_block(block, level + 1, dump)
+            _ret = process_block(locate_blocks, block, level + 1, dump)
             if dump:
                 ret += _ret
     return ret
 
 
-@profile
-def profile_process_block(codestr):
-    for q in xrange(10000):
-        process_block(codestr)
-
+def process_blocks(locate_blocks, codestr):
+    for q in xrange(50000):
+        process_block(locate_blocks, codestr)
+profiled_process_blocks = profile(process_blocks)
 
 if __name__ == "__main__":
     codestr = load_string(codestr)
 
-    ret = process_block(codestr, dump=True)
-    print "This is what `%s()` returned:" % locate_blocks.__name__
-    # print repr(ret)
-    print ret
-    assert ret == verify, 'It should be:\n%s' % verify
+    for locate_blocks, desc in (
+        (_locate_blocks_a, "Pure Python, Full algorithm (_locate_blocks_a))"),
+        (_locate_blocks_b, "Pure Python, Condensed algorithm (_locate_blocks_b))"),
+        (_locate_blocks_c, "Builtin C Function, Full algorithm (_locate_blocks_c))"),
+        (_locate_blocks_d, "CTypes C Function, Full algorithm (_locate_blocks_d))")):
+        if locate_blocks:
+            ret = process_block(locate_blocks, codestr, dump=True)
+            # print "This is what `%s()` returned:" % locate_blocks
+            # print ret
+            # print repr(ret)
+            assert ret == verify, 'It should be:\n%s' % verify
 
-    start = datetime.now()
-    print "Timing: %s()..." % locate_blocks.__name__
-    profile_process_block(codestr)
-    elap = datetime.now() - start
+            start = datetime.now()
+            print >>sys.stderr, "Timing: %s..." % desc,
+            process_blocks(locate_blocks, codestr)
+            elap = datetime.now() - start
 
-    elapms = elap.seconds * 1000.0 + elap.microseconds / 1000.0
-    print "Done! took %06.3fms" % elapms
+            elapms = elap.seconds * 1000.0 + elap.microseconds / 1000.0
+            print >>sys.stderr, "Done! took %06.3fms" % elapms
