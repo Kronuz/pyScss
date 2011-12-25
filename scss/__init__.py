@@ -63,12 +63,13 @@ DEBUG = 0
 
 ################################################################################
 # Load C acceleration modules
+locate_blocks = None
+Scanner = None
+setup_patterns = None
 try:
-    from _scss import locate_blocks, Scanner, NoMoreTokens, setup_patterns
+    from _scss import locate_blocks#, Scanner, NoMoreTokens, setup_patterns
 except ImportError:
-    locate_blocks = None
-    Scanner = None
-    setup_patterns = None
+    pass
 
 ################################################################################
 

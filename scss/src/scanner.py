@@ -128,6 +128,9 @@ class Scanner(object):
             output = "%s\n  (@%s)  %s  =  %s" % (output, t[0], t[2], repr(t[3]))
         return output
 
+    def scan(self, restrict=None):
+        return self.token(len(self.tokens), restrict)
+
     def token(self, i, restrict=None):
         """
         Get the i'th token, and if i is one past the end, then scan
@@ -136,7 +139,7 @@ class Scanner(object):
         """
         tokens_len = len(self.tokens)
         if i == tokens_len:  # We are at the end, get the next...
-            tokens_len += self.scan(restrict)
+            tokens_len += self._scan(restrict)
         if i < tokens_len:
             if restrict and self.restrictions[i] and restrict > self.restrictions[i]:
                 raise NotImplementedError("Unimplemented: restriction set changed")
@@ -151,7 +154,7 @@ class Scanner(object):
             self.restrictions = self.restrictions[:i]
             self.pos = token[0]
 
-    def scan(self, restrict):
+    def _scan(self, restrict):
         """
         Should scan another token and add it to the list, self.tokens,
         and add the restriction to self.restrictions
@@ -214,12 +217,8 @@ class Scanner(object):
 class _Scanner_a(Scanner):
     patterns = None
 
-    def __init__(self):
-        if self.patterns is None:
-            self.patterns = []
-            for k, p in PATTERNS:
-                self.patterns.append((k, re.compile(p)))
-        Scanner.__init__(self, None, ['[ \r\t\n]+'])
+    def __init__(self, patterns, ignore, input=None):
+        Scanner.__init__(self, PATTERNS, ['[ \r\t\n]+'], input)
 
 
 ################################################################################
@@ -232,12 +231,12 @@ except ImportError:
     _Scanner_b = None
 
 
-def process_scan(Scanner, codestr, level=0, dump=False):
+def process_scan(Scanner, level=0, dump=False):
     ret = '' if dump else None
-    s = Scanner([], ['COLOR', 'NUM'], '[(5px - 3) * (5px - 3)]')
+    s = Scanner([], ['[ \r\t\n]+'], '[(5px - 3) * (5px - 3)]')
     while True:
         try:
-            s.scan()
+            s.scan([])
             if dump:
                 ret += '%s\n%s\n' % ('-' * 70, repr(s))
         except:
@@ -245,9 +244,12 @@ def process_scan(Scanner, codestr, level=0, dump=False):
     return ret
 
 
-def process_scans(Scanner, codestr):
+verify = "----------------------------------------------------------------------\n\n  (@0)  LPAR  =  '['\n----------------------------------------------------------------------\n\n  (@0)  LPAR  =  '['\n  (@1)  LPAR  =  '('\n----------------------------------------------------------------------\n\n  (@0)  LPAR  =  '['\n  (@1)  LPAR  =  '('\n  (@2)  NUM  =  '5'\n----------------------------------------------------------------------\n\n  (@0)  LPAR  =  '['\n  (@1)  LPAR  =  '('\n  (@2)  NUM  =  '5'\n  (@3)  UNITS  =  'px'\n----------------------------------------------------------------------\n\n  (@0)  LPAR  =  '['\n  (@1)  LPAR  =  '('\n  (@2)  NUM  =  '5'\n  (@3)  UNITS  =  'px'\n  (@6)  SUB  =  '- '\n----------------------------------------------------------------------\n\n  (@0)  LPAR  =  '['\n  (@1)  LPAR  =  '('\n  (@2)  NUM  =  '5'\n  (@3)  UNITS  =  'px'\n  (@6)  SUB  =  '- '\n  (@8)  NUM  =  '3'\n----------------------------------------------------------------------\n\n  (@0)  LPAR  =  '['\n  (@1)  LPAR  =  '('\n  (@2)  NUM  =  '5'\n  (@3)  UNITS  =  'px'\n  (@6)  SUB  =  '- '\n  (@8)  NUM  =  '3'\n  (@9)  RPAR  =  ')'\n----------------------------------------------------------------------\n\n  (@0)  LPAR  =  '['\n  (@1)  LPAR  =  '('\n  (@2)  NUM  =  '5'\n  (@3)  UNITS  =  'px'\n  (@6)  SUB  =  '- '\n  (@8)  NUM  =  '3'\n  (@9)  RPAR  =  ')'\n  (@11)  MUL  =  '*'\n----------------------------------------------------------------------\n\n  (@0)  LPAR  =  '['\n  (@1)  LPAR  =  '('\n  (@2)  NUM  =  '5'\n  (@3)  UNITS  =  'px'\n  (@6)  SUB  =  '- '\n  (@8)  NUM  =  '3'\n  (@9)  RPAR  =  ')'\n  (@11)  MUL  =  '*'\n  (@13)  LPAR  =  '('\n----------------------------------------------------------------------\n\n  (@0)  LPAR  =  '['\n  (@1)  LPAR  =  '('\n  (@2)  NUM  =  '5'\n  (@3)  UNITS  =  'px'\n  (@6)  SUB  =  '- '\n  (@8)  NUM  =  '3'\n  (@9)  RPAR  =  ')'\n  (@11)  MUL  =  '*'\n  (@13)  LPAR  =  '('\n  (@14)  NUM  =  '5'\n----------------------------------------------------------------------\n\n  (@1)  LPAR  =  '('\n  (@2)  NUM  =  '5'\n  (@3)  UNITS  =  'px'\n  (@6)  SUB  =  '- '\n  (@8)  NUM  =  '3'\n  (@9)  RPAR  =  ')'\n  (@11)  MUL  =  '*'\n  (@13)  LPAR  =  '('\n  (@14)  NUM  =  '5'\n  (@15)  UNITS  =  'px'\n----------------------------------------------------------------------\n\n  (@2)  NUM  =  '5'\n  (@3)  UNITS  =  'px'\n  (@6)  SUB  =  '- '\n  (@8)  NUM  =  '3'\n  (@9)  RPAR  =  ')'\n  (@11)  MUL  =  '*'\n  (@13)  LPAR  =  '('\n  (@14)  NUM  =  '5'\n  (@15)  UNITS  =  'px'\n  (@18)  SUB  =  '- '\n----------------------------------------------------------------------\n\n  (@3)  UNITS  =  'px'\n  (@6)  SUB  =  '- '\n  (@8)  NUM  =  '3'\n  (@9)  RPAR  =  ')'\n  (@11)  MUL  =  '*'\n  (@13)  LPAR  =  '('\n  (@14)  NUM  =  '5'\n  (@15)  UNITS  =  'px'\n  (@18)  SUB  =  '- '\n  (@20)  NUM  =  '3'\n----------------------------------------------------------------------\n\n  (@6)  SUB  =  '- '\n  (@8)  NUM  =  '3'\n  (@9)  RPAR  =  ')'\n  (@11)  MUL  =  '*'\n  (@13)  LPAR  =  '('\n  (@14)  NUM  =  '5'\n  (@15)  UNITS  =  'px'\n  (@18)  SUB  =  '- '\n  (@20)  NUM  =  '3'\n  (@21)  RPAR  =  ')'\n----------------------------------------------------------------------\n\n  (@8)  NUM  =  '3'\n  (@9)  RPAR  =  ')'\n  (@11)  MUL  =  '*'\n  (@13)  LPAR  =  '('\n  (@14)  NUM  =  '5'\n  (@15)  UNITS  =  'px'\n  (@18)  SUB  =  '- '\n  (@20)  NUM  =  '3'\n  (@21)  RPAR  =  ')'\n  (@22)  RPAR  =  ']'\n----------------------------------------------------------------------\n\n  (@9)  RPAR  =  ')'\n  (@11)  MUL  =  '*'\n  (@13)  LPAR  =  '('\n  (@14)  NUM  =  '5'\n  (@15)  UNITS  =  'px'\n  (@18)  SUB  =  '- '\n  (@20)  NUM  =  '3'\n  (@21)  RPAR  =  ')'\n  (@22)  RPAR  =  ']'\n  (@23)  END  =  ''\n"
+
+
+def process_scans(Scanner):
     for q in xrange(10000):
-        process_scan(Scanner, codestr)
+        process_scan(Scanner)
 profiled_process_scans = profile(process_scans)
 
 if __name__ == "__main__":
@@ -256,16 +258,16 @@ if __name__ == "__main__":
         (_Scanner_b, "Builtin C Function, Full algorithm (_Scanner_b)"),
     ):
         if scanner:
-            ret = process_scan(scanner, codestr, dump=True)
-            print "This is what %s returned:" % desc
-            print ret
+            ret = process_scan(scanner, dump=True)
+            # print "This is what %s returned:" % desc
+            # print ret
             # print repr(ret)
             assert ret == verify, 'It should be:\n%s' % verify
 
-            # start = datetime.now()
-            # print >>sys.stderr, "Timing: %s..." % desc,
-            # process_blocks(locate_blocks, codestr)
-            # elap = datetime.now() - start
+            start = datetime.now()
+            print >>sys.stderr, "Timing: %s..." % desc,
+            process_scans(scanner)
+            elap = datetime.now() - start
 
-            # elapms = elap.seconds * 1000.0 + elap.microseconds / 1000.0
-            # print >>sys.stderr, "Done! took %06.3fms" % elapms
+            elapms = elap.seconds * 1000.0 + elap.microseconds / 1000.0
+            print >>sys.stderr, "Done! took %06.3fms" % elapms

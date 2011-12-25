@@ -550,10 +550,10 @@ if __name__ == "__main__":
             # print repr(ret)
             assert ret == verify, 'It should be:\n%s' % verify
 
-            # start = datetime.now()
-            # print >>sys.stderr, "Timing: %s..." % desc,
-            # process_blocks(locate_blocks, codestr)
-            # elap = datetime.now() - start
+            start = datetime.now()
+            print >>sys.stderr, "Timing: %s..." % desc,
+            process_blocks(locate_blocks, codestr)
+            elap = datetime.now() - start
 
-            # elapms = elap.seconds * 1000.0 + elap.microseconds / 1000.0
-            # print >>sys.stderr, "Done! took %06.3fms" % elapms
+            elapms = elap.seconds * 1000.0 + elap.microseconds / 1000.0
+            print >>sys.stderr, "Done! took %06.3fms" % elapms
