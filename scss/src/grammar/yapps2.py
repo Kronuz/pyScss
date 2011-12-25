@@ -226,12 +226,17 @@ class Generator:
         self.write("from yappsrt import *\n")
         self.write("\n\n")
         self.write("class ", self.name, "Scanner(Scanner):\n")
-        self.write("    patterns = [\n")
+        self.write("    patterns = None\n")
+        self.write("    _patterns = [\n")
         for p in self.terminals:
-            self.write("        (%s, re.compile(%s)),\n" % (
+            self.write("        (%s, %s),\n" % (
                 repr(p), repr(self.tokens[p])))
         self.write("    ]\n\n")
         self.write("    def __init__(self):\n")
+        self.write("        if self.patterns is None:\n")
+        self.write("            self.patterns = []\n")
+        self.write("            for k, p in self._patterns:\n")
+        self.write("                self.patterns.append((k, re.compile(p)))\n")
         self.write("        Scanner.__init__(self, None, %s)\n" %
                    repr(self.ignore))
         self.write("\n\n")

@@ -3,14 +3,23 @@
 
 _units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
           'grad', 'ms', 's', 'hz', 'khz', '%']
+_inv = lambda s: s
 ParserValue = lambda s: s
 NumberValue = lambda s: float(s)
 StringValue = lambda s: s
 QuotedStringValue = lambda s: s
 BooleanValue = lambda s: bool(s)
 ColorValue = lambda s: s
-ListValue = lambda s: s
-_inv = lambda s: s
+class ListValue():
+    def __init__(self, v):
+        if isinstance(v, self.__class__):
+            self.v = v
+        else:
+            self.v = {0: v}
+    def first(self):
+        return self.v[0]
+    def __len__(self):
+        return len(self.v)
 
 
 def _reorder_list(lst):

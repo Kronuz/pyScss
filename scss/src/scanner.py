@@ -1,4 +1,4 @@
-#!/bin/env python
+#!/usr/bin/env python
 
 ## locate_blocks() needs heavy optimizations... is way too slow right now!
 ## Any suggestion from python wizards? :-)
@@ -40,520 +40,232 @@ def profile(fn):
 
 DEBUG = False
 ################################################################################
-# Helper functions
+# Helpers
 
-
-SEPARATOR = '\x00'
-_nl_re = re.compile(r'\s*\n\s*', re.MULTILINE)
-_nl_num_re = re.compile(r'\n.+' + SEPARATOR, re.MULTILINE)
-_nl_num_nl_re = re.compile(r'\n.+' + SEPARATOR + r'\s*(?=\n)', re.MULTILINE)
-_blocks_re = re.compile(r'[{},;()\'"\n]')
-
-
-def load_string(codestr):
-    """
-    Add line numbers to the string using SEPARATOR as the separation between
-    the line number and the line.
-    """
-    idx = {'line': 1}
-
-    # Add line numbers:
-    def _cnt(m):
-        idx['line'] += 1
-        return '\n' + str(idx['line']) + SEPARATOR
-    codestr = str(idx['line']) + SEPARATOR + _nl_re.sub(_cnt, codestr + '\n')
-
-    # remove empty lines
-    codestr = _nl_num_nl_re.sub('', codestr)
-    return codestr
-
-
-def _strip_selprop(selprop, lineno):
-    # Get the line number of the selector or property and strip all other
-    # line numbers that might still be there (from multiline selectors)
-    _lineno, _sep, selprop = selprop.partition(SEPARATOR)
-    if _sep == SEPARATOR:
-        _lineno = _lineno.strip()
-        lineno = int(_lineno) if _lineno else 0
-    else:
-        selprop = _lineno
-    selprop = _nl_num_re.sub('\n', selprop)
-    selprop = selprop.strip()
-    return selprop, lineno
-
-
-def _strip(selprop):
-    # Strip all line numbers, ignoring them in the way
-    selprop, _ = _strip_selprop(selprop, None)
-    return selprop
+_units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
+          'grad', 'ms', 's', 'hz', 'khz', '%']
+PATTERNS = [
+        ('":"', ':'),
+        ('[ \r\t\n]+', '[ \r\t\n]+'),
+        ('COMMA', ','),
+        ('LPAR', '\\(|\\['),
+        ('RPAR', '\\)|\\]'),
+        ('END', '$'),
+        ('MUL', '[*]'),
+        ('DIV', '/'),
+        ('ADD', '[+]'),
+        ('SUB', '-\\s'),
+        ('SIGN', '-(?![a-zA-Z_])'),
+        ('AND', '(?<![-\\w])and(?![-\\w])'),
+        ('OR', '(?<![-\\w])or(?![-\\w])'),
+        ('NOT', '(?<![-\\w])not(?![-\\w])'),
+        ('NE', '!='),
+        ('INV', '!'),
+        ('EQ', '=='),
+        ('LE', '<='),
+        ('GE', '>='),
+        ('LT', '<'),
+        ('GT', '>'),
+        ('STR', "'[^']*'"),
+        ('QSTR', '"[^"]*"'),
+        ('UNITS', '(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'),
+        ('NUM', '(?:\\d+(?:\\.\\d*)?|\\.\\d+)'),
+        ('BOOL', '(?<![-\\w])(?:true|false)(?![-\\w])'),
+        ('COLOR', '#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])'),
+        ('VAR', '\\$[-a-zA-Z0-9_]+'),
+        ('FNCT', '[-a-zA-Z_][-a-zA-Z0-9_]*(?=\\()'),
+        ('ID', '[-a-zA-Z_][-a-zA-Z0-9_]*'),
+]
 
 
 ################################################################################
-# Algorithm implemented in C (much slower here):
 
-PAR = 0
-INSTR = 1
-DEPTH = 2
-SKIP = 3
-THIN = 4
-INIT = 5
-SAFE = 6
-LOSE = 7
-START = 8
-END = 9
-LINENO = 10
-SELPROP = 11
-
-
-def _start_string(codestr, ctx, i, c):
-    if DEBUG: print "_start_string"
-    # A string starts
-    ctx[INSTR] = c
-    return
-    yield
-
-
-def _end_string(codestr, ctx, i, c):
-    if DEBUG: print "_end_string"
-    # A string ends (FIXME: needs to accept escaped characters)
-    ctx[INSTR] = None
-    return
-    yield
-
-
-def _start_parenthesis(codestr, ctx, i, c):
-    if DEBUG: print "_start_parenthesis"
-    # parenthesis begins:
-    ctx[PAR] += 1
-    ctx[THIN] = None
-    ctx[SAFE] = i + 1
-    return
-    yield
-
-
-def _end_parenthesis(codestr, ctx, i, c):
-    if DEBUG: print "_end_parenthesis"
-    ctx[PAR] -= 1
-    return
-    yield
-
-
-def _flush_properties(codestr, ctx, i, c):
-    if DEBUG: print "_flush_properties"
-    # Flush properties
-    if ctx[LOSE] <= ctx[INIT]:
-        _property, ctx[LINENO] = _strip_selprop(codestr[ctx[LOSE]:ctx[INIT]], ctx[LINENO])
-        if _property:
-            yield ctx[LINENO], _property, None
-            ctx[SELPROP] = _property
-        ctx[LOSE] = ctx[INIT]
-    return
-    yield
-
-
-def _start_block1(codestr, ctx, i, c):
-    if DEBUG: print "_start_block1"
-    # Start level-1 block
-    if i > 0 and codestr[i - 1] == '#':  # Do not process #{...} as blocks!
-        ctx[SKIP] = True
-    else:
-        ctx[START] = i
-        if ctx[THIN] is not None and _strip(codestr[ctx[THIN]:i]):
-            ctx[INIT] = ctx[THIN]
-        for y in _flush_properties(codestr, ctx, i, c):
-            yield y
-        ctx[THIN] = None
-    ctx[DEPTH] += 1
-    return
-    yield
-
-
-def _start_block(codestr, ctx, i, c):
-    if DEBUG: print "_start_block"
-    # Start blocks:
-    ctx[DEPTH] += 1
-    return
-    yield
-
-
-def _end_block1(codestr, ctx, i, c):
-    if DEBUG: print "_end_block1"
-    # End level-1 block:
-    ctx[DEPTH] -= 1
-    if not ctx[SKIP]:
-        ctx[END] = i
-        _selectors, ctx[LINENO] = _strip_selprop(codestr[ctx[INIT]:ctx[START]], ctx[LINENO])
-        _codestr = codestr[ctx[START] + 1:ctx[END]]
-        if _selectors:
-            yield ctx[LINENO], _selectors, _codestr
-            ctx[SELPROP] = _selectors
-        ctx[INIT] = ctx[SAFE] = ctx[LOSE] = ctx[END] + 1
-        ctx[THIN] = None
-    ctx[SKIP] = False
-    return
-    yield
-
-
-def _end_block(codestr, ctx, i, c):
-    if DEBUG: print "_end_block"
-    # Block ends:
-    ctx[DEPTH] -= 1
-    return
-    yield
-
-
-def _end_property(codestr, ctx, i, c):
-    if DEBUG: print "_end_property"
-    # End of property (or block):
-    ctx[INIT] = i
-    if ctx[LOSE] <= ctx[INIT]:
-        _property, ctx[LINENO] = _strip_selprop(codestr[ctx[LOSE]:ctx[INIT]], ctx[LINENO])
-        if _property:
-            yield ctx[LINENO], _property, None
-            ctx[SELPROP] = _property
-        ctx[INIT] = ctx[SAFE] = ctx[LOSE] = i + 1
-    ctx[THIN] = None
-    return
-    yield
-
-
-def _mark_safe(codestr, ctx, i, c):
-    if DEBUG: print "_mark_safe"
-    # We are on a safe zone
-    if ctx[THIN] is not None and _strip(codestr[ctx[THIN]:i]):
-        ctx[INIT] = ctx[THIN]
-    ctx[THIN] = None
-    ctx[SAFE] = i + 1
-    return
-    yield
-
-
-def _mark_thin(codestr, ctx, i, c):
-    if DEBUG: print "_mark_thin"
-    # Step on thin ice, if it breaks, it breaks here
-    if ctx[THIN] is not None and _strip(codestr[ctx[THIN]:i]):
-        ctx[INIT] = ctx[THIN]
-        ctx[THIN] = i + 1
-    elif ctx[THIN] is None and _strip(codestr[ctx[SAFE]:i]):
-        ctx[THIN] = i + 1
-    return
-    yield
-
-
-scss_function_map = {
-    # (c, instr, par, depth)
-    ('"', None, False, 0): _start_string,
-    ("'", None, False, 0): _start_string,
-    ('"', None, True, 0): _start_string,
-    ("'", None, True, 0): _start_string,
-    ('"', None, False, 1): _start_string,
-    ("'", None, False, 1): _start_string,
-    ('"', None, True, 1): _start_string,
-    ("'", None, True, 1): _start_string,
-    ('"', None, False, 2): _start_string,
-    ("'", None, False, 2): _start_string,
-    ('"', None, True, 2): _start_string,
-    ("'", None, True, 2): _start_string,
-
-    ('"', '"', False, 0): _end_string,
-    ("'", "'", False, 0): _end_string,
-    ('"', '"', True, 0): _end_string,
-    ("'", "'", True, 0): _end_string,
-    ('"', '"', False, 1): _end_string,
-    ("'", "'", False, 1): _end_string,
-    ('"', '"', True, 1): _end_string,
-    ("'", "'", True, 1): _end_string,
-    ('"', '"', False, 2): _end_string,
-    ("'", "'", False, 2): _end_string,
-    ('"', '"', True, 2): _end_string,
-    ("'", "'", True, 2): _end_string,
-
-    ("(", None, False, 0): _start_parenthesis,
-    ("(", None, True, 0): _start_parenthesis,
-    ("(", None, False, 1): _start_parenthesis,
-    ("(", None, True, 1): _start_parenthesis,
-    ("(", None, False, 2): _start_parenthesis,
-    ("(", None, True, 2): _start_parenthesis,
-
-    (")", None, True, 0): _end_parenthesis,
-    (")", None, True, 1): _end_parenthesis,
-    (")", None, True, 2): _end_parenthesis,
-
-    ("{", None, False, 0): _start_block1,
-    ("{", None, False, 1): _start_block,
-    ("{", None, False, 2): _start_block,
-
-    ("}", None, False, 1): _end_block1,
-    ("}", None, False, 2): _end_block,
-
-    (";", None, False, 0): _end_property,
-
-    (",", None, False, 0): _mark_safe,
-
-    ("\n", None, False, 0): _mark_thin,
-
-    (None, None, False, 0): _flush_properties,
-    (None, None, False, 1): _flush_properties,
-    (None, None, False, 2): _flush_properties,
-}
-
-
-def _locate_blocks_a(codestr):
+class NoMoreTokens(Exception):
     """
-    For processing CSS like strings.
-
-    Either returns all selectors (that can be "smart" multi-lined, as
-    long as it's joined by `,`, or enclosed in `(` and `)`) with its code block
-    (the one between `{` and `}`, which can be nested), or the "lose" code
-    (properties) that doesn't have any blocks.
-
-    threshold is the number of blank lines before selectors are broken into
-    pieces (properties).
+    Another exception object, for when we run out of tokens
     """
-    ctx = [0, None, 0, False, None, 0, 0, 0, None, None, 0, '??']
+    pass
 
-    for m in _blocks_re.finditer(codestr):
-        c = m.group()
 
-        fn = scss_function_map.get((c, ctx[INSTR], ctx[PAR] != 0, 2 if ctx[DEPTH] > 1 else ctx[DEPTH]))
-        if DEBUG: print fn and ' > ' or '   ', fn and fn.__name__, (c, ctx[INSTR], ctx[PAR] != 0, 2 if ctx[DEPTH] > 1 else ctx[DEPTH])
-        if fn:
-            for y in fn(codestr, ctx, m.start(), c):
-                yield y
+class Scanner(object):
+    _cache_ = {}
 
-    codestr_end = len(codestr)
-    exc = None
-    if ctx[PAR]:
-        exc = exc or "Missing closing parenthesis somewhere in block: '%s'" % ctx[SELPROP]
-    elif ctx[INSTR]:
-        exc = exc or "Missing closing string somewhere in block: '%s'" % ctx[SELPROP]
-    elif ctx[DEPTH]:
-        exc = exc or "Block never closed: '%s'" % ctx[SELPROP]
-        while ctx[DEPTH] > 0 and ctx[INIT] < codestr_end:
-            c = '}'
-            fn = scss_function_map.get((c, ctx[INSTR], ctx[PAR] != 0, 2 if ctx[DEPTH] > 1 else ctx[DEPTH]))
-            if DEBUG: print fn and ' > ' or ' ! ', fn and fn.__name__, (c, ctx[INSTR], ctx[PAR] != 0, 2 if ctx[DEPTH] > 1 else ctx[DEPTH])
-            if fn:
-                for y in fn(codestr, ctx, m.start(), c):
-                    yield y
+    def __init__(self, patterns, ignore, input=None):
+        """
+        Patterns is [(terminal,regex)...]
+        Ignore is [terminal,...];
+        Input is a string
+        """
+        self.reset(input)
+        self.ignore = ignore
+        # The stored patterns are a pair (compiled regex,source
+        # regex).  If the patterns variable passed in to the
+        # constructor is None, we assume that the class already has a
+        # proper .patterns list constructed
+        if patterns is not None:
+            self.patterns = []
+            for k, r in patterns:
+                self.patterns.append((k, re.compile(r)))
 
-    if ctx[INIT] < codestr_end:
-        ctx[INIT] = codestr_end
-        c = None
-        fn = scss_function_map.get((c, ctx[INSTR], ctx[PAR] != 0, 2 if ctx[DEPTH] > 1 else ctx[DEPTH]))
-        if DEBUG: print fn and ' > ' or ' ! ', fn and fn.__name__, (c, ctx[INSTR], ctx[PAR] != 0, 2 if ctx[DEPTH] > 1 else ctx[DEPTH])
-        if fn:
-            for y in fn(codestr, ctx, m.start(), c):
-                yield y
+    @classmethod
+    def cleanup(cls):
+        cls._cache_ = {}
 
-    if exc:
-        raise Exception(exc)
+    def reset(self, input):
+        self.tokens = []
+        self.restrictions = []
+        self.input = input
+        self.pos = 0
+        self._cache_.setdefault(input, {})
+        self.scanned = self._cache_[input]
+
+    def __repr__(self):
+        """
+        Print the last 10 tokens that have been scanned in
+        """
+        output = ''
+        for t in self.tokens[-10:]:
+            output = "%s\n  (@%s)  %s  =  %s" % (output, t[0], t[2], repr(t[3]))
+        return output
+
+    def token(self, i, restrict=None):
+        """
+        Get the i'th token, and if i is one past the end, then scan
+        for another token; restrict is a list of tokens that
+        are allowed, or 0 for any token.
+        """
+        tokens_len = len(self.tokens)
+        if i == tokens_len:  # We are at the end, get the next...
+            tokens_len += self.scan(restrict)
+        if i < tokens_len:
+            if restrict and self.restrictions[i] and restrict > self.restrictions[i]:
+                raise NotImplementedError("Unimplemented: restriction set changed")
+            return self.tokens[i]
+        raise NoMoreTokens()
+
+    def rewind(self, i):
+        tokens_len = len(self.tokens)
+        if i <= tokens_len:
+            token = self.tokens[i]
+            self.tokens = self.tokens[:i]
+            self.restrictions = self.restrictions[:i]
+            self.pos = token[0]
+
+    def scan(self, restrict):
+        """
+        Should scan another token and add it to the list, self.tokens,
+        and add the restriction to self.restrictions
+        """
+        # Keep looking for a token, ignoring any in self.ignore
+        _k_ = (self.pos, tuple(restrict) if restrict else None)
+        try:
+            token = self.scanned[_k_]
+        except KeyError:
+            token = None
+            while True:
+                best_pat = None
+                # Search the patterns for a match, with earlier
+                # tokens in the list having preference
+                best_pat_len = 0
+                for p, regexp in self.patterns:
+                    # First check to see if we're restricting to this token
+                    if restrict and p not in restrict and p not in self.ignore:
+                        continue
+                    m = regexp.match(self.input, self.pos)
+                    if m:
+                        # We got a match
+                        best_pat = p
+                        best_pat_len = len(m.group(0))
+                        break
+
+                # If we didn't find anything, raise an error
+                if best_pat is None:
+                    msg = "Bad Token"
+                    if restrict:
+                        msg = "Trying to find one of " + ", ".join(restrict)
+                    raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(self.pos), msg))
+
+                # If we found something that isn't to be ignored, return it
+                if best_pat in self.ignore:
+                    # This token should be ignored...
+                    self.pos += best_pat_len
+                else:
+                    end_pos = self.pos + best_pat_len
+                    # Create a token with this data
+                    token = (
+                        self.pos,
+                        end_pos,
+                        best_pat,
+                        self.input[self.pos:end_pos]
+                    )
+                    break
+            self.scanned[_k_] = token
+        if token is not None:
+            self.pos = token[1]
+            # Only add this token if it's not in the list
+            # (to prevent looping)
+            if not self.tokens or token != self.tokens[-1]:
+                self.tokens.append(token)
+                self.restrictions.append(restrict)
+                return 1
+        return 0
+
+
+class _Scanner_a(Scanner):
+    patterns = None
+
+    def __init__(self):
+        if self.patterns is None:
+            self.patterns = []
+            for k, p in PATTERNS:
+                self.patterns.append((k, re.compile(p)))
+        Scanner.__init__(self, None, ['[ \r\t\n]+'])
 
 
 ################################################################################
-# Algorithm using Regexps in pure Python (fastest pure python):
-
-
-def _locate_blocks_b(codestr):
-    """
-    For processing CSS like strings.
-
-    Either returns all selectors (that can be "smart" multi-lined, as
-    long as it's joined by `,`, or enclosed in `(` and `)`) with its code block
-    (the one between `{` and `}`, which can be nested), or the "lose" code
-    (properties) that doesn't have any blocks.
-
-    threshold is the number of blank lines before selectors are broken into
-    pieces (properties).
-    """
-    lineno = 0
-
-    par = 0
-    instr = None
-    depth = 0
-    skip = False
-    thin = None
-    i = init = safe = lose = 0
-    start = end = None
-
-    for m in _blocks_re.finditer(codestr):
-        i = m.start(0)
-        c = codestr[i]
-        if instr is not None:
-            if c == instr:
-                instr = None  # A string ends (FIXME: needs to accept escaped characters)
-        elif c in ('"', "'"):
-            instr = c  # A string starts
-        elif c == '(':  # parenthesis begins:
-            par += 1
-            thin = None
-            safe = i + 1
-        elif c == ')':  # parenthesis ends:
-            par -= 1
-        elif not par and not instr:
-            if c == '{':  # block begins:
-                if depth == 0:
-                    if i > 0 and codestr[i - 1] == '#':  # Do not process #{...} as blocks!
-                        skip = True
-                    else:
-                        start = i
-                        if thin is not None and _strip(codestr[thin:i]):
-                            init = thin
-                        if lose <= init:
-                            _property, lineno = _strip_selprop(codestr[lose:init], lineno)
-                            if _property:
-                                yield lineno, _property, None
-                            lose = init
-                        thin = None
-                depth += 1
-            elif c == '}':  # block ends:
-                if depth > 0:
-                    depth -= 1
-                    if depth == 0:
-                        if not skip:
-                            end = i
-                            _selectors, lineno = _strip_selprop(codestr[init:start], lineno)
-                            _codestr = codestr[start + 1:end].strip()
-                            if _selectors:
-                                yield lineno, _selectors, _codestr
-                            init = safe = lose = end + 1
-                            thin = None
-                        skip = False
-            elif depth == 0:
-                if c == ';':  # End of property (or block):
-                    init = i
-                    if lose <= init:
-                        _property, lineno = _strip_selprop(codestr[lose:init], lineno)
-                        if _property:
-                            yield lineno, _property, None
-                        init = safe = lose = i + 1
-                    thin = None
-                elif c == ',':
-                    if thin is not None and _strip(codestr[thin:i]):
-                        init = thin
-                    thin = None
-                    safe = i + 1
-                elif c == '\n':
-                    if thin is not None and _strip(codestr[thin:i]):
-                        init = thin
-                        thin = i + 1
-                    elif thin is None and _strip(codestr[safe:i]):
-                        thin = i + 1  # Step on thin ice, if it breaks, it breaks here
-    if depth > 0:
-        if not skip:
-            _selectors, lineno = _strip_selprop(codestr[init:start], lineno)
-            _codestr = codestr[start + 1:].strip()
-            if _selectors:
-                yield lineno, _selectors, _codestr
-            if par:
-                raise Exception("Missing closing parenthesis somewhere in block: '%s'" % _selectors)
-            elif instr:
-                raise Exception("Missing closing string somewhere in block: '%s'" % _selectors)
-            else:
-                raise Exception("Block never closed: '%s'" % _selectors)
-    losestr = codestr[lose:]
-    for _property in losestr.split(';'):
-        _property, lineno = _strip_selprop(_property, lineno)
-        if _property:
-            yield lineno, _property, None
-
-
-################################################################################
-# Algorithm implemented in C:
-
 
 try:
-    from _scss import locate_blocks as _locate_blocks_c
+    import _scss
+    _scss.setup_patterns(PATTERNS)
+    _Scanner_b = _scss.Scanner
 except ImportError:
-    _locate_blocks_c = None
-    print >>sys.stderr, "Scanning acceleration disabled (_scss not found)!"
+    _Scanner_b = None
 
 
-################################################################################
-# Algorithm implemented in C with CTypes:
-
-
-try:
-    from _scss_c import locate_blocks as _locate_blocks_d
-except ImportError:
-    _locate_blocks_d = None
-    print >>sys.stderr, "Scanning CTypes acceleration disabled (_scss_c not found)!"
-
-
-################################################################################
-
-
-codestr = """
-simple {
-    block;
-}
-#{ignored};
-some,
-selectors,
-and multi-lined,
-selectors
-with more
-{
-    the block in here;
-    can have, nested, selectors {
-        and properties in nested blocks;
-        and stuff with #{ ignored blocks };
-    }
-    properties-can: "have strings with stuff like this: }";
-}
-and other,
-selectors
-can be turned into "lose"
-properties
-if no commas are found
-however this is a selector (
-    as well as these things,
-    which are parameters
-    and can expand
-    any number of
-    lines) {
-    and this is its block;;
-}
-"""
-verify = '\t----------------------------------------------------------------------\n\t>[1] \'simple\'\n\t----------------------------------------------------------------------\n\t>\t[3] \'block\'\n\t----------------------------------------------------------------------\n\t>[5] \'#{ignored}\'\n\t----------------------------------------------------------------------\n\t>[6] \'some,\\nselectors,\\nand multi-lined,\\nselectors\'\n\t----------------------------------------------------------------------\n\t>[10] \'with more\'\n\t----------------------------------------------------------------------\n\t>\t[12] \'the block in here\'\n\t----------------------------------------------------------------------\n\t>\t[13] \'can have, nested, selectors\'\n\t----------------------------------------------------------------------\n\t>\t\t[14] \'and properties in nested blocks\'\n\t----------------------------------------------------------------------\n\t>\t\t[15] \'and stuff with #{ ignored blocks }\'\n\t----------------------------------------------------------------------\n\t>\t[17] \'properties-can: "have strings with stuff like this: }"\'\n\t----------------------------------------------------------------------\n\t>[19] \'and other,\\nselectors\\ncan be turned into "lose"\\nproperties\'\n\t----------------------------------------------------------------------\n\t>[23] \'if no commas are found\\nhowever this is a selector (\\nas well as these things,\\nwhich are parameters\\nand can expand\\nany number of\\nlines)\'\n\t----------------------------------------------------------------------\n\t>\t[30] \'and this is its block\'\n'
-
-
-def process_block(locate_blocks, codestr, level=0, dump=False):
+def process_scan(Scanner, codestr, level=0, dump=False):
     ret = '' if dump else None
-    for lineno, selprop, block in locate_blocks(codestr):
-        if dump:
-            ret += '\t%s\n\t>%s[%s] %s\n' % ('-' * 70, '\t' * level, lineno, repr(selprop))
-        if block:
-            _ret = process_block(locate_blocks, block, level + 1, dump)
+    s = Scanner([], ['COLOR', 'NUM'], '[(5px - 3) * (5px - 3)]')
+    while True:
+        try:
+            s.scan()
             if dump:
-                ret += _ret
+                ret += '%s\n%s\n' % ('-' * 70, repr(s))
+        except:
+            break
     return ret
 
 
-def process_blocks(locate_blocks, codestr):
-    for q in xrange(50000):
-        process_block(locate_blocks, codestr)
-profiled_process_blocks = profile(process_blocks)
+def process_scans(Scanner, codestr):
+    for q in xrange(10000):
+        process_scan(Scanner, codestr)
+profiled_process_scans = profile(process_scans)
 
 if __name__ == "__main__":
-    codestr = load_string(codestr)
-
-    for locate_blocks, desc in (
-        (_locate_blocks_a, "Pure Python, Full algorithm (_locate_blocks_a))"),
-        (_locate_blocks_b, "Pure Python, Condensed algorithm (_locate_blocks_b))"),
-        (_locate_blocks_c, "Builtin C Function, Full algorithm (_locate_blocks_c))"),
-        (_locate_blocks_d, "CTypes C Function, Full algorithm (_locate_blocks_d))")):
-        if locate_blocks:
-            ret = process_block(locate_blocks, codestr, dump=True)
-            # print "This is what `%s()` returned:" % locate_blocks
-            # print ret
+    for scanner, desc in (
+        (_Scanner_a, "Pure Python, Full algorithm (_Scanner_a)"),
+        (_Scanner_b, "Builtin C Function, Full algorithm (_Scanner_b)"),
+    ):
+        if scanner:
+            ret = process_scan(scanner, codestr, dump=True)
+            print "This is what %s returned:" % desc
+            print ret
             # print repr(ret)
             assert ret == verify, 'It should be:\n%s' % verify
 
-            start = datetime.now()
-            print >>sys.stderr, "Timing: %s..." % desc,
-            process_blocks(locate_blocks, codestr)
-            elap = datetime.now() - start
+            # start = datetime.now()
+            # print >>sys.stderr, "Timing: %s..." % desc,
+            # process_blocks(locate_blocks, codestr)
+            # elap = datetime.now() - start
 
-            elapms = elap.seconds * 1000.0 + elap.microseconds / 1000.0
-            print >>sys.stderr, "Done! took %06.3fms" % elapms
+            # elapms = elap.seconds * 1000.0 + elap.microseconds / 1000.0
+            # print >>sys.stderr, "Done! took %06.3fms" % elapms

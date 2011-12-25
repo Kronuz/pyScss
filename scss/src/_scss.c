@@ -9,11 +9,8 @@
 * Copyright (c) 2011 German M. Bravo (Kronuz), All rights reserved.
 */
 #include <Python.h>
-
-/* Counter type */
-staticforward PyTypeObject scss_BlockLocatorType;
-
-#undef DEBUG
+#include "block_locator.h"
+#include "scanner.h"
 
 void reprl(char *str, int len) {
 	char c,
@@ -43,415 +40,36 @@ void repr(char *str, char *str2) {
 	reprl(str, (int)(str2 - str));
 }
 
-typedef struct {
-	int error;
-	int lineno;
-	char *selprop;
-	int selprop_sz;
-	char *codestr;
-	int codestr_sz;
-} scss_Block;
+/* BlockLocator */
+staticforward PyTypeObject scss_BlockLocatorType;
 
 typedef struct {
 	PyObject_HEAD
-	char *exc;
-	char *_codestr;
-	char *codestr;
-	char *codestr_ptr;
-	int codestr_sz;
-	int lineno;
-	int par;
-	char instr;
-	int depth;
-	int skip;
-	char *thin;
-	char *init;
-	char *safe;
-	char *lose;
-	char *start;
-	char *end;
-	scss_Block block;
+	BlockLocator *locator;
 } scss_BlockLocator;
 
-
-int _strip(char *begin, char *end, int *lineno) {
-	// "    1\0     some,    \n  2\0 aca  "
-	int _cnt,
-		cnt = 0,
-		pass = 1,
-		addnl = 0;
-	char c,
-		*line = NULL,
-		*first = begin,
-		*last = begin,
-		*write = lineno ? begin : NULL;
-	while (begin < end) {
-		c = *begin;
-		if (c == '\0') {
-			if (line == NULL) {
-				line = first;
-				if (lineno) {
-					sscanf(line, "%d", lineno);
-				}
-			}
-			first = last = begin + 1;
-			pass = 1;
-		} else if (c == '\n') {
-			_cnt = (int)(last - first);
-			if (_cnt > 0) {
-				cnt += _cnt + addnl;
-				if (write != NULL) {
-					if (addnl) {
-						*write++ = '\n';
-					}
-					while (first < last) {
-						*write++ = *first++;
-					}
-					*write = '\0';
-					addnl = 1;
-				}
-			}
-			first = last = begin + 1;
-			pass = 1;
-		} else if (c == ' ' || c == '\t') {
-			if (pass) {
-				first = last = begin + 1;
-			}
-		} else {
-			last = begin + 1;
-			pass = 0;
-		}
-		begin++;
-	}
-	_cnt = (int)(last - first);
-	if (_cnt > 0) {
-		cnt += _cnt + addnl;
-		if (write != NULL) {
-			if (addnl) {
-				*write++ = '\n';
-			}
-			while (first < last) {
-				*write++ = *first++;
-			}
-			*write = '\0';
-		}
-	}
-
-	return cnt;
-}
-
-
-typedef void scss_Callback(scss_BlockLocator*);
-
-
-void _start_string(scss_BlockLocator *self) {
-	#ifdef DEBUG
-		PySys_WriteStderr("_start_string\n");
-	#endif
-	// A string starts
-	self->instr = *(self->codestr_ptr);
-}
-
-void _end_string(scss_BlockLocator *self) {
-	#ifdef DEBUG
-		PySys_WriteStderr("_end_string\n");
-	#endif
-	// A string ends (FIXME: needs to accept escaped characters)
-	self->instr = 0;
-}
-
-void _start_parenthesis(scss_BlockLocator *self) {
-	#ifdef DEBUG
-		PySys_WriteStderr("_start_parenthesis\n");
-	#endif
-	// parenthesis begins:
-	self->par++;
-	self->thin = NULL;
-	self->safe = self->codestr_ptr + 1;
-}
-
-void _end_parenthesis(scss_BlockLocator *self) {
-	#ifdef DEBUG
-		PySys_WriteStderr("_end_parenthesis\n");
-	#endif
-	self->par--;
-}
-
-void _flush_properties(scss_BlockLocator *self) {
-	#ifdef DEBUG
-		PySys_WriteStderr("_flush_properties\n");
-	#endif
-	// Flush properties
-	int len, lineno = -1;
-	if (self->lose <= self->init) {
-		len = _strip(self->lose, self->init, &lineno);
-		if (len) {
-			if (lineno != -1) {
-				self->lineno = lineno;
-			}
-
-			self->block.selprop = self->lose;
-			self->block.selprop_sz = len;
-			self->block.codestr = NULL;
-			self->block.codestr_sz = 0;
-			self->block.lineno = self->lineno;
-			self->block.error = -1;
-		}
-		self->lose = self->init;
-	}
-}
-
-void _start_block1(scss_BlockLocator *self) {
-	#ifdef DEBUG
-		PySys_WriteStderr("_start_block1\n");
-	#endif
-	// Start block:
-	if (self->codestr_ptr > self->codestr && *(self->codestr_ptr - 1) == '#') {
-		self->skip = 1;
-	} else {
-		self->start = self->codestr_ptr;
-		if (self->thin != NULL && _strip(self->thin, self->codestr_ptr, NULL)) {
-			self->init = self->thin;
-		}
-		_flush_properties(self);
-		self->thin = NULL;
-	}
-	self->depth++;
-}
-
-void _start_block(scss_BlockLocator *self) {
-	#ifdef DEBUG
-		PySys_WriteStderr("_start_block\n");
-	#endif
-	// Start block:
-	self->depth++;
-}
-
-void _end_block1(scss_BlockLocator *self) {
-	#ifdef DEBUG
-		PySys_WriteStderr("_end_block1\n");
-	#endif
-	// Block ends:
-	int len, lineno = -1;
-	self->depth--;
-	if (!self->skip) {
-		self->end = self->codestr_ptr;
-		len = _strip(self->init, self->start, &lineno);
-		if (lineno != -1) {
-			self->lineno = lineno;
-		}
-
-		self->block.selprop = self->init;
-		self->block.selprop_sz = len;
-		self->block.codestr = (self->start + 1);
-		self->block.codestr_sz = (int)(self->end - (self->start + 1));
-		self->block.lineno = self->lineno;
-		self->block.error = -1;
-
-		self->init = self->safe = self->lose = self->end + 1;
-		self->thin = NULL;
-	}
-	self->skip = 0;
-}
-
-void _end_block(scss_BlockLocator *self) {
-	#ifdef DEBUG
-		PySys_WriteStderr("_end_block\n");
-	#endif
-	// Block ends:
-	self->depth--;
-}
-
-void _end_property(scss_BlockLocator *self) {
-	#ifdef DEBUG
-		PySys_WriteStderr("_end_property\n");
-	#endif
-	// End of property (or block):
-	int len, lineno = -1;
-	self->init = self->codestr_ptr;
-	if (self->lose <= self->init) {
-		len = _strip(self->lose, self->init, &lineno);
-		if (len) {
-			if (lineno != -1) {
-				self->lineno = lineno;
-			}
-
-			self->block.selprop = self->lose;
-			self->block.selprop_sz = len;
-			self->block.codestr = NULL;
-			self->block.codestr_sz = 0;
-			self->block.lineno = self->lineno;
-			self->block.error = -1;
-		}
-		self->init = self->safe = self->lose = self->codestr_ptr + 1;
-	}
-	self->thin = NULL;
-}
-
-void _mark_safe(scss_BlockLocator *self) {
-	#ifdef DEBUG
-		PySys_WriteStderr("_mark_safe\n");
-	#endif
-	// We are on a safe zone
-	if (self->thin != NULL && _strip(self->thin, self->codestr_ptr, NULL)) {
-		self->init = self->thin;
-	}
-	self->thin = NULL;
-	self->safe = self->codestr_ptr + 1;
-}
-
-void _mark_thin(scss_BlockLocator *self) {
-	#ifdef DEBUG
-		PySys_WriteStderr("_mark_thin\n");
-	#endif
-	// Step on thin ice, if it breaks, it breaks here
-	if (self->thin != NULL && _strip(self->thin, self->codestr_ptr, NULL)) {
-		self->init = self->thin;
-		self->thin = self->codestr_ptr + 1;
-	} else if (self->thin == NULL && _strip(self->safe, self->codestr_ptr, NULL)) {
-		self->thin = self->codestr_ptr + 1;
-	}
-}
-
-int scss_function_map_initialized = 0;
-scss_Callback* scss_function_map[256 * 256 * 2 * 3]; // (c, instr, par, depth)
-void init_function_map(void) {
-	int i;
-
-	if (scss_function_map_initialized)
-		return;
-	scss_function_map_initialized = 1;
-
-	for (i = 0; i < 256 * 256 * 2 * 3; i++) {
-		scss_function_map[i] = NULL;
-	}
-	scss_function_map[(int)'\"' + 256*0 + 256*256*0 + 256*256*2*0] = _start_string;
-	scss_function_map[(int)'\'' + 256*0 + 256*256*0 + 256*256*2*0] = _start_string;
-	scss_function_map[(int)'\"' + 256*0 + 256*256*1 + 256*256*2*0] = _start_string;
-	scss_function_map[(int)'\'' + 256*0 + 256*256*1 + 256*256*2*0] = _start_string;
-	scss_function_map[(int)'\"' + 256*0 + 256*256*0 + 256*256*2*1] = _start_string;
-	scss_function_map[(int)'\'' + 256*0 + 256*256*0 + 256*256*2*1] = _start_string;
-	scss_function_map[(int)'\"' + 256*0 + 256*256*1 + 256*256*2*1] = _start_string;
-	scss_function_map[(int)'\'' + 256*0 + 256*256*1 + 256*256*2*1] = _start_string;
-	scss_function_map[(int)'\"' + 256*0 + 256*256*0 + 256*256*2*2] = _start_string;
-	scss_function_map[(int)'\'' + 256*0 + 256*256*0 + 256*256*2*2] = _start_string;
-	scss_function_map[(int)'\"' + 256*0 + 256*256*1 + 256*256*2*2] = _start_string;
-	scss_function_map[(int)'\'' + 256*0 + 256*256*1 + 256*256*2*2] = _start_string;
-
-	scss_function_map[(int)'\"' + 256*(int)'\"' + 256*256*0 + 256*256*2*0] = _end_string;
-	scss_function_map[(int)'\'' + 256*(int)'\'' + 256*256*0 + 256*256*2*0] = _end_string;
-	scss_function_map[(int)'\"' + 256*(int)'\"' + 256*256*1 + 256*256*2*0] = _end_string;
-	scss_function_map[(int)'\'' + 256*(int)'\'' + 256*256*1 + 256*256*2*0] = _end_string;
-	scss_function_map[(int)'\"' + 256*(int)'\"' + 256*256*0 + 256*256*2*1] = _end_string;
-	scss_function_map[(int)'\'' + 256*(int)'\'' + 256*256*0 + 256*256*2*1] = _end_string;
-	scss_function_map[(int)'\"' + 256*(int)'\"' + 256*256*1 + 256*256*2*1] = _end_string;
-	scss_function_map[(int)'\'' + 256*(int)'\'' + 256*256*1 + 256*256*2*1] = _end_string;
-	scss_function_map[(int)'\"' + 256*(int)'\"' + 256*256*0 + 256*256*2*2] = _end_string;
-	scss_function_map[(int)'\'' + 256*(int)'\'' + 256*256*0 + 256*256*2*2] = _end_string;
-	scss_function_map[(int)'\"' + 256*(int)'\"' + 256*256*1 + 256*256*2*2] = _end_string;
-	scss_function_map[(int)'\'' + 256*(int)'\'' + 256*256*1 + 256*256*2*2] = _end_string;
-
-	scss_function_map[(int)'(' + 256*0 + 256*256*0 + 256*256*2*0] = _start_parenthesis;
-	scss_function_map[(int)'(' + 256*0 + 256*256*1 + 256*256*2*0] = _start_parenthesis;
-	scss_function_map[(int)'(' + 256*0 + 256*256*0 + 256*256*2*1] = _start_parenthesis;
-	scss_function_map[(int)'(' + 256*0 + 256*256*1 + 256*256*2*1] = _start_parenthesis;
-	scss_function_map[(int)'(' + 256*0 + 256*256*0 + 256*256*2*2] = _start_parenthesis;
-	scss_function_map[(int)'(' + 256*0 + 256*256*1 + 256*256*2*2] = _start_parenthesis;
-
-	scss_function_map[(int)')' + 256*0 + 256*256*1 + 256*256*2*0] = _end_parenthesis;
-	scss_function_map[(int)')' + 256*0 + 256*256*1 + 256*256*2*1] = _end_parenthesis;
-	scss_function_map[(int)')' + 256*0 + 256*256*1 + 256*256*2*2] = _end_parenthesis;
-
-	scss_function_map[(int)'{' + 256*0 + 256*256*0 + 256*256*2*0] = _start_block1;
-	scss_function_map[(int)'{' + 256*0 + 256*256*0 + 256*256*2*1] = _start_block;
-	scss_function_map[(int)'{' + 256*0 + 256*256*0 + 256*256*2*2] = _start_block;
-
-	scss_function_map[(int)'}' + 256*0 + 256*256*0 + 256*256*2*1] = _end_block1;
-	scss_function_map[(int)'}' + 256*0 + 256*256*0 + 256*256*2*2] = _end_block;
-
-	scss_function_map[(int)';' + 256*0 + 256*256*0 + 256*256*2*0] = _end_property;
-
-	scss_function_map[(int)',' + 256*0 + 256*256*0 + 256*256*2*0] = _mark_safe;
-
-	scss_function_map[(int)'\n' + 256*0 + 256*256*0 + 256*256*2*0] = _mark_thin;
-
-	scss_function_map[0 + 256*0 + 256*256*0 + 256*256*2*0] = _flush_properties;
-	scss_function_map[0 + 256*0 + 256*256*0 + 256*256*2*1] = _flush_properties;
-	scss_function_map[0 + 256*0 + 256*256*0 + 256*256*2*2] = _flush_properties;
-	#ifdef DEBUG
-		PySys_WriteStderr("Scss function maps initialized!\n");
-	#endif
-}
-
-
-/* constructor */
-
-static PyObject *
-scss_BlockLocator_new(char *codestr, int codestr_sz)
+static int
+scss_BlockLocator_init(scss_BlockLocator *self, PyObject *args, PyObject *kwds)
 {
-	scss_BlockLocator *self;
-
-	init_function_map();
-
-	self = PyObject_New(scss_BlockLocator, &scss_BlockLocatorType);;
-	if (self) {
-		self->_codestr = (char *)malloc(codestr_sz);
-		memcpy(self->_codestr, codestr, codestr_sz);
-		self->codestr_sz = codestr_sz;
-		self->codestr = (char *)malloc(self->codestr_sz);
-		memcpy(self->codestr, self->_codestr, self->codestr_sz);
-		self->codestr_ptr = self->codestr;
-		self->lineno = 0;
-		self->par = 0;
-		self->instr = 0;
-		self->depth = 0;
-		self->skip = 0;
-		self->thin = self->codestr;
-		self->init = self->codestr;
-		self->safe = self->codestr;
-		self->lose = self->codestr;
-		self->start = NULL;
-		self->end = NULL;
-		self->exc = NULL;
-
-		#ifdef DEBUG
-			PySys_WriteStderr("Scss BlockLocator object initialized! (%lu)\n", sizeof(scss_BlockLocator));
-		#endif
+	char *codestr;
+	int codestr_sz;
+	if (!PyArg_ParseTuple(args, "s#", &codestr, &codestr_sz)) {
+		return -1;
 	}
 
-	return (PyObject *)self;
-}
-
-static void
-scss_BlockLocator_rewind(scss_BlockLocator *self)
-{
-	free(self->codestr);
-	self->codestr = (char *)malloc(self->codestr_sz);
-	memcpy(self->codestr, self->_codestr, self->codestr_sz);
-	self->codestr_ptr = self->codestr;
-	self->lineno = 0;
-	self->par = 0;
-	self->instr = 0;
-	self->depth = 0;
-	self->skip = 0;
-	self->thin = self->codestr;
-	self->init = self->codestr;
-	self->safe = self->codestr;
-	self->lose = self->codestr;
-	self->start = NULL;
-	self->end = NULL;
-	self->exc = NULL;
+	self->locator = BlockLocator_new(codestr, codestr_sz);
 
 	#ifdef DEBUG
-		PySys_WriteStderr("Scss BlockLocator object rewound!\n");
+		PySys_WriteStderr("Scss BlockLocator object initialized! (%lu)\n", sizeof(scss_BlockLocator));
 	#endif
+
+	return 0;
 }
 
 static void
 scss_BlockLocator_dealloc(scss_BlockLocator *self)
 {
-	free(self->codestr);
-	free(self->_codestr);
+	BlockLocator_del(self->locator);
 
 	self->ob_type->tp_free((PyObject*)self);
 
@@ -459,9 +77,6 @@ scss_BlockLocator_dealloc(scss_BlockLocator *self)
 		PySys_WriteStderr("Scss BlockLocator object destroyed!\n");
 	#endif
 }
-
-
-/*****/
 
 scss_BlockLocator*
 scss_BlockLocator_iter(scss_BlockLocator *self)
@@ -473,94 +88,23 @@ scss_BlockLocator_iter(scss_BlockLocator *self)
 PyObject*
 scss_BlockLocator_iternext(scss_BlockLocator *self)
 {
-	scss_Callback *fn;
-	char c = 0;
-	char *codestr_end = self->codestr + self->codestr_sz;
+	Block *block;
 
-	memset(&self->block, 0, sizeof(scss_Block));
+	block = BlockLocator_iternext(self->locator);
 
-	while (self->codestr_ptr < codestr_end) {
-		c = *(self->codestr_ptr);
-		if (!c) {
-			self->codestr_ptr++;
-			continue;
-		}
-
-		repeat:
-
-		fn = scss_function_map[
-			(int)c +
-			256 * self->instr +
-			256 * 256 * (int)(self->par != 0) +
-			256 * 256 * 2 * (int)(self->depth > 1 ? 2 : self->depth)
-		];
-
-		if (fn != NULL) {
-			fn(self);
-		}
-
-		self->codestr_ptr++;
-		if (self->codestr_ptr > codestr_end) {
-			self->codestr_ptr = codestr_end;
-		}
-
-		if (self->block.error) {
-			#ifdef DEBUG
-				if (self->block.error < 0) {
-					PySys_WriteStderr("Block found!\n");
-				} else {
-					PySys_WriteStderr("Exception!\n");
-				}
-			#endif
-			return Py_BuildValue(
-				"is#s#",
-				self->block.lineno,
-				self->block.selprop,
-				self->block.selprop_sz,
-				self->block.codestr,
-				self->block.codestr_sz
-			);
-		}
-	}
-	if (self->par > 0) {
-		if (self->block.error <= 0) {
-			self->block.error = 1;
-			self->exc = "Missing closing parenthesis somewhere in block";
-			#ifdef DEBUG
-				PySys_WriteStderr("%s\n", self->exc);
-			#endif
-		}
-	} else if (self->instr != 0) {
-		if (self->block.error <= 0) {
-			self->block.error = 2;
-			self->exc = "Missing closing string somewhere in block";
-			#ifdef DEBUG
-				PySys_WriteStderr("%s\n", self->exc);
-			#endif
-		}
-	} else if (self->depth > 0) {
-		if (self->block.error <= 0) {
-			self->block.error = 3;
-			self->exc = "Missing closing string somewhere in block";
-			#ifdef DEBUG
-				PySys_WriteStderr("%s\n", self->exc);
-			#endif
-		}
-		if (self->init < codestr_end) {
-			c = '}';
-			goto repeat;
-		}
-	}
-	if (self->init < codestr_end) {
-		self->init = codestr_end;
-		c = 0;
-		goto repeat;
+	if (block->error == -1) {
+		return Py_BuildValue(
+			"is#s#",
+			block->lineno,
+			block->selprop,
+			block->selprop_sz,
+			block->codestr,
+			block->codestr_sz
+		);
 	}
 
-	scss_BlockLocator_rewind(self);
-
-	if (self->exc) {
-		PyErr_SetString(PyExc_Exception, self->exc);
+	if (self->locator->exc) {
+		PyErr_SetString(PyExc_Exception, self->locator->exc);
 		return NULL;
 	}
 
@@ -568,7 +112,6 @@ scss_BlockLocator_iternext(scss_BlockLocator *self)
 	PyErr_SetNone(PyExc_StopIteration);
 	return NULL;
 }
-
 
 /* Type definition */
 
@@ -601,31 +144,398 @@ static PyTypeObject scss_BlockLocatorType = {
 	0,                                         /* tp_weaklistoffset */
 	(getiterfunc)scss_BlockLocator_iter,       /* tp_iter: __iter__() method */
 	(iternextfunc)scss_BlockLocator_iternext,  /* tp_iternext: next() method */
+	0,                                         /* tp_methods */
+	0,                                         /* tp_members */
+	0,                                         /* tp_getset */
+	0,                                         /* tp_base */
+	0,                                         /* tp_dict */
+	0,                                         /* tp_descr_get */
+	0,                                         /* tp_descr_set */
+	0,                                         /* tp_dictoffset */
+	(initproc)scss_BlockLocator_init,          /* tp_init */
 };
 
+
+/* Scanner */
+static PyObject *PyExc_scss_NoMoreTokens;
+
+staticforward PyTypeObject scss_ScannerType;
+
+typedef struct {
+	PyObject_HEAD
+	Scanner *scanner;
+} scss_Scanner;
+
+
+static PyObject *
+scss_Scanner_rewind(scss_Scanner *self, PyObject *args)
+{
+	int token_num;
+	if (PyArg_ParseTuple(args, "i", &token_num)) {
+		Scanner_rewind(self->scanner, token_num);
+	}
+	return (PyObject *)Py_None;
+}
+
+static PyObject *
+scss_Scanner_scan(scss_Scanner *self, PyObject *args)
+{
+	PyObject *item;
+	int i, is_tuple;
+	long size;
+
+	Token *p_token;
+
+	PyObject *restrictions;
+	Pattern _restrictions[100];
+	int restrictions_sz = 0;
+
+	if (PyArg_ParseTuple(args, "|O", &restrictions)) {
+		is_tuple = PyTuple_Check(restrictions);
+		if (is_tuple || PyList_Check(restrictions)) {
+			size = is_tuple ? PyTuple_Size(restrictions) : PyList_Size(restrictions);
+			for (i = 0; i < size; ++i) {
+				item = is_tuple ? PyTuple_GetItem(restrictions, i) : PyList_GetItem(restrictions, i);
+				if (PyString_Check(item)) {
+					_restrictions[restrictions_sz].tok = PyString_AsString(item);
+					_restrictions[restrictions_sz].expr = NULL;
+					restrictions_sz++;
+				}
+			}
+		}
+		p_token = Scanner_token(self->scanner, self->scanner->tokens_sz, _restrictions, restrictions_sz);
+		if (p_token == (Token *)SCANNER_EXC_BAD_TOKEN) {
+			PyErr_SetString(PyExc_SyntaxError, self->scanner->exc);
+			return NULL;
+		}
+		if (p_token == (Token *)SCANNER_EXC_RESTRICTED) {
+			PyErr_SetString(PyExc_SyntaxError, self->scanner->exc);
+			return NULL;
+		}
+		if (p_token == (Token *)SCANNER_EXC_UNIMPLEMENTED) {
+			PyErr_SetString(PyExc_NotImplementedError, self->scanner->exc);
+			return NULL;
+		}
+		if (p_token == (Token *)SCANNER_EXC_NO_MORE_TOKENS) {
+			PyErr_SetNone(PyExc_scss_NoMoreTokens);
+			return NULL;
+		}
+		if (p_token < 0) {
+			PyErr_SetNone(PyExc_Exception);
+			return NULL;
+		}
+		return Py_BuildValue(
+			"iiss#",
+			p_token->string - self->scanner->input,
+			p_token->string - self->scanner->input + p_token->string_sz,
+			p_token->regex->tok,
+			p_token->string,
+			p_token->string_sz
+		);
+	}
+	return (PyObject *)Py_None;
+}
+
+static PyObject *
+scss_Scanner_token(scss_Scanner *self, PyObject *args)
+{
+	PyObject *item;
+	int i, is_tuple;
+	long size;
+
+	Token *p_token;
+
+	int token_num;
+	PyObject *restrictions;
+	Pattern _restrictions[100];
+	int restrictions_sz = 0;
+
+	if (PyArg_ParseTuple(args, "i|O", &token_num, &restrictions)) {
+		is_tuple = PyTuple_Check(restrictions);
+		if (is_tuple || PyList_Check(restrictions)) {
+			size = is_tuple ? PyTuple_Size(restrictions) : PyList_Size(restrictions);
+			for (i = 0; i < size; ++i) {
+				item = is_tuple ? PyTuple_GetItem(restrictions, i) : PyList_GetItem(restrictions, i);
+				if (PyString_Check(item)) {
+					_restrictions[restrictions_sz].tok = PyString_AsString(item);
+					_restrictions[restrictions_sz].expr = NULL;
+					restrictions_sz++;
+				}
+			}
+		}
+		p_token = Scanner_token(self->scanner, token_num, _restrictions, restrictions_sz);
+		if (p_token == (Token *)SCANNER_EXC_BAD_TOKEN) {
+			PyErr_SetString(PyExc_SyntaxError, self->scanner->exc);
+			return NULL;
+		}
+		if (p_token == (Token *)SCANNER_EXC_RESTRICTED) {
+			PyErr_SetString(PyExc_SyntaxError, self->scanner->exc);
+			return NULL;
+		}
+		if (p_token == (Token *)SCANNER_EXC_UNIMPLEMENTED) {
+			PyErr_SetString(PyExc_NotImplementedError, self->scanner->exc);
+			return NULL;
+		}
+		if (p_token == (Token *)SCANNER_EXC_NO_MORE_TOKENS) {
+			PyErr_SetNone(PyExc_scss_NoMoreTokens);
+			return NULL;
+		}
+		if (p_token < 0) {
+			PyErr_SetNone(PyExc_Exception);
+			return NULL;
+		}
+		return Py_BuildValue(
+			"iiss#",
+			p_token->string - self->scanner->input,
+			p_token->string - self->scanner->input + p_token->string_sz,
+			p_token->regex->tok,
+			p_token->string,
+			p_token->string_sz
+		);
+	}
+	return (PyObject *)Py_None;
+}
+
+static PyObject *
+scss_Scanner_reset(scss_Scanner *self, PyObject *args, PyObject *kwds)
+{
+	char *input = NULL;
+	int input_sz = 0;
+
+	if (PyArg_ParseTuple(args, "|s#", &input, &input_sz)) {
+		Scanner_reset(self->scanner, input, input_sz);
+	}
+
+	return (PyObject *)Py_None;
+}
+
+static int
+scss_Scanner_init(scss_Scanner *self, PyObject *args, PyObject *kwds)
+{
+	PyObject *item, *item0, *item1;
+	int i, is_tuple, _is_tuple;
+	long size;
+
+	PyObject *patterns, *ignore;
+	Pattern _patterns[100];
+	int patterns_sz = 0;
+	Pattern _ignore[100];
+	int ignore_sz = 0;
+	char *input = NULL;
+	int input_sz = 0;
+
+	if (!PyArg_ParseTuple(args, "OO|s#", &patterns, &ignore, &input, &input_sz)) {
+		return -1;
+	}
+	if (!Scanner_initialized()) {
+		is_tuple = PyTuple_Check(patterns);
+		if (is_tuple || PyList_Check(patterns)) {
+			size = is_tuple ? PyTuple_Size(patterns) : PyList_Size(patterns);
+			for (i = 0; i < size; ++i) {
+				item = is_tuple ? PyTuple_GetItem(patterns, i) : PyList_GetItem(patterns, i);
+				_is_tuple = PyTuple_Check(item);
+				if (_is_tuple || PyList_Check(item)) {
+					item0 = _is_tuple ? PyTuple_GetItem(item, 0) : PyList_GetItem(item, 0);
+					item1 = _is_tuple ? PyTuple_GetItem(item, 1) : PyList_GetItem(item, 1);
+					if (PyString_Check(item0) && PyString_Check(item1)) {
+						_patterns[patterns_sz].tok = PyString_AsString(item0);
+						_patterns[patterns_sz].expr = PyString_AsString(item1);
+						patterns_sz++;
+					}
+				}
+			}
+		}
+		Scanner_initialize(_patterns, patterns_sz);
+	}
+	is_tuple = PyTuple_Check(ignore);
+	if (is_tuple || PyList_Check(ignore)) {
+		size = is_tuple ? PyTuple_Size(ignore) : PyList_Size(ignore);
+		for (i = 0; i < size; ++i) {
+			item = is_tuple ? PyTuple_GetItem(ignore, i) : PyList_GetItem(ignore, i);
+			if (PyString_Check(item)) {
+				_ignore[ignore_sz].tok = PyString_AsString(item);
+				_ignore[ignore_sz].expr = NULL;
+				ignore_sz++;
+			}
+		}
+	}
+
+	self->scanner = Scanner_new(_patterns, patterns_sz, _ignore, ignore_sz, input, input_sz);
+
+	#ifdef DEBUG
+		PySys_WriteStderr("Scss Scanner object initialized! (%lu)\n", sizeof(scss_Scanner));
+	#endif
+
+	return 0;
+}
+
+static PyObject *
+scss_Scanner_repr(scss_Scanner *self)
+{
+	/* Print the last 10 tokens that have been scanned in */
+	PyObject *repr, *tmp, *tmp2;
+	Token *p_token;
+	char *tok;
+	int i, start, first = 1, cur, max=0, pos;
+
+	if (self->scanner->tokens_sz) {
+		start = self->scanner->tokens_sz - 10;
+		for (i = (start < 0) ? 0 : start; i < self->scanner->tokens_sz; i++) {
+			p_token = self->scanner->tokens[i];
+			cur = strlen(p_token->regex->tok) * 2;
+			if (cur > max) max = cur;
+		}
+		tok = malloc(max + 4);
+		repr = PyString_FromString("");
+		for (i = (start < 0) ? 0 : start; i < self->scanner->tokens_sz; i++) {
+			p_token = self->scanner->tokens[i];
+			if (!first) PyString_ConcatAndDel(&repr, PyString_FromString("\n"));
+
+			pos = (int)(p_token->string - self->scanner->input);
+			if (pos < 10) PyString_ConcatAndDel(&repr, PyString_FromString(" "));
+			if (pos < 100) PyString_ConcatAndDel(&repr, PyString_FromString(" "));
+			if (pos < 1000) PyString_ConcatAndDel(&repr, PyString_FromString(" "));
+			PyString_ConcatAndDel(&repr, PyString_FromFormat("(@%d)  ",
+				pos));
+
+			tmp = PyString_FromString(p_token->regex->tok);
+			tmp2 = PyObject_Repr(tmp);
+			memset(tok, ' ', max + 4);
+			tok[max + 3 - PyString_Size(tmp2)] = '\0';
+			PyString_ConcatAndDel(&repr, PyString_FromString(tok));
+			PyString_ConcatAndDel(&repr, tmp2);
+			Py_XDECREF(tmp);
+
+			PyString_ConcatAndDel(&repr, PyString_FromString("  =  "));
+			tmp = PyString_FromString(p_token->string);
+			PyString_ConcatAndDel(&repr, PyObject_Repr(tmp));
+			Py_XDECREF(tmp);
+
+			first = 0;
+		}
+		free(tok);
+	} else {
+		repr = PyString_FromString("None");
+	}
+
+	return (PyObject *)repr;
+}
+
+static void
+scss_Scanner_dealloc(scss_Scanner *self)
+{
+	Scanner_del(self->scanner);
+
+	self->ob_type->tp_free((PyObject*)self);
+
+	#ifdef DEBUG
+		PySys_WriteStderr("Scss Scanner object destroyed!\n");
+	#endif
+}
+
+static PyMethodDef scss_Scanner_methods[] = {
+	{"scan", (PyCFunction)scss_Scanner_scan, METH_VARARGS, "Scan the next token"},
+	{"reset", (PyCFunction)scss_Scanner_reset, METH_VARARGS, "Scan the next token"},
+	{"token", (PyCFunction)scss_Scanner_token, METH_VARARGS, "Get the nth token"},
+	{"rewind", (PyCFunction)scss_Scanner_rewind, METH_VARARGS, "Rewind scanner"},
+	{NULL, NULL, 0, NULL}        /* Sentinel */
+};
+
+static PyTypeObject scss_ScannerType = {
+	PyObject_HEAD_INIT(NULL)
+	0,                                         /* ob_size */
+	"scss.Scanner",                            /* tp_name */
+	sizeof(scss_Scanner),                      /* tp_basicsize */
+	0,                                         /* tp_itemsize */
+	(destructor)scss_Scanner_dealloc,          /* tp_dealloc */
+	0,                                         /* tp_print */
+	0,                                         /* tp_getattr */
+	0,                                         /* tp_setattr */
+	0,                                         /* tp_compare */
+	(reprfunc)scss_Scanner_repr,               /* tp_repr */
+	0,                                         /* tp_as_number */
+	0,                                         /* tp_as_sequence */
+	0,                                         /* tp_as_mapping */
+	0,                                         /* tp_hash  */
+	0,                                         /* tp_call */
+	0,                                         /* tp_str */
+	0,                                         /* tp_getattro */
+	0,                                         /* tp_setattro */
+	0,                                         /* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,  /* tp_flags */
+	"Scanner object.",                         /* tp_doc */
+	0,                                         /* tp_traverse */
+	0,                                         /* tp_clear */
+	0,                                         /* tp_richcompare */
+	0,                                         /* tp_weaklistoffset */
+	0,                                         /* tp_iter: __iter__() method */
+	0,                                         /* tp_iternext: next() method */
+	scss_Scanner_methods,                      /* tp_methods */
+	0,                                         /* tp_members */
+	0,                                         /* tp_getset */
+	0,                                         /* tp_base */
+	0,                                         /* tp_dict */
+	0,                                         /* tp_descr_get */
+	0,                                         /* tp_descr_set */
+	0,                                         /* tp_dictoffset */
+	(initproc)scss_Scanner_init,               /* tp_init */
+};
 
 /* Python constructor */
 
 static PyObject *
 scss_locate_blocks(PyObject *self, PyObject *args)
 {
-	PyObject *result = NULL;
+	scss_BlockLocator *result = NULL;
 
-	char *codestr;
-	int codestr_sz;
-
-	if (PyArg_ParseTuple(args, "s#", &codestr, &codestr_sz)) {
-		result = scss_BlockLocator_new(codestr, codestr_sz);
+	result = PyObject_New(scss_BlockLocator, &scss_BlockLocatorType);
+	if (result) {
+		scss_BlockLocator_init(result, args, NULL);
 	}
 
-	return result;
+	return (PyObject *)result;
 }
 
+static PyObject *
+scss_setup_patterns(PyObject *self, PyObject *args)
+{
+	PyObject *item, *item0, *item1;
+	int i, is_tuple, _is_tuple;
+	long size;
+
+	PyObject *patterns;
+	Pattern _patterns[100];
+	int patterns_sz = 0;
+	if (!Scanner_initialized()) {
+		if (PyArg_ParseTuple(args, "O", &patterns)) {
+			is_tuple = PyTuple_Check(patterns);
+			if (is_tuple || PyList_Check(patterns)) {
+				size = is_tuple ? PyTuple_Size(patterns) : PyList_Size(patterns);
+				for (i = 0; i < size; ++i) {
+					item = is_tuple ? PyTuple_GetItem(patterns, i) : PyList_GetItem(patterns, i);
+					_is_tuple = PyTuple_Check(item);
+					if (_is_tuple || PyList_Check(item)) {
+						item0 = _is_tuple ? PyTuple_GetItem(item, 0) : PyList_GetItem(item, 0);
+						item1 = _is_tuple ? PyTuple_GetItem(item, 1) : PyList_GetItem(item, 1);
+						if (PyString_Check(item0) && PyString_Check(item1)) {
+							_patterns[patterns_sz].tok = PyString_AsString(item0);
+							_patterns[patterns_sz].expr = PyString_AsString(item1);
+							patterns_sz++;
+						}
+					}
+				}
+			}
+			Scanner_initialize(_patterns, patterns_sz);
+		}
+	}
+	return (PyObject *)Py_None;
+}
 
 /* Module functions */
 
-static PyMethodDef scssMethods[] = {
-	{"locate_blocks",  scss_locate_blocks, METH_VARARGS, "Locate Scss blocks."},
+static PyMethodDef scss_methods[] = {
+	{"locate_blocks", (PyCFunction)scss_locate_blocks, METH_VARARGS, "Locate Scss blocks."},
+	{"setup_patterns", (PyCFunction)scss_setup_patterns, METH_VARARGS, "Initialize patterns."},
 	{NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
@@ -641,10 +551,22 @@ init_scss(void)
 	if (PyType_Ready(&scss_BlockLocatorType) < 0)
 		return;
 
-	m = Py_InitModule("_scss", scssMethods);
+	scss_ScannerType.tp_new = PyType_GenericNew;
+	if (PyType_Ready(&scss_ScannerType) < 0)
+		return;
 
-	init_function_map();
+	BlockLocator_initialize();
+	Scanner_initialize(NULL, 0);
+
+	m = Py_InitModule("_scss", scss_methods);
 
 	Py_INCREF(&scss_BlockLocatorType);
 	PyModule_AddObject(m, "_BlockLocator", (PyObject *)&scss_BlockLocatorType);
+
+	Py_INCREF(&scss_ScannerType);
+	PyModule_AddObject(m, "Scanner", (PyObject *)&scss_ScannerType);
+
+	PyExc_scss_NoMoreTokens = PyErr_NewExceptionWithDoc("_scss.NoMoreTokens", "Another exception object, for when we run out of tokens", NULL, NULL);
+	Py_INCREF(PyExc_scss_NoMoreTokens);
+	PyModule_AddObject(m, "NoMoreTokens", (PyObject *)PyExc_scss_NoMoreTokens);
 }

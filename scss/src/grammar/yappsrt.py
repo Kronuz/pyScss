@@ -9,22 +9,6 @@ import re
 # Parser
 
 
-class SyntaxError(Exception):
-    """
-    When we run into an unexpected token, this is the exception to use
-    """
-    def __init__(self, pos=-1, msg="Bad Token"):
-        Exception.__init__(self)
-        self.pos = pos
-        self.msg = msg
-
-    def __repr__(self):
-        if self.pos < 0:
-            return "#<syntax-error>"
-        else:
-            return "SyntaxError[@ char %s: %s]" % (repr(self.pos), self.msg)
-
-
 class NoMoreTokens(Exception):
     """
     Another exception object, for when we run out of tokens
@@ -108,9 +92,9 @@ class Scanner(object):
         except KeyError:
             token = None
             while True:
+                best_pat = None
                 # Search the patterns for a match, with earlier
                 # tokens in the list having preference
-                best_pat = None
                 best_pat_len = 0
                 for p, regexp in self.patterns:
                     # First check to see if we're restricting to this token
@@ -128,11 +112,11 @@ class Scanner(object):
                     msg = "Bad Token"
                     if restrict:
                         msg = "Trying to find one of " + ", ".join(restrict)
-                    raise SyntaxError(self.pos, msg)
+                    raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(self.pos), msg))
 
                 # If we found something that isn't to be ignored, return it
                 if best_pat in self.ignore:
-                    # This token should be ignored ..
+                    # This token should be ignored...
                     self.pos += best_pat_len
                 else:
                     end_pos = self.pos + best_pat_len
@@ -145,7 +129,6 @@ class Scanner(object):
                     )
                     break
             self.scanned[_k_] = token
-
         if token is not None:
             self.pos = token[1]
             # Only add this token if it's not in the list
@@ -180,7 +163,7 @@ class Parser(object):
         """
         tok = self._scanner.token(self._pos, set([type]))
         if tok[2] != type:
-            raise SyntaxError(tok[0], "Trying to find " + type)
+            raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(tok[0]), "Trying to find " + type))
         self._pos += 1
         return tok[3]
 

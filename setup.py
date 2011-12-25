@@ -20,7 +20,14 @@ if sys.version_info >= (3, 0):
     )
 
 
-EXT_MODULES = [Extension('scss._scss', sources=['scss/src/_scss.c'], optional=True)]
+EXT_MODULES = [
+    Extension(
+        'scss._scss',
+        sources=['scss/src/_scss.c', 'scss/src/block_locator.c', 'scss/src/scanner.c'],
+        libraries=['pcre'],
+        optional=True
+    )
+]
 if '--with-accel' in sys.argv:
     sys.argv.remove('--with-accel')
 if '--without-accel' in sys.argv:
