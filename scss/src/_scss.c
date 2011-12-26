@@ -16,25 +16,27 @@ void reprl(char *str, int len) {
 	char c,
 		 *begin = str,
 		 *end = str + len;
-	PySys_WriteStderr("'");
+	fprintf(stderr, "'");
 	while (begin < end) {
 		c = *begin;
 		if (len == -1 && !c) {
 			break;
+		} else if (c == '\'') {
+			fprintf(stderr, "\\'");
 		} else if (c == '\r') {
-			PySys_WriteStderr("\\r");
+			fprintf(stderr, "\\r");
 		} else if (c == '\n') {
-			PySys_WriteStderr("\\n");
+			fprintf(stderr, "\\n");
 		} else if (c == '\t') {
-			PySys_WriteStderr("\\t");
+			fprintf(stderr, "\\t");
 		} else if (c < ' ') {
-			PySys_WriteStderr("\\x%02x", c);
+			fprintf(stderr, "\\x%02x", c);
 		} else {
-			PySys_WriteStderr("%c", c);
+			fprintf(stderr, "%c", c);
 		}
 		begin++;
 	}
-	PySys_WriteStderr("'\n");
+	fprintf(stderr, "'\n");
 }
 void repr(char *str, char *str2) {
 	reprl(str, (int)(str2 - str));
@@ -69,7 +71,7 @@ scss_BlockLocator_init(scss_BlockLocator *self, PyObject *args, PyObject *kwds)
 static void
 scss_BlockLocator_dealloc(scss_BlockLocator *self)
 {
-	BlockLocator_del(self->locator);
+	if(self->locator) BlockLocator_del(self->locator);
 
 	self->ob_type->tp_free((PyObject*)self);
 
@@ -462,7 +464,7 @@ scss_Scanner_repr(scss_Scanner *self)
 static void
 scss_Scanner_dealloc(scss_Scanner *self)
 {
-	Scanner_del(self->scanner);
+	if (self->scanner) Scanner_del(self->scanner);
 
 	self->ob_type->tp_free((PyObject*)self);
 

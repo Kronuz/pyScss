@@ -46,7 +46,6 @@ int _strip(char *begin, char *end, int *lineno) {
 					while (first < last) {
 						*write++ = *first++;
 					}
-					*write = '\0';
 					addnl = 1;
 				}
 			}
@@ -72,10 +71,8 @@ int _strip(char *begin, char *end, int *lineno) {
 			while (first < last) {
 				*write++ = *first++;
 			}
-			*write = '\0';
 		}
 	}
-
 	return cnt;
 }
 
