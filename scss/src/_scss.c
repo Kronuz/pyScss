@@ -424,7 +424,7 @@ scss_Scanner_repr(scss_Scanner *self)
 			cur = strlen(p_token->regex->tok) * 2;
 			if (cur > max) max = cur;
 		}
-		tok = malloc(max + 4);
+		tok = PyMem_New(char, max + 4);
 		repr = PyString_FromString("");
 		for (i = (start < 0) ? 0 : start; i < self->scanner->tokens_sz; i++) {
 			p_token = self->scanner->tokens[i];
@@ -452,7 +452,7 @@ scss_Scanner_repr(scss_Scanner *self)
 
 			first = 0;
 		}
-		free(tok);
+		PyMem_Del(tok);
 	} else {
 		repr = PyString_FromString("None");
 	}

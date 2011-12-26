@@ -8,6 +8,8 @@
 * MIT license (http://www.opensource.org/licenses/mit-license.php)
 * Copyright (c) 2011 German M. Bravo (Kronuz), All rights reserved.
 */
+#include <Python.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -359,15 +361,16 @@ BlockLocator_finalize(void)
 BlockLocator *
 BlockLocator_new(char *codestr, int codestr_sz)
 {
-	BlockLocator *self = (BlockLocator *)malloc(sizeof(BlockLocator));
+	BlockLocator *self = PyMem_New(BlockLocator, 1);
+	memset(self, 0, sizeof(BlockLocator));
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
 	if (self) {
-		self->_codestr = (char *)malloc(codestr_sz);
+		self->_codestr = PyMem_New(char, codestr_sz);
 		memcpy(self->_codestr, codestr, codestr_sz);
 		self->codestr_sz = codestr_sz;
-		self->codestr = (char *)malloc(self->codestr_sz);
+		self->codestr = PyMem_New(char, self->codestr_sz);
 		memcpy(self->codestr, self->_codestr, self->codestr_sz);
 		self->codestr_ptr = self->codestr;
 		self->lineno = 0;
@@ -404,7 +407,7 @@ BlockLocator_rewind(BlockLocator *self)
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
 	free(self->codestr);
-	self->codestr = (char *)malloc(self->codestr_sz);
+	self->codestr = PyMem_New(char, self->codestr_sz);
 	memcpy(self->codestr, self->_codestr, self->codestr_sz);
 	self->codestr_ptr = self->codestr;
 	self->lineno = 0;

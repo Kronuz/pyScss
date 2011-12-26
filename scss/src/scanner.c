@@ -8,9 +8,22 @@
 * MIT license (http://www.opensource.org/licenses/mit-license.php)
 * Copyright (c) 2011 German M. Bravo (Kronuz), All rights reserved.
 */
+#include <Python.h>
+
 #include <stdio.h>
 #include <string.h>
 #include "scanner.h"
+
+char *
+PyMem_Strdup(const char *str)
+{
+	if (str != NULL) {
+		char *copy = PyMem_New(char, strlen(str) + 1);
+		if (copy != NULL)
+			return strcpy(copy, str);
+	}
+	return NULL;
+}
 
 Pattern *Pattern_patterns[MAX_PATTERNS];
 int Pattern_patterns_initialized = 0;
@@ -25,9 +38,10 @@ Pattern_regex(char *tok, char *expr) {
 	for (j = 0; j < MAX_PATTERNS; j++) {
 		if(Pattern_patterns[j] == NULL) {
 			if (expr) {
-				Pattern_patterns[j] = (Pattern *)calloc(1, sizeof(Pattern));
-				Pattern_patterns[j]->tok = strdup(tok);
-				Pattern_patterns[j]->expr = strdup(expr);
+				Pattern_patterns[j] = PyMem_New(Pattern, 1);
+				memset(Pattern_patterns[j], 0, sizeof(Pattern));
+				Pattern_patterns[j]->tok = PyMem_Strdup(tok);
+				Pattern_patterns[j]->expr = PyMem_Strdup(expr);
 				ret = Pattern_patterns[j];
 			}
 			break;
@@ -126,12 +140,12 @@ Pattern_finalize(void) {
 	if (Pattern_patterns_initialized) {
 		for (j = 0; j < MAX_PATTERNS; j++) {
 			if (Pattern_patterns[j] != NULL) {
-				free(Pattern_patterns[j]->tok);
-				free(Pattern_patterns[j]->expr);
+				PyMem_Del(Pattern_patterns[j]->tok);
+				PyMem_Del(Pattern_patterns[j]->expr);
 				if (Pattern_patterns[j]->pattern != NULL) {
 					pcre_free(Pattern_patterns[j]->pattern);
 				}
-				free(Pattern_patterns[j]);
+				PyMem_Del(Pattern_patterns[j]);
 				Pattern_patterns[j] = NULL;
 			}
 		}
@@ -256,7 +270,7 @@ Scanner_reset(Scanner *self, char *input, int input_sz) {
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
 	if (input_sz) {
-		if (self->input) free(self->input);
+		if (self->input) PyMem_Del(self->input);
 		self->input = strndup(input, input_sz + 1);
 		self->input[input_sz] = '\0';
 		self->input_sz = input_sz;
@@ -264,7 +278,7 @@ Scanner_reset(Scanner *self, char *input, int input_sz) {
 	self->tokens_sz = 0;
 	for (i = 0; i < MAX_TOKENS; i++) {
 		if (self->tokens[i]) {
-			free(self->tokens[i]);
+			PyMem_Del(self->tokens[i]);
 		}
 		self->tokens[i] = NULL;
 		for (j = 0; j < MAX_PATTERNS; j++) {
@@ -283,17 +297,17 @@ Scanner_del(Scanner *self) {
 	#endif
 	for (i = 0; i < MAX_TOKENS; i++) {
 		if (self->tokens[i]) {
-			free(self->tokens[i]);
+			PyMem_Del(self->tokens[i]);
 		}
 		self->tokens[i] = NULL;
 	}
 
 	if (self->input != NULL) {
-		free(self->input);
+		PyMem_Del(self->input);
 		self->input = NULL;
 	}
 
-	free(self);
+	PyMem_Del(self);
 }
 
 Scanner*
@@ -305,7 +319,8 @@ Scanner_new(Pattern patterns[], int patterns_sz, Pattern ignore[], int ignore_sz
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
-	self = (Scanner *)calloc(1, sizeof(Scanner));
+	self = PyMem_New(Scanner, 1);
+	memset(self, 0, sizeof(Scanner));
 	if (self) {
 		for (i = 0; i < patterns_sz; i++) {
 			regex = Pattern_regex(patterns[i].tok, patterns[i].expr);
