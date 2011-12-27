@@ -139,7 +139,7 @@ _BlockLocator_flush_properties(BlockLocator *self) {
 			self->block.codestr = NULL;
 			self->block.codestr_sz = 0;
 			self->block.lineno = self->lineno;
-			self->block.error = -1;
+			self->block.error = 1;
 		}
 		self->lose = self->init;
 	}
@@ -193,7 +193,7 @@ _BlockLocator_end_block1(BlockLocator *self) {
 		self->block.codestr = (self->start + 1);
 		self->block.codestr_sz = (int)(self->end - (self->start + 1));
 		self->block.lineno = self->lineno;
-		self->block.error = -1;
+		self->block.error = 1;
 
 		self->init = self->safe = self->lose = self->end + 1;
 		self->thin = NULL;
@@ -230,7 +230,7 @@ _BlockLocator_end_property(BlockLocator *self) {
 			self->block.codestr = NULL;
 			self->block.codestr_sz = 0;
 			self->block.lineno = self->lineno;
-			self->block.error = -1;
+			self->block.error = 1;
 		}
 		self->init = self->safe = self->lose = self->codestr_ptr + 1;
 	}
@@ -334,7 +334,7 @@ init_function_map(void) {
 	scss_function_map[0 + 256*0 + 256*256*0 + 256*256*2*1] = _BlockLocator_flush_properties;
 	scss_function_map[0 + 256*0 + 256*256*0 + 256*256*2*2] = _BlockLocator_flush_properties;
 	#ifdef DEBUG
-		fprintf(stderr, "Scss function maps initialized!\n");
+		fprintf(stderr, "\tScss function maps initialized!\n");
 	#endif
 }
 
@@ -384,7 +384,6 @@ BlockLocator_new(char *codestr, int codestr_sz)
 		self->lose = self->codestr;
 		self->start = NULL;
 		self->end = NULL;
-		self->exc = NULL;
 	}
 	return self;
 }
@@ -421,10 +420,9 @@ BlockLocator_rewind(BlockLocator *self)
 	self->lose = self->codestr;
 	self->start = NULL;
 	self->end = NULL;
-	self->exc = NULL;
 
 	#ifdef DEBUG
-		fprintf(stderr, "Scss BlockLocator object rewound!\n");
+		fprintf(stderr, "\tScss BlockLocator object rewound!\n");
 	#endif
 }
 
@@ -467,37 +465,37 @@ BlockLocator_iternext(BlockLocator *self)
 
 		if (self->block.error) {
 			#ifdef DEBUG
-				if (self->block.error < 0) {
-					fprintf(stderr, "Block found!\n");
+				if (self->block.error > 0) {
+					fprintf(stderr, "\tBlock found!\n");
 				} else {
-					fprintf(stderr, "Exception!\n");
+					fprintf(stderr, "\tException!\n");
 				}
 			#endif
 			return &self->block;
 		}
 	}
 	if (self->par > 0) {
-		if (self->block.error <= 0) {
-			self->block.error = 1;
-			self->exc = "Missing closing parenthesis somewhere in block";
+		if (self->block.error >= 0) {
+			self->block.error = -1;
+			sprintf(self->exc, "Missing closing parenthesis somewhere in block");
 			#ifdef DEBUG
-				fprintf(stderr, "%s\n", self->exc);
+				fprintf(stderr, "\t%s\n", self->exc);
 			#endif
 		}
 	} else if (self->instr != 0) {
-		if (self->block.error <= 0) {
-			self->block.error = 2;
-			self->exc = "Missing closing string somewhere in block";
+		if (self->block.error >= 0) {
+			self->block.error = -2;
+			sprintf(self->exc, "Missing closing string somewhere in block");
 			#ifdef DEBUG
-				fprintf(stderr, "%s\n", self->exc);
+				fprintf(stderr, "\t%s\n", self->exc);
 			#endif
 		}
 	} else if (self->depth > 0) {
-		if (self->block.error <= 0) {
-			self->block.error = 3;
-			self->exc = "Missing closing string somewhere in block";
+		if (self->block.error >= 0) {
+			self->block.error = -3;
+			sprintf(self->exc, "Missing closing string somewhere in block");
 			#ifdef DEBUG
-				fprintf(stderr, "%s\n", self->exc);
+				fprintf(stderr, "\t%s\n", self->exc);
 			#endif
 		}
 		if (self->init < codestr_end) {

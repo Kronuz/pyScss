@@ -140,9 +140,10 @@ class Scanner(object):
         tokens_len = len(self.tokens)
         if i == tokens_len:  # We are at the end, get the next...
             tokens_len += self._scan(restrict)
-        if i < tokens_len:
+        elif i >= 0 and i < tokens_len:
             if restrict and self.restrictions[i] and restrict > self.restrictions[i]:
                 raise NotImplementedError("Unimplemented: restriction set changed")
+        if i >= 0 and i < tokens_len:
             return self.tokens[i]
         raise NoMoreTokens()
 
@@ -266,7 +267,7 @@ if __name__ == "__main__":
 
             start = datetime.now()
             print >>sys.stderr, "Timing: %s..." % desc,
-            process_scans(scanner)
+            profiled_process_scans(scanner)
             elap = datetime.now() - start
 
             elapms = elap.seconds * 1000.0 + elap.microseconds / 1000.0

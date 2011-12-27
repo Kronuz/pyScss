@@ -11,6 +11,8 @@
 #ifndef BLOCK_LOCATOR_H
 #define BLOCK_LOCATOR_H
 
+#define MAX_EXC_STRING 200
+
 typedef struct {
     int error;
     int lineno;
@@ -21,7 +23,7 @@ typedef struct {
 } Block;
 
 typedef struct {
-    char *exc;
+    char exc[MAX_EXC_STRING];
     char *_codestr;
     char *codestr;
     char *codestr_ptr;

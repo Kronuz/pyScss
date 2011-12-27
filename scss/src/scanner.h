@@ -14,9 +14,10 @@
 #define PCRE_STATIC
 #include <pcre.h>
 
-#define MAX_EXC_STRING 1024
-#define MAX_PATTERNS 1024
-#define MAX_TOKENS 1024
+#define BLOCK_SIZE_PATTERNS 50
+#define BLOCK_SIZE_TOKENS 50
+
+#define MAX_EXC_STRING 200
 
 #define SCANNER_EXC_BAD_TOKEN -1
 #define SCANNER_EXC_RESTRICTED -2
@@ -36,27 +37,32 @@ typedef struct {
 } Token;
 
 typedef struct {
+	int patterns_sz;
+	Pattern **patterns;
+} Restriction;
+
+typedef struct {
 	char exc[MAX_EXC_STRING];
     int ignore_sz;
-    Pattern *ignore[MAX_PATTERNS];
+    Pattern **ignore;
     int tokens_sz;
-    Token *tokens[MAX_TOKENS];
-    int restrictions_sz[MAX_TOKENS];
-    Pattern *restrictions[MAX_TOKENS][MAX_PATTERNS];
+    int tokens_bsz;
+    Token *tokens;
+    Restriction *restrictions;
     int input_sz;
     char *input;
 	int pos;
 } Scanner;
 
 int Scanner_initialized(void);
-void Scanner_initialize(Pattern [], int);
+void Scanner_initialize(Pattern *, int);
 void Scanner_finalize(void);
 
 void Scanner_reset(Scanner *self, char *input, int input_sz);
-Scanner *Scanner_new(Pattern [], int, Pattern [], int, char *, int);
+Scanner *Scanner_new(Pattern *, int, Pattern *, int, char *, int);
 void Scanner_del(Scanner *);
 
-Token* Scanner_token(Scanner *, int, Pattern [], int);
+Token* Scanner_token(Scanner *, int, Pattern *, int);
 void Scanner_rewind(Scanner *, int);
 
 #endif

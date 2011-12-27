@@ -12,36 +12,6 @@
 #include "block_locator.h"
 #include "scanner.h"
 
-void reprl(char *str, int len) {
-	char c,
-		 *begin = str,
-		 *end = str + len;
-	fprintf(stderr, "'");
-	while (begin < end) {
-		c = *begin;
-		if (len == -1 && !c) {
-			break;
-		} else if (c == '\'') {
-			fprintf(stderr, "\\'");
-		} else if (c == '\r') {
-			fprintf(stderr, "\\r");
-		} else if (c == '\n') {
-			fprintf(stderr, "\\n");
-		} else if (c == '\t') {
-			fprintf(stderr, "\\t");
-		} else if (c < ' ') {
-			fprintf(stderr, "\\x%02x", c);
-		} else {
-			fprintf(stderr, "%c", c);
-		}
-		begin++;
-	}
-	fprintf(stderr, "'\n");
-}
-void repr(char *str, char *str2) {
-	reprl(str, (int)(str2 - str));
-}
-
 /* BlockLocator */
 staticforward PyTypeObject scss_BlockLocatorType;
 
@@ -71,7 +41,7 @@ scss_BlockLocator_init(scss_BlockLocator *self, PyObject *args, PyObject *kwds)
 static void
 scss_BlockLocator_dealloc(scss_BlockLocator *self)
 {
-	if(self->locator) BlockLocator_del(self->locator);
+	if(self->locator != NULL) BlockLocator_del(self->locator);
 
 	self->ob_type->tp_free((PyObject*)self);
 
@@ -94,7 +64,7 @@ scss_BlockLocator_iternext(scss_BlockLocator *self)
 
 	block = BlockLocator_iternext(self->locator);
 
-	if (block->error == -1) {
+	if (block->error > 0) {
 		return Py_BuildValue(
 			"is#s#",
 			block->lineno,
@@ -105,7 +75,7 @@ scss_BlockLocator_iternext(scss_BlockLocator *self)
 		);
 	}
 
-	if (self->locator->exc) {
+	if (block->error > 0) {
 		PyErr_SetString(PyExc_Exception, self->locator->exc);
 		return NULL;
 	}
@@ -189,13 +159,14 @@ scss_Scanner_scan(scss_Scanner *self, PyObject *args)
 	Token *p_token;
 
 	PyObject *restrictions;
-	Pattern _restrictions[100];
+	Pattern *_restrictions = NULL;
 	int restrictions_sz = 0;
 
 	if (PyArg_ParseTuple(args, "|O", &restrictions)) {
 		is_tuple = PyTuple_Check(restrictions);
 		if (is_tuple || PyList_Check(restrictions)) {
 			size = is_tuple ? PyTuple_Size(restrictions) : PyList_Size(restrictions);
+			_restrictions = PyMem_New(Pattern, size);
 			for (i = 0; i < size; ++i) {
 				item = is_tuple ? PyTuple_GetItem(restrictions, i) : PyList_GetItem(restrictions, i);
 				if (PyString_Check(item)) {
@@ -206,6 +177,9 @@ scss_Scanner_scan(scss_Scanner *self, PyObject *args)
 			}
 		}
 		p_token = Scanner_token(self->scanner, self->scanner->tokens_sz, _restrictions, restrictions_sz);
+
+		if (_restrictions != NULL) PyMem_Del(_restrictions);
+
 		if (p_token == (Token *)SCANNER_EXC_BAD_TOKEN) {
 			PyErr_SetString(PyExc_SyntaxError, self->scanner->exc);
 			return NULL;
@@ -249,13 +223,14 @@ scss_Scanner_token(scss_Scanner *self, PyObject *args)
 
 	int token_num;
 	PyObject *restrictions;
-	Pattern _restrictions[100];
+	Pattern *_restrictions = NULL;
 	int restrictions_sz = 0;
 
 	if (PyArg_ParseTuple(args, "i|O", &token_num, &restrictions)) {
 		is_tuple = PyTuple_Check(restrictions);
 		if (is_tuple || PyList_Check(restrictions)) {
 			size = is_tuple ? PyTuple_Size(restrictions) : PyList_Size(restrictions);
+			_restrictions = PyMem_New(Pattern, size);
 			for (i = 0; i < size; ++i) {
 				item = is_tuple ? PyTuple_GetItem(restrictions, i) : PyList_GetItem(restrictions, i);
 				if (PyString_Check(item)) {
@@ -266,6 +241,9 @@ scss_Scanner_token(scss_Scanner *self, PyObject *args)
 			}
 		}
 		p_token = Scanner_token(self->scanner, token_num, _restrictions, restrictions_sz);
+
+		if (_restrictions != NULL) PyMem_Del(_restrictions);
+
 		if (p_token == (Token *)SCANNER_EXC_BAD_TOKEN) {
 			PyErr_SetString(PyExc_SyntaxError, self->scanner->exc);
 			return NULL;
@@ -319,9 +297,9 @@ scss_Scanner_init(scss_Scanner *self, PyObject *args, PyObject *kwds)
 	long size;
 
 	PyObject *patterns, *ignore;
-	Pattern _patterns[100];
+	Pattern *_patterns = NULL;
 	int patterns_sz = 0;
-	Pattern _ignore[100];
+	Pattern *_ignore = NULL;
 	int ignore_sz = 0;
 	char *input = NULL;
 	int input_sz = 0;
@@ -333,6 +311,7 @@ scss_Scanner_init(scss_Scanner *self, PyObject *args, PyObject *kwds)
 		is_tuple = PyTuple_Check(patterns);
 		if (is_tuple || PyList_Check(patterns)) {
 			size = is_tuple ? PyTuple_Size(patterns) : PyList_Size(patterns);
+			_patterns = PyMem_New(Pattern, size);
 			for (i = 0; i < size; ++i) {
 				item = is_tuple ? PyTuple_GetItem(patterns, i) : PyList_GetItem(patterns, i);
 				_is_tuple = PyTuple_Check(item);
@@ -352,6 +331,7 @@ scss_Scanner_init(scss_Scanner *self, PyObject *args, PyObject *kwds)
 	is_tuple = PyTuple_Check(ignore);
 	if (is_tuple || PyList_Check(ignore)) {
 		size = is_tuple ? PyTuple_Size(ignore) : PyList_Size(ignore);
+		_ignore = PyMem_New(Pattern, size);
 		for (i = 0; i < size; ++i) {
 			item = is_tuple ? PyTuple_GetItem(ignore, i) : PyList_GetItem(ignore, i);
 			if (PyString_Check(item)) {
@@ -363,6 +343,9 @@ scss_Scanner_init(scss_Scanner *self, PyObject *args, PyObject *kwds)
 	}
 
 	self->scanner = Scanner_new(_patterns, patterns_sz, _ignore, ignore_sz, input, input_sz);
+
+	if (_patterns != NULL) PyMem_Del(_patterns);
+	if (_ignore != NULL) PyMem_Del(_ignore);
 
 	#ifdef DEBUG
 		PySys_WriteStderr("Scss Scanner object initialized! (%lu)\n", sizeof(scss_Scanner));
@@ -383,7 +366,7 @@ scss_Scanner_repr(scss_Scanner *self)
 		start = self->scanner->tokens_sz - 10;
 		repr = PyString_FromString("");
 		for (i = (start < 0) ? 0 : start; i < self->scanner->tokens_sz; i++) {
-			p_token = self->scanner->tokens[i];
+			p_token = &self->scanner->tokens[i];
 			PyString_ConcatAndDel(&repr, PyString_FromString("\n"));
 			pos = (int)(p_token->string - self->scanner->input);
 			PyString_ConcatAndDel(&repr, PyString_FromFormat("  (@%d)  %s  =  ",
@@ -464,7 +447,7 @@ scss_Scanner_repr(scss_Scanner *self)
 static void
 scss_Scanner_dealloc(scss_Scanner *self)
 {
-	if (self->scanner) Scanner_del(self->scanner);
+	if (self->scanner != NULL) Scanner_del(self->scanner);
 
 	self->ob_type->tp_free((PyObject*)self);
 
@@ -544,13 +527,14 @@ scss_setup_patterns(PyObject *self, PyObject *args)
 	long size;
 
 	PyObject *patterns;
-	Pattern _patterns[100];
+	Pattern *_patterns = NULL;
 	int patterns_sz = 0;
 	if (!Scanner_initialized()) {
 		if (PyArg_ParseTuple(args, "O", &patterns)) {
 			is_tuple = PyTuple_Check(patterns);
 			if (is_tuple || PyList_Check(patterns)) {
 				size = is_tuple ? PyTuple_Size(patterns) : PyList_Size(patterns);
+				_patterns = PyMem_New(Pattern, size);
 				for (i = 0; i < size; ++i) {
 					item = is_tuple ? PyTuple_GetItem(patterns, i) : PyList_GetItem(patterns, i);
 					_is_tuple = PyTuple_Check(item);
@@ -566,6 +550,7 @@ scss_setup_patterns(PyObject *self, PyObject *args)
 				}
 			}
 			Scanner_initialize(_patterns, patterns_sz);
+			if (_patterns != NULL) PyMem_Del(_patterns);
 		}
 	}
 	return (PyObject *)Py_None;
