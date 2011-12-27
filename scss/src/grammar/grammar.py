@@ -79,10 +79,12 @@ class CalculatorScanner(Scanner):
     ]
 
     def __init__(self):
-        if self.patterns is None:
-            self.patterns = []
-            for k, p in self._patterns:
-                self.patterns.append((k, re.compile(p)))
+        if setup_patterns:
+            setup_patterns(self._patterns)
+        elif self.patterns is None:
+            self.__class__.patterns = []
+            for t, p in self._patterns:
+                self.patterns.append((t, re.compile(p)))
         Scanner.__init__(self, None, ['[ \r\t\n]+'])
 
 

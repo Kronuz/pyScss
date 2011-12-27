@@ -67,7 +67,7 @@ locate_blocks = None
 Scanner = None
 setup_patterns = None
 try:
-    from _scss import locate_blocks#, Scanner, NoMoreTokens, setup_patterns
+    from _scss import locate_blocks, Scanner, NoMoreTokens, setup_patterns
 except ImportError:
     pass
 
@@ -4777,42 +4777,47 @@ class Parser(object):
 #'(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'
 ## Grammar compiled using Yapps:
 class CalculatorScanner(Scanner):
-    patterns = [
-        ('":"', re.compile(':')),
-        ('[ \r\t\n]+', re.compile('[ \r\t\n]+')),
-        ('COMMA', re.compile(',')),
-        ('LPAR', re.compile('\\(|\\[')),
-        ('RPAR', re.compile('\\)|\\]')),
-        ('END', re.compile('$')),
-        ('MUL', re.compile('[*]')),
-        ('DIV', re.compile('/')),
-        ('ADD', re.compile('[+]')),
-        ('SUB', re.compile('-\\s')),
-        ('SIGN', re.compile('-(?![a-zA-Z_])')),
-        ('AND', re.compile('(?<![-\\w])and(?![-\\w])')),
-        ('OR', re.compile('(?<![-\\w])or(?![-\\w])')),
-        ('NOT', re.compile('(?<![-\\w])not(?![-\\w])')),
-        ('NE', re.compile('!=')),
-        ('INV', re.compile('!')),
-        ('EQ', re.compile('==')),
-        ('LE', re.compile('<=')),
-        ('GE', re.compile('>=')),
-        ('LT', re.compile('<')),
-        ('GT', re.compile('>')),
-        ('STR', re.compile("'[^']*'")),
-        ('QSTR', re.compile('"[^"]*"')),
-        ('UNITS', re.compile('(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])')),
-        ('NUM', re.compile('(?:\\d+(?:\\.\\d*)?|\\.\\d+)')),
-        ('BOOL', re.compile('(?<![-\\w])(?:true|false)(?![-\\w])')),
-        ('COLOR', re.compile('#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])')),
-        ('VAR', re.compile('\\$[-a-zA-Z0-9_]+')),
-        ('FNCT', re.compile('[-a-zA-Z_][-a-zA-Z0-9_]*(?=\\()')),
-        ('ID', re.compile('[-a-zA-Z_][-a-zA-Z0-9_]*')),
+    patterns = None
+    _patterns = [
+        ('":"', ':'),
+        ('[ \r\t\n]+', '[ \r\t\n]+'),
+        ('COMMA', ','),
+        ('LPAR', '\\(|\\['),
+        ('RPAR', '\\)|\\]'),
+        ('END', '$'),
+        ('MUL', '[*]'),
+        ('DIV', '/'),
+        ('ADD', '[+]'),
+        ('SUB', '-\\s'),
+        ('SIGN', '-(?![a-zA-Z_])'),
+        ('AND', '(?<![-\\w])and(?![-\\w])'),
+        ('OR', '(?<![-\\w])or(?![-\\w])'),
+        ('NOT', '(?<![-\\w])not(?![-\\w])'),
+        ('NE', '!='),
+        ('INV', '!'),
+        ('EQ', '=='),
+        ('LE', '<='),
+        ('GE', '>='),
+        ('LT', '<'),
+        ('GT', '>'),
+        ('STR', "'[^']*'"),
+        ('QSTR', '"[^"]*"'),
+        ('UNITS', '(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'),
+        ('NUM', '(?:\\d+(?:\\.\\d*)?|\\.\\d+)'),
+        ('BOOL', '(?<![-\\w])(?:true|false)(?![-\\w])'),
+        ('COLOR', '#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])'),
+        ('VAR', '\\$[-a-zA-Z0-9_]+'),
+        ('FNCT', '[-a-zA-Z_][-a-zA-Z0-9_]*(?=\\()'),
+        ('ID', '[-a-zA-Z_][-a-zA-Z0-9_]*'),
     ]
 
     def __init__(self):
         if setup_patterns:
-            setup_patterns(self.patterns)
+            setup_patterns(self._patterns)
+        elif self.patterns is None:
+            self.__class__.patterns = []
+            for t, p in self._patterns:
+                self.patterns.append((t, re.compile(p)))
         Scanner.__init__(self, None, ['[ \r\t\n]+'])
 
 

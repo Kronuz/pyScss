@@ -249,7 +249,7 @@ verify = "----------------------------------------------------------------------
 
 
 def process_scans(Scanner):
-    for q in xrange(10000):
+    for q in xrange(20000):
         process_scan(Scanner)
 profiled_process_scans = profile(process_scans)
 
@@ -267,7 +267,7 @@ if __name__ == "__main__":
 
             start = datetime.now()
             print >>sys.stderr, "Timing: %s..." % desc,
-            profiled_process_scans(scanner)
+            process_scans(scanner)
             elap = datetime.now() - start
 
             elapms = elap.seconds * 1000.0 + elap.microseconds / 1000.0

@@ -531,7 +531,7 @@ def process_block(locate_blocks, codestr, level=0, dump=False):
 
 
 def process_blocks(locate_blocks, codestr):
-    for q in xrange(10000):
+    for q in xrange(20000):
         process_block(locate_blocks, codestr)
 profiled_process_blocks = profile(process_blocks)
 
@@ -545,8 +545,8 @@ if __name__ == "__main__":
         (_locate_blocks_d, "CTypes C Function, Full algorithm (_locate_blocks_d)")):
         if locate_blocks:
             ret = process_block(locate_blocks, codestr, dump=True)
-            print "This is what %s returned:" % desc
-            print ret
+            # print "This is what %s returned:" % desc
+            # print ret
             # print repr(ret)
             assert ret == verify, 'It should be:\n%s' % verify
 

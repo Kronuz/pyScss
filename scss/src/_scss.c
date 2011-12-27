@@ -146,6 +146,7 @@ scss_Scanner_rewind(scss_Scanner *self, PyObject *args)
 	if (PyArg_ParseTuple(args, "i", &token_num)) {
 		Scanner_rewind(self->scanner, token_num);
 	}
+	Py_INCREF(Py_None);
 	return (PyObject *)Py_None;
 }
 
@@ -209,6 +210,7 @@ scss_Scanner_scan(scss_Scanner *self, PyObject *args)
 			p_token->string_sz
 		);
 	}
+	Py_INCREF(Py_None);
 	return (PyObject *)Py_None;
 }
 
@@ -273,6 +275,7 @@ scss_Scanner_token(scss_Scanner *self, PyObject *args)
 			p_token->string_sz
 		);
 	}
+	Py_INCREF(Py_None);
 	return (PyObject *)Py_None;
 }
 
@@ -286,6 +289,7 @@ scss_Scanner_reset(scss_Scanner *self, PyObject *args, PyObject *kwds)
 		Scanner_reset(self->scanner, input, input_sz);
 	}
 
+	Py_INCREF(Py_None);
 	return (PyObject *)Py_None;
 }
 
@@ -553,6 +557,7 @@ scss_setup_patterns(PyObject *self, PyObject *args)
 			if (_patterns != NULL) PyMem_Del(_patterns);
 		}
 	}
+	Py_INCREF(Py_None);
 	return (PyObject *)Py_None;
 }
 
