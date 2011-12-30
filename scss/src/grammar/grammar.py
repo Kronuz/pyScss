@@ -79,8 +79,8 @@ class CalculatorScanner(Scanner):
     ]
 
     def __init__(self):
-        if setup_patterns:
-            setup_patterns(self._patterns)
+        if hasattr(self, 'setup_patterns'):
+            self.setup_patterns(self._patterns)
         elif self.patterns is None:
             self.__class__.patterns = []
             for t, p in self._patterns:

@@ -19,10 +19,10 @@
 
 #define MAX_EXC_STRING 200
 
-#define SCANNER_EXC_BAD_TOKEN -1
-#define SCANNER_EXC_RESTRICTED -2
-#define SCANNER_EXC_UNIMPLEMENTED -3
-#define SCANNER_EXC_NO_MORE_TOKENS -4
+#define SCANNER_EXC_BAD_TOKEN (long)-1
+#define SCANNER_EXC_RESTRICTED (long)-2
+#define SCANNER_EXC_UNIMPLEMENTED (long)-3
+#define SCANNER_EXC_NO_MORE_TOKENS (long)-4
 
 typedef struct {
 	char *tok;

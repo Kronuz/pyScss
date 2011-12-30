@@ -5,10 +5,9 @@
 import re
 
 try:
-    from _scss import setup_patterns, Scanner, NoMoreTokens
+    from _scss import Scanner, NoMoreTokens
 except ImportError:
     Scanner = None
-    setup_patterns = None
 
 ################################################################################
 # Parser
@@ -21,8 +20,6 @@ if not Scanner:
         pass
 
     class Scanner(object):
-        _cache_ = {}
-
         def __init__(self, patterns, ignore, input=None):
             """
             Patterns is [(terminal,regex)...]
@@ -40,17 +37,11 @@ if not Scanner:
                 for k, r in patterns:
                     self.patterns.append((k, re.compile(r)))
 
-        @classmethod
-        def cleanup(cls):
-            cls._cache_ = {}
-
         def reset(self, input):
             self.tokens = []
             self.restrictions = []
             self.input = input
             self.pos = 0
-            self._cache_.setdefault(input, {})
-            self.scanned = self._cache_[input]
 
         def __repr__(self):
             """
@@ -61,78 +52,50 @@ if not Scanner:
                 output = "%s\n  (@%s)  %s  =  %s" % (output, t[0], t[2], repr(t[3]))
             return output
 
-        def token(self, i, restrict=None):
-            """
-            Get the i'th token, and if i is one past the end, then scan
-            for another token; restrict is a list of tokens that
-            are allowed, or 0 for any token.
-            """
-            tokens_len = len(self.tokens)
-            if i == tokens_len:  # We are at the end, get the next...
-                tokens_len += self.scan(restrict)
-            if i < tokens_len:
-                if restrict and self.restrictions[i] and restrict > self.restrictions[i]:
-                    raise NotImplementedError("Unimplemented: restriction set changed")
-                return self.tokens[i]
-            raise NoMoreTokens()
-
-        def rewind(self, i):
-            tokens_len = len(self.tokens)
-            if i <= tokens_len:
-                token = self.tokens[i]
-                self.tokens = self.tokens[:i]
-                self.restrictions = self.restrictions[:i]
-                self.pos = token[0]
-
-        def scan(self, restrict):
+        def _scan(self, restrict):
             """
             Should scan another token and add it to the list, self.tokens,
             and add the restriction to self.restrictions
             """
             # Keep looking for a token, ignoring any in self.ignore
-            _k_ = (self.pos, tuple(restrict) if restrict else None)
-            try:
-                token = self.scanned[_k_]
-            except KeyError:
-                token = None
-                while True:
-                    best_pat = None
-                    # Search the patterns for a match, with earlier
-                    # tokens in the list having preference
-                    best_pat_len = 0
-                    for p, regexp in self.patterns:
-                        # First check to see if we're restricting to this token
-                        if restrict and p not in restrict and p not in self.ignore:
-                            continue
-                        m = regexp.match(self.input, self.pos)
-                        if m:
-                            # We got a match
-                            best_pat = p
-                            best_pat_len = len(m.group(0))
-                            break
-
-                    # If we didn't find anything, raise an error
-                    if best_pat is None:
-                        msg = "Bad Token"
-                        if restrict:
-                            msg = "Trying to find one of " + ", ".join(restrict)
-                        raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(self.pos), msg))
-
-                    # If we found something that isn't to be ignored, return it
-                    if best_pat in self.ignore:
-                        # This token should be ignored...
-                        self.pos += best_pat_len
-                    else:
-                        end_pos = self.pos + best_pat_len
-                        # Create a token with this data
-                        token = (
-                            self.pos,
-                            end_pos,
-                            best_pat,
-                            self.input[self.pos:end_pos]
-                        )
+            token = None
+            while True:
+                best_pat = None
+                # Search the patterns for a match, with earlier
+                # tokens in the list having preference
+                best_pat_len = 0
+                for p, regexp in self.patterns:
+                    # First check to see if we're restricting to this token
+                    if restrict and p not in restrict and p not in self.ignore:
+                        continue
+                    m = regexp.match(self.input, self.pos)
+                    if m:
+                        # We got a match
+                        best_pat = p
+                        best_pat_len = len(m.group(0))
                         break
-                self.scanned[_k_] = token
+
+                # If we didn't find anything, raise an error
+                if best_pat is None:
+                    msg = "Bad Token"
+                    if restrict:
+                        msg = "Trying to find one of " + ", ".join(restrict)
+                    raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(self.pos), msg))
+
+                # If we found something that isn't to be ignored, return it
+                if best_pat in self.ignore:
+                    # This token should be ignored...
+                    self.pos += best_pat_len
+                else:
+                    end_pos = self.pos + best_pat_len
+                    # Create a token with this data
+                    token = (
+                        self.pos,
+                        end_pos,
+                        best_pat,
+                        self.input[self.pos:end_pos]
+                    )
+                    break
             if token is not None:
                 self.pos = token[1]
                 # Only add this token if it's not in the list
@@ -142,6 +105,84 @@ if not Scanner:
                     self.restrictions.append(restrict)
                     return 1
             return 0
+
+        def token(self, i, restrict=None):
+            """
+            Get the i'th token, and if i is one past the end, then scan
+            for another token; restrict is a list of tokens that
+            are allowed, or 0 for any token.
+            """
+            tokens_len = len(self.tokens)
+            if i == tokens_len:  # We are at the end, get the next...
+                tokens_len += self._scan(restrict)
+            if i < tokens_len:
+                if restrict and self.restrictions[i] and restrict > self.restrictions[i]:
+                    raise NotImplementedError("Unimplemented: restriction set changed")
+                return self.tokens[i]
+            raise NoMoreTokens
+
+        def rewind(self, i):
+            tokens_len = len(self.tokens)
+            if i <= tokens_len:
+                token = self.tokens[i]
+                self.tokens = self.tokens[:i]
+                self.restrictions = self.restrictions[:i]
+                self.pos = token[0]
+
+
+class CachedScanner(Scanner):
+    """
+    Same as Scanner, but keeps cached tokens for any given input
+    """
+    _cache_ = {}
+    _goals_ = ['END']
+
+    @classmethod
+    def cleanup(cls):
+        cls._cache_ = {}
+
+    def __init__(self, patterns, ignore, input=None):
+        try:
+            self._tokens = self._cache_[input]
+        except KeyError:
+            self._tokens = None
+            self.__tokens = {}
+            self.__input = input
+            super(CachedScanner, self).__init__(patterns, ignore, input)
+
+    def reset(self, input):
+        try:
+            self._tokens = self._cache_[input]
+        except KeyError:
+            self._tokens = None
+            self.__tokens = {}
+            self.__input = input
+            super(CachedScanner, self).reset(input)
+
+    def __repr__(self):
+        if self._tokens is None:
+            return super(CachedScanner, self).__repr__()
+        output = ''
+        for t in self._tokens[-10:]:
+            output = "%s\n  (@%s)  %s  =  %s" % (output, t[0], t[2], repr(t[3]))
+        return output
+
+    def token(self, i, restrict=None):
+        if self._tokens is None:
+            token = super(CachedScanner, self).token(i, restrict)
+            self.__tokens[i] = token
+            if token[2] in self._goals_:  # goal tokens
+                self._cache_[self.__input] = self._tokens = self.__tokens
+            return token
+        else:
+            token = self._tokens.get(i)
+            if token is None:
+                raise NoMoreTokens
+            return token
+
+    def rewind(self, i):
+        if self._tokens is None:
+            super(CachedScanner, self).rewind(i)
 
 
 class Parser(object):

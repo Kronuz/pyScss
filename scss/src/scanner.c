@@ -147,7 +147,7 @@ Pattern_finalize(void) {
 /* Scanner */
 
 
-static int
+static long
 _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 {
 	Token best_token, *p_token;
@@ -383,7 +383,7 @@ Scanner_token(Scanner *self, int i, Pattern restrictions[], int restrictions_sz)
 {
 	int j, k, found;
 	Pattern *regex;
-	int result;
+	long result;
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
