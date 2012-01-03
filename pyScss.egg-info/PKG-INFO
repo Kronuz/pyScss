@@ -1,12 +1,12 @@
 Metadata-Version: 1.0
 Name: pyScss
-Version: 1.1.0
+Version: 1.1.1
 Summary: pyScss, a Scss compiler for Python
 Home-page: http://github.com/Kronuz/pyScss
 Author: German M. Bravo (Kronuz)
 Author-email: german.mb@gmail.com
 License: MIT
-Download-URL: http://github.com/Kronuz/pyScss/tarball/v1.1.0
+Download-URL: http://github.com/Kronuz/pyScss/tarball/v1.1.1
 Description: pyScss, a Scss compiler for Python
         ==================================
         :Author:

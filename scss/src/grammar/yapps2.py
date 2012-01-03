@@ -232,14 +232,14 @@ class Generator:
             self.write("        (%s, %s),\n" % (
                 repr(p), repr(self.tokens[p])))
         self.write("    ]\n\n")
-        self.write("    def __init__(self):\n")
+        self.write("    def __init__(self, input=None):\n")
         self.write("        if hasattr(self, 'setup_patterns'):\n")
         self.write("            self.setup_patterns(self._patterns)\n")
         self.write("        elif self.patterns is None:\n")
         self.write("            self.__class__.patterns = []\n")
         self.write("            for t, p in self._patterns:\n")
         self.write("                self.patterns.append((t, re.compile(p)))\n")
-        self.write("        Scanner.__init__(self, None, %s)\n" %
+        self.write("        super(", self.name, "Scanner, self).__init__(None, %s, input)\n" %
                    repr(self.ignore))
         self.write("\n\n")
 

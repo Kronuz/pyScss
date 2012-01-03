@@ -1,8 +1,8 @@
 Changelog
 =========
-1.1.1 - ???
+1.1.1 Jan 2, 2012
 	+ Added optional C module for an amazing boost in scanning speed!
-	+ Added ``headings``, ``stylesheet-url``, ``font-url``, ``font-files`` and ``inline-font-files``.
+	+ Added ``headings``, ``stylesheet-url``, ``font-url``, ``font-files``, ``inline-font-files`` and ``sprite-names``.
 
 1.1.0 - Dec 22, 2011
 	+ Added min() and max() for lists.

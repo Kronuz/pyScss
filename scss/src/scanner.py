@@ -21,22 +21,23 @@ def profile(fn):
             profiler.disable()
             stats = pstats.Stats(profiler, stream=stream)
             stats.sort_stats('time')
-            print >> stream, ""
-            print >> stream, "=" * 100
-            print >> stream, "Stats:"
+            print >>stream, ""
+            print >>stream, "=" * 100
+            print >>stream, "Stats:"
             stats.print_stats()
 
-            print >> stream, "=" * 100
-            print >> stream, "Callers:"
+            print >>stream, "=" * 100
+            print >>stream, "Callers:"
             stats.print_callers()
 
-            print >> stream, "=" * 100
-            print >> stream, "Callees:"
+            print >>stream, "=" * 100
+            print >>stream, "Callees:"
             stats.print_callees()
-            print stream.getvalue()
+            print >>sys.stderr, stream.getvalue()
             stream.close()
         return res
     return wrapper
+
 
 DEBUG = False
 ################################################################################
@@ -88,8 +89,6 @@ class NoMoreTokens(Exception):
 
 
 class Scanner(object):
-    _cache_ = {}
-
     def __init__(self, patterns, ignore, input=None):
         """
         Patterns is [(terminal,regex)...]
@@ -107,17 +106,11 @@ class Scanner(object):
             for k, r in patterns:
                 self.patterns.append((k, re.compile(r)))
 
-    @classmethod
-    def cleanup(cls):
-        cls._cache_ = {}
-
     def reset(self, input):
         self.tokens = []
         self.restrictions = []
         self.input = input
         self.pos = 0
-        self._cache_.setdefault(input, {})
-        self.scanned = self._cache_[input]
 
     def __repr__(self):
         """
@@ -128,8 +121,59 @@ class Scanner(object):
             output = "%s\n  (@%s)  %s  =  %s" % (output, t[0], t[2], repr(t[3]))
         return output
 
-    def scan(self, restrict=None):
-        return self.token(len(self.tokens), restrict)
+    def _scan(self, restrict):
+        """
+        Should scan another token and add it to the list, self.tokens,
+        and add the restriction to self.restrictions
+        """
+        # Keep looking for a token, ignoring any in self.ignore
+        token = None
+        while True:
+            best_pat = None
+            # Search the patterns for a match, with earlier
+            # tokens in the list having preference
+            best_pat_len = 0
+            for p, regexp in self.patterns:
+                # First check to see if we're restricting to this token
+                if restrict and p not in restrict and p not in self.ignore:
+                    continue
+                m = regexp.match(self.input, self.pos)
+                if m:
+                    # We got a match
+                    best_pat = p
+                    best_pat_len = len(m.group(0))
+                    break
+
+            # If we didn't find anything, raise an error
+            if best_pat is None:
+                msg = "Bad Token"
+                if restrict:
+                    msg = "Trying to find one of " + ", ".join(restrict)
+                raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(self.pos), msg))
+
+            # If we found something that isn't to be ignored, return it
+            if best_pat in self.ignore:
+                # This token should be ignored...
+                self.pos += best_pat_len
+            else:
+                end_pos = self.pos + best_pat_len
+                # Create a token with this data
+                token = (
+                    self.pos,
+                    end_pos,
+                    best_pat,
+                    self.input[self.pos:end_pos]
+                )
+                break
+        if token is not None:
+            self.pos = token[1]
+            # Only add this token if it's not in the list
+            # (to prevent looping)
+            if not self.tokens or token != self.tokens[-1]:
+                self.tokens.append(token)
+                self.restrictions.append(restrict)
+                return 1
+        return 0
 
     def token(self, i, restrict=None):
         """
@@ -155,89 +199,52 @@ class Scanner(object):
             self.restrictions = self.restrictions[:i]
             self.pos = token[0]
 
-    def _scan(self, restrict):
-        """
-        Should scan another token and add it to the list, self.tokens,
-        and add the restriction to self.restrictions
-        """
-        # Keep looking for a token, ignoring any in self.ignore
-        _k_ = (self.pos, tuple(restrict) if restrict else None)
-        try:
-            token = self.scanned[_k_]
-        except KeyError:
-            token = None
-            while True:
-                best_pat = None
-                # Search the patterns for a match, with earlier
-                # tokens in the list having preference
-                best_pat_len = 0
-                for p, regexp in self.patterns:
-                    # First check to see if we're restricting to this token
-                    if restrict and p not in restrict and p not in self.ignore:
-                        continue
-                    m = regexp.match(self.input, self.pos)
-                    if m:
-                        # We got a match
-                        best_pat = p
-                        best_pat_len = len(m.group(0))
-                        break
-
-                # If we didn't find anything, raise an error
-                if best_pat is None:
-                    msg = "Bad Token"
-                    if restrict:
-                        msg = "Trying to find one of " + ", ".join(restrict)
-                    raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(self.pos), msg))
-
-                # If we found something that isn't to be ignored, return it
-                if best_pat in self.ignore:
-                    # This token should be ignored...
-                    self.pos += best_pat_len
-                else:
-                    end_pos = self.pos + best_pat_len
-                    # Create a token with this data
-                    token = (
-                        self.pos,
-                        end_pos,
-                        best_pat,
-                        self.input[self.pos:end_pos]
-                    )
-                    break
-            self.scanned[_k_] = token
-        if token is not None:
-            self.pos = token[1]
-            # Only add this token if it's not in the list
-            # (to prevent looping)
-            if not self.tokens or token != self.tokens[-1]:
-                self.tokens.append(token)
-                self.restrictions.append(restrict)
-                return 1
-        return 0
 
 
 class _Scanner_a(Scanner):
     patterns = None
+    _patterns = PATTERNS
 
-    def __init__(self, patterns, ignore, input=None):
-        Scanner.__init__(self, PATTERNS, ['[ \r\t\n]+'], input)
+    def __init__(self, input=None):
+        if hasattr(self, 'setup_patterns'):
+            self.setup_patterns(self._patterns)
+        elif self.patterns is None:
+            self.__class__.patterns = []
+            for t, p in self._patterns:
+                self.patterns.append((t, re.compile(p)))
+        super(_Scanner_a, self).__init__(None, ['[ \r\t\n]+'], input)
 
 
 ################################################################################
 
 try:
-    import _scss
-    _scss.setup_patterns(PATTERNS)
-    _Scanner_b = _scss.Scanner
+    from _speedups import Scanner
+
+    class _Scanner_b(Scanner):
+        patterns = None
+        _patterns = PATTERNS
+
+        def __init__(self, input=None):
+            if hasattr(self, 'setup_patterns'):
+                self.setup_patterns(self._patterns)
+            elif self.patterns is None:
+                self.__class__.patterns = []
+                for t, p in self._patterns:
+                    self.patterns.append((t, re.compile(p)))
+            super(_Scanner_b, self).__init__(None, ['[ \r\t\n]+'], input)
+
 except ImportError:
     _Scanner_b = None
 
 
 def process_scan(Scanner, level=0, dump=False):
     ret = '' if dump else None
-    s = Scanner([], ['[ \r\t\n]+'], '[(5px - 3) * (5px - 3)]')
+    s = Scanner('[(5px - 3) * (5px - 3)]')
+    i = 0
     while True:
         try:
-            s.scan([])
+            s.token(i)
+            i += 1
             if dump:
                 ret += '%s\n%s\n' % ('-' * 70, repr(s))
         except:
@@ -263,7 +270,7 @@ if __name__ == "__main__":
             # print "This is what %s returned:" % desc
             # print ret
             # print repr(ret)
-            assert ret == verify, 'It should be:\n%s' % verify
+            assert ret == verify, '\nFrom %s, got:\n%s\nShould be:\n%s' % (desc, ret, verify)
 
             start = datetime.now()
             print >>sys.stderr, "Timing: %s..." % desc,

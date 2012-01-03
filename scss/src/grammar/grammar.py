@@ -78,14 +78,14 @@ class CalculatorScanner(Scanner):
         ('ID', '[-a-zA-Z_][-a-zA-Z0-9_]*'),
     ]
 
-    def __init__(self):
+    def __init__(self, input=None):
         if hasattr(self, 'setup_patterns'):
             self.setup_patterns(self._patterns)
         elif self.patterns is None:
             self.__class__.patterns = []
             for t, p in self._patterns:
                 self.patterns.append((t, re.compile(p)))
-        Scanner.__init__(self, None, ['[ \r\t\n]+'])
+        super(CalculatorScanner, self).__init__(None, ['[ \r\t\n]+'], input)
 
 
 class Calculator(Parser):

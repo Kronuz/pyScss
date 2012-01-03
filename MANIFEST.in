@@ -1,0 +1,2 @@
+include DESCRIPTION LICENSE CHANGELOG README.rst
+recursive-include scss *

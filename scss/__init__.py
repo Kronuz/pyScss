@@ -4,9 +4,9 @@
 pyScss, a Scss compiler for Python
 
 @author     German M. Bravo (Kronuz) <german.mb@gmail.com>
-@version    1.0
+@version    1.1.1
 @see        https://github.com/Kronuz/pyScss
-@copyright  (c) 2011 German M. Bravo (Kronuz)
+@copyright  (c) 2012 German M. Bravo (Kronuz)
 @license    MIT License
             http://www.opensource.org/licenses/mit-license.php
 
@@ -80,9 +80,9 @@ from collections import deque
 locate_blocks = None
 Scanner = None
 try:
-    from _scss import locate_blocks, Scanner, NoMoreTokens
+    from _speedups import locate_blocks, Scanner, NoMoreTokens
 except ImportError:
-    print >>sys.stderr, "Scanning acceleration disabled (_scss not found)!"
+    print >>sys.stderr, "Scanning acceleration disabled (_speedups not found)!"
     pass
 
 ################################################################################
@@ -4396,6 +4396,7 @@ fnct = {
     'image-color:2': _image_color,
     'image-color:3': _image_color,
     'sprite-map:1': _sprite_map,
+    'sprite-names:1': _sprites,
     'sprites:1': _sprites,
     'sprite:2': _sprite,
     'sprite:3': _sprite,
@@ -4851,14 +4852,14 @@ class CalculatorScanner(CachedScanner):
         ('ID', '[-a-zA-Z_][-a-zA-Z0-9_]*'),
     ]
 
-    def __init__(self):
+    def __init__(self, input=None):
         if hasattr(self, 'setup_patterns'):
             self.setup_patterns(self._patterns)
         elif self.patterns is None:
             self.__class__.patterns = []
             for t, p in self._patterns:
                 self.patterns.append((t, re.compile(p)))
-        Scanner.__init__(self, None, ['[ \r\t\n]+'])
+        super(CalculatorScanner, self).__init__(None, ['[ \r\t\n]+'], input)
 
 
 class Calculator(Parser):

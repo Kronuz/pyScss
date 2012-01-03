@@ -21,22 +21,23 @@ def profile(fn):
             profiler.disable()
             stats = pstats.Stats(profiler, stream=stream)
             stats.sort_stats('time')
-            print >> stream, ""
-            print >> stream, "=" * 100
-            print >> stream, "Stats:"
+            print >>stream, ""
+            print >>stream, "=" * 100
+            print >>stream, "Stats:"
             stats.print_stats()
 
-            print >> stream, "=" * 100
-            print >> stream, "Callers:"
+            print >>stream, "=" * 100
+            print >>stream, "Callers:"
             stats.print_callers()
 
-            print >> stream, "=" * 100
-            print >> stream, "Callees:"
+            print >>stream, "=" * 100
+            print >>stream, "Callees:"
             stats.print_callees()
-            print stream.getvalue()
+            print >>sys.stderr, stream.getvalue()
             stream.close()
         return res
     return wrapper
+
 
 DEBUG = False
 ################################################################################
@@ -463,21 +464,11 @@ def _locate_blocks_b(codestr):
 
 
 try:
-    from _scss import locate_blocks as _locate_blocks_c
+    from _speedups import locate_blocks as _locate_blocks_c
 except ImportError:
     _locate_blocks_c = None
-    print >>sys.stderr, "Scanning acceleration disabled (_scss not found)!"
+    print >>sys.stderr, "Scanning acceleration disabled (_speedups not found)!"
 
-
-################################################################################
-# Algorithm implemented in C with CTypes:
-
-
-try:
-    from _scss_c import locate_blocks as _locate_blocks_d
-except ImportError:
-    _locate_blocks_d = None
-    print >>sys.stderr, "Scanning CTypes acceleration disabled (_scss_c not found)!"
 
 
 ################################################################################
@@ -542,13 +533,13 @@ if __name__ == "__main__":
         (_locate_blocks_a, "Pure Python, Full algorithm (_locate_blocks_a)"),
         (_locate_blocks_b, "Pure Python, Condensed algorithm (_locate_blocks_b)"),
         (_locate_blocks_c, "Builtin C Function, Full algorithm (_locate_blocks_c)"),
-        (_locate_blocks_d, "CTypes C Function, Full algorithm (_locate_blocks_d)")):
+    ):
         if locate_blocks:
             ret = process_block(locate_blocks, codestr, dump=True)
             # print "This is what %s returned:" % desc
             # print ret
             # print repr(ret)
-            assert ret == verify, 'It should be:\n%s' % verify
+            assert ret == verify, '\nFrom %s, got:\n%s\nShould be:\n%s' % (desc, ret, verify)
 
             start = datetime.now()
             print >>sys.stderr, "Timing: %s..." % desc,
