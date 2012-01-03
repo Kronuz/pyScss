@@ -9,14 +9,12 @@ pyScss.egg-info/SOURCES.txt
 pyScss.egg-info/dependency_links.txt
 pyScss.egg-info/entry_points.txt
 pyScss.egg-info/top_level.txt
-scss/MANIFEST
 scss/__init__.py
 scss/__init__.pyc
 scss/scss_meta.py
 scss/scss_meta.pyc
 scss/setup.py
 scss/tests.rst
-scss/dist/pyScss-1.1.1.tar.gz
 scss/src/_speedups.c
 scss/src/block_locator.c
 scss/src/block_locator.h
