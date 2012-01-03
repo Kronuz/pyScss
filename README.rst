@@ -18,6 +18,10 @@ structure but it's been completely rewritten, many bugs have been fixed and it
 has been extensively extended to support almost the full range of Sass' Scss
 syntax and functionality.
 
+.. image:: http://pledgie.com/campaigns/16513.png?skin_name=chrome
+   :alt: Click here to lend your support to pyScss and make a donation at pledgie.com!
+   :target: http://pledgie.com/campaigns/16513
+
 Support
 ========
 pyScss is fully compatible with SCSS (Sass) 3.2 ...it has:
@@ -276,7 +280,7 @@ http://www.opensource.org/licenses/mit-license.php
 
 Copyright
 =========
-Copyright (c) 2011 German M. Bravo (Kronuz)
+Copyright (c) 2012 German M. Bravo (Kronuz)
 *Bits of code in pyScss come from various projects:*
 
 Compass:
