@@ -52,7 +52,7 @@ BUILD_INFO = "pyScss v" + VERSION + " (" + REVISION + ")"
 AUTHOR = "German M. Bravo (Kronuz)"
 AUTHOR_EMAIL = 'german.mb@gmail.com'
 URL = 'http://github.com/Kronuz/pyScss'
-DOWNLOAD_URL = 'http://github.com/Kronuz/pyScss/tarball/v1.1.2'
+DOWNLOAD_URL = 'http://github.com/Kronuz/pyScss/tarball/v' + VERSION
 LICENSE = "MIT"
 PROJECT = "pyScss"
 
