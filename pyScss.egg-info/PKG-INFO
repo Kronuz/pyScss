@@ -1,12 +1,12 @@
 Metadata-Version: 1.0
 Name: pyScss
-Version: 1.1.2
+Version: 1.1.3
 Summary: pyScss, a Scss compiler for Python
 Home-page: http://github.com/Kronuz/pyScss
 Author: German M. Bravo (Kronuz)
 Author-email: german.mb@gmail.com
 License: MIT
-Download-URL: http://github.com/Kronuz/pyScss/tarball/v1.1.1
+Download-URL: http://github.com/Kronuz/pyScss/tarball/v1.1.3
 Description: pyScss, a Scss compiler for Python
         ==================================
         :Author:
@@ -26,6 +26,10 @@ Description: pyScss, a Scss compiler for Python
         structure but it's been completely rewritten, many bugs have been fixed and it
         has been extensively extended to support almost the full range of Sass' Scss
         syntax and functionality.
+        
+        .. image:: http://pledgie.com/campaigns/16513.png?skin_name=chrome
+           :alt: Click here to lend your support to pyScss and make a donation at pledgie.com!
+           :target: http://pledgie.com/campaigns/16513
         
         Support
         ========
@@ -285,7 +289,7 @@ Description: pyScss, a Scss compiler for Python
         
         Copyright
         =========
-        Copyright (c) 2011 German M. Bravo (Kronuz)
+        Copyright (c) 2012 German M. Bravo (Kronuz)
         *Bits of code in pyScss come from various projects:*
         
         Compass:
