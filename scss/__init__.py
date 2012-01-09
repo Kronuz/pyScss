@@ -36,7 +36,7 @@ xCSS:
 
 """
 
-from scss_meta import BUILD_INFO, PROJECT, VERSION, AUTHOR, AUTHOR_EMAIL, LICENSE
+from scss_meta import BUILD_INFO, PROJECT, VERSION, REVISION, URL, AUTHOR, AUTHOR_EMAIL, LICENSE
 
 __project__ = PROJECT
 __version__ = VERSION
@@ -294,6 +294,15 @@ _default_scss_files = {}  # Files to be compiled ({file: content, ...})
 _default_scss_index = {0: '<unknown>:0'}
 
 _default_scss_vars = {
+    '$BUILD_INFO': BUILD_INFO,
+    '$PROJECT': PROJECT,
+    '$VERSION': VERSION,
+    '$REVISION': REVISION,
+    '$URL': URL,
+    '$AUTHOR': AUTHOR,
+    '$AUTHOR_EMAIL': AUTHOR_EMAIL,
+    '$LICENSE': LICENSE,
+
     # unsafe chars will be hidden as vars
     '$__doubleslash': '//',
     '$__bigcopen': '/*',
