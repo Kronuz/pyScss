@@ -74,8 +74,11 @@ def _strip_selprop(selprop, lineno):
     # line numbers that might still be there (from multiline selectors)
     _lineno, _sep, selprop = selprop.partition(SEPARATOR)
     if _sep == SEPARATOR:
-        _lineno = _lineno.strip()
-        lineno = int(_lineno) if _lineno else 0
+        _lineno = _lineno.strip(' \t\n;')
+        try:
+            lineno = int(_lineno)
+        except ValueError:
+            pass
     else:
         selprop = _lineno
     selprop = _nl_num_re.sub('\n', selprop)

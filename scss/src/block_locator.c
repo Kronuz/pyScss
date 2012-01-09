@@ -29,9 +29,12 @@ int _strip(char *begin, char *end, int *lineno) {
 	while (begin < end) {
 		c = *begin;
 		if (c == '\0') {
-			if (line == NULL) {
-				line = first;
-				if (lineno) {
+			if (lineno && line == NULL) {
+				line = first - 1;
+				do {
+					c = *++line;
+				} while (c == ' ' || c == '\t' || c == '\n' || c == ';');
+				if (c != '\0') {
 					sscanf(line, "%d", lineno);
 				}
 			}
