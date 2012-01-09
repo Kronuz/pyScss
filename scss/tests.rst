@@ -514,6 +514,26 @@ http://sass-lang.com/tutorial.html
     }
 
 
+    Support for ``@content``
+    >>> print css.compile('''
+    ... @option compress:no, short_colors:yes, reverse_colors:yes;
+    ... @mixin iphone {
+    ...   @media only screen and (max-width: 480px) {
+    ...     @content;
+    ...   }
+    ... }
+    ...
+    ... @include iphone {
+    ...   body { color: red }
+    ... }
+    ... ''') #doctest: +NORMALIZE_WHITESPACE
+    @media only screen and (max-width: 480px) {
+        body {
+            color: red;
+        }
+    }
+
+
 SASS EXTEND COMPATIBILITY
 -------------------------
 
@@ -613,6 +633,23 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html#extend
         border-width: 3px;
     }
 
+
+    Placeholder Selectors: ``%foo``
+    >>> print css.compile('''
+    ... @option compress:no, short_colors:yes, reverse_colors:yes;
+    ... // This ruleset won't be rendered on its own.
+    ... #context a%extreme {
+    ...   color: blue;
+    ...   font-weight: bold;
+    ...   font-size: 2em;
+    ... }
+    ... .notice { @extend %extreme; }
+    ... ''') #doctest: +NORMALIZE_WHITESPACE
+    #context a.notice {
+        color: #00f;
+        font-weight: bold;
+        font-size: 2em;
+    }
 
 
 FROM THE FORUM

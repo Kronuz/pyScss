@@ -947,6 +947,8 @@ class Scss(object):
                     log.info("Debug mode is %s", 'On' if DEBUG else 'Off')
                 elif code == '@option':
                     self._settle_options(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                elif code == '@content':
+                    self._do_content(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@import':
                     self._do_import(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@extend':
@@ -1106,9 +1108,21 @@ class Scss(object):
             _context = rule[CONTEXT].copy()
             _context.update(m_vars)
             _rule = spawn_rule(rule, codestr=m_codestr, context=_context, lineno=c_lineno)
+            _rule[OPTIONS]['@content'] = c_codestr
             self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
         else:
             log.error("Required mixin not found: %s:%d (%s)", funct, num_args, rule[INDEX][rule[LINENO]])
+
+    @print_timing(10)
+    def _do_content(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+        """
+        Implements @content
+        """
+        if '@content' not in rule[OPTIONS]:
+            log.error("Content string not found for @content (%s)", rule[INDEX][rule[LINENO]])
+        c_codestr = rule[OPTIONS].pop('@content', '')
+        rule[CODESTR] = c_codestr
+        self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
 
     @print_timing(10)
     def _do_import(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
@@ -1480,7 +1494,7 @@ class Scss(object):
                             _parent = _parent[:-lcs]
                         if _c_selector and _parent:
                             # Get the new selectors:
-                            prev_symbol = '(?<![#.:])' if _parent[0] in ('#', '.', ':') else r'(?<![-\w#.:])'
+                            prev_symbol = '(?<![%#.:])' if _parent[0] in ('%', '#', '.', ':') else r'(?<![-\w%#.:])'
                             post_symbol = r'(?![-\w])'
                             new_parent = re.sub(prev_symbol + _parent + post_symbol, _c_selector, p_selector)
                             if p_selector != new_parent:
@@ -1619,6 +1633,7 @@ class Scss(object):
         scope = set() if scope is None else scope
 
         open_selectors = False
+        skip_selectors = False
         old_selectors = None
         open_media = False
         old_media = None
@@ -1637,11 +1652,13 @@ class Scss(object):
                 _tb = tb if old_media else ''
                 if old_media != media or media is not None:
                     if open_selectors:
-                        if not sc:
-                            if result[-1] == ';':
-                                result = result[:-1]
-                        result += _tb + '}' + nl
+                        if not skip_selectors:
+                            if not sc:
+                                if result[-1] == ';':
+                                    result = result[:-1]
+                            result += _tb + '}' + nl
                         open_selectors = False
+                        skip_selectors = False
                     if open_media:
                         if not sc:
                             if result[-1] == ';':
@@ -1656,21 +1673,27 @@ class Scss(object):
                 _tb = tb if media else ''
                 if old_selectors != selectors or selectors is not None:
                     if open_selectors:
-                        if not sc:
-                            if result[-1] == ';':
-                                result = result[:-1]
-                        result += _tb + '}' + nl
+                        if not skip_selectors:
+                            if not sc:
+                                if result[-1] == ';':
+                                    result = result[:-1]
+                            result += _tb + '}' + nl
                         open_selectors = False
+                        skip_selectors = False
                     if selectors:
                         if debug_info:
                             filename, lineno = rule[INDEX][rule[LINENO]].rsplit(':', 1)
                             filename = _escape_chars_re.sub(r'\\\1', filename)
                             sass_debug_info = '@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}' % (filename, lineno)
                             result += sass_debug_info + nl
-                        selector = (',' + sp).join(selectors.split(',')) + sp + '{'
-                        if nl:
-                            selector = nl.join(wrap(selector))
-                        result += _tb + selector + nl
+                        _selectors = [s for s in selectors.split(',') if '%' not in s]
+                        if _selectors:
+                            selector = (',' + sp).join(_selectors) + sp + '{'
+                            if nl:
+                                selector = nl.join(wrap(selector))
+                            result += _tb + selector + nl
+                        else:
+                            skip_selectors = True
                         open_selectors = True
                     old_selectors = selectors
                     scope = set()
@@ -1683,13 +1706,14 @@ class Scss(object):
                         for k, v in rule[CONTEXT].items():
                             result += _tb + _tb + k + ' = ' + v + ';' + nl
                         result += _tb + '*/' + nl
-                result += self._print_properties(rule[PROPERTIES], scope, [old_property], sc, sp, _tb, nl, wrap)
+                if not skip_selectors:
+                    result += self._print_properties(rule[PROPERTIES], scope, [old_property], sc, sp, _tb, nl, wrap)
 
         if open_media:
             _tb = tb
         else:
             _tb = ''
-        if open_selectors:
+        if open_selectors and not skip_selectors:
             if not sc:
                 if result[-1] == ';':
                     result = result[:-1]
