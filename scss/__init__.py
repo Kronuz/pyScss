@@ -5255,7 +5255,7 @@ def main():
         context = css.scss_vars
         options = css.scss_opts
         rule = spawn_rule(context=context, options=options)
-        print 'Welcome to ' + BUILD_INFO + " interactive shell"
+        print "Welcome to %s interactive shell" % BUILD_INFO
         while True:
             try:
                 s = raw_input('>>> ').strip()
@@ -5358,7 +5358,7 @@ def main():
                 s = to_str(css.calculate(s, context, options, rule))
                 s = css.post_process(s)
                 print s
-        print 'Bye!'
+        print "Bye!"
     elif options.watch:
         import time
         try:
@@ -5409,7 +5409,7 @@ def main():
                 else:
                     dest_path = os.path.join(os.path.dirname(src_path), fname)
 
-                print ("Compiling %s => %s" % (src_path, dest_path))
+                print "Compiling %s => %s" % (src_path, dest_path)
                 src_file = open(src_path)
                 dest_file = open(dest_path, 'w')
                 dest_file.write(self.css.compile(src_file.read()))
@@ -5455,8 +5455,8 @@ def main():
             output.write(css.compile(sys.stdin.read()))
 
         for f, t in profiling.items():
-            print >>sys.stderr, '%s took %03fs' % (f, t)
+            print >>sys.stderr, "%s took %03fs" % (f, t)
 
 if __name__ == "__main__":
-    logging.basicConfig(format='%(levelname)s: %(message)s')
+    logging.basicConfig(format="%(levelname)s: %(message)s")
     main()
