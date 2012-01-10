@@ -5156,6 +5156,8 @@ def main():
                       help="Also watch directories inside of the watch directory")
     parser.add_option("-o", "--output", metavar="PATH",
                       help="Write output to PATH (a directory if using watch, a file otherwise)")
+    parser.add_option("-s", "--suffix", metavar="STRING",
+                      help="If using watch, a suffix added to the output filename (i.e. filename.STRING.css)")
     parser.add_option("--time", action="store_true",
                       help="Display compliation times")
     parser.add_option("--debug-info", action="store_true",
@@ -5351,6 +5353,7 @@ def main():
                     'debug_info': options.debug_info,
                 })
                 self.output = options.output
+                self.suffix = options.suffix
 
             def is_valid(self, path):
                 return os.path.isfile(path) and path.endswith(".scss") and not os.path.basename(path).startswith("_")
@@ -5367,7 +5370,10 @@ def main():
             def compile(self, src_path):
                 fname = os.path.basename(src_path)
                 if fname.endswith(".scss"):
-                    fname = fname[:-5] + ".css"
+                    fname = fname[:-5]
+                    if self.suffix:
+                        fname += "." + self.suffix
+                    fname += ".css"
                 else:
                     # you didn't give me a file of the correct type!
                     return False
