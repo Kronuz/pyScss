@@ -5,8 +5,6 @@ pyScss, a Scss compiler for Python
 
 About
 =====
-.. include:: <DESCRIPTION>
-
 pyScss compiles Scss (Sass), a superset of CSS that is more powerful, elegant
 and easier to maintain than plain-vanilla CSS. The library acts as a CSS source
 code preprocesor which allows you to use variables, nested rules, mixins, and
@@ -271,7 +269,40 @@ If you have any suggestions, bug reports or annoyances please report them to the
 issue tracker at http://github.com/Kronuz/pyScss/issues
 
 
-.. include:: <CHANGELOG>
+Changelog
+=========
+
+1.1.4 ???
+	+ Added ``--debug-info`` command line option
+
+1.1.3 Jan 9, 2012
+	+ Support for the new Sass 3.2.0 features (@content and placeholder selectors)
+	+ Fixed bug with line numbers throwing an exception.
+
+1.1.2 Jan 3, 2012
+	+ Regression bug fixed from 1.1.1
+
+1.1.1 Jan 2, 2012
+	+ Added optional C module for an amazing boost in scanning speed!
+	+ Added ``headings``, ``stylesheet-url``, ``font-url``, ``font-files``, ``inline-font-files`` and ``sprite-names``.
+
+1.1.0 - Dec 22, 2011
+	+ Added min() and max() for lists.
+	+ Removed exception raise.
+
+1.0.9 - Dec 22, 2011
+	+ Optimizations in the scanner.
+	+ Added background-noise() for compass-recipes support.
+	+ enumerate() and range() can go backwards. Ex.: range(3, 0) goes from 3 to 0.
+	+ Added line numbers and files for errors.
+	+ Added support for FireSass for Firebug
+	+ nth(n) is round (returns nth mod len item of the list).
+	+ --watch added to the command line.
+	+ Several bugs fixed.
+
+1.0.8 - May 13, 2011
+    + Changed source color ($src-color) default to black.
+    + Moved the module filename to __init__.py and module renamed back to scss.
 
 
 Contributing
