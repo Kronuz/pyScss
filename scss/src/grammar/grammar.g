@@ -72,48 +72,48 @@ parser Calculator:
                               END                           {{ return v }}
     rule expr<<R>>:         and_test<<R>>                   {{ v = and_test }}
                               (
-                                  OR and_test<<R>>          {{ v = v or and_test }}
+                                  OR and_test<<R>>          {{ v = and_test if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) else (v or and_test) }}
                               )*                            {{ return v }}
     rule and_test<<R>>:     not_test<<R>>                   {{ v = not_test }}
                               (
-                                  AND not_test<<R>>         {{ v = v and not_test }}
+                                  AND not_test<<R>>         {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) else (v and not_test) }}
                               )*                            {{ return v }}
     rule not_test<<R>>:     comparison<<R>>                 {{ return comparison }}
                               |
                               (
-                                  NOT not_test<<R>>         {{ v = not not_test }}
+                                  NOT not_test<<R>>         {{ v = 'undefined' if isinstance(not_test, basestring) and (not_test == 'undefined' or not_test.startswith('$')) else (not not_test) }}
                                   |
-                                  INV not_test<<R>>         {{ v = _inv('!', not_test) }}
+                                  INV not_test<<R>>         {{ v = 'undefined' if isinstance(not_test, basestring) and (not_test == 'undefined' or not_test.startswith('$')) else _inv('!', not_test) }}
                               )+                            {{ return v }}
     rule comparison<<R>>:   a_expr<<R>>                     {{ v = a_expr }}
                               (
-                                  LT a_expr<<R>>            {{ v = v < a_expr }}
+                                  LT a_expr<<R>>            {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else (v < a_expr) }}
                                   |
-                                  GT a_expr<<R>>            {{ v = v > a_expr }}
+                                  GT a_expr<<R>>            {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else (v > a_expr) }}
                                   |
-                                  LE a_expr<<R>>            {{ v = v <= a_expr }}
+                                  LE a_expr<<R>>            {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else (v <= a_expr) }}
                                   |
-                                  GE a_expr<<R>>            {{ v = v >= a_expr }}
+                                  GE a_expr<<R>>            {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else (v >= a_expr) }}
                                   |
-                                  EQ a_expr<<R>>            {{ v = v == a_expr }}
+                                  EQ a_expr<<R>>            {{ v = (None if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) else v) == (None if isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else a_expr) }}
                                   |
-                                  NE a_expr<<R>>            {{ v = v != a_expr }}
+                                  NE a_expr<<R>>            {{ v = (None if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) else v) != (None if isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else a_expr) }}
                               )*                            {{ return v }}
     rule a_expr<<R>>:       m_expr<<R>>                     {{ v = m_expr }}
                               (
-                                  ADD m_expr<<R>>           {{ v = v + m_expr }}
+                                  ADD m_expr<<R>>           {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(m_expr, basestring) and (m_expr == 'undefined' or m_expr.startswith('$')) else (v + m_expr) }}
                                   |
-                                  SUB m_expr<<R>>           {{ v = v - m_expr }}
+                                  SUB m_expr<<R>>           {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(m_expr, basestring) and (m_expr == 'undefined' or m_expr.startswith('$')) else (v - m_expr) }}
                               )*                            {{ return v }}
     rule m_expr<<R>>:       u_expr<<R>>                     {{ v = u_expr }}
                               (
-                                  MUL u_expr<<R>>           {{ v = v * u_expr }}
+                                  MUL u_expr<<R>>           {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(u_expr, basestring) and (u_expr == 'undefined' or u_expr.startswith('$')) else (v * u_expr) }}
                                   |
-                                  DIV u_expr<<R>>           {{ v = v / u_expr }}
+                                  DIV u_expr<<R>>           {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(u_expr, basestring) and (u_expr == 'undefined' or u_expr.startswith('$')) else (v / u_expr) }}
                               )*                            {{ return v }}
-    rule u_expr<<R>>:       SIGN u_expr<<R>>                {{ return _inv('-', u_expr) }}
+    rule u_expr<<R>>:       SIGN u_expr<<R>>                {{ return 'undefined' if isinstance(u_expr, basestring) and (u_expr == 'undefined' or u_expr.startswith('$')) else _inv('-', u_expr) }}
                               |
-                              ADD u_expr<<R>>               {{ return u_expr }}
+                              ADD u_expr<<R>>               {{ return 'undefined' if isinstance(u_expr, basestring) and (u_expr == 'undefined' or u_expr.startswith('$')) else u_expr }}
                               |
                               atom<<R>>                     {{ v = atom }}
                               [
