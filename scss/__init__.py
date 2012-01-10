@@ -3296,9 +3296,15 @@ def _grad_point(*p):
 
 
 def __compass_list(*args):
+    separator = None
     if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
         args = ListValue(args[0]).values()
-    return ListValue(args)
+    else:
+        separator = ','
+    ret = ListValue(args)
+    if separator:
+        ret['_'] = separator
+    return ret
 
 
 def __compass_space_list(*lst):
@@ -3333,9 +3339,35 @@ def _compact(*args):
         elif bool(args):
             ret[0] = args
     else:
+        ret['_'] = ','
         for i, item in enumerate(args):
             if bool(item):
                 ret[i] = item
+    if isinstance(args, ListValue):
+        args = args.value
+    if isinstance(args, dict):
+        separator = args.get('_', None)
+        if separator is not None:
+            ret['_'] = separator
+    return ListValue(ret)
+
+
+def _reject(lst, *values):
+    """Removes the given values from the list"""
+    ret = {}
+    if not isinstance(lst, ListValue):
+        lst = ListValue(lst)
+    lst = lst.value
+    if len(values) == 1:
+        values = values[0]
+        if isinstance(values, ListValue):
+            values = values.value.values()
+    for i, item in lst.items():
+        if item not in values:
+            ret[i] = item
+    separator = lst.get('_', None)
+    if separator is not None:
+        ret['_'] = separator
     return ListValue(ret)
 
 
@@ -4540,6 +4572,7 @@ fnct = {
     '-compass-space-list:n': __compass_space_list,
     'blank:n': _blank,
     'compact:n': _compact,
+    'reject:n': _reject,
     '-compass-slice:3': __compass_slice,
     'nth:2': _nth,
     'max:n': _max,
@@ -4619,13 +4652,6 @@ def call(name, args, R, is_function=True):
         else:
             fn = fnct.get(_fn_a) or fnct[_fn_n]
             node = fn(*_args, **_kwargs)
-        if args and isinstance(node, ListValue):
-            separator = args.value.get('_')
-            if separator is not None:
-                if separator:
-                    node.value['_'] = separator
-                else:
-                    node.value.pop('_', None)
     except KeyError:
         sp = args and args.value.get('_') or ''
         if is_function:
