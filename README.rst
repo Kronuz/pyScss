@@ -5,6 +5,8 @@ pyScss, a Scss compiler for Python
 
 About
 =====
+.. include:: <DESCRIPTION>
+
 pyScss compiles Scss (Sass), a superset of CSS that is more powerful, elegant
 and easier to maintain than plain-vanilla CSS. The library acts as a CSS source
 code preprocesor which allows you to use variables, nested rules, mixins, and
@@ -269,14 +271,19 @@ If you have any suggestions, bug reports or annoyances please report them to the
 issue tracker at http://github.com/Kronuz/pyScss/issues
 
 
+.. include:: <CHANGELOG>
+
+
 Contributing
 ============
 Development of pyScss happens at github: https://github.com/Kronuz/pyScss
+
 
 License
 =======
 MIT License. See *LICENSE* for details.
 http://www.opensource.org/licenses/mit-license.php
+
 
 Copyright
 =========

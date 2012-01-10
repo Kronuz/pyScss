@@ -5158,6 +5158,11 @@ def main():
                       help="Write output to PATH (a directory if using watch, a file otherwise)")
     parser.add_option("--time", action="store_true",
                       help="Display compliation times")
+    parser.add_option("--debug-info", action="store_true",
+                      help="Turns on scss's debuging information")
+    parser.add_option("--no-debug-info", action="store_false",
+                      dest="debug_info", default=False,
+                      help="Turns off scss's debuging information")
     parser.add_option("-t", "--test", action="store_true", help=SUPPRESS_HELP)
     parser.add_option("-C", "--no-compress", action="store_false",
                       dest="compress", default=True,
@@ -5342,7 +5347,8 @@ def main():
             def __init__(self, *args, **kwargs):
                 super(ScssEventHandler, self).__init__(*args, **kwargs)
                 self.css = Scss(scss_opts={
-                    'compress': options.compress
+                    'compress': options.compress,
+                    'debug_info': options.debug_info,
                 })
                 self.output = options.output
 
@@ -5406,7 +5412,8 @@ def main():
             output = sys.stdout
 
         css = Scss(scss_opts={
-            'compress': options.compress
+            'compress': options.compress,
+            'debug_info': options.debug_info,
         })
         if args:
             for path in args:
