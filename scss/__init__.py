@@ -1189,8 +1189,16 @@ class Scss(object):
                         filename = os.path.basename(name)
                         dirname = os.path.dirname(name)
                         i_codestr = None
-                        for path in ['./'] + LOAD_PATHS.split(','):
-                            for basepath in ['./', os.path.dirname(rule[PATH])]:
+
+                        # TODO: Convert global LOAD_PATHS to a list. Use it directly.
+                        # Doing the above will break backwards compatibility!
+                        if hasattr(LOAD_PATHS, 'split'):
+                            load_path_list = LOAD_PATHS.split(',') # Old style
+                        else:
+                            load_path_list = LOAD_PATHS # New style
+
+                        for path in [ './' ] + load_path_list:
+                            for basepath in [ './', os.path.dirname(rule[PATH]) ]:
                                 i_codestr = None
                                 full_path = os.path.realpath(os.path.join(path, basepath, dirname))
                                 if full_path not in load_paths:
@@ -5253,8 +5261,9 @@ def main():
                       help="Print version and exit")
 
     paths_group = OptionGroup(parser, "Resource Paths")
-    paths_group.add_option("-I", "--load-path", metavar="PATH", action='append', dest="load_paths",
-                      help="Add a scss import path")
+    paths_group.add_option("-I", "--load-path", metavar="PATH",
+                      action="append", dest="load_paths",
+                      help="Add a scss import path, may be given multiple times")
     paths_group.add_option("-S", "--static-root", metavar="PATH", dest="static_root",
                       help="Static root path (Where images and static resources are located)")
     paths_group.add_option("-A", "--assets-root", metavar="PATH", dest="assets_root",
@@ -5274,13 +5283,24 @@ def main():
     if options.assets_root is not None:
         ASSETS_ROOT = options.assets_root
     if options.load_paths is not None:
-        load_paths = [p.strip() for p in LOAD_PATHS.split(',')]
-        for load_path in options.load_paths:
-            for p in load_path.replace(os.pathsep, ',').replace(';', ',').split(','):
+        # TODO: Convert global LOAD_PATHS to a list. Use it directly.
+        # Doing the above will break backwards compatibility!
+        if hasattr(LOAD_PATHS, 'split'):
+            load_path_list = [p.strip() for p in LOAD_PATHS.split(',')]
+        else:
+            load_path_list = list(LOAD_PATHS)
+
+        for path_param in options.load_paths:
+            for p in path_param.replace(os.pathsep, ',').replace(';', ',').split(','):
                 p = p.strip()
-                if p and p not in load_paths:
-                    load_paths.append(p)
-        LOAD_PATHS = ','.join(load_paths)
+                if p and p not in load_path_list:
+                    load_path_list.append(p)
+
+        # TODO: Remove this once global LOAD_PATHS is a list.
+        if hasattr(LOAD_PATHS, 'split'):
+            LOAD_PATHS = ','.join(load_path_list)
+        else:
+            LOAD_PATHS = load_path_list
 
     # Execution modes
     if options.test:
