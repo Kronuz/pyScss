@@ -531,7 +531,7 @@ init_speedups(void)
 	Py_INCREF(&scss_ScannerType);
 	PyModule_AddObject(m, "Scanner", (PyObject *)&scss_ScannerType);
 
-	PyExc_scss_NoMoreTokens = PyErr_NewExceptionWithDoc("_speedups.NoMoreTokens", "Another exception object, for when we run out of tokens", NULL, NULL);
+	PyExc_scss_NoMoreTokens = PyErr_NewException("_speedups.NoMoreTokens", NULL, NULL);
 	Py_INCREF(PyExc_scss_NoMoreTokens);
 	PyModule_AddObject(m, "NoMoreTokens", (PyObject *)PyExc_scss_NoMoreTokens);
 }

@@ -74,6 +74,13 @@ import sys
 import time
 import textwrap
 from collections import deque
+try:
+    from cStringIO import StringIO
+except:
+    from StringIO import StringIO
+
+import pstats
+import cProfile
 
 ################################################################################
 # Load C acceleration modules
@@ -368,12 +375,7 @@ _strings_re = re.compile(r'([\'"]).*?\1')
 _blocks_re = re.compile(r'[{},;()\'"\n]')
 
 _prop_split_re = re.compile(r'[:=]')
-_skip_word_re = re.compile(r'-?[\w\s#.,:%]*$|[\w\-#.,:%]*$', re.MULTILINE)
-_skip_re = re.compile(r'''
-    (?:url|alpha)\([^)]*\)$
-|
-    [\w\-#.,:%]+(?:\s+[\w\-#.,:%]+)*$
-''', re.MULTILINE | re.IGNORECASE | re.VERBOSE)
+_skip_word_re = re.compile(r'-?[_\w\s#.,:%]*$|[-_\w#.,:%]*$', re.MULTILINE)
 _has_code_re = re.compile('''
     (?:^|(?<=[{;}]))            # the character just before it should be a '{', a ';' or a '}'
     \s*                         # ...followed by any number of spaces
@@ -403,7 +405,7 @@ _has_code_re = re.compile('''
     )
 ''', re.VERBOSE)
 
-_css_function_re = re.compile(r'^(from|to|mask|rotate|format|local|url|attr|counter|counters|color-stop|rect|-webkit-.*|-webkit-.*|-moz-.*|-pie-.*|-ms-.*|-o-.*)$')
+_css_function_re = re.compile(r'^(from|to|mask|rotate|scale|format|local|url|attr|counter|counters|color-stop|rect|-webkit-.*|-webkit-.*|-moz-.*|-pie-.*|-ms-.*|-o-.*)$')
 
 FILEID = 0
 POSITION = 1
@@ -469,6 +471,36 @@ def print_timing(level=0):
         else:
             return func
     return _print_timing
+
+
+# Profiler decorator
+def profile(fn):
+    def wrapper(*args, **kwargs):
+        profiler = cProfile.Profile()
+        stream = StringIO()
+        profiler.enable()
+        try:
+            res = fn(*args, **kwargs)
+        finally:
+            profiler.disable()
+            stats = pstats.Stats(profiler, stream=stream)
+            stats.sort_stats('time')
+            print >>stream, ""
+            print >>stream, "=" * 100
+            print >>stream, "Stats:"
+            stats.print_stats()
+
+            print >>stream, "=" * 100
+            print >>stream, "Callers:"
+            stats.print_callers()
+
+            print >>stream, "=" * 100
+            print >>stream, "Callees:"
+            stats.print_callees()
+            print >>sys.stderr, stream.getvalue()
+            stream.close()
+        return res
+    return wrapper
 
 
 def split_params(params):
@@ -682,10 +714,10 @@ class Scss(object):
         self._scss_index = _default_scss_index.copy()
 
         self._contexts = {}
-        self._replaces = {}
 
         self.clean()
 
+    #@profile
     @print_timing(2)
     def Compilation(self, input_scss=None):
         if input_scss is not None:
@@ -945,6 +977,10 @@ class Scss(object):
                 elif code == '@raw':
                     name = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
                     log.info(repr(name))
+                elif code == '@dump_context':
+                    log.info(repr(rule[CONTEXT]))
+                elif code == '@dump_options':
+                    log.info(repr(rule[OPTIONS]))
                 elif code == '@debug':
                     global DEBUG
                     name = name.strip()
@@ -1148,7 +1184,6 @@ class Scss(object):
                     unsupported = []
                     load_paths = []
                     try:
-                        raise KeyError
                         i_codestr = self.scss_files[name]
                     except KeyError:
                         filename = os.path.basename(name)
@@ -1316,10 +1351,10 @@ class Scss(object):
         """
         Implements @for
         """
-        var, _, name = name.partition('from')
-        frm, _, through = name.partition('through')
+        var, _, name = name.partition(' from ')
+        frm, _, through = name.partition(' through ')
         if not through:
-            frm, _, through = frm.partition('to')
+            frm, _, through = frm.partition(' to ')
         frm = self.calculate(frm, rule[CONTEXT], rule[OPTIONS], rule)
         through = self.calculate(through, rule[CONTEXT], rule[OPTIONS], rule)
         try:
@@ -1346,7 +1381,7 @@ class Scss(object):
         """
         Implements @each
         """
-        var, _, name = name.partition('in')
+        var, _, name = name.partition(' in ')
         name = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
         if name:
             name = ListValue(name)
@@ -1763,47 +1798,31 @@ class Scss(object):
         return result
 
     def calculate(self, _base_str, context, options, rule):
-        try:
-            better_expr_str = self._replaces[_base_str]
-        except KeyError:
-            better_expr_str = _base_str
+        better_expr_str = _base_str
 
-            if _skip_word_re.match(better_expr_str) and '- ' not in better_expr_str and ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
-                    self._replaces[_base_str] = better_expr_str
-                    return better_expr_str
+        if _skip_word_re.match(better_expr_str) and '- ' not in better_expr_str and ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
+            return better_expr_str
 
-            better_expr_str = self.do_glob_math(better_expr_str, context, options, rule)
+        better_expr_str = self.do_glob_math(better_expr_str, context, options, rule)
 
-            better_expr_str = eval_expr(better_expr_str, rule, True)
-            if better_expr_str is None:
-                better_expr_str = self.apply_vars(_base_str, context, options, rule)
+        better_expr_str = eval_expr(better_expr_str, rule, True)
+        if better_expr_str is None:
+            better_expr_str = self.apply_vars(_base_str, context, options, rule)
 
-            if '$' not in _base_str:
-                self._replaces[_base_str] = better_expr_str
         return better_expr_str
 
     def _calculate_expr(self, context, options, rule, _dequote):
         def __calculate_expr(result):
             _group0 = result.group(1)
             _base_str = _group0
-            try:
-                better_expr_str = self._replaces[_group0]
-            except KeyError:
+            better_expr_str = eval_expr(_base_str, rule)
+
+            if better_expr_str is None:
                 better_expr_str = _base_str
-
-                if _skip_re.match(better_expr_str) and '- ' not in better_expr_str:
-                    self._replaces[_group0] = better_expr_str
-                    return better_expr_str
-
-                better_expr_str = eval_expr(better_expr_str, rule)
-
-                if better_expr_str is None:
-                    better_expr_str = _base_str
-                elif _dequote:
-                    better_expr_str = dequote(better_expr_str)
-
-                if '$' not in _group0:
-                    self._replaces[_group0] = better_expr_str
+            elif _dequote:
+                better_expr_str = dequote(str(better_expr_str))
+            else:
+                better_expr_str = str(better_expr_str)
 
             return better_expr_str
         return __calculate_expr
@@ -1841,11 +1860,6 @@ import glob
 import math
 import operator
 import colorsys
-
-try:
-    import cStringIO as StringIO
-except:
-    import StringIO
 
 try:
     from PIL import Image, ImageDraw
@@ -2754,7 +2768,7 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
             inline = True  # Retry inline version
         url = '%s%s' % (ASSETS_URL, asset_file)
     if inline:
-        output = StringIO.StringIO()
+        output = StringIO()
         new_image.save(output, format='PNG')
         contents = output.getvalue()
         output.close()
@@ -2776,7 +2790,7 @@ def _image_color(color, width=1, height=1):
         size=(w, h),
         color=(c[0], c[1], c[2], int(c[3] * 255.0))
     )
-    output = StringIO.StringIO()
+    output = StringIO()
     new_image.save(output, format='PNG')
     contents = output.getvalue()
     output.close()
@@ -2948,7 +2962,7 @@ def _background_noise(intensity=None, opacity=None, size=None, monochrome=False,
             inline = True  # Retry inline version
         url = '%s%s' % (ASSETS_URL, asset_file)
     if inline:
-        output = StringIO.StringIO()
+        output = StringIO()
         new_image.save(output, format='PNG')
         contents = output.getvalue()
         output.close()
@@ -3146,7 +3160,7 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
                 if cache_buster:
                     url += '?_=%s' % filetime
             if inline:
-                output = StringIO.StringIO()
+                output = StringIO()
                 image.save(output, format='PNG')
                 contents = output.getvalue()
                 output.close()
@@ -3516,8 +3530,10 @@ def __pie(*args):
 def __webkit(*args):
     return _prefix('_webkit', *args)
 
+
 def __owg(*args):
     return _prefix('_owg', *args)
+
 
 def __khtml(*args):
     return _prefix('_khtml', *args)
@@ -3959,6 +3975,8 @@ class NumberValue(Value):
                 type = None
         elif isinstance(tokens, (StringValue, basestring)):
             tokens = getattr(tokens, 'value', tokens)
+            if tokens.startswith('$'):
+                raise ValueError("Value is not a Number! (%s)" % tokens)
             try:
                 if tokens and tokens[-1] == '%':
                     self.value = to_float(tokens[:-1]) / 100.0
@@ -4133,7 +4151,10 @@ class ListValue(Value):
         elif isinstance(tokens, (list, tuple)):
             self.value = dict(enumerate(tokens))
         else:
-            lst = [i for i in to_str(tokens).split() if i]
+            if isinstance(tokens, StringValue):
+                tokens = tokens.value
+            tokens = to_str(tokens)
+            lst = [i for i in tokens.split() if i]
             if len(lst) == 1:
                 lst = [i.strip() for i in lst[0].split(',') if i.strip()]
                 if len(lst) > 1:
@@ -4214,8 +4235,8 @@ class ListValue(Value):
 class ColorValue(Value):
     def __init__(self, tokens):
         self.tokens = tokens
-        self.types = {}
         self.value = (0, 0, 0, 1)
+        self.types = {}
         if tokens is None:
             self.value = (0, 0, 0, 1)
         elif isinstance(tokens, ParserValue):
@@ -4240,17 +4261,21 @@ class ColorValue(Value):
             val = float(tokens)
             self.value = (val, val, val, 1)
         else:
-            hex = to_str(tokens)
+            if isinstance(tokens, StringValue):
+                tokens = tokens.value
+            tokens = to_str(tokens)
+            tokens.replace(' ', '').lower()
+            if tokens.startswith('$'):
+                raise ValueError("Value is not a Color! (%s)" % tokens)
             try:
-                self.value = hex2rgba[len(hex)](hex)
+                self.value = hex2rgba[len(tokens)](tokens)
             except:
                 try:
-                    val = to_float(hex)
-                    self.values = (val, val, val, 1)
+                    val = to_float(tokens)
+                    self.value = (val, val, val, 1)
                 except ValueError:
                     try:
-                        hex.replace(' ', '').lower()
-                        type, _, colors = hex.partition('(')
+                        type, _, colors = tokens.partition('(')
                         colors = colors.rstrip(')')
                         if type in ('rgb', 'rgba'):
                             c = tuple(colors.split(','))
@@ -4261,7 +4286,7 @@ class ColorValue(Value):
                                 self.value = tuple(col)
                                 self.types = {type: 1}
                             except:
-                                raise ValueError("Value is not a Color!")
+                                raise ValueError("Value is not a Color! (%s)" % tokens)
                         elif type in ('hsl', 'hsla'):
                             c = colors.split(',')
                             try:
@@ -4271,9 +4296,11 @@ class ColorValue(Value):
                                 self.value = tuple([c * 255.0 for c in colorsys.hls_to_rgb(col[0], 0.999999 if col[2] == 1 else col[2], 0.999999 if col[1] == 1 else col[1])] + [col[3]])
                                 self.types = {type: 1}
                             except:
-                                raise ValueError("Value is not a Color!")
+                                raise ValueError("Value is not a Color! (%s)" % tokens)
+                        else:
+                            raise ValueError("Value is not a Color! (%s)" % tokens)
                     except:
-                        raise ValueError("Value is not a Color!")
+                        raise ValueError("Value is not a Color! (%s)" % tokens)
 
     def __repr__(self):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.types))
@@ -5144,21 +5171,36 @@ class Calculator(Parser):
 ### Grammar ends.
 ################################################################################
 
-
+expr_cache = {}
 def eval_expr(expr, rule, raw=False):
     # print >>sys.stderr, '>>',expr,'<<'
-    val = None
+    if not isinstance(expr, basestring):
+        return expr
+
+    _cache = False
+    if raw:
+        if expr in rule[CONTEXT]:
+            while expr in rule[CONTEXT]:
+                _expr = rule[CONTEXT][expr]
+                if _expr == expr:
+                    break
+                expr = _expr
+
+        if not isinstance(expr, basestring):
+            return expr
+
+        if '$' not in expr:
+            _cache = True
+            try:
+                return expr_cache[expr]
+            except KeyError:
+                pass
+
+    results = None
     try:
         P = Calculator(CalculatorScanner())
         P.reset(expr)
         results = P.goal(rule)
-        if raw:
-            #print >>sys.stderr, '%%',repr(results),'%%'
-            return results
-        if results is not None:
-            val = to_str(results)
-            #print >>sys.stderr, '==',val,'=='
-            return val
     except SyntaxError:
         if DEBUG:
             raise
@@ -5166,6 +5208,15 @@ def eval_expr(expr, rule, raw=False):
         log.error("Exception raised: %s in `%s' (%s)", e, expr, rule[INDEX][rule[LINENO]])
         if DEBUG:
             raise
+    if raw:
+        if _cache:
+            expr_cache[expr] = results
+        # print >>sys.stderr, repr(expr),'%%',repr(results),'%%'
+        return results
+    if results is not None:
+        results = to_str(results)
+        # print >>sys.stderr, repr(expr),'==',results,'=='
+    return results
 
 
 def main():
