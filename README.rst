@@ -266,77 +266,75 @@ Django Example
 ==============
 The following shows some code that can be used with django::
 
-	.. code-block:: python
-		
-		import os
-		import fnmatch
-		
-		import scss
-		
-		from django.conf import settings
-		from django.utils.datastructures import SortedDict
-		from django.contrib.staticfiles import finders
-		
-		
-		def finder(glob):
-		    """
-		    Finds all files in the django finders for a given glob,
-		    returns the file path, if available, and the django storage object.
-		    storage objects must implement the File storage API:
-		    https://docs.djangoproject.com/en/dev/ref/files/storage/
-		    """
-		    for finder in finders.get_finders():
-		        for path, storage in finder.list([]):
-		            if fnmatch.fnmatchcase(path, glob):
-		                yield path, storage
-		
-		
-		# STATIC_ROOT is where pyScss looks for images and static data.
-		# STATIC_ROOT can be either a fully qualified path name or a "finder"
-		# iterable function that receives a filename or glob and returns a tuple
-		# of the file found and its file storage object for each matching file.
-		# (https://docs.djangoproject.com/en/dev/ref/files/storage/)
-		scss.STATIC_ROOT = finder
-		scss.STATIC_URL = settings.STATIC_URL
-		
-		# ASSETS_ROOT is where the pyScss outputs the generated files such as spritemaps
-		# and compile cache:
-		scss.ASSETS_ROOT = os.path.join(settings.MEDIA_ROOT, 'assets/')
-		scss.ASSETS_URL = settings.MEDIA_URL + 'assets/'
-		
-		# These are the paths pyScss will look ".scss" files on. This can be the path to
-		# the compass framework or blueprint or compass-recepies, etc.
-		scss.LOAD_PATHS = [
-		    '/usr/local/www/sass/frameworks/',
-		    '/Library/Ruby/Gems/1.8/gems/compass-0.11.5/frameworks/compass/stylesheets/',
-		    '/Library/Ruby/Gems/1.8/gems/compass-0.11.5/frameworks/blueprint/stylesheets/',
-		]
-		
-		# This creates the Scss object used to compile SCSS code. In this example,
-		# _scss_vars will hold the context variables:
-		_scss_vars = {}
-		_scss = scss.Scss(
-		    scss_vars=_scss_vars,
-		    scss_opts={
-		        'compress': True,
-		        'debug_info': True,
-		    }
-		)
-		
-		# 1. Compile from a string:
-		compiled_css_from_string = _scss.compile('@import "file2"; a {color: red + green; }')
-		
-		# 2. Compile from a file:
-		compiled_css_from_file = _scss.compile(scss_file='file1.scss')
-		
-		# 3. Compile from a set of files (use SortedDict or collections.OrderedDict to
-		# maintain the compile order):
-		_scss._scss_files = SortedDict((
-		    ('file2.scss', open('file2.scss').read()),
-		    ('file3.scss', open('file3.scss').read()),
-		    ('file4.scss', open('file4.scss').read()),
-		))
-		compiled_css_from_files = _scss.compile()
+	import os
+	import fnmatch
+	
+	import scss
+	
+	from django.conf import settings
+	from django.utils.datastructures import SortedDict
+	from django.contrib.staticfiles import finders
+	
+	
+	def finder(glob):
+	    """
+	    Finds all files in the django finders for a given glob,
+	    returns the file path, if available, and the django storage object.
+	    storage objects must implement the File storage API:
+	    https://docs.djangoproject.com/en/dev/ref/files/storage/
+	    """
+	    for finder in finders.get_finders():
+	        for path, storage in finder.list([]):
+	            if fnmatch.fnmatchcase(path, glob):
+	                yield path, storage
+	
+	
+	# STATIC_ROOT is where pyScss looks for images and static data.
+	# STATIC_ROOT can be either a fully qualified path name or a "finder"
+	# iterable function that receives a filename or glob and returns a tuple
+	# of the file found and its file storage object for each matching file.
+	# (https://docs.djangoproject.com/en/dev/ref/files/storage/)
+	scss.STATIC_ROOT = finder
+	scss.STATIC_URL = settings.STATIC_URL
+	
+	# ASSETS_ROOT is where the pyScss outputs the generated files such as spritemaps
+	# and compile cache:
+	scss.ASSETS_ROOT = os.path.join(settings.MEDIA_ROOT, 'assets/')
+	scss.ASSETS_URL = settings.MEDIA_URL + 'assets/'
+	
+	# These are the paths pyScss will look ".scss" files on. This can be the path to
+	# the compass framework or blueprint or compass-recepies, etc.
+	scss.LOAD_PATHS = [
+	    '/usr/local/www/sass/frameworks/',
+	    '/Library/Ruby/Gems/1.8/gems/compass-0.11.5/frameworks/compass/stylesheets/',
+	    '/Library/Ruby/Gems/1.8/gems/compass-0.11.5/frameworks/blueprint/stylesheets/',
+	]
+	
+	# This creates the Scss object used to compile SCSS code. In this example,
+	# _scss_vars will hold the context variables:
+	_scss_vars = {}
+	_scss = scss.Scss(
+	    scss_vars=_scss_vars,
+	    scss_opts={
+	        'compress': True,
+	        'debug_info': True,
+	    }
+	)
+	
+	# 1. Compile from a string:
+	compiled_css_from_string = _scss.compile('@import "file2"; a {color: red + green; }')
+	
+	# 2. Compile from a file:
+	compiled_css_from_file = _scss.compile(scss_file='file1.scss')
+	
+	# 3. Compile from a set of files (use SortedDict or collections.OrderedDict to
+	# maintain the compile order):
+	_scss._scss_files = SortedDict((
+	    ('file2.scss', open('file2.scss').read()),
+	    ('file3.scss', open('file3.scss').read()),
+	    ('file4.scss', open('file4.scss').read()),
+	))
+	compiled_css_from_files = _scss.compile()
 
 
 Bug tracker
