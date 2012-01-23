@@ -79,9 +79,6 @@ try:
 except:
     from StringIO import StringIO
 
-import pstats
-import cProfile
-
 ################################################################################
 # Load C acceleration modules
 locate_blocks = None
@@ -474,33 +471,33 @@ def print_timing(level=0):
 
 
 # Profiler decorator
-def profile(fn):
-    def wrapper(*args, **kwargs):
-        profiler = cProfile.Profile()
-        stream = StringIO()
-        profiler.enable()
-        try:
-            res = fn(*args, **kwargs)
-        finally:
-            profiler.disable()
-            stats = pstats.Stats(profiler, stream=stream)
-            stats.sort_stats('time')
-            print >>stream, ""
-            print >>stream, "=" * 100
-            print >>stream, "Stats:"
-            stats.print_stats()
-
-            print >>stream, "=" * 100
-            print >>stream, "Callers:"
-            stats.print_callers()
-
-            print >>stream, "=" * 100
-            print >>stream, "Callees:"
-            stats.print_callees()
-            print >>sys.stderr, stream.getvalue()
-            stream.close()
-        return res
-    return wrapper
+# import pstats
+# import cProfile
+# def profile(fn):
+#     def wrapper(*args, **kwargs):
+#         profiler = cProfile.Profile()
+#         stream = StringIO()
+#         profiler.enable()
+#         try:
+#             res = fn(*args, **kwargs)
+#         finally:
+#             profiler.disable()
+#             stats = pstats.Stats(profiler, stream=stream)
+#             stats.sort_stats('time')
+#             print >>stream, ""
+#             print >>stream, "=" * 100
+#             print >>stream, "Stats:"
+#             stats.print_stats()
+#             print >>stream, "=" * 100
+#             print >>stream, "Callers:"
+#             stats.print_callers()
+#             print >>stream, "=" * 100
+#             print >>stream, "Callees:"
+#             stats.print_callees()
+#             print >>sys.stderr, stream.getvalue()
+#             stream.close()
+#         return res
+#     return wrapper
 
 
 def split_params(params):
@@ -719,9 +716,11 @@ class Scss(object):
 
     #@profile
     @print_timing(2)
-    def Compilation(self, input_scss=None):
-        if input_scss is not None:
-            self._scss_files = {'<string>': input_scss}
+    def Compilation(self, scss_string=None, scss_file=None):
+        if scss_string is not None:
+            self._scss_files = {'<string>': scss_string}
+        elif scss_file is not None:
+            self._scss_files = {scss_file: open(scss_file).read()}
 
         self.reset()
 
@@ -1193,12 +1192,12 @@ class Scss(object):
                         # TODO: Convert global LOAD_PATHS to a list. Use it directly.
                         # Doing the above will break backwards compatibility!
                         if hasattr(LOAD_PATHS, 'split'):
-                            load_path_list = LOAD_PATHS.split(',') # Old style
+                            load_path_list = LOAD_PATHS.split(',')  # Old style
                         else:
-                            load_path_list = LOAD_PATHS # New style
+                            load_path_list = LOAD_PATHS  # New style
 
-                        for path in [ './' ] + load_path_list:
-                            for basepath in [ './', os.path.dirname(rule[PATH]) ]:
+                        for path in ['./'] + load_path_list:
+                            for basepath in ['./', os.path.dirname(rule[PATH])]:
                                 i_codestr = None
                                 full_path = os.path.realpath(os.path.join(path, basepath, dirname))
                                 if full_path not in load_paths:
