@@ -266,6 +266,8 @@ Django Example
 ==============
 The following shows some code that can be used with django::
 
+	.. code-block:: python
+		
 		import os
 		import fnmatch
 		
