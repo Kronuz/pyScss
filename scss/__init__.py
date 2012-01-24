@@ -5181,48 +5181,43 @@ class Calculator(Parser):
 expr_cache = {}
 def eval_expr(expr, rule, raw=False):
     # print >>sys.stderr, '>>',expr,'<<'
-    if not isinstance(expr, basestring):
-        return expr
+    results = None
 
-    _cache = False
-    if raw:
+    if not isinstance(expr, basestring):
+        results = expr
+
+    if results is None:
         if expr in rule[CONTEXT]:
             while expr in rule[CONTEXT]:
                 _expr = rule[CONTEXT][expr]
                 if _expr == expr:
                     break
                 expr = _expr
-
         if not isinstance(expr, basestring):
-            return expr
+            results = expr
 
-        if '$' not in expr:
-            _cache = True
+    if results is None:
+        try:
+            results = expr_cache[expr]
+        except KeyError:
             try:
-                return expr_cache[expr]
-            except KeyError:
-                pass
+                P = Calculator(CalculatorScanner())
+                P.reset(expr)
+                results = P.goal(rule)
+            except SyntaxError:
+                if DEBUG:
+                    raise
+            except Exception as e:
+                log.error("Exception raised: %s in `%s' (%s)", e, expr, rule[INDEX][rule[LINENO]])
+                if DEBUG:
+                    raise
+            if '$' not in expr:
+                expr_cache[expr] = results
 
-    results = None
-    try:
-        P = Calculator(CalculatorScanner())
-        P.reset(expr)
-        results = P.goal(rule)
-    except SyntaxError:
-        if DEBUG:
-            raise
-    except Exception as e:
-        log.error("Exception raised: %s in `%s' (%s)", e, expr, rule[INDEX][rule[LINENO]])
-        if DEBUG:
-            raise
-    if raw:
-        if _cache:
-            expr_cache[expr] = results
-        # print >>sys.stderr, repr(expr),'%%',repr(results),'%%'
-        return results
-    if results is not None:
+    if not raw and results is not None:
         results = to_str(results)
-        # print >>sys.stderr, repr(expr),'==',results,'=='
+
+    # print >>sys.stderr, repr(expr),'==',results,'=='
     return results
 
 
