@@ -5207,7 +5207,7 @@ def eval_expr(expr, rule, raw=False):
             except SyntaxError:
                 if DEBUG:
                     raise
-            except Exception as e:
+            except Exception, e:
                 log.error("Exception raised: %s in `%s' (%s)", e, expr, rule[INDEX][rule[LINENO]])
                 if DEBUG:
                     raise
