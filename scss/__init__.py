@@ -5190,7 +5190,9 @@ def eval_expr(expr, rule, raw=False):
 
     if results is None:
         if expr in rule[CONTEXT]:
-            while expr in rule[CONTEXT]:
+            chkd = {}
+            while expr in rule[CONTEXT] and expr not in chkd:
+                chkd[expr] = 1
                 _expr = rule[CONTEXT][expr]
                 if _expr == expr:
                     break
