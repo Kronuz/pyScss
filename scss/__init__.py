@@ -3355,14 +3355,14 @@ def _compact(*args):
             args = args.value
         if isinstance(args, dict):
             for i, item in args.items():
-                if bool(item):
+                if False if isinstance(item, basestring) and (item == 'undefined' or item.startswith('$')) else bool(item):
                     ret[i] = item
-        elif bool(args):
+        elif False if isinstance(args, basestring) and (args == 'undefined' or args.startswith('$')) else bool(args):
             ret[0] = args
     else:
         ret['_'] = ','
         for i, item in enumerate(args):
-            if bool(item):
+            if False if isinstance(item, basestring) and (item == 'undefined' or item.startswith('$')) else bool(item):
                 ret[i] = item
     if isinstance(args, ListValue):
         args = args.value
@@ -3408,7 +3408,7 @@ def __compass_slice(lst, start_index, end_index=None):
 
 def _first_value_of(*lst):
     if len(lst) == 1 and isinstance(lst[0], (list, tuple, ListValue)):
-        lst = ListValue(lst[0]).values()
+        lst = ListValue(lst[0])
     ret = ListValue(lst).first()
     return ret.__class__(ret)
 
@@ -4233,10 +4233,12 @@ class ListValue(Value):
         return sorted((k, v) for k, v in self.value.items() if k != '_')
 
     def first(self):
-        try:
-            return self.items()[0][1]
-        except IndexError:
-            return None
+        for v in self.values():
+            if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')):
+                continue
+            if bool(v):
+                return v
+        return v
 
 
 class ColorValue(Value):
