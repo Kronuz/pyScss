@@ -7,24 +7,13 @@ import re
 import sys
 from collections import deque
 
-from . import Scss, VERBOSITY, log
+from . import Scss, VERBOSITY, PROJECT_ROOT, LOAD_PATHS, STATIC_ROOT, ASSETS_ROOT, STATIC_URL, ASSETS_URL, log
 from . import spawn_rule, to_str, profiling
 from . import _prop_split_re
 from .scss_meta import BUILD_INFO
 
 log.setLevel(logging.INFO)
 
-
-PROJECT_ROOT = os.path.normpath(os.path.dirname(os.path.abspath(__file__)))
-# Sass @import load_paths:
-LOAD_PATHS = os.path.join(PROJECT_ROOT, 'sass/frameworks/')
-# Assets path, where new sprite files are created:
-STATIC_ROOT = os.path.join(PROJECT_ROOT, 'static/')
-# Assets path, where new sprite files are created:
-ASSETS_ROOT = os.path.join(PROJECT_ROOT, 'static/assets/')
-# Urls for the static and assets:
-STATIC_URL = '/static/'
-ASSETS_URL = '/static/assets/'
 
 def main():
     logging.basicConfig(format="%(levelname)s: %(message)s")
