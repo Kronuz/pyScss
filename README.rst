@@ -64,11 +64,18 @@ Usage example::
 
 Or compile from the command line::
 
-	python scss.py < file.scss
+	python -mscss < file.scss
 
 Interactive mode::
 
-	python scss.py --interactive
+	python -mscss --interactive
+
+.. note::
+
+    ``-mscss`` will only work in Python 2.7 and above, for Python 2.5
+    and 2.6 you need to invoke::
+
+        python -mscss.tool
 
 Examples
 ========
