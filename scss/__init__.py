@@ -402,7 +402,7 @@ _has_code_re = re.compile('''
     )
 ''', re.VERBOSE)
 
-_css_function_re = re.compile(r'^(from|to|mask|rotate|scale|format|local|url|attr|counter|counters|color-stop|rect|-webkit-.*|-webkit-.*|-moz-.*|-pie-.*|-ms-.*|-o-.*)$')
+_css_function_re = re.compile(r'^(from|to|mask|rotate|scale|format|local|url|attr|counter|counters|color-stop|rect|-[^-]+-.+)$')
 
 FILEID = 0
 POSITION = 1
