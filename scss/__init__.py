@@ -4723,7 +4723,7 @@ def call(name, args, R, is_function=True):
     except KeyError:
         sp = args and args.value.get('_') or ''
         if is_function:
-            if not _css_function_re.match(_name):
+            if not _css_functions_re.match(_name):
                 log.error("Required function not found: %s (%s)", _fn_a, R[INDEX][R[LINENO]])
             _args = (sp + ' ').join(to_str(v) for n, v in s if isinstance(n, int))
             _kwargs = (sp + ' ').join('%s: %s' % (n, to_str(v)) for n, v in s if not isinstance(n, int) and n != '_')
