@@ -25,6 +25,9 @@ scss_BlockLocator_init(scss_BlockLocator *self, PyObject *args, PyObject *kwds)
 {
 	char *codestr;
 	int codestr_sz;
+
+	self->locator = NULL;
+
 	if (!PyArg_ParseTuple(args, "s#", &codestr, &codestr_sz)) {
 		return -1;
 	}
@@ -32,7 +35,7 @@ scss_BlockLocator_init(scss_BlockLocator *self, PyObject *args, PyObject *kwds)
 	self->locator = BlockLocator_new(codestr, codestr_sz);
 
 	#ifdef DEBUG
-		PySys_WriteStderr("Scss BlockLocator object initialized! (%lu)\n", sizeof(scss_BlockLocator));
+		PySys_WriteStderr("Scss BlockLocator object initialized! (%lu bytes)\n", sizeof(scss_BlockLocator));
 	#endif
 
 	return 0;
@@ -41,7 +44,7 @@ scss_BlockLocator_init(scss_BlockLocator *self, PyObject *args, PyObject *kwds)
 static void
 scss_BlockLocator_dealloc(scss_BlockLocator *self)
 {
-	if(self->locator != NULL) BlockLocator_del(self->locator);
+	if (self->locator != NULL) BlockLocator_del(self->locator);
 
 	self->ob_type->tp_free((PyObject*)self);
 
@@ -62,22 +65,24 @@ scss_BlockLocator_iternext(scss_BlockLocator *self)
 {
 	Block *block;
 
-	block = BlockLocator_iternext(self->locator);
+	if (self->locator != NULL) {
+		block = BlockLocator_iternext(self->locator);
 
-	if (block->error > 0) {
-		return Py_BuildValue(
-			"is#s#",
-			block->lineno,
-			block->selprop,
-			block->selprop_sz,
-			block->codestr,
-			block->codestr_sz
-		);
-	}
+		if (block->error > 0) {
+			return Py_BuildValue(
+				"is#s#",
+				block->lineno,
+				block->selprop,
+				block->selprop_sz,
+				block->codestr,
+				block->codestr_sz
+			);
+		}
 
-	if (block->error > 0) {
-		PyErr_SetString(PyExc_Exception, self->locator->exc);
-		return NULL;
+		if (block->error > 0) {
+			PyErr_SetString(PyExc_Exception, self->locator->exc);
+			return NULL;
+		}
 	}
 
 	/* Raising of standard StopIteration exception with empty value. */
@@ -143,8 +148,10 @@ static PyObject *
 scss_Scanner_rewind(scss_Scanner *self, PyObject *args)
 {
 	int token_num;
-	if (PyArg_ParseTuple(args, "i", &token_num)) {
-		Scanner_rewind(self->scanner, token_num);
+	if (self->scanner != NULL) {
+		if (PyArg_ParseTuple(args, "i", &token_num)) {
+			Scanner_rewind(self->scanner, token_num);
+		}
 	}
 	Py_INCREF(Py_None);
 	return (PyObject *)Py_None;
@@ -164,53 +171,54 @@ scss_Scanner_token(scss_Scanner *self, PyObject *args)
 	PyObject *restrictions;
 	Pattern *_restrictions = NULL;
 	int restrictions_sz = 0;
-
-	if (PyArg_ParseTuple(args, "i|O", &token_num, &restrictions)) {
-		is_tuple = PyTuple_Check(restrictions);
-		if (is_tuple || PyList_Check(restrictions)) {
-			size = is_tuple ? PyTuple_Size(restrictions) : PyList_Size(restrictions);
-			_restrictions = PyMem_New(Pattern, size);
-			for (i = 0; i < size; ++i) {
-				item = is_tuple ? PyTuple_GetItem(restrictions, i) : PyList_GetItem(restrictions, i);
-				if (PyString_Check(item)) {
-					_restrictions[restrictions_sz].tok = PyString_AsString(item);
-					_restrictions[restrictions_sz].expr = NULL;
-					restrictions_sz++;
+	if (self->scanner != NULL) {
+		if (PyArg_ParseTuple(args, "i|O", &token_num, &restrictions)) {
+			is_tuple = PyTuple_Check(restrictions);
+			if (is_tuple || PyList_Check(restrictions)) {
+				size = is_tuple ? PyTuple_Size(restrictions) : PyList_Size(restrictions);
+				_restrictions = PyMem_New(Pattern, size);
+				for (i = 0; i < size; ++i) {
+					item = is_tuple ? PyTuple_GetItem(restrictions, i) : PyList_GetItem(restrictions, i);
+					if (PyString_Check(item)) {
+						_restrictions[restrictions_sz].tok = PyString_AsString(item);
+						_restrictions[restrictions_sz].expr = NULL;
+						restrictions_sz++;
+					}
 				}
 			}
-		}
-		p_token = Scanner_token(self->scanner, token_num, _restrictions, restrictions_sz);
+			p_token = Scanner_token(self->scanner, token_num, _restrictions, restrictions_sz);
 
-		if (_restrictions != NULL) PyMem_Del(_restrictions);
+			if (_restrictions != NULL) PyMem_Del(_restrictions);
 
-		if (p_token == (Token *)SCANNER_EXC_BAD_TOKEN) {
-			PyErr_SetString(PyExc_SyntaxError, self->scanner->exc);
-			return NULL;
+			if (p_token == (Token *)SCANNER_EXC_BAD_TOKEN) {
+				PyErr_SetString(PyExc_SyntaxError, self->scanner->exc);
+				return NULL;
+			}
+			if (p_token == (Token *)SCANNER_EXC_RESTRICTED) {
+				PyErr_SetString(PyExc_SyntaxError, self->scanner->exc);
+				return NULL;
+			}
+			if (p_token == (Token *)SCANNER_EXC_UNIMPLEMENTED) {
+				PyErr_SetString(PyExc_NotImplementedError, self->scanner->exc);
+				return NULL;
+			}
+			if (p_token == (Token *)SCANNER_EXC_NO_MORE_TOKENS) {
+				PyErr_SetNone(PyExc_scss_NoMoreTokens);
+				return NULL;
+			}
+			if (p_token < 0) {
+				PyErr_SetNone(PyExc_Exception);
+				return NULL;
+			}
+			return Py_BuildValue(
+				"iiss#",
+				p_token->string - self->scanner->input,
+				p_token->string - self->scanner->input + p_token->string_sz,
+				p_token->regex->tok,
+				p_token->string,
+				p_token->string_sz
+			);
 		}
-		if (p_token == (Token *)SCANNER_EXC_RESTRICTED) {
-			PyErr_SetString(PyExc_SyntaxError, self->scanner->exc);
-			return NULL;
-		}
-		if (p_token == (Token *)SCANNER_EXC_UNIMPLEMENTED) {
-			PyErr_SetString(PyExc_NotImplementedError, self->scanner->exc);
-			return NULL;
-		}
-		if (p_token == (Token *)SCANNER_EXC_NO_MORE_TOKENS) {
-			PyErr_SetNone(PyExc_scss_NoMoreTokens);
-			return NULL;
-		}
-		if (p_token < 0) {
-			PyErr_SetNone(PyExc_Exception);
-			return NULL;
-		}
-		return Py_BuildValue(
-			"iiss#",
-			p_token->string - self->scanner->input,
-			p_token->string - self->scanner->input + p_token->string_sz,
-			p_token->regex->tok,
-			p_token->string,
-			p_token->string_sz
-		);
 	}
 	Py_INCREF(Py_None);
 	return (PyObject *)Py_None;
@@ -222,8 +230,10 @@ scss_Scanner_reset(scss_Scanner *self, PyObject *args, PyObject *kwds)
 	char *input = NULL;
 	int input_sz = 0;
 
-	if (PyArg_ParseTuple(args, "|z#", &input, &input_sz)) {
-		Scanner_reset(self->scanner, input, input_sz);
+	if (self->scanner != NULL) {
+		if (PyArg_ParseTuple(args, "|z#", &input, &input_sz)) {
+			Scanner_reset(self->scanner, input, input_sz);
+		}
 	}
 
 	Py_INCREF(Py_None);
@@ -280,9 +290,12 @@ scss_Scanner_init(scss_Scanner *self, PyObject *args, PyObject *kwds)
 	char *input = NULL;
 	int input_sz = 0;
 
+	self->scanner = NULL;
+
 	if (!PyArg_ParseTuple(args, "OO|z#", &patterns, &ignore, &input, &input_sz)) {
 		return -1;
 	}
+
 	if (!Scanner_initialized()) {
 		is_tuple = PyTuple_Check(patterns);
 		if (is_tuple || PyList_Check(patterns)) {
@@ -304,6 +317,7 @@ scss_Scanner_init(scss_Scanner *self, PyObject *args, PyObject *kwds)
 		}
 		Scanner_initialize(_patterns, patterns_sz);
 	}
+
 	is_tuple = PyTuple_Check(ignore);
 	if (is_tuple || PyList_Check(ignore)) {
 		size = is_tuple ? PyTuple_Size(ignore) : PyList_Size(ignore);
@@ -324,7 +338,7 @@ scss_Scanner_init(scss_Scanner *self, PyObject *args, PyObject *kwds)
 	if (_ignore != NULL) PyMem_Del(_ignore);
 
 	#ifdef DEBUG
-		PySys_WriteStderr("Scss Scanner object initialized! (%lu)\n", sizeof(scss_Scanner));
+		PySys_WriteStderr("Scss Scanner object initialized! (%lu bytes)\n", sizeof(scss_Scanner));
 	#endif
 
 	return 0;
@@ -338,7 +352,7 @@ scss_Scanner_repr(scss_Scanner *self)
 	Token *p_token;
 	int i, start, pos;
 
-	if (self->scanner->tokens_sz) {
+	if (self->scanner != NULL && self->scanner->tokens_sz) {
 		start = self->scanner->tokens_sz - 10;
 		repr = PyString_FromString("");
 		for (i = (start < 0) ? 0 : start; i < self->scanner->tokens_sz; i++) {
@@ -363,7 +377,7 @@ scss_Scanner_repr(scss_Scanner *self)
 	char *tok;
 	int i, start, first = 1, cur, max=0, pos;
 
-	if (self->scanner->tokens_sz) {
+	if (self->scanner != NULL && self->scanner->tokens_sz) {
 		start = self->scanner->tokens_sz - 10;
 		repr = PyString_FromString("");
 		for (i = (start < 0) ? 0 : start; i < self->scanner->tokens_sz; i++) {

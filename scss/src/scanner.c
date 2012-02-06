@@ -24,9 +24,11 @@ int Pattern_patterns_initialized = 0;
 Pattern*
 Pattern_regex(char *tok, char *expr) {
 	int j;
+
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
+
 	for (j = 0; j < Pattern_patterns_sz; j++) {
 		if (strcmp(Pattern_patterns[j].tok, tok) == 0) {
 			return &Pattern_patterns[j];
@@ -53,9 +55,11 @@ Pattern_match(Pattern *regex, char *string, int string_sz, int start_at, Token *
 	const char *errptr;
 	int ret, erroffset, ovector[3];
 	pcre *p_pattern = regex->pattern;
+
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
+
 	if (p_pattern == NULL) {
 		#ifdef DEBUG
 			fprintf(stderr, "\tpcre_compile %s\n", repr(regex->expr));
@@ -93,6 +97,7 @@ Pattern_initialize(Pattern *patterns, int patterns_sz) {
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
+
 	if (!Pattern_patterns_initialized) {
 		if (patterns_sz) {
 			Pattern_patterns_initialized = 1;
@@ -105,9 +110,11 @@ static void
 Pattern_setup(Pattern *patterns, int patterns_sz) {
 	int i;
 	Pattern *regex;
+
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
+
 	if (!Pattern_patterns_initialized) {
 		Pattern_initialize(patterns, patterns_sz);
 	} else {
@@ -125,9 +132,11 @@ Pattern_setup(Pattern *patterns, int patterns_sz) {
 static void
 Pattern_finalize(void) {
 	int j;
+
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
+
 	if (Pattern_patterns_initialized) {
 		for (j = 0; j < Pattern_patterns_sz; j++) {
 			PyMem_Del(Pattern_patterns[j].tok);
@@ -154,9 +163,11 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 	Restriction *p_restriction;
 	Pattern *regex;
 	int j, k, max, skip;
+
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
+
 	while (1) {
 		best_token.regex = NULL;
 		/* Search the patterns for a match, with earlier
@@ -266,6 +277,7 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 void
 Scanner_reset(Scanner *self, char *input, int input_sz) {
 	int i;
+
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
@@ -291,6 +303,7 @@ Scanner_reset(Scanner *self, char *input, int input_sz) {
 void
 Scanner_del(Scanner *self) {
 	int i;
+
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
@@ -320,9 +333,11 @@ Scanner_new(Pattern patterns[], int patterns_sz, Pattern ignore[], int ignore_sz
 	int i;
 	Scanner *self;
 	Pattern *regex;
+
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
+
 	self = PyMem_New(Scanner, 1);
 	memset(self, 0, sizeof(Scanner));
 	if (self) {
@@ -365,6 +380,7 @@ Scanner_initialize(Pattern patterns[], int patterns_sz)
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
+
 	Pattern_initialize(patterns, patterns_sz);
 }
 
@@ -374,9 +390,9 @@ Scanner_finalize(void)
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
+
 	Pattern_finalize();
 }
-
 
 Token*
 Scanner_token(Scanner *self, int i, Pattern restrictions[], int restrictions_sz)
@@ -384,9 +400,11 @@ Scanner_token(Scanner *self, int i, Pattern restrictions[], int restrictions_sz)
 	int j, k, found;
 	Pattern *regex;
 	long result;
+
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
+
 	if (i == self->tokens_sz) {
 		result = _Scanner_scan(self, restrictions, restrictions_sz);
 		if (result < 0) {
@@ -422,6 +440,7 @@ Scanner_rewind(Scanner *self, int i)
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
+
 	if (i >= 0 && i < self->tokens_sz) {
 		self->tokens_sz = i;
 		self->pos = (int)(self->tokens[i].string - self->input);
