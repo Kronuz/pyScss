@@ -5140,7 +5140,7 @@ class Calculator(Parser):
             return NumberValue(ParserValue(NUM))
         elif _token_ == 'STR':
             STR = self._scan('STR')
-            return StringValue(ParserValue(STR))
+            return QuotedStringValue(ParserValue(STR))
         elif _token_ == 'QSTR':
             QSTR = self._scan('QSTR')
             return QuotedStringValue(ParserValue(QSTR))
