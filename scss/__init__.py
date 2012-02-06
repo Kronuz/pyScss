@@ -4500,7 +4500,7 @@ class QuotedStringValue(Value):
 
 class StringValue(QuotedStringValue):
     def __str__(self):
-        return self.value
+        return "'%s'" % escape(self.value)
 
     def __add__(self, other):
         if isinstance(other, ListValue):
