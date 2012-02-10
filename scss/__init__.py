@@ -409,6 +409,7 @@ FUNCTIONS_FONTS = 'local format' # http://www.w3.org/TR/css3-fonts/
 # http://www.w3.org/TR/css3-images
 FUNCTIONS_IMAGES = 'image element linear-gradient radial-gradient '\
                    'repeating-linear-gradient repeating-radial-gradient'
+FUNCTIONS_GRADIENTS = 'color-stop'
 # http://www.w3.org/TR/css3-2d-transforms/
 FUNCTIONS_2D = 'matrix translate translateX translateY scale '\
                'scaleX scaleY rotate skewX skewY'
@@ -429,6 +430,7 @@ _css_functions_re = re.compile(r'^(%s)$' % (
         FUNCTIONS_COLORS,
         FUNCTIONS_FONTS,
         FUNCTIONS_IMAGES,
+        FUNCTIONS_GRADIENTS,
         FUNCTIONS_2D,
         FUNCTIONS_3D,
         FUNCTIONS_TRANSITIONS,
