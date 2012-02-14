@@ -3130,7 +3130,7 @@ def _inline_font_files(*args):
 
 
 def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_color=None, inline=False, mime_type=None):
-    if src_color and dst_color:
+    if src_color and dst_color or inline:
         if not Image:
             raise Exception("Images manipulation require PIL")
     filepath = StringValue(path).value
