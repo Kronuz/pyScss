@@ -751,7 +751,7 @@ class Scss(object):
     @print_timing(2)
     def Compilation(self, scss_string=None, scss_file=None):
         if scss_string is not None:
-            self._scss_files = {'<string>': scss_string}
+            self._scss_files = {'<string %r>' % (scss_string.strip()[:50] + '...'): scss_string}
         elif scss_file is not None:
             self._scss_files = {scss_file: open(scss_file).read()}
 
@@ -778,7 +778,7 @@ class Scss(object):
 
         final_cont = ''
         for fileid in self.css_files:
-            if fileid != '<string>':
+            if not fileid.startswith('<string '):
                 final_cont += '/* Generated from: ' + fileid + ' */\n'
             fcont = self.create_css(fileid)
             final_cont += fcont
