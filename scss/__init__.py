@@ -2591,14 +2591,29 @@ def _sprite_map(g, **kwargs):
         sprite_maps[glob]['*'] = datetime.datetime.now()
     elif '..' not in g:  # Protect against going to prohibited places...
         vertical = (kwargs.get('direction', 'vertical') == 'vertical')
-        offset_x = NumberValue(kwargs.get('offset_x', 0))
-        offset_y = NumberValue(kwargs.get('offset_y', 0))
         repeat = StringValue(kwargs.get('repeat', 'no-repeat'))
         position = NumberValue(kwargs.get('position', 0))
-        dst_color = kwargs.get('dst_color')
-        src_color = kwargs.get('src_color')
+        collapse_x = NumberValue(kwargs.get('collapse_x', 0))
+        collapse_y = NumberValue(kwargs.get('collapse_y', 0))
         if position and position > -1 and position < 1:
             position.units = {'%': _units_weights.get('%', 1), '_': '%'}
+
+        dst_colors = kwargs.get('dst_color')
+        if isinstance(dst_colors, ListValue):
+            dst_colors = [list(ColorValue(v).value[:3]) for n, v in dst_colors.items() if v]
+        else:
+            dst_colors = [list(ColorValue(dst_colors).value[:3])] if dst_colors else []
+
+        src_colors = kwargs.get('src_color')
+        if isinstance(src_colors, ListValue):
+            src_colors = [tuple(ColorValue(v).value[:3]) if v else (0, 0, 0) for n, v in src_colors.items()]
+        else:
+            src_colors = [tuple(ColorValue(src_colors).value[:3]) if src_colors else (0, 0, 0)]
+
+        len_colors = max(len(dst_colors), len(src_colors))
+        dst_colors = (dst_colors * len_colors)[:len_colors]
+        src_colors = (src_colors * len_colors)[:len_colors]
+
         spacing = kwargs.get('spacing', 0)
         if isinstance(spacing, ListValue):
             spacing = [int(NumberValue(v).value) for n, v in spacing.items()]
@@ -2670,7 +2685,8 @@ def _sprite_map(g, **kwargs):
                             tot_spacings.append((_spacing[0] + _position, _spacing[1], _spacing[2], _spacing[3]))
                 else:
                     tot_spacings.append(_spacing)
-            sizes = tuple(image.size for image in images)
+
+            sizes = tuple((collapse_x or image.size[0], collapse_y or image.size[1]) for image in images)
 
             _spacings = zip(*tot_spacings)
             if vertical:
@@ -2692,39 +2708,66 @@ def _sprite_map(g, **kwargs):
             for i, image in enumerate(images):
                 spacing = spacings[i]
                 position = positions[i]
+                iwidth, iheight = image.size
+                width, height = sizes[i]
                 if vertical:
                     if position and position.unit == '%':
-                        x = width * position.value - (spacing[3] + sizes[i][1] + spacing[1])
+                        x = width * position.value - (spacing[3] + height + spacing[1])
                     elif position.value < 0:
-                        x = width + position.value - (spacing[3] + sizes[i][1] + spacing[1])
+                        x = width + position.value - (spacing[3] + height + spacing[1])
                     else:
                         x = position.value
                     offset += spacing[0]
-                    new_image.paste(image, (int(x + spacing[3]), offset))
+                    for i, dst_color in enumerate(dst_colors):
+                        src_color = src_colors[i]
+                        pixdata = image.load()
+                        for _y in xrange(image.size[1]):
+                            for _x in xrange(image.size[0]):
+                                if pixdata[_x, _y][:3] == src_color:
+                                    pixdata[_x, _y] = tuple(dst_color + [pixdata[_x, _y][3]])
+                    if iwidth != width or iheight != height:
+                        cy = 0
+                        while cy < iheight:
+                            cx = 0
+                            while cx < iwidth:
+                                cropped_image = image.crop((cx, cy, cx + width, cy + height))
+                                new_image.paste(cropped_image, (int(x + spacing[3]), offset), cropped_image)
+                                cx += width
+                            cy += height
+                    else:
+                        new_image.paste(image, (int(x + spacing[3]), offset))
                     offsets_x.append(x)
                     offsets_y.append(offset - spacing[0])
-                    offset += sizes[i][1] + spacing[2]
+                    offset += height + spacing[2]
                 else:
                     if position and position.unit == '%':
-                        y = height * position.value - (spacing[0] + sizes[i][1] + spacing[2])
+                        y = height * position.value - (spacing[0] + height + spacing[2])
                     elif position.value < 0:
-                        y = height + position.value - (spacing[0] + sizes[i][1] + spacing[2])
+                        y = height + position.value - (spacing[0] + height + spacing[2])
                     else:
                         y = position.value
                     offset += spacing[3]
-                    new_image.paste(image, (offset, int(y + spacing[0])))
+                    for i, dst_color in enumerate(dst_colors):
+                        src_color = src_colors[i]
+                        pixdata = image.load()
+                        for _y in xrange(image.size[1]):
+                            for _x in xrange(image.size[0]):
+                                if pixdata[_x, _y][:3] == src_color:
+                                    pixdata[_x, _y] = tuple(dst_color + [pixdata[_x, _y][3]])
+                    if iwidth != width or iheight != height:
+                        cy = 0
+                        while cy < iheight:
+                            cx = 0
+                            while cx < iwidth:
+                                cropped_image = image.crop((cx, cy, cx + width, cy + height))
+                                new_image.paste(cropped_image, (offset, int(y + spacing[0])), cropped_image)
+                                cx += width
+                            cy += height
+                    else:
+                        new_image.paste(image, (offset, int(y + spacing[0])))
                     offsets_x.append(offset - spacing[3])
                     offsets_y.append(y)
-                    offset += sizes[i][0] + spacing[1]
-
-            if dst_color:
-                src_color = ColorValue(src_color).value[:3] if src_color else (0, 0, 0)
-                dst_color = list(ColorValue(dst_color).value[:3])
-                pixdata = new_image.load()
-                for y in xrange(new_image.size[1]):
-                    for x in xrange(new_image.size[0]):
-                        if pixdata[x, y][:3] == src_color:
-                            pixdata[x, y] = tuple(dst_color + [pixdata[x, y][3]])
+                    offset += width + spacing[1]
 
             try:
                 new_image.save(asset_path)
@@ -3130,8 +3173,13 @@ def _inline_font_files(*args):
     return __font_files(args, inline=True)
 
 
-def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_color=None, inline=False, mime_type=None):
-    if src_color and dst_color:
+def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_color=None, inline=False, mime_type=None, spacing=None, collapse_x=None, collapse_y=None):
+    """
+    src_color - a list of or a single color to be replaced by each corresponding dst_color colors
+    spacing - spaces to be added to the image
+    collapse_x, collapse_y - collapsable (layered) image of the given size (x, y)
+    """
+    if dst_color:
         if not Image:
             raise Exception("Images manipulation require PIL")
     filepath = StringValue(path).value
@@ -3156,8 +3204,27 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
             filetime = 'NA'
     BASE_URL = STATIC_URL
     if path:
-        src_color = src_color and tuple(int(round(c)) for c in ColorValue(src_color).value[:3]) if src_color else (0, 0, 0)
-        dst_color = dst_color and [int(round(c)) for c in ColorValue(dst_color).value[:3]]
+        dst_colors = dst_color
+        if isinstance(dst_colors, ListValue):
+            dst_colors = [list(ColorValue(v).value[:3]) for n, v in dst_colors.items() if v]
+        else:
+            dst_colors = [list(ColorValue(dst_colors).value[:3])] if dst_colors else []
+
+        src_colors = src_color
+        if isinstance(src_colors, ListValue):
+            src_colors = [tuple(ColorValue(v).value[:3]) if v else (0, 0, 0) for n, v in src_colors.items()]
+        else:
+            src_colors = [tuple(ColorValue(src_colors).value[:3]) if src_colors else (0, 0, 0)]
+
+        len_colors = max(len(dst_colors), len(src_colors))
+        dst_colors = (dst_colors * len_colors)[:len_colors]
+        src_colors = (src_colors * len_colors)[:len_colors]
+
+        if isinstance(spacing, ListValue):
+            spacing = [int(NumberValue(v).value) for n, v in spacing.items()]
+        else:
+            spacing = [int(NumberValue(spacing).value)]
+        spacing = (spacing * 4)[:4]
 
         file_name, file_ext = os.path.splitext(os.path.normpath(filepath).replace('\\', '_').replace('/', '_'))
         key = (filetime, src_color, dst_color)
@@ -3178,17 +3245,35 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
                     url += '?_=%s' % filetime
         else:
             image = Image.open(path)
-            image = image.convert("RGBA")
-            if dst_color:
+            width, height = collapse_x or image.size[0], collapse_y or image.size[1]
+            new_image = Image.new(
+                mode='RGBA',
+                size=(width + spacing[1] + spacing[3], height + spacing[0] + spacing[2]),
+                color=(0, 0, 0, 0)
+            )
+            for i, dst_color in enumerate(dst_colors):
+                src_color = src_colors[i]
                 pixdata = image.load()
-                for y in xrange(image.size[1]):
-                    for x in xrange(image.size[0]):
-                        if pixdata[x, y][:3] == src_color:
-                            new_color = tuple(dst_color + [pixdata[x, y][3]])
-                            pixdata[x, y] = new_color
+                for _y in xrange(image.size[1]):
+                    for _x in xrange(image.size[0]):
+                        if pixdata[_x, _y][:3] == src_color:
+                            pixdata[_x, _y] = tuple(dst_color + [pixdata[_x, _y][3]])
+            iwidth, iheight = image.size
+            if iwidth != width or iheight != height:
+                cy = 0
+                while cy < iheight:
+                    cx = 0
+                    while cx < iwidth:
+                        cropped_image = image.crop((cx, cy, cx + width, cy + height))
+                        new_image.paste(cropped_image, (int(spacing[3]), int(spacing[0])), cropped_image)
+                        cx += width
+                    cy += height
+            else:
+                new_image.paste(image, (int(spacing[3]), int(spacing[0])))
+
             if not inline:
                 try:
-                    image.save(asset_path)
+                    new_image.save(asset_path)
                     filepath = asset_file
                     BASE_URL = ASSETS_URL
                     if cache_buster:
@@ -3201,7 +3286,7 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
                     url += '?_=%s' % filetime
             if inline:
                 output = StringIO()
-                image.save(output, format='PNG')
+                new_image.save(output, format='PNG')
                 contents = output.getvalue()
                 output.close()
                 url = 'data:' + mime_type + ';base64,' + base64.b64encode(contents)
@@ -3215,24 +3300,24 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
     return StringValue(url)
 
 
-def _inline_image(image, mime_type=None, dst_color=None, src_color=None):
+def _inline_image(image, mime_type=None, dst_color=None, src_color=None, spacing=None, collapse_x=None, collapse_y=None):
     """
     Embeds the contents of a file directly inside your stylesheet, eliminating
     the need for another HTTP request. For small files such images or fonts,
     this can be a performance benefit at the cost of a larger generated CSS
     file.
     """
-    return __image_url(image, False, False, dst_color, src_color, True, mime_type)
+    return __image_url(image, False, False, dst_color, src_color, True, mime_type, spacing, collapse_x, collapse_y)
 
 
-def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_color=None):
+def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_color=None, spacing=None, collapse_x=None, collapse_y=None):
     """
     Generates a path to an asset found relative to the project's images
     directory.
     Passing a true value as the second argument will cause the only the path to
     be returned instead of a `url()` function
     """
-    return __image_url(path, only_path, cache_buster, dst_color, src_color, False, None)
+    return __image_url(path, only_path, cache_buster, dst_color, src_color, False, None, spacing, collapse_x, collapse_y)
 
 
 def _image_width(image):
