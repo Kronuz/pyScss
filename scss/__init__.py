@@ -403,9 +403,9 @@ _has_code_re = re.compile('''
 
 FUNCTIONS_CSS2 = 'attr counter counters url rgb rect'
 ## CSS3
-FUNCTIONS_UNITS = 'calc min max cycle' # http://www.w3.org/TR/css3-values/
-FUNCTIONS_COLORS = 'rgba hsl hsla' # http://www.w3.org/TR/css3-color/
-FUNCTIONS_FONTS = 'local format' # http://www.w3.org/TR/css3-fonts/
+FUNCTIONS_UNITS = 'calc min max cycle'  # http://www.w3.org/TR/css3-values/
+FUNCTIONS_COLORS = 'rgba hsl hsla'  # http://www.w3.org/TR/css3-color/
+FUNCTIONS_FONTS = 'local format'  # http://www.w3.org/TR/css3-fonts/
 # http://www.w3.org/TR/css3-images
 FUNCTIONS_IMAGES = 'image element linear-gradient radial-gradient '\
                    'repeating-linear-gradient repeating-radial-gradient'
@@ -418,8 +418,8 @@ FUNCTIONS_3D = 'matrix3d translate3d translateZ scale3d scaleZ rotate3d '\
 # http://www.w3.org/TR/css3-transitions/
 FUNCTIONS_TRANSITIONS = 'cubic-bezier'
 # http://www.w3.org/TR/css3-animations/
-FUNCTIONS_ANIMATIONS = '' # has 'from' and 'to' block selectors, but no new function
-
+FUNCTIONS_ANIMATIONS = ''  # has 'from' and 'to' block selectors, but no new function
+FUNCTIONS_OTHERS = 'from to mask'
 VENDORS = '-[^-]+-.+'
 
 _css_functions_re = re.compile(r'^(%s)$' % (
@@ -433,7 +433,8 @@ _css_functions_re = re.compile(r'^(%s)$' % (
         FUNCTIONS_3D,
         FUNCTIONS_TRANSITIONS,
         FUNCTIONS_ANIMATIONS,
-        VENDORS
+        FUNCTIONS_OTHERS,
+        VENDORS,
     ]).split())))
 
 FILEID = 0
