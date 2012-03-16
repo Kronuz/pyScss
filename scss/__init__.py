@@ -1177,7 +1177,7 @@ class Scss(object):
                     m_param = varname
                 value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
                 m_vars[m_param] = value
-            for p in m_vars:
+            for p in m_params:
                 if p not in new_params:
                     if isinstance(m_vars[p], basestring):
                         value = self.calculate(m_vars[p], m_vars, rule[OPTIONS], rule)
@@ -1843,9 +1843,14 @@ class Scss(object):
         if _skip_word_re.match(better_expr_str) and '- ' not in better_expr_str and ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
             return better_expr_str
 
+        rule = list(rule)
+        rule[CONTEXT] = context
+        rule[OPTIONS] = options
+
         better_expr_str = self.do_glob_math(better_expr_str, context, options, rule)
 
         better_expr_str = eval_expr(better_expr_str, rule, True)
+
         if better_expr_str is None:
             better_expr_str = self.apply_vars(_base_str, context, options, rule)
 
@@ -2622,6 +2627,7 @@ def _sprite_map(g, **kwargs):
         spacing = (spacing * 4)[:4]
 
         if callable(STATIC_ROOT):
+            glob_path = g
             rfiles = files = sorted(STATIC_ROOT(g))
         else:
             glob_path = os.path.join(STATIC_ROOT, g)
