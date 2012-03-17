@@ -2388,28 +2388,80 @@ def _color_stops_in_percentages(*args):
     return StringValue(ret)
 
 
+def _get_gradient_position_and_angle(args):
+    for arg in args:
+        if isinstance(arg, (StringValue, NumberValue, basestring)):
+            _arg = [arg]
+        elif isinstance(arg, (list, tuple, ListValue)):
+            _arg = arg
+        else:
+            continue
+        for a in _arg:
+            if isinstance(a, NumberValue):
+                return arg
+        for seek in (
+            'center',
+            'top', 'bottom',
+            'left', 'right',
+        ):
+            if seek in _arg:
+                return arg
+    return None
+
+
+def _get_gradient_shape_and_size(args):
+    for arg in args:
+        if isinstance(arg, (StringValue, NumberValue, basestring)):
+            _arg = [arg]
+        elif isinstance(arg, (list, tuple, ListValue)):
+            _arg = arg
+        else:
+            continue
+        for seek in (
+            'circle', 'ellipse',
+            'closest-side', 'closest-corner',
+            'farthest-side', 'farthest-corner',
+            'contain', 'cover',
+        ):
+            if seek in _arg:
+                return arg
+    return None
+
+
+def _get_gradient_color_stops(args):
+    color_stops = []
+    for arg in args:
+        if isinstance(arg, ColorValue):
+            color_stops.append(arg)
+        elif isinstance(arg, (list, tuple, ListValue)):
+            for a in arg:
+                if isinstance(a, ColorValue):
+                    color_stops.append(arg)
+                    break
+    return color_stops or None
+
+
 def _radial_gradient(*args):
     if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
         args = ListValue(args[0]).values()
-    color_stops = args
-    position_and_angle = None
-    shape_and_size = None
-    if isinstance(args[0], (StringValue, NumberValue, basestring)):
-        position_and_angle = args[0]
-        if isinstance(args[1], (StringValue, NumberValue, basestring)):
-            shape_and_size = args[1]
-            color_stops = args[2:]
-        else:
-            color_stops = args[1:]
+
+    position_and_angle = _get_gradient_position_and_angle(args)
+    shape_and_size = _get_gradient_shape_and_size(args)
+    color_stops = _get_gradient_color_stops(args)
     color_stops = __color_stops(False, *color_stops)
 
     args = [
-        position_and_angle if position_and_angle is not None else None,
+        _position(position_and_angle) if position_and_angle is not None else None,
         shape_and_size if shape_and_size is not None else None,
     ]
     args.extend('%s %s' % (c, to_str(s)) for s, c in color_stops)
+
     to__s = 'radial-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
     ret = StringValue(to__s)
+
+    def to__css2():
+        return StringValue('')
+    ret.to__css2 = to__css2
 
     def to__moz():
         return StringValue('-moz-' + to__s)
@@ -2419,10 +2471,6 @@ def _radial_gradient(*args):
         log.warn("PIE does not support radial-gradient.")
         return StringValue('-pie-radial-gradient(unsupported)')
     ret.to__pie = to__pie
-
-    def to__css2():
-        return StringValue('')
-    ret.to__css2 = to__css2
 
     def to__webkit():
         return StringValue('-webkit-' + to__s)
@@ -2451,19 +2499,22 @@ def _radial_gradient(*args):
 def _linear_gradient(*args):
     if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
         args = ListValue(args[0]).values()
-    color_stops = args
-    position_and_angle = None
-    if isinstance(args[0], (StringValue, NumberValue, basestring)):
-        position_and_angle = args[0]
-        color_stops = args[1:]
+
+    position_and_angle = _get_gradient_position_and_angle(args)
+    color_stops = _get_gradient_color_stops(args)
     color_stops = __color_stops(False, *color_stops)
 
     args = [
         _position(position_and_angle) if position_and_angle is not None else None,
     ]
     args.extend('%s %s' % (c, to_str(s)) for s, c in color_stops)
+
     to__s = 'linear-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
     ret = StringValue(to__s)
+
+    def to__css2():
+        return StringValue('')
+    ret.to__css2 = to__css2
 
     def to__moz():
         return StringValue('-moz-' + to__s)
@@ -2480,10 +2531,6 @@ def _linear_gradient(*args):
     def to__o():
         return StringValue('-o-' + to__s)
     ret.to__o = to__o
-
-    def to__css2():
-        return StringValue('')
-    ret.to__css2 = to__css2
 
     def to__webkit():
         return StringValue('-webkit-' + to__s)
@@ -3391,34 +3438,45 @@ def _image_height(image):
 ################################################################################
 
 
-def __position(opposite, *p):
-    pos = set()
+def __position(opposite, p):
+    pos = []
     hrz = vrt = None
-    for _p in p:
-        pos.update(StringValue(_p).value.split())
-    if 'left' in pos:
+    nums = [v for v in p if isinstance(v, NumberValue)]
+
+    if 'left' in p:
         hrz = 'right' if opposite else 'left'
-    elif 'right' in pos:
+    elif 'right' in p:
         hrz = 'left' if opposite else 'right'
-    else:
+    elif 'center' in p:
         hrz = 'center'
-    if 'top' in pos:
+
+    if 'top' in p:
         vrt = 'bottom' if opposite else 'top'
-    elif 'bottom' in pos:
+    elif 'bottom' in p:
         vrt = 'top' if opposite else 'bottom'
-    else:
-        vrt = 'center'
+    elif 'center' in p:
+        hrz = 'center'
+
     if hrz == vrt:
         vrt = None
-    return ListValue(list(v for v in (hrz, vrt) if v is not None))
+
+    if hrz is not None:
+        pos.append(hrz)
+    elif len(nums):
+        pos.append(nums.pop(0))
+    if vrt is not None:
+        pos.append(vrt)
+    elif len(nums):
+        pos.append(nums.pop(0))
+    return ListValue(pos + nums)
 
 
-def _position(*p):
-    return __position(False, *p)
+def _position(p):
+    return __position(False, p)
 
 
-def _opposite_position(*p):
-    return __position(True, *p)
+def _opposite_position(p):
+    return __position(True, p)
 
 
 def _grad_point(*p):
@@ -3434,7 +3492,7 @@ def _grad_point(*p):
         vrt = NumberValue(0, '%')
     elif 'bottom' in pos:
         vrt = NumberValue(1, '%')
-    return ListValue(list(v for v in (hrz, vrt) if v is not None))
+    return ListValue(v for v in (hrz, vrt) if v is not None)
 
 
 ################################################################################
