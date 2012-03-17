@@ -2730,7 +2730,7 @@ def _sprite_map(g, **kwargs):
                         for _y in xrange(image.size[1]):
                             for _x in xrange(image.size[0]):
                                 if pixdata[_x, _y][:3] == src_color:
-                                    pixdata[_x, _y] = tuple(dst_color + [pixdata[_x, _y][3]])
+                                    pixdata[_x, _y] = tuple([int(c) for c in dst_color] + [pixdata[_x, _y][3]])
                     if iwidth != width or iheight != height:
                         cy = 0
                         while cy < iheight:
@@ -2759,7 +2759,7 @@ def _sprite_map(g, **kwargs):
                         for _y in xrange(image.size[1]):
                             for _x in xrange(image.size[0]):
                                 if pixdata[_x, _y][:3] == src_color:
-                                    pixdata[_x, _y] = tuple(dst_color + [pixdata[_x, _y][3]])
+                                    pixdata[_x, _y] = tuple([int(c) for c in dst_color] + [pixdata[_x, _y][3]])
                     if iwidth != width or iheight != height:
                         cy = 0
                         while cy < iheight:
@@ -3263,7 +3263,7 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
                 for _y in xrange(image.size[1]):
                     for _x in xrange(image.size[0]):
                         if pixdata[_x, _y][:3] == src_color:
-                            pixdata[_x, _y] = tuple(dst_color + [pixdata[_x, _y][3]])
+                            pixdata[_x, _y] = tuple([int(c) for c in dst_color] + [pixdata[_x, _y][3]])
             iwidth, iheight = image.size
             if iwidth != width or iheight != height:
                 cy = 0
