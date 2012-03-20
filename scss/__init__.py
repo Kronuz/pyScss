@@ -2396,9 +2396,18 @@ def _get_gradient_position_and_angle(args):
             _arg = arg
         else:
             continue
+        ret = None
+        skip = False
         for a in _arg:
-            if isinstance(a, NumberValue):
-                return arg
+            if isinstance(a, ColorValue):
+                skip = True
+                break
+            elif isinstance(a, NumberValue):
+                ret = arg
+        if skip:
+            continue
+        if ret is not None:
+            return ret
         for seek in (
             'center',
             'top', 'bottom',
