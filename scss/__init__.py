@@ -1207,6 +1207,7 @@ class Scss(object):
         Implements @import
         Load and import mixins and functions and rules
         """
+        full_filename = None
         i_codestr = None
         if '..' not in name and '://' not in name and 'url(' not in name:  # Protect against going to prohibited places...
             names = name.split(',')
