@@ -3404,6 +3404,8 @@ def _image_width(image):
                 pass
         else:
             _path = os.path.join(STATIC_ROOT, file)
+            if not os.path.exists(_path):
+                _path = STATIC_ROOT + file
             if os.path.exists(_path):
                 path = open(_path, 'rb')
         if path:
@@ -3435,6 +3437,8 @@ def _image_height(image):
                 pass
         else:
             _path = os.path.join(STATIC_ROOT, file)
+            if not os.path.exists(_path):
+                _path = STATIC_ROOT + file
             if os.path.exists(_path):
                 path = open(_path, 'rb')
         if path:
