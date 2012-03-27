@@ -1270,7 +1270,7 @@ class Scss(object):
                     if i_codestr is None:
                         load_paths = load_paths and "\nLoad paths:\n\t%s" % "\n\t".join(load_paths) or ''
                         unsupported = unsupported and "\nPossible matches (for unsupported file format SASS):\n\t%s" % "\n\t".join(unsupported) or ''
-                        log.warn("File to import not found or unreadable: '%s' (%s)%s%s", filename, rule[INDEX][rule[LINENO]], load_paths, unsupported)
+                        log.warn("File to import not found or unreadable: '%s' (%s)%s%s", name, rule[INDEX][rule[LINENO]], load_paths, unsupported)
                     else:
                         _rule = spawn_rule(rule, codestr=i_codestr, path=full_filename, lineno=c_lineno)
                         self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
