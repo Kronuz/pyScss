@@ -754,7 +754,7 @@ class Scss(object):
         if scss_string is not None:
             self._scss_files = {'<string %r>' % (scss_string.strip()[:50] + '...'): scss_string}
         elif scss_file is not None:
-            self._scss_files = {scss_file: open(scss_file).read()}
+            self._scss_files = {scss_file: codecs.open(scss_file, encoding='utf8').read()}
 
         self.reset()
 
