@@ -4419,7 +4419,7 @@ class ListValue(Value):
         return zip(*self.items())[1]
 
     def keys(self):
-        return zip(*self.items())[1]
+        return zip(*self.items())[0]
 
     def items(self):
         return sorted((k, v) for k, v in self.value.items() if k != '_')
