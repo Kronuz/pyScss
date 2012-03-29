@@ -3672,6 +3672,13 @@ def _append(lst, val, separator=None):
     return ret
 
 
+def _index(lst, val):
+    for i in xrange(len(lst)):
+        if lst.value[i] == val:
+            return NumberValue(i + 1)
+    return BooleanValue(False)
+
+
 ################################################################################
 
 
@@ -4813,6 +4820,7 @@ fnct = {
     '-compass-list-size:n': _length,
     'append:2': _append,
     'append:3': _append,
+    'index:2': _index,
 
     'nest:n': _nest,
     'append-selector:2': _append_selector,
