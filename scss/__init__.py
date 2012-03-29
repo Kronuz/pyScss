@@ -4187,11 +4187,11 @@ class NumberValue(Value):
         elif isinstance(tokens, (int, float)):
             self.value = float(tokens)
         elif isinstance(tokens, (list, tuple)):
-            raise ValueError("Value is not a Number! (%r)" % list(tokens))
+            raise ValueError("Value is not a Number! (%r)" % (tokens,))
         elif isinstance(tokens, (dict, ListValue)):
-            raise ValueError("Value is not a Number! (%r)" % tokens.values())
+            raise ValueError("Value is not a Number! (%r)" % (tokens.values(),))
         else:
-            raise ValueError("Value is not a Number! (%s)" % tokens)
+            raise ValueError("Value is not a Number! (%r)" % (tokens,))
         if type is not None:
             self.units = {type: _units_weights.get(type, 1), '_': type}
 
