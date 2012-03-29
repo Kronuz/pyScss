@@ -3508,6 +3508,20 @@ def _grad_point(*p):
 ################################################################################
 
 
+def __parse_separator(sep):
+    if sep is None:
+        return None
+    sep = StringValue(sep).value
+    if sep == 'comma':
+        return ','
+    elif sep == 'space':
+        return ' '
+    elif sep == 'auto':
+        return None
+    else:
+        raise ValueError('Separator must be auto, comma, or space')
+
+
 def __compass_list(*args):
     separator = None
     if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
@@ -3635,10 +3649,9 @@ def _join(lst1, lst2, separator=None):
     lst2 = ListValue(lst2).value
     lst_len = len(ret.value)
     ret.value.update((k + lst_len if isinstance(k, int) else k, v) for k, v in lst2.items())
+    separator = __parse_separator(separator)
     if separator is not None:
-        separator = StringValue(separator).value
-        if separator:
-            ret.value['_'] = separator
+        ret.value['_'] = separator
     return ret
 
 
@@ -3664,7 +3677,7 @@ def _min(*lst):
 
 
 def _append(lst, val, separator=None):
-    separator = separator and StringValue(separator).value
+    separator = __parse_separator(separator)
     ret = ListValue(lst, separator)
     val = ListValue(val)
     for v in val:
