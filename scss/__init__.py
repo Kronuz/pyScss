@@ -414,7 +414,7 @@ FUNCTIONS_2D = 'matrix translate translateX translateY scale '\
                'scaleX scaleY rotate skewX skewY'
 # http://www.w3.org/TR/css3-3d-transforms/
 FUNCTIONS_3D = 'matrix3d translate3d translateZ scale3d scaleZ rotate3d '\
-               'rotateX rotateY rotateZ perspective'
+               'rotateX rotateY rotateZ skew perspective'
 # http://www.w3.org/TR/css3-transitions/
 FUNCTIONS_TRANSITIONS = 'cubic-bezier'
 # http://www.w3.org/TR/css3-animations/
