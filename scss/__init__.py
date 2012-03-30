@@ -3566,14 +3566,32 @@ def _compact(*args):
             args = args.value
         if isinstance(args, dict):
             for i, item in args.items():
-                if False if isinstance(item, basestring) and (item == 'undefined' or item.startswith('$')) else bool(item):
+                if isinstance(item, (basestring, StringValue)):
+                    if item != 'false':
+                        ret[i] = item
+                elif isinstance(item, BooleanValue):
+                    if bool(item):
+                        ret[i] = item
+                else:
                     ret[i] = item
-        elif False if isinstance(args, basestring) and (args == 'undefined' or args.startswith('$')) else bool(args):
+        elif isinstance(args, (basestring, StringValue)):
+            if args != 'false':
+                ret[0] = args
+        elif isinstance(args, BooleanValue):
+            if bool(args):
+                ret[0] = args
+        else:
             ret[0] = args
     else:
         ret['_'] = ','
         for i, item in enumerate(args):
-            if False if isinstance(item, basestring) and (item == 'undefined' or item.startswith('$')) else bool(item):
+            if isinstance(item, (basestring, StringValue)):
+                if item != 'false':
+                    ret[i] = item
+            elif isinstance(item, BooleanValue):
+                if bool(item):
+                    ret[i] = item
+            else:
                 ret[i] = item
     if isinstance(args, ListValue):
         args = args.value
