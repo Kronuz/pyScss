@@ -540,7 +540,8 @@ def split_params(params):
         param = params.pop(0)
         try:
             while True:
-                while param.count('(') != param.count(')'):
+                while param.count('(') != param.count(')') or \
+                      param.count('"') % 2 == 1:
                     try:
                         param = param + ',' + params.pop(0)
                     except IndexError:
