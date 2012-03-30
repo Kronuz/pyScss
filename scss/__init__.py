@@ -3530,7 +3530,7 @@ def __compass_list(*args):
         separator = ','
     ret = ListValue(args)
     if separator:
-        ret['_'] = separator
+        ret.value['_'] = separator
     return ret
 
 
