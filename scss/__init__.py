@@ -2404,7 +2404,7 @@ def _get_gradient_position_and_angle(args):
                 skip = True
                 break
             elif isinstance(a, NumberValue):
-                ret = arg
+                ret = _arg
         if skip:
             continue
         if ret is not None:
@@ -2415,7 +2415,7 @@ def _get_gradient_position_and_angle(args):
             'left', 'right',
         ):
             if seek in _arg:
-                return arg
+                return _arg
     return None
 
 
