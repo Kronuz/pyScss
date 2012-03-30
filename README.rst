@@ -357,6 +357,13 @@ Changelog
 	+ Added ``--debug-info`` command line option (for *FireSass* output).
 	+ Added compass helper function ``reject()``.
 	+ Added ``undefined`` keyword for undefined variables.
+	+ Added function ``index()``.
+	+ Fixed ``append()`` and ``join()`` when called with a separator.
+	+ Fixed incorrect exception when a file is not found.
+	+ Fixed incorrect exceptions when a token is not in the expected number format.
+	+ Fix parsing of gradients.
+	+ Fix bug in the ``-compass-list()`` function.
+	+ Show a better error if no color stops given to ``*-gradient`` functions.
 
 1.1.3 Jan 9, 2012
 	+ Support for the new Sass 3.2.0 features (``@content`` and placeholder selectors)
