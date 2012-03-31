@@ -1410,15 +1410,10 @@ class Scss(object):
         except ValueError:
             pass
         else:
-            if frm > through:
-                frm, through = through, frm
-                rev = reversed
-            else:
-                rev = lambda x: x
             var = var.strip()
             var = self.do_glob_math(var, rule[CONTEXT], rule[OPTIONS], rule, True)
 
-            for i in rev(range(frm, through + 1)):
+            for i in range(frm, through + 1):
                 rule[CODESTR] = c_codestr
                 rule[CONTEXT][var] = str(i)
                 self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
