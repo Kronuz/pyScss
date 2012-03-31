@@ -1878,6 +1878,11 @@ class Scss(object):
         cont = str(cont)
         if '#{' not in cont:
             return cont
+        if not _dequote:
+            _calc_expr = self._calculate_expr(context, options, rule, True)
+            def _do_str(result):
+                return _expr_glob_re.sub(_calc_expr, result.group())
+            cont = _strings_re.sub(_do_str, cont)
         cont = _expr_glob_re.sub(self._calculate_expr(context, options, rule, _dequote), cont)
         return cont
 
