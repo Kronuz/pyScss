@@ -1370,7 +1370,12 @@ class Scss(object):
             val = True
         if val:
             val = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
-            val = bool(False if not val or isinstance(val, basestring) and (val in ('0', 'false', 'undefined') or _variable_re.match(val)) else val)
+            if isinstance(val, basestring) and val == 'false':
+                val = False
+            elif isinstance(val, (BooleanValue, bool)):
+                val = bool(val)
+            else:
+                val = True
             if val:
                 rule[CODESTR] = c_codestr
                 self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)

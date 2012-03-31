@@ -365,6 +365,7 @@ Changelog
 	+ Fix bug in the ``-compass-list()`` function.
 	+ Show a better error if no color stops given to ``*-gradient`` functions.
 	+ Fix ``compact()`` function removing incorrect values.
+	+ Fix ``@if`` conditions.
 
 1.1.3 Jan 9, 2012
 	+ Support for the new Sass 3.2.0 features (``@content`` and placeholder selectors)
