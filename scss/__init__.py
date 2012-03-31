@@ -3579,7 +3579,7 @@ def _compact(*args):
                 if isinstance(item, (basestring, StringValue)):
                     if item != 'false':
                         ret[i] = item
-                elif isinstance(item, BooleanValue):
+                elif isinstance(item, (bool, BooleanValue)):
                     if bool(item):
                         ret[i] = item
                 else:
@@ -3587,7 +3587,7 @@ def _compact(*args):
         elif isinstance(args, (basestring, StringValue)):
             if args != 'false':
                 ret[0] = args
-        elif isinstance(args, BooleanValue):
+        elif isinstance(args, (bool, BooleanValue)):
             if bool(args):
                 ret[0] = args
         else:
@@ -3598,7 +3598,7 @@ def _compact(*args):
             if isinstance(item, (basestring, StringValue)):
                 if item != 'false':
                     ret[i] = item
-            elif isinstance(item, BooleanValue):
+            elif isinstance(item, (bool, BooleanValue)):
                 if bool(item):
                     ret[i] = item
             else:
