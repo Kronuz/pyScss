@@ -3118,6 +3118,20 @@ def _background_noise(intensity=None, opacity=None, size=None, monochrome=False,
     return StringValue(inline)
 
 
+def add_cache_buster(url, mtime):
+    fragment = url.split('#')
+    query = fragment[0].split('?')
+    if len(query) > 1 and query[1] != '':
+        cb = '&_=%s' % (mtime)
+        url = '?'.join(query) + cb
+    else:
+        cb = '?_=%s' % (mtime)
+        url = query[0] + cb
+    if len(fragment) > 1:
+        url += '#' + fragment[1]
+    return url
+
+
 def _stylesheet_url(path, only_path=False, cache_buster=True):
     """
     Generates a path to an asset found relative to the project's css directory.
@@ -3142,7 +3156,7 @@ def _stylesheet_url(path, only_path=False, cache_buster=True):
 
     url = '%s%s' % (BASE_URL, filepath)
     if cache_buster:
-        url += '?_=%s' % filetime
+        url = add_cache_buster(url, filetime)
     if not only_path:
         url = 'url("%s")' % (url)
     return StringValue(url)
@@ -3176,7 +3190,7 @@ def __font_url(path, only_path=False, cache_buster=True, inline=False):
     else:
         url = '%s%s' % (BASE_URL, filepath)
         if cache_buster:
-            url += '?_=%s' % filetime
+            url = add_cache_buster(url, filetime)
 
     if not only_path:
         url = 'url("%s")' % escape(url)
@@ -3305,7 +3319,7 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
                 url = '%s%s' % (BASE_URL, filepath)
                 if cache_buster:
                     filetime = int(os.path.getmtime(asset_path))
-                    url += '?_=%s' % filetime
+                    url = add_cache_buster(url, filetime)
         else:
             image = Image.open(path)
             width, height = collapse_x or image.size[0], collapse_y or image.size[1]
@@ -3346,7 +3360,7 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
                     inline = True  # Retry inline version
                 url = '%s%s' % (ASSETS_URL, asset_file)
                 if cache_buster:
-                    url += '?_=%s' % filetime
+                    url = add_cache_buster(url, filetime)
             if inline:
                 output = StringIO()
                 new_image.save(output, format='PNG')
@@ -3356,7 +3370,7 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
     else:
         url = '%s%s' % (BASE_URL, filepath)
         if cache_buster:
-            url += '?_=%s' % filetime
+            url = add_cache_buster(url, filetime)
 
     if not only_path:
         url = 'url("%s")' % escape(url)
