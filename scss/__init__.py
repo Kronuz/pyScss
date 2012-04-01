@@ -68,6 +68,7 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle
+import codecs
 import re
 import sys
 import time
@@ -753,7 +754,7 @@ class Scss(object):
         if scss_string is not None:
             self._scss_files = {'<string %r>' % (scss_string.strip()[:50] + '...'): scss_string}
         elif scss_file is not None:
-            self._scss_files = {scss_file: open(scss_file).read()}
+            self._scss_files = {scss_file: codecs.open(scss_file, encoding='utf8').read()}
 
         self.reset()
 
@@ -1237,23 +1238,23 @@ class Scss(object):
                                 if full_path not in load_paths:
                                     try:
                                         full_filename = os.path.join(full_path, '_' + filename)
-                                        i_codestr = open(full_filename + '.scss').read()
+                                        i_codestr = codecs.open(full_filename + '.scss', encoding='utf8').read()
                                     except IOError:
                                         if os.path.exists(full_filename + '.sass'):
                                             unsupported.append(full_filename + '.sass')
                                         try:
                                             full_filename = os.path.join(full_path, filename)
-                                            i_codestr = open(full_filename + '.scss').read()
+                                            i_codestr = codecs.open(full_filename + '.scss', encoding='utf8').read()
                                         except IOError:
                                             if os.path.exists(full_filename + '.sass'):
                                                 unsupported.append(full_filename + '.sass')
                                             try:
                                                 full_filename = os.path.join(full_path, '_' + filename)
-                                                i_codestr = open(full_filename).read()
+                                                i_codestr = codecs.open(full_filename, encoding='utf8').read()
                                             except IOError:
                                                 try:
                                                     full_filename = os.path.join(full_path, filename)
-                                                    i_codestr = open(full_filename).read()
+                                                    i_codestr = codecs.open(full_filename, encoding='utf8').read()
                                                 except IOError:
                                                     pass
                                     if i_codestr is not None:
@@ -1874,7 +1875,7 @@ class Scss(object):
         return __calculate_expr
 
     def do_glob_math(self, cont, context, options, rule, _dequote=False):
-        cont = str(cont)
+        cont = unicode(cont)
         if '#{' not in cont:
             return cont
         cont = _expr_glob_re.sub(self._calculate_expr(context, options, rule, _dequote), cont)
@@ -1925,13 +1926,13 @@ def to_str(num):
         sp = num.get('_', '')
         return (sp + ' ').join(to_str(v) for n, v in s if n != '_')
     elif isinstance(num, float):
-        num = ('%0.03f' % round(num, 3)).rstrip('0').rstrip('.')
+        num = (u'%0.03f' % round(num, 3)).rstrip('0').rstrip('.')
         return num
     elif isinstance(num, bool):
-        return 'true' if num else 'false'
+        return u'true' if num else u'false'
     elif num is None:
-        return ''
-    return str(num)
+        return u''
+    return unicode(num)
 
 
 def to_float(num):
