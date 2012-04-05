@@ -2708,6 +2708,8 @@ def _sprite_map(g, **kwargs):
         key = list(zip(*files)[0]) + times + [repr(kwargs)]
         key = map_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
+        if not os.path.exists(ASSETS_ROOT):
+            os.makedirs(ASSETS_ROOT)
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
 
         if os.path.exists(asset_path + '.cache'):
