@@ -4,7 +4,7 @@
 pyScss, a Scss compiler for Python
 
 @author     German M. Bravo (Kronuz) <german.mb@gmail.com>
-@version    1.1.3
+@version    1.1.4
 @see        https://github.com/Kronuz/pyScss
 @copyright  (c) 2012 German M. Bravo (Kronuz)
 @license    MIT License
@@ -414,7 +414,7 @@ FUNCTIONS_2D = 'matrix translate translateX translateY scale '\
                'scaleX scaleY rotate skewX skewY'
 # http://www.w3.org/TR/css3-3d-transforms/
 FUNCTIONS_3D = 'matrix3d translate3d translateZ scale3d scaleZ rotate3d '\
-               'rotateX rotateY rotateZ perspective'
+               'rotateX rotateY rotateZ skew perspective'
 # http://www.w3.org/TR/css3-transitions/
 FUNCTIONS_TRANSITIONS = 'cubic-bezier'
 # http://www.w3.org/TR/css3-animations/
@@ -540,7 +540,8 @@ def split_params(params):
         param = params.pop(0)
         try:
             while True:
-                while param.count('(') != param.count(')'):
+                while param.count('(') != param.count(')') or \
+                      param.count('"') % 2 == 1:
                     try:
                         param = param + ',' + params.pop(0)
                     except IndexError:
@@ -1270,7 +1271,7 @@ class Scss(object):
                     if i_codestr is None:
                         load_paths = load_paths and "\nLoad paths:\n\t%s" % "\n\t".join(load_paths) or ''
                         unsupported = unsupported and "\nPossible matches (for unsupported file format SASS):\n\t%s" % "\n\t".join(unsupported) or ''
-                        log.warn("File to import not found or unreadable: '%s' (%s)%s%s", filename, rule[INDEX][rule[LINENO]], load_paths, unsupported)
+                        log.warn("File to import not found or unreadable: '%s' (%s)%s%s", name, rule[INDEX][rule[LINENO]], load_paths, unsupported)
                     else:
                         _rule = spawn_rule(rule, codestr=i_codestr, path=full_filename, lineno=c_lineno)
                         self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
@@ -1369,7 +1370,12 @@ class Scss(object):
             val = True
         if val:
             val = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
-            val = bool(False if not val or isinstance(val, basestring) and (val in ('0', 'false', 'undefined') or _variable_re.match(val)) else val)
+            if isinstance(val, basestring) and val == 'false':
+                val = False
+            elif isinstance(val, (BooleanValue, bool)):
+                val = bool(val)
+            else:
+                val = True
             if val:
                 rule[CODESTR] = c_codestr
                 self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
@@ -1404,15 +1410,10 @@ class Scss(object):
         except ValueError:
             pass
         else:
-            if frm > through:
-                frm, through = through, frm
-                rev = reversed
-            else:
-                rev = lambda x: x
             var = var.strip()
             var = self.do_glob_math(var, rule[CONTEXT], rule[OPTIONS], rule, True)
 
-            for i in rev(range(frm, through + 1)):
+            for i in range(frm, through + 1):
                 rule[CODESTR] = c_codestr
                 rule[CONTEXT][var] = str(i)
                 self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
@@ -1877,6 +1878,11 @@ class Scss(object):
         cont = str(cont)
         if '#{' not in cont:
             return cont
+        if not _dequote:
+            _calc_expr = self._calculate_expr(context, options, rule, True)
+            def _do_str(result):
+                return _expr_glob_re.sub(_calc_expr, result.group())
+            cont = _strings_re.sub(_do_str, cont)
         cont = _expr_glob_re.sub(self._calculate_expr(context, options, rule, _dequote), cont)
         return cont
 
@@ -2118,10 +2124,11 @@ def _invert(color):
     The red, green, and blue values are inverted, while the opacity is left alone.
     """
     col = ColorValue(color)
-    c = col.value
+    c = list(col.value)
     c[0] = 255.0 - c[0]
     c[1] = 255.0 - c[1]
     c[2] = 255.0 - c[2]
+    col.value = tuple(c)
     return col
 
 
@@ -2404,7 +2411,7 @@ def _get_gradient_position_and_angle(args):
                 skip = True
                 break
             elif isinstance(a, NumberValue):
-                ret = arg
+                ret = _arg
         if skip:
             continue
         if ret is not None:
@@ -2415,7 +2422,7 @@ def _get_gradient_position_and_angle(args):
             'left', 'right',
         ):
             if seek in _arg:
-                return arg
+                return _arg
     return None
 
 
@@ -2458,6 +2465,8 @@ def _radial_gradient(*args):
     position_and_angle = _get_gradient_position_and_angle(args)
     shape_and_size = _get_gradient_shape_and_size(args)
     color_stops = _get_gradient_color_stops(args)
+    if color_stops is None:
+        raise Exception('No color stops provided to radial-gradient function')
     color_stops = __color_stops(False, *color_stops)
 
     args = [
@@ -2512,6 +2521,8 @@ def _linear_gradient(*args):
 
     position_and_angle = _get_gradient_position_and_angle(args)
     color_stops = _get_gradient_color_stops(args)
+    if color_stops is None:
+        raise Exception('No color stops provided to linear-gradient function')
     color_stops = __color_stops(False, *color_stops)
 
     args = [
@@ -3502,10 +3513,24 @@ def _grad_point(*p):
         vrt = NumberValue(0, '%')
     elif 'bottom' in pos:
         vrt = NumberValue(1, '%')
-    return ListValue(v for v in (hrz, vrt) if v is not None)
+    return ListValue([v for v in (hrz, vrt) if v is not None])
 
 
 ################################################################################
+
+
+def __parse_separator(sep):
+    if sep is None:
+        return None
+    sep = StringValue(sep).value
+    if sep == 'comma':
+        return ','
+    elif sep == 'space':
+        return ' '
+    elif sep == 'auto':
+        return None
+    else:
+        raise ValueError('Separator must be auto, comma, or space')
 
 
 def __compass_list(*args):
@@ -3516,7 +3541,7 @@ def __compass_list(*args):
         separator = ','
     ret = ListValue(args)
     if separator:
-        ret['_'] = separator
+        ret.value['_'] = separator
     return ret
 
 
@@ -3547,14 +3572,32 @@ def _compact(*args):
             args = args.value
         if isinstance(args, dict):
             for i, item in args.items():
-                if False if isinstance(item, basestring) and (item == 'undefined' or item.startswith('$')) else bool(item):
+                if isinstance(item, (basestring, StringValue)):
+                    if item != 'false':
+                        ret[i] = item
+                elif isinstance(item, (bool, BooleanValue)):
+                    if bool(item):
+                        ret[i] = item
+                else:
                     ret[i] = item
-        elif False if isinstance(args, basestring) and (args == 'undefined' or args.startswith('$')) else bool(args):
+        elif isinstance(args, (basestring, StringValue)):
+            if args != 'false':
+                ret[0] = args
+        elif isinstance(args, (bool, BooleanValue)):
+            if bool(args):
+                ret[0] = args
+        else:
             ret[0] = args
     else:
         ret['_'] = ','
         for i, item in enumerate(args):
-            if False if isinstance(item, basestring) and (item == 'undefined' or item.startswith('$')) else bool(item):
+            if isinstance(item, (basestring, StringValue)):
+                if item != 'false':
+                    ret[i] = item
+            elif isinstance(item, (bool, BooleanValue)):
+                if bool(item):
+                    ret[i] = item
+            else:
                 ret[i] = item
     if isinstance(args, ListValue):
         args = args.value
@@ -3575,6 +3618,8 @@ def _reject(lst, *values):
         values = values[0]
         if isinstance(values, ListValue):
             values = values.value.values()
+        elif not isinstance(values, (list, tuple)):
+            values = list(values)
     for i, item in lst.items():
         if item not in values:
             ret[i] = item
@@ -3635,10 +3680,9 @@ def _join(lst1, lst2, separator=None):
     lst2 = ListValue(lst2).value
     lst_len = len(ret.value)
     ret.value.update((k + lst_len if isinstance(k, int) else k, v) for k, v in lst2.items())
+    separator = __parse_separator(separator)
     if separator is not None:
-        separator = StringValue(separator).value
-        if separator:
-            ret.value['_'] = separator
+        ret.value['_'] = separator
     return ret
 
 
@@ -3664,12 +3708,17 @@ def _min(*lst):
 
 
 def _append(lst, val, separator=None):
-    separator = separator and StringValue(separator).value
+    separator = __parse_separator(separator)
     ret = ListValue(lst, separator)
-    val = ListValue(val)
-    for v in val:
-        ret.value[len(ret)] = v
+    ret.value[len(ret)] = val
     return ret
+
+
+def _index(lst, val):
+    for i in xrange(len(lst)):
+        if lst.value[i] == val:
+            return NumberValue(i + 1)
+    return BooleanValue(False)
 
 
 ################################################################################
@@ -4187,11 +4236,11 @@ class NumberValue(Value):
         elif isinstance(tokens, (int, float)):
             self.value = float(tokens)
         elif isinstance(tokens, (list, tuple)):
-            raise ValueError("Value is not a Number! (%r)" % list(tokens))
+            raise ValueError("Value is not a Number! (%r)" % (tokens,))
         elif isinstance(tokens, (dict, ListValue)):
-            raise ValueError("Value is not a Number! (%r)" % tokens.values())
+            raise ValueError("Value is not a Number! (%r)" % (tokens.values(),))
         else:
-            raise ValueError("Value is not a Number! (%s)" % tokens)
+            raise ValueError("Value is not a Number! (%r)" % (tokens,))
         if type is not None:
             self.units = {type: _units_weights.get(type, 1), '_': type}
 
@@ -4419,7 +4468,7 @@ class ListValue(Value):
         return zip(*self.items())[1]
 
     def keys(self):
-        return zip(*self.items())[1]
+        return zip(*self.items())[0]
 
     def items(self):
         return sorted((k, v) for k, v in self.value.items() if k != '_')
@@ -4813,6 +4862,7 @@ fnct = {
     '-compass-list-size:n': _length,
     'append:2': _append,
     'append:3': _append,
+    'index:2': _index,
 
     'nest:n': _nest,
     'append-selector:2': _append_selector,
