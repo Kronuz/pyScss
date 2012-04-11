@@ -7,10 +7,10 @@ import re
 import sys
 from collections import deque
 
-import __init__
-from __init__ import Scss, log, spawn_rule, to_str, profiling
-from __init__ import _prop_split_re
-from scss_meta import BUILD_INFO
+import scss
+from scss import Scss, log, spawn_rule, to_str, profiling
+from scss import _prop_split_re
+from scss.scss_meta import BUILD_INFO
 
 log.setLevel(logging.INFO)
 
@@ -63,20 +63,20 @@ def main():
     (options, args) = parser.parse_args()
 
     # General runtime configuration
-    __init__.VERBOSITY = 0
+    scss.VERBOSITY = 0
     if options.time:
-        __init__.VERBOSITY = 2
+        scss.VERBOSITY = 2
     if options.static_root is not None:
-        __init__.STATIC_ROOT = options.static_root
+        scss.STATIC_ROOT = options.static_root
     if options.assets_root is not None:
-        __init__.ASSETS_ROOT = options.assets_root
+        scss.ASSETS_ROOT = options.assets_root
     if options.load_paths is not None:
         # TODO: Convert global LOAD_PATHS to a list. Use it directly.
         # Doing the above will break backwards compatibility!
-        if hasattr(__init__.LOAD_PATHS, 'split'):
-            load_path_list = [p.strip() for p in __init__.LOAD_PATHS.split(',')]
+        if hasattr(scss.LOAD_PATHS, 'split'):
+            load_path_list = [p.strip() for p in scss.LOAD_PATHS.split(',')]
         else:
-            load_path_list = list(__init__.LOAD_PATHS)
+            load_path_list = list(scss.LOAD_PATHS)
 
         for path_param in options.load_paths:
             for p in path_param.replace(os.pathsep, ',').replace(';', ',').split(','):
@@ -85,10 +85,10 @@ def main():
                     load_path_list.append(p)
 
         # TODO: Remove this once global LOAD_PATHS is a list.
-        if hasattr(__init__.LOAD_PATHS, 'split'):
-            __init__.LOAD_PATHS = ','.join(load_path_list)
+        if hasattr(scss.LOAD_PATHS, 'split'):
+            scss.LOAD_PATHS = ','.join(load_path_list)
         else:
-            __init__.LOAD_PATHS = load_path_list
+            scss.LOAD_PATHS = load_path_list
 
     # Execution modes
     if options.test:
