@@ -4,7 +4,7 @@ SCSS TESTS
 INITIALIZATION
 --------------
 
->>> from __init__ import Scss
+>>> from scss import Scss
 >>> css = Scss()
 
 VARIABLES
@@ -1217,6 +1217,19 @@ TESTS FOR REPORTED ISSUES
     ... ''') #doctest: +NORMALIZE_WHITESPACE
     a {
       background: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwA...");
+    }
+
+
+### Issue #52 test
+
+    >>> print css.compile('''
+    ... @option compress:no;
+    ... h1 {
+    ...   background: url(//example.com/image.png);
+    ... }
+    ... ''') #doctest: +NORMALIZE_WHITESPACE
+    h1 {
+      background: url(//example.com/image.png);
     }
 
 
