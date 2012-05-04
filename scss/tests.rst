@@ -1220,6 +1220,19 @@ TESTS FOR REPORTED ISSUES
     }
 
 
+### Issue #52 test
+
+    >>> print css.compile('''
+    ... @option compress:no;
+    ... h1 {
+    ...   background: url(//example.com/image.png);
+    ... }
+    ... ''') #doctest: +NORMALIZE_WHITESPACE
+    h1 {
+      background: url(//example.com/image.png);
+    }
+
+
 UNSUPPORTED
 -----------
 
