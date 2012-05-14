@@ -4,7 +4,7 @@
 pyScss, a Scss compiler for Python
 
 @author     German M. Bravo (Kronuz) <german.mb@gmail.com>
-@version    1.1.3
+@version    1.1.4
 @see        https://github.com/Kronuz/pyScss
 @copyright  (c) 2012 German M. Bravo (Kronuz)
 @license    MIT License
@@ -1724,7 +1724,7 @@ class Scss(object):
         old_media = None
         old_property = None
 
-        wrap = textwrap.TextWrapper(break_long_words=False)
+        wrap = textwrap.TextWrapper(break_long_words=False, break_on_hyphens=False)
         wrap.wordsep_re = re.compile(r'(?<=,)(\s*)')
         wrap = wrap.wrap
 
