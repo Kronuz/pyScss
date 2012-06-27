@@ -4507,21 +4507,12 @@ class ColorValue(Value):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.types))
 
     def __str__(self):
-        type = self.type
         c = self.value
-        if type == 'hsl' or type == 'hsla' and c[3] == 1:
-            h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
-            return 'hsl(%s, %s%%, %s%%)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0))
-        if type == 'hsla':
-            h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
-            return 'hsla(%s, %s%%, %s%%, %s)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0), to_str(c[3]))
         r, g, b = to_str(c[0]), to_str(c[1]), to_str(c[2])
         _, _, r = r.partition('.')
         _, _, g = g.partition('.')
         _, _, b = b.partition('.')
         if c[3] == 1:
-            if len(r) > 2 or len(g) > 2 or len(b) > 2:
-                return 'rgb(%s%%, %s%%, %s%%)' % (to_str(c[0] * 100.0 / 255.0), to_str(c[1] * 100.0 / 255.0), to_str(c[2] * 100.0 / 255.0))
             return '#%02x%02x%02x' % (round(c[0]), round(c[1]), round(c[2]))
         if len(r) > 2 or len(g) > 2 or len(b) > 2:
             return 'rgba(%s%%, %s%%, %s%%, %s)' % (to_str(c[0] * 100.0 / 255.0), to_str(c[1] * 100.0 / 255.0), to_str(c[2] * 100.0 / 255.0), to_str(c[3]))
