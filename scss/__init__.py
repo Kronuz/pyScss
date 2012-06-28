@@ -3258,6 +3258,8 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
         except:
             filetime = 'NA'
     else:
+        if filepath.startswith('/'):
+            filepath = filepath[1:]
         _path = os.path.join(STATIC_ROOT, filepath)
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
