@@ -1220,6 +1220,59 @@ TESTS FOR REPORTED ISSUES
     }
 
 
+### Strings interpolation
+
+    >>> print css.compile('''
+    ... @option compress:no, short_colors: no;
+    ... a {
+    ...   $a: 'a';
+    ...   $b: 'b';
+    ...   $c: 'c';
+    ...   $x: '';
+    ...   A: $a$b$x$c;
+    ...   B: '$a$b$x$c';
+    ...   C: "$a$b$x$c";
+    ...   D: #{$a}#{$b}#{$x}#{$c};
+    ...   E: '#{$a}#{$b}#{$x}#{$c}';
+    ...   F: "#{$a}#{$b}#{$x}#{$c}";
+    ... }
+    ... ''') #doctest: +NORMALIZE_WHITESPACE
+    a {
+      A: a b  c;
+      B: $a$b$x$c;
+      C: "$a$b$x$c";
+      D: abc;
+      E: abc;
+      F: "abc";
+    }
+
+
+### Strings interpolation
+
+    >>> print css.compile('''
+    ... @option compress:no, short_colors: no;
+    ... a {
+    ...   @each $a in '', '_a' {
+    ...     @each $b in '', '_b' {
+    ...       @each $c in '', '_c' {
+    ...         A: X#{$a}#{$b}#{$c};
+    ...       }
+    ...     }
+    ...   }
+    ... }
+    ... ''') #doctest: +NORMALIZE_WHITESPACE
+    a {
+      A: X;
+      A: X_c;
+      A: X_b;
+      A: X_b_c;
+      A: X_a;
+      A: X_a_c;
+      A: X_a_b;
+      A: X_a_b_c;
+    }
+
+
 UNSUPPORTED
 -----------
 

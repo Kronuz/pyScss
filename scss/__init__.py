@@ -1870,7 +1870,7 @@ class Scss(object):
             better_expr_str = eval_expr(_base_str, rule)
 
             if better_expr_str is None:
-                better_expr_str = _base_str
+                better_expr_str = self.apply_vars(_base_str, context, options, rule)
             elif _dequote:
                 better_expr_str = dequote(str(better_expr_str))
             else:
