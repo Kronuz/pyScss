@@ -1,12 +1,12 @@
 Metadata-Version: 1.0
 Name: pyScss
-Version: 1.1.3
+Version: 1.1.4
 Summary: pyScss, a Scss compiler for Python
 Home-page: http://github.com/Kronuz/pyScss
 Author: German M. Bravo (Kronuz)
 Author-email: german.mb@gmail.com
 License: MIT
-Download-URL: http://github.com/Kronuz/pyScss/tarball/v1.1.3
+Download-URL: http://github.com/Kronuz/pyScss/tarball/v1.1.4
 Description: pyScss, a Scss compiler for Python
         ==================================
         :Author:
@@ -73,11 +73,18 @@ Description: pyScss, a Scss compiler for Python
         
         Or compile from the command line::
         
-        	python scss.py < file.scss
+        	python -mscss < file.scss
         
         Interactive mode::
         
-        	python scss.py --interactive
+        	python -mscss --interactive
+        
+        .. note::
+        
+            ``-mscss`` will only work in Python 2.7 and above, for Python 2.5
+            and 2.6 you need to invoke::
+        
+                python -mscss.tool
         
         Examples
         ========
@@ -271,6 +278,80 @@ Description: pyScss, a Scss compiler for Python
         
         	// Stuff goes here...
         
+        Django Example
+        ==============
+        The following shows some code that can be used with django::
+        
+        	import os
+        	import fnmatch
+        	
+        	import scss
+        	
+        	from django.conf import settings
+        	from django.utils.datastructures import SortedDict
+        	from django.contrib.staticfiles import finders
+        	
+        	
+        	def finder(glob):
+        	    """
+        	    Finds all files in the django finders for a given glob,
+        	    returns the file path, if available, and the django storage object.
+        	    storage objects must implement the File storage API:
+        	    https://docs.djangoproject.com/en/dev/ref/files/storage/
+        	    """
+        	    for finder in finders.get_finders():
+        	        for path, storage in finder.list([]):
+        	            if fnmatch.fnmatchcase(path, glob):
+        	                yield path, storage
+        	
+        	
+        	# STATIC_ROOT is where pyScss looks for images and static data.
+        	# STATIC_ROOT can be either a fully qualified path name or a "finder"
+        	# iterable function that receives a filename or glob and returns a tuple
+        	# of the file found and its file storage object for each matching file.
+        	# (https://docs.djangoproject.com/en/dev/ref/files/storage/)
+        	scss.STATIC_ROOT = finder
+        	scss.STATIC_URL = settings.STATIC_URL
+        	
+        	# ASSETS_ROOT is where the pyScss outputs the generated files such as spritemaps
+        	# and compile cache:
+        	scss.ASSETS_ROOT = os.path.join(settings.MEDIA_ROOT, 'assets/')
+        	scss.ASSETS_URL = settings.MEDIA_URL + 'assets/'
+        	
+        	# These are the paths pyScss will look ".scss" files on. This can be the path to
+        	# the compass framework or blueprint or compass-recepies, etc.
+        	scss.LOAD_PATHS = [
+        	    '/usr/local/www/sass/frameworks/',
+        	    '/Library/Ruby/Gems/1.8/gems/compass-0.11.5/frameworks/compass/stylesheets/',
+        	    '/Library/Ruby/Gems/1.8/gems/compass-0.11.5/frameworks/blueprint/stylesheets/',
+        	]
+        	
+        	# This creates the Scss object used to compile SCSS code. In this example,
+        	# _scss_vars will hold the context variables:
+        	_scss_vars = {}
+        	_scss = scss.Scss(
+        	    scss_vars=_scss_vars,
+        	    scss_opts={
+        	        'compress': True,
+        	        'debug_info': True,
+        	    }
+        	)
+        	
+        	# 1. Compile from a string:
+        	compiled_css_from_string = _scss.compile('@import "file2"; a {color: red + green; }')
+        	
+        	# 2. Compile from a file:
+        	compiled_css_from_file = _scss.compile(scss_file='file1.scss')
+        	
+        	# 3. Compile from a set of files (use SortedDict or collections.OrderedDict to
+        	# maintain the compile order):
+        	_scss._scss_files = SortedDict((
+        	    ('file2.scss', open('file2.scss').read()),
+        	    ('file3.scss', open('file3.scss').read()),
+        	    ('file4.scss', open('file4.scss').read()),
+        	))
+        	compiled_css_from_files = _scss.compile()
+        
         
         Bug tracker
         ===========
@@ -278,14 +359,54 @@ Description: pyScss, a Scss compiler for Python
         issue tracker at http://github.com/Kronuz/pyScss/issues
         
         
+        Changelog
+        =========
+        
+        1.1.4 ???
+        	+ Added ``--debug-info`` command line option (for *FireSass* output).
+        	+ Added compass helper function ``reject()``.
+        	+ Added ``undefined`` keyword for undefined variables.
+        
+        1.1.3 Jan 9, 2012
+        	+ Support for the new Sass 3.2.0 features (``@content`` and placeholder selectors)
+        	+ Fixed bug with line numbers throwing an exception.
+        
+        1.1.2 Jan 3, 2012
+        	+ Regression bug fixed from 1.1.1
+        
+        1.1.1 Jan 2, 2012
+        	+ Added optional C speedup module for an amazing boost in scanning speed!
+        	+ Added ``headings``, ``stylesheet-url``, ``font-url``, ``font-files``, ``inline-font-files`` and ``sprite-names``.
+        
+        1.1.0 - Dec 22, 2011
+        	+ Added ``min()`` and ``max()`` for lists.
+        	+ Removed exception raise.
+        
+        1.0.9 - Dec 22, 2011
+        	+ Optimizations in the scanner.
+        	+ Added ``background-noise()`` for compass-recipes support.
+        	+ ``enumerate()`` and ``range()`` can go backwards. Ex.: ``range(3, 0)`` goes from 3 to 0.
+        	+ Added line numbers and files for errors.
+        	+ Added support for *Firebug* with *FireSass*.
+        	+ ``nth(n)`` is round (returns the ``nth mod len`` item of the list).
+        	+ ``--watch`` added to the command line.
+        	+ Several bugs fixed.
+        
+        1.0.8 - May 13, 2011
+            + Changed source color (``$src-color``) default to black.
+            + Moved the module filename to ``__init__.py`` and module renamed back to scss.
+        
+        
         Contributing
         ============
         Development of pyScss happens at github: https://github.com/Kronuz/pyScss
+        
         
         License
         =======
         MIT License. See *LICENSE* for details.
         http://www.opensource.org/licenses/mit-license.php
+        
         
         Copyright
         =========

@@ -11,10 +11,11 @@ pyScss.egg-info/entry_points.txt
 pyScss.egg-info/top_level.txt
 scss/__init__.py
 scss/__init__.pyc
+scss/__main__.py
 scss/scss_meta.py
-scss/scss_meta.pyc
 scss/setup.py
 scss/tests.rst
+scss/tool.py
 scss/src/_speedups.c
 scss/src/block_locator.c
 scss/src/block_locator.h
@@ -30,4 +31,3 @@ scss/src/grammar/grammar.g
 scss/src/grammar/grammar.py
 scss/src/grammar/yapps2.py
 scss/src/grammar/yappsrt.py
-scss/src/grammar/yappsrt.pyc
