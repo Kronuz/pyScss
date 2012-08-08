@@ -702,7 +702,11 @@ class Scss(object):
     # configuration:
     construct = 'self'
 
-    def __init__(self, scss_vars=None, scss_opts=None, scss_files=None):
+    def __init__(self, scss_vars=None, scss_opts=None, scss_files=None, super_selector=None):
+        if super_selector:
+            self.super_selector = super_selector + ' '
+        else:
+            self.super_selector = ''
         self._scss_vars = scss_vars
         self._scss_opts = scss_opts
         self._scss_files = scss_files
@@ -749,7 +753,9 @@ class Scss(object):
 
     #@profile
     @print_timing(2)
-    def Compilation(self, scss_string=None, scss_file=None):
+    def Compilation(self, scss_string=None, scss_file=None, super_selector=None):
+        if super_selector:
+            self.super_selector = super_selector + ' '
         if scss_string is not None:
             self._scss_files = {'<string %r>' % (scss_string.strip()[:50] + '...'): scss_string}
         elif scss_file is not None:
@@ -1773,7 +1779,7 @@ class Scss(object):
                             result += sass_debug_info + nl
                         _selectors = [s for s in selectors.split(',') if '%' not in s]
                         if _selectors:
-                            selector = (',' + sp).join(_selectors) + sp + '{'
+                            selector = (',' + sp).join('%s%s' % (self.super_selector, s) for s in _selectors) + sp + '{'
                             if nl:
                                 selector = nl.join(wrap(selector))
                             result += _tb + selector + nl
