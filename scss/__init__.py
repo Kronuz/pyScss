@@ -2792,8 +2792,9 @@ def _sprite_map(g, **kwargs):
                         pixdata = image.load()
                         for _y in xrange(image.size[1]):
                             for _x in xrange(image.size[0]):
-                                if pixdata[_x, _y][:3] == src_color:
-                                    pixdata[_x, _y] = tuple([int(c) for c in dst_color] + [pixdata[_x, _y][3]])
+                                pixel = pixdata[_x, _y]
+                                if pixel[:3] == src_color:
+                                    pixdata[_x, _y] = tuple([int(c) for c in dst_color] + [pixel[3] if len(pixel) == 4 else 255])
                     if iwidth != width or iheight != height:
                         cy = 0
                         while cy < iheight:
@@ -2821,8 +2822,9 @@ def _sprite_map(g, **kwargs):
                         pixdata = image.load()
                         for _y in xrange(image.size[1]):
                             for _x in xrange(image.size[0]):
-                                if pixdata[_x, _y][:3] == src_color:
-                                    pixdata[_x, _y] = tuple([int(c) for c in dst_color] + [pixdata[_x, _y][3]])
+                                pixel = pixdata[_x, _y]
+                                if pixel[:3] == src_color:
+                                    pixdata[_x, _y] = tuple([int(c) for c in dst_color] + [pixel[3] if len(pixel) == 4 else 255])
                     if iwidth != width or iheight != height:
                         cy = 0
                         while cy < iheight:
@@ -3325,8 +3327,9 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
                 pixdata = image.load()
                 for _y in xrange(image.size[1]):
                     for _x in xrange(image.size[0]):
-                        if pixdata[_x, _y][:3] == src_color:
-                            pixdata[_x, _y] = tuple([int(c) for c in dst_color] + [pixdata[_x, _y][3]])
+                        pixel = pixdata[_x, _y]
+                        if pixel[:3] == src_color:
+                            pixdata[_x, _y] = tuple([int(c) for c in dst_color] + [pixel[3] if len(pixel) == 4 else 255])
             iwidth, iheight = image.size
             if iwidth != width or iheight != height:
                 cy = 0
