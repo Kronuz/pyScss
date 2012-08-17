@@ -1,0 +1,10 @@
+.error, .seriousError {
+  border: 1px red;
+  background-color: #fdd;
+}
+.error.intrusion, .seriousError.intrusion {
+  background-image: url("/image/hacked.png");
+}
+.seriousError {
+  border-width: 3px;
+}

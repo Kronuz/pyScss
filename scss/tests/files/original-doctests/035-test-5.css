@@ -1,0 +1,6 @@
+a, button {
+  color: #00f;
+}
+.some a, .some button, a:hover, button:hover {
+  text-decoration: underline;
+}

@@ -1,0 +1,8 @@
+.basicClass, .specialClass {
+  padding: 20px;
+  background-color: red;
+}
+.specialClass {
+  padding: 10px;
+  font-size: 14px;
+}

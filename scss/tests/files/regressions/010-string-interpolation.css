@@ -1,0 +1,8 @@
+a {
+  A: a b  c;
+  B: $a$b$x$c;
+  C: "$a$b$x$c";
+  D: abc;
+  E: abc;
+  F: "abc";
+}

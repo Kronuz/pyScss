@@ -1,0 +1,13 @@
+@option compress:no, short_colors: no;
+a {
+  $a: 'a';
+  $b: 'b';
+  $c: 'c';
+  $x: '';
+  A: $a$b$x$c;
+  B: '$a$b$x$c';
+  C: "$a$b$x$c";
+  D: #{$a}#{$b}#{$x}#{$c};
+  E: '#{$a}#{$b}#{$x}#{$c}';
+  F: "#{$a}#{$b}#{$x}#{$c}";
+}
