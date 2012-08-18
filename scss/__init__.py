@@ -4117,6 +4117,9 @@ class BooleanValue(Value):
         else:
             self.value = to_str(tokens).lower() in ('true', '1', 'on', 'yes', 't', 'y') or bool(tokens)
 
+    def __hash__(self):
+        return hash(self.value)
+
     def __str__(self):
         return 'true' if self.value else 'false'
 
@@ -4203,6 +4206,9 @@ class NumberValue(Value):
             raise ValueError("Value is not a Number! (%s)" % tokens)
         if type is not None:
             self.units = {type: _units_weights.get(type, 1), '_': type}
+
+    def __hash__(self):
+        return hash((self.value, frozenset(self.units.items())))
 
     def __repr__(self):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.units))
@@ -4375,6 +4381,9 @@ class ListValue(Value):
         if separator:
             self.value['_'] = separator
 
+    def __hash__(self):
+        return hash((frozenset(self.value.items())))
+
     @classmethod
     def _do_cmps(cls, first, second, op):
         try:
@@ -4512,6 +4521,9 @@ class ColorValue(Value):
                     except:
                         raise ValueError("Value is not a Color! (%s)" % tokens)
 
+    def __hash__(self):
+        return hash((tuple(self.value), frozenset(self.types.items())))
+
     def __repr__(self):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.types))
 
@@ -4615,6 +4627,9 @@ class QuotedStringValue(Value):
         else:
             self.value = to_str(tokens)
 
+    def __hash__(self):
+        return hash((True, self.value))
+
     def convert_to(self, type):
         return QuotedStringValue(self.value + type)
 
@@ -4668,6 +4683,9 @@ class QuotedStringValue(Value):
 
 
 class StringValue(QuotedStringValue):
+    def __hash__(self):
+        return hash((False, self.value))
+
     def __str__(self):
         return self.value
 
