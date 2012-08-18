@@ -3250,7 +3250,7 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
     spacing - spaces to be added to the image
     collapse_x, collapse_y - collapsable (layered) image of the given size (x, y)
     """
-    if dst_color:
+    if inline or dst_color or spacing:
         if not Image:
             raise Exception("Images manipulation require PIL")
     filepath = StringValue(path).value
@@ -3261,7 +3261,7 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
             _file, _storage = list(STATIC_ROOT(filepath))[0]
             d_obj = _storage.modified_time(_file)
             filetime = int(time.mktime(d_obj.timetuple()))
-            if inline or dst_color:
+            if inline or dst_color or spacing:
                 path = _storage.open(_file)
         except:
             filetime = 'NA'
@@ -3269,7 +3269,7 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
         _path = os.path.join(STATIC_ROOT, filepath)
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
-            if inline or dst_color:
+            if inline or dst_color or spacing:
                 path = open(_path, 'rb')
         else:
             filetime = 'NA'
@@ -3298,7 +3298,7 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
         spacing = (spacing * 4)[:4]
 
         file_name, file_ext = os.path.splitext(os.path.normpath(filepath).replace('\\', '_').replace('/', '_'))
-        key = (filetime, src_color, dst_color)
+        key = (filetime, src_color, dst_color, spacing)
         key = file_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + file_ext
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
