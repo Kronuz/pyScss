@@ -106,7 +106,7 @@ def run_setup(with_binary):
         features=features,
         entry_points="""
         [console_scripts]
-        pyscss = scss:main
+        pyscss = scss.tool:main
         """,
         **extra
     )

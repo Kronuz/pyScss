@@ -4,7 +4,7 @@ SCSS TESTS
 INITIALIZATION
 --------------
 
->>> from __init__ import Scss
+>>> from scss import Scss
 >>> css = Scss()
 
 VARIABLES
