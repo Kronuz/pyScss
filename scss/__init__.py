@@ -3749,11 +3749,6 @@ def _append(lst, val, separator=None):
     return ret
 
 
-def _index(lst, val):
-    for i in xrange(len(lst)):
-        if lst.value[i] == val:
-            return NumberValue(i + 1)
-    return BooleanValue(False)
 
 
 ################################################################################
@@ -4908,14 +4903,13 @@ fnct = {
     'min:n': _min,
     '-compass-nth:2': _nth,
     'first-value-of:n': _first_value_of,
-    'index:n': _index,
     'join:2': _join,
     'join:3': _join,
     'length:n': _length,
     '-compass-list-size:n': _length,
     'append:2': _append,
     'append:3': _append,
-    'index:2': _index,
+    'index:n': _index,
 
     'nest:n': _nest,
     'append-selector:2': _append_selector,
@@ -5403,7 +5397,7 @@ class Calculator(Parser):
             return NumberValue(ParserValue(NUM))
         elif _token_ == 'STR':
             STR = self._scan('STR')
-            return StringValue(ParserValue(STR))
+            return QuotedStringValue(ParserValue(STR))
         elif _token_ == 'QSTR':
             QSTR = self._scan('QSTR')
             return QuotedStringValue(ParserValue(QSTR))
