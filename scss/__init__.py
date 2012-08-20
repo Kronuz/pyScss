@@ -3627,6 +3627,18 @@ def _first_value_of(*lst):
     ret = ListValue(lst).first()
     return ret.__class__(ret)
 
+def _index(*args):
+    lst = None
+    needle = None
+    if len(args) == 2 and isinstance(args[0], (list, tuple, ListValue)):
+        lst = list(args[0])
+        needle = args[1]
+    else:
+        lst = list(args)
+        needle = lst.pop()
+    if needle in lst:
+        return lst.index(needle)
+    return False
 
 def _nth(lst, n=1):
     """
@@ -3818,7 +3830,6 @@ def _type_of(obj):  # -> bool, number, string, color, list
 def _if(condition, if_true, if_false=''):
     condition = bool(False if not condition or isinstance(condition, basestring) and (condition in ('0', 'false', 'undefined') or _variable_re.match(condition)) else condition)
     return if_true.__class__(if_true) if condition else if_true.__class__(if_false)
-
 
 def _unit(number):  # -> px, em, cm, etc.
     unit = NumberValue(number).unit
@@ -4848,6 +4859,7 @@ fnct = {
     'min:n': _min,
     '-compass-nth:2': _nth,
     'first-value-of:n': _first_value_of,
+    'index:n': _index,
     'join:2': _join,
     'join:3': _join,
     'length:n': _length,
