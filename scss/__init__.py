@@ -1808,10 +1808,10 @@ class Scss(object):
                             total_selectors += len(_selectors)
                             if debug_info:
                                 filename, lineno = rule[INDEX][rule[LINENO]].rsplit(':', 1)
-                                filename = _escape_chars_re.sub(r'\\\1', filename)
                                 if debug_info == 'comments':
                                     sass_debug_info = '/* file: %s, line: %s */' % (filename, lineno)
                                 else:
+                                    filename = _escape_chars_re.sub(r'\\\1', filename)
                                     sass_debug_info = '@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}' % (filename, lineno)
                                 result += sass_debug_info + nl
                             selector = (',' + sp).join('%s%s' % (self.super_selector, s) for s in _selectors) + sp + '{'
