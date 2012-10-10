@@ -1033,10 +1033,10 @@ class Scss(object):
                     log.warn(dequote(to_str(name)))
                 elif code == '@print':
                     name = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
-                    log.info(dequote(to_str(name)))
+                    print >>sys.stderr, dequote(to_str(name))
                 elif code == '@raw':
                     name = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
-                    log.info(repr(name))
+                    print >>sys.stderr, repr(name)
                 elif code == '@dump_context':
                     log.info(repr(rule[CONTEXT]))
                 elif code == '@dump_options':
