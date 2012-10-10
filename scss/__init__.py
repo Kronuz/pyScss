@@ -412,7 +412,7 @@ FUNCTIONS_IMAGES = 'image element linear-gradient radial-gradient '\
                    'repeating-linear-gradient repeating-radial-gradient'
 # http://www.w3.org/TR/css3-2d-transforms/
 FUNCTIONS_2D = 'matrix translate translateX translateY scale '\
-               'scaleX scaleY rotate skewX skewY'
+               'scale scaleX scaleY rotate skew skewX skewY'
 # http://www.w3.org/TR/css3-3d-transforms/
 FUNCTIONS_3D = 'matrix3d translate3d translateZ scale3d scaleZ rotate3d '\
                'rotateX rotateY rotateZ perspective'
@@ -420,6 +420,7 @@ FUNCTIONS_3D = 'matrix3d translate3d translateZ scale3d scaleZ rotate3d '\
 FUNCTIONS_TRANSITIONS = 'cubic-bezier'
 # http://www.w3.org/TR/css3-animations/
 FUNCTIONS_ANIMATIONS = ''  # has 'from' and 'to' block selectors, but no new function
+FUNCTIONS_FILTER = 'grayscale blur sepia saturate opacity brightness contrast hue-rotate invert'
 FUNCTIONS_OTHERS = 'from to mask'
 VENDORS = '-[^-]+-.+'
 
@@ -434,6 +435,7 @@ _css_functions_re = re.compile(r'^(%s)$' % (
         FUNCTIONS_3D,
         FUNCTIONS_TRANSITIONS,
         FUNCTIONS_ANIMATIONS,
+        FUNCTIONS_FILTER,
         FUNCTIONS_OTHERS,
         VENDORS,
     ]).split())))
