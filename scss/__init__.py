@@ -793,11 +793,22 @@ class Scss(object):
 
         self.parse_properties()
 
+        all_rules = 0
+        all_selectors = 0
+        exceeded = ''
         final_cont = ''
         for fileid in self.css_files:
-            if not fileid.startswith('<string '):
-                final_cont += '/* Generated from: ' + fileid + ' */\n'
-            fcont = self.create_css(fileid)
+            fcont, total_rules, total_selectors = self.create_css(fileid)
+            all_rules += total_rules
+            all_selectors += total_selectors
+            if not exceeded and all_selectors > 4095:
+                exceeded = " (IE exceeded!)"
+                log.error("Maximum number of supported selectors in Internet Explorer (4095) exceeded!")
+            if self.scss_opts.get('debug_info', False):
+                if fileid.startswith('<string '):
+                    final_cont += "/* %s, add to %s%s selectors generated */\n" % (total_selectors, all_selectors, exceeded)
+                else:
+                    final_cont += "/* %s, add to %s%s selectors generated from '%s' */\n" % (total_selectors, all_selectors, exceeded, fileid)
             final_cont += fcont
 
         final_cont = self.post_process(final_cont)
@@ -1750,6 +1761,9 @@ class Scss(object):
         wrap.wordsep_re = re.compile(r'(?<=,)(\s*)')
         wrap = wrap.wrap
 
+        total_rules = 0
+        total_selectors = 0
+
         result = ''
         for rule in rules:
             #print >>sys.stderr, rule[FILEID], rule[MEDIA], rule[POSITION], [ c for c in rule[CONTEXT] if not c.startswith('$__') ], rule[OPTIONS].keys(), rule[SELECTORS], rule[DEPS]
@@ -1788,13 +1802,18 @@ class Scss(object):
                         open_selectors = False
                         skip_selectors = False
                     if selectors:
-                        if debug_info:
-                            filename, lineno = rule[INDEX][rule[LINENO]].rsplit(':', 1)
-                            filename = _escape_chars_re.sub(r'\\\1', filename)
-                            sass_debug_info = '@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}' % (filename, lineno)
-                            result += sass_debug_info + nl
                         _selectors = [s for s in selectors.split(',') if '%' not in s]
                         if _selectors:
+                            total_rules += 1
+                            total_selectors += len(_selectors)
+                            if debug_info:
+                                filename, lineno = rule[INDEX][rule[LINENO]].rsplit(':', 1)
+                                filename = _escape_chars_re.sub(r'\\\1', filename)
+                                if debug_info == 'firesass':
+                                    sass_debug_info = '@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}' % (filename, lineno)
+                                else:
+                                    sass_debug_info = '/* file: %s, line: %s */' % (filename, lineno)
+                                result += sass_debug_info + nl
                             selector = (',' + sp).join('%s%s' % (self.super_selector, s) for s in _selectors) + sp + '{'
                             if nl:
                                 selector = nl.join(wrap(selector))
@@ -1832,7 +1851,7 @@ class Scss(object):
                     result = result[:-1]
             result += '}' + nl
 
-        return result + '\n'
+        return (result, total_rules, total_selectors)
 
     def _print_properties(self, properties, scope=None, old_property=None, sc=True, sp=' ', _tb='', nl='\n', wrap=None):
         if wrap is None:

@@ -968,13 +968,11 @@ http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
     ... }
     ... '''
     >>> print css.compile() #doctest: +NORMALIZE_WHITESPACE
-    /* Generated from: second.css */
     .basicClass,
     .specialClass {
         padding: 20px;
         background-color: red;
     }
-    /* Generated from: first.css */
     .specialClass {
         padding: 10px;
         font-size: 14px;
