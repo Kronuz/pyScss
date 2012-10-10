@@ -366,6 +366,7 @@ _interpolate_re = re.compile(r'(#\{\s*)?(\$[-\w]+)(?(1)\s*\})')
 _spaces_re = re.compile(r'\s+')
 _expand_rules_space_re = re.compile(r'\s*{')
 _collapse_properties_space_re = re.compile(r'([:#])\s*{')
+_undefined_re = re.compile('^(?:\\$[-a-zA-Z0-9_]+|undefined)$')
 
 _strings_re = re.compile(r'([\'"]).*?\1')
 _blocks_re = re.compile(r'[{},;()\'"\n]')
@@ -1489,19 +1490,24 @@ class Scss(object):
                 value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
             _prop = (scope or '') + prop
             if is_var or prop.startswith('$') and value is not None:
+                in_context = rule[CONTEXT].get(_prop)
+                is_defined = not (in_context is None or isinstance(in_context, basestring) and _undefined_re.match(in_context))
                 if isinstance(value, basestring):
                     if '!default' in value:
-                        if _prop in rule[CONTEXT]:
+                        if is_defined:
                             value = None
-                        else:
+                        if value is not None:
                             value = value.replace('!default', '').replace('  ', ' ').strip()
+                    if value is not None and prop.startswith('$') and prop[1].isupper():
+                        if is_defined:
+                            log.warn("Constant %r redefined", prop)
                 elif isinstance(value, ListValue):
                     value = ListValue(value)
                     for k, v in value.value.items():
                         if v == '!default':
-                            if _prop in rule[CONTEXT]:
+                            if is_defined:
                                 value = None
-                            else:
+                            if value is not None:
                                 del value.value[k]
                                 value = value.first() if len(value) == 1 else value
                             break
@@ -3570,14 +3576,14 @@ def _compact(*args):
             args = args.value
         if isinstance(args, dict):
             for i, item in args.items():
-                if False if isinstance(item, basestring) and (item == 'undefined' or item.startswith('$')) else bool(item):
+                if False if isinstance(item, basestring) and _undefined_re.match(item) else bool(item):
                     ret[i] = item
-        elif False if isinstance(args, basestring) and (args == 'undefined' or args.startswith('$')) else bool(args):
+        elif False if isinstance(args, basestring) and _undefined_re.match(args) else bool(args):
             ret[0] = args
     else:
         ret['_'] = ','
         for i, item in enumerate(args):
-            if False if isinstance(item, basestring) and (item == 'undefined' or item.startswith('$')) else bool(item):
+            if False if isinstance(item, basestring) and _undefined_re.match(item) else bool(item):
                 ret[i] = item
     if isinstance(args, ListValue):
         args = args.value
@@ -4200,7 +4206,7 @@ class NumberValue(Value):
                 type = None
         elif isinstance(tokens, (StringValue, basestring)):
             tokens = getattr(tokens, 'value', tokens)
-            if tokens.startswith('$'):
+            if _undefined_re.match(tokens):
                 raise ValueError("Value is not a Number! (%s)" % tokens)
             try:
                 if tokens and tokens[-1] == '%':
@@ -4458,7 +4464,7 @@ class ListValue(Value):
 
     def first(self):
         for v in self.values():
-            if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')):
+            if isinstance(v, basestring) and _undefined_re.match(v):
                 continue
             if bool(v):
                 return v
@@ -4498,7 +4504,7 @@ class ColorValue(Value):
                 tokens = tokens.value
             tokens = to_str(tokens)
             tokens.replace(' ', '').lower()
-            if tokens.startswith('$'):
+            if _undefined_re.match(tokens):
                 raise ValueError("Value is not a Color! (%s)" % tokens)
             try:
                 self.value = hex2rgba[len(tokens)](tokens)
@@ -5206,7 +5212,7 @@ class Calculator(Parser):
         while self._peek(self.expr_rsts) == 'OR':
             OR = self._scan('OR')
             and_test = self.and_test(R)
-            v = and_test if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) else (v or and_test)
+            v = and_test if isinstance(v, basestring) and _undefined_re.match(v) else (v or and_test)
         return v
 
     def and_test(self, R):
@@ -5215,7 +5221,7 @@ class Calculator(Parser):
         while self._peek(self.and_test_rsts) == 'AND':
             AND = self._scan('AND')
             not_test = self.not_test(R)
-            v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) else (v and not_test)
+            v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) else (v and not_test)
         return v
 
     def not_test(self, R):
@@ -5229,11 +5235,11 @@ class Calculator(Parser):
                 if _token_ == 'NOT':
                     NOT = self._scan('NOT')
                     not_test = self.not_test(R)
-                    v = 'undefined' if isinstance(not_test, basestring) and (not_test == 'undefined' or not_test.startswith('$')) else (not not_test)
+                    v = 'undefined' if isinstance(not_test, basestring) and _undefined_re.match(not_test) else (not not_test)
                 else:  # == 'INV'
                     INV = self._scan('INV')
                     not_test = self.not_test(R)
-                    v = 'undefined' if isinstance(not_test, basestring) and (not_test == 'undefined' or not_test.startswith('$')) else _inv('!', not_test)
+                    v = 'undefined' if isinstance(not_test, basestring) and _undefined_re.match(not_test) else _inv('!', not_test)
                 if self._peek(self.not_test_rsts_) not in self.not_test_chks:
                     break
             return v
@@ -5246,27 +5252,27 @@ class Calculator(Parser):
             if _token_ == 'LT':
                 LT = self._scan('LT')
                 a_expr = self.a_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else (v < a_expr)
+                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v < a_expr)
             elif _token_ == 'GT':
                 GT = self._scan('GT')
                 a_expr = self.a_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else (v > a_expr)
+                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v > a_expr)
             elif _token_ == 'LE':
                 LE = self._scan('LE')
                 a_expr = self.a_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else (v <= a_expr)
+                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v <= a_expr)
             elif _token_ == 'GE':
                 GE = self._scan('GE')
                 a_expr = self.a_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else (v >= a_expr)
+                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v >= a_expr)
             elif _token_ == 'EQ':
                 EQ = self._scan('EQ')
                 a_expr = self.a_expr(R)
-                v = (None if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) else v) == (None if isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else a_expr)
+                v = (None if isinstance(v, basestring) and _undefined_re.match(v) else v) == (None if isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else a_expr)
             else:  # == 'NE'
                 NE = self._scan('NE')
                 a_expr = self.a_expr(R)
-                v = (None if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) else v) != (None if isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else a_expr)
+                v = (None if isinstance(v, basestring) and _undefined_re.match(v) else v) != (None if isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else a_expr)
         return v
 
     def a_expr(self, R):
@@ -5277,11 +5283,11 @@ class Calculator(Parser):
             if _token_ == 'ADD':
                 ADD = self._scan('ADD')
                 m_expr = self.m_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(m_expr, basestring) and (m_expr == 'undefined' or m_expr.startswith('$')) else (v + m_expr)
+                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(m_expr, basestring) and _undefined_re.match(m_expr) else (v + m_expr)
             else:  # == 'SUB'
                 SUB = self._scan('SUB')
                 m_expr = self.m_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(m_expr, basestring) and (m_expr == 'undefined' or m_expr.startswith('$')) else (v - m_expr)
+                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(m_expr, basestring) and _undefined_re.match(m_expr) else (v - m_expr)
         return v
 
     def m_expr(self, R):
@@ -5292,11 +5298,11 @@ class Calculator(Parser):
             if _token_ == 'MUL':
                 MUL = self._scan('MUL')
                 u_expr = self.u_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(u_expr, basestring) and (u_expr == 'undefined' or u_expr.startswith('$')) else (v * u_expr)
+                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else (v * u_expr)
             else:  # == 'DIV'
                 DIV = self._scan('DIV')
                 u_expr = self.u_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(u_expr, basestring) and (u_expr == 'undefined' or u_expr.startswith('$')) else (v / u_expr)
+                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else (v / u_expr)
         return v
 
     def u_expr(self, R):
@@ -5304,11 +5310,11 @@ class Calculator(Parser):
         if _token_ == 'SIGN':
             SIGN = self._scan('SIGN')
             u_expr = self.u_expr(R)
-            return 'undefined' if isinstance(u_expr, basestring) and (u_expr == 'undefined' or u_expr.startswith('$')) else _inv('-', u_expr)
+            return 'undefined' if isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else _inv('-', u_expr)
         elif _token_ == 'ADD':
             ADD = self._scan('ADD')
             u_expr = self.u_expr(R)
-            return 'undefined' if isinstance(u_expr, basestring) and (u_expr == 'undefined' or u_expr.startswith('$')) else u_expr
+            return 'undefined' if isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else u_expr
         else:  # in self.u_expr_chks
             atom = self.atom(R)
             v = atom
