@@ -1496,7 +1496,7 @@ class Scss(object):
     @print_timing(10)
     def _get_properties(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr):
         """
-        Implements properties and variables extraction
+        Implements properties and variables extraction and assignment
         """
         prop, value = (_prop_split_re.split(c_property, 1) + [None])[:2]
         try:
