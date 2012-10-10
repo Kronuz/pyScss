@@ -1266,12 +1266,14 @@ class Scss(object):
                                     try:
                                         full_filename = os.path.join(full_path, '_' + filename)
                                         i_codestr = open(full_filename + '.scss').read()
+                                        full_filename += '.scss'
                                     except IOError:
                                         if os.path.exists(full_filename + '.sass'):
                                             unsupported.append(full_filename + '.sass')
                                         try:
                                             full_filename = os.path.join(full_path, filename)
                                             i_codestr = open(full_filename + '.scss').read()
+                                            full_filename += '.scss'
                                         except IOError:
                                             if os.path.exists(full_filename + '.sass'):
                                                 unsupported.append(full_filename + '.sass')
@@ -1807,13 +1809,35 @@ class Scss(object):
                             total_rules += 1
                             total_selectors += len(_selectors)
                             if debug_info:
-                                filename, lineno = rule[INDEX][rule[LINENO]].rsplit(':', 1)
+                                _lineno = rule[LINENO]
+                                line = rule[INDEX][_lineno]
+                                filename, lineno = line.rsplit(':', 1)
+                                real_filename, real_lineno = filename, lineno
+                                # Walk up to a non-library file:
+                                # while _lineno >= 0:
+                                #     path, name = os.path.split(line)
+                                #     if not name.startswith('_'):
+                                #         filename, lineno = line.rsplit(':', 1)
+                                #         break
+                                #     line = rule[INDEX][_lineno]
+                                #     _lineno -= 1
+                                sass_debug_info = ''
+                                if filename.startswith('<string '):
+                                    filename = '<unknown>'
+                                if real_filename.startswith('<string '):
+                                    real_filename = '<unknown>'
+                                if real_filename != filename or real_lineno != lineno:
+                                    if debug_info == 'comments':
+                                        sass_debug_info += '/* file: %s, line: %s */' % (real_filename, real_lineno) + nl
+                                    else:
+                                        real_filename = _escape_chars_re.sub(r'\\\1', real_filename)
+                                        sass_debug_info += "@media -sass-debug-info{filename{font-family:file\:\/%s;}line{font-family:'%s';}}" % (real_filename, real_lineno) + nl
                                 if debug_info == 'comments':
-                                    sass_debug_info = '/* file: %s, line: %s */' % (filename, lineno)
+                                    sass_debug_info += '/* file: %s, line: %s */' % (filename, lineno) + nl
                                 else:
                                     filename = _escape_chars_re.sub(r'\\\1', filename)
-                                    sass_debug_info = '@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}' % (filename, lineno)
-                                result += sass_debug_info + nl
+                                    sass_debug_info += "@media -sass-debug-info{filename{font-family:file\:\/%s;}line{font-family:'%s';}}" % (filename, lineno) + nl
+                                result += sass_debug_info
                             selector = (',' + sp).join('%s%s' % (self.super_selector, s) for s in _selectors) + sp + '{'
                             if nl:
                                 selector = nl.join(wrap(selector))
