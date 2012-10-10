@@ -1284,6 +1284,78 @@ TESTS FOR REPORTED ISSUES
     }
 
 
+### Compass excerpt
+
+    >>> print css.compile('''
+    ... @option compress:no, short_colors: no;
+    ...
+    ... $experimental-support-for-mozilla      : true !default;
+    ... $experimental-support-for-webkit       : true !default;
+    ... $experimental-support-for-opera        : true !default;
+    ... $experimental-support-for-microsoft    : true !default;
+    ... $experimental-support-for-khtml        : false !default;
+    ...
+    ... @mixin experimental($property, $value,
+    ...   $moz      : $experimental-support-for-mozilla,
+    ...   $webkit   : $experimental-support-for-webkit,
+    ...   $o        : $experimental-support-for-opera,
+    ...   $ms       : $experimental-support-for-microsoft,
+    ...   $khtml    : $experimental-support-for-khtml,
+    ...   $official : true
+    ... ) {
+    ...   @if $webkit  and $experimental-support-for-webkit    { -webkit-#{$property} : $value; }
+    ...   @if $khtml   and $experimental-support-for-khtml     {  -khtml-#{$property} : $value; }
+    ...   @if $moz     and $experimental-support-for-mozilla   {    -moz-#{$property} : $value; }
+    ...   @if $ms      and $experimental-support-for-microsoft {     -ms-#{$property} : $value; }
+    ...   @if $o       and $experimental-support-for-opera     {      -o-#{$property} : $value; }
+    ...   @if $official                                        {         #{$property} : $value; }
+    ... }
+    ...
+    ... $default-box-shadow-color: #333333 !default;
+    ... $default-box-shadow-h-offset: 0px !default;
+    ... $default-box-shadow-v-offset: 0px !default;
+    ... $default-box-shadow-blur: 5px !default;
+    ... $default-box-shadow-spread : false !default;
+    ... $default-box-shadow-inset : false !default;
+    ...
+    ... @mixin box-shadow(
+    ...   $shadow-1 : default,
+    ...   $shadow-2 : false,
+    ...   $shadow-3 : false,
+    ...   $shadow-4 : false,
+    ...   $shadow-5 : false,
+    ...   $shadow-6 : false,
+    ...   $shadow-7 : false,
+    ...   $shadow-8 : false,
+    ...   $shadow-9 : false,
+    ...   $shadow-10: false
+    ... ) {
+    ...   @if $shadow-1 == default {
+    ...     $shadow-1 : -compass-space-list(compact(if($default-box-shadow-inset, inset, false), $default-box-shadow-h-offset, $default-box-shadow-v-offset, $default-box-shadow-blur, $default-box-shadow-spread, $default-box-shadow-color));
+    ...   }
+    ...   $shadow : compact($shadow-1, $shadow-2, $shadow-3, $shadow-4, $shadow-5, $shadow-6, $shadow-7, $shadow-8, $shadow-9, $shadow-10);
+    ...   @include experimental(box-shadow, $shadow,
+    ...     -moz, -webkit, not -o, not -ms, not -khtml, official
+    ...   );
+    ... }
+    ...
+    ... a {
+    ...   $drop-shadow-color: red;
+    ...   $drop-shadow-blur: 4px;
+    ...   $inner-shadow-color: rgba(0, 0, 0, 0.5);
+    ...   $inner-shadow-blur: 40px !default;
+    ...   $offset-x: 0;
+    ...   $offset-y: -1px;
+    ...   +box-shadow: $drop-shadow-color $offset-x $offset-y $drop-shadow-blur 0, $inner-shadow-color 0 0 $inner-shadow-blur inset;
+    ... }
+    ... ''') #doctest: +NORMALIZE_WHITESPACE
+    a {
+      -webkit-box-shadow: #ff0000 0 -1px 4px 0, rgba(0, 0, 0, 0.5) 0 0 40px inset;
+      -moz-box-shadow: #ff0000 0 -1px 4px 0, rgba(0, 0, 0, 0.5) 0 0 40px inset;
+      box-shadow: #ff0000 0 -1px 4px 0, rgba(0, 0, 0, 0.5) 0 0 40px inset;
+    }
+
+
 UNSUPPORTED
 -----------
 
