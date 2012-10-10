@@ -715,6 +715,14 @@ class Scss(object):
         self._scss_files = scss_files
         self.reset()
 
+    def get_scss_constants(self):
+        scss_vars = self.scss_vars or {}
+        return dict((k, v) for k, v in scss_vars.items() if k and (not k.startswith('$') or k.startswith('$') and k[1].isupper()))
+
+    def get_scss_vars(self):
+        scss_vars = self.scss_vars or {}
+        return dict((k, v) for k, v in scss_vars.items() if k and not (not k.startswith('$') or k.startswith('$') and k[1].isupper()))
+
     def clean(self):
         self.children = deque()
         self.rules = []
