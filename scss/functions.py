@@ -2074,3 +2074,20 @@ fnct = {
 }
 for u in _units:
     fnct[u + ':2'] = _convert_to
+
+class FunctionRegistry(object):
+    def __init__(self, function_dict):
+        self.function_dict = function_dict
+
+    def lookup(self, name, argc):
+        """Find a function given its name and the number of arguments it takes.
+        """
+        # Try foo:1 first
+        specific_name = "{0}:{1}".format(name, argc)
+        if specific_name in self.function_dict:
+            return self.function_dict[specific_name]
+
+        # Fall back to foo:n
+        return self.function_dict["{0}:n".format(name)]
+
+function_registry = FunctionRegistry(fnct)
