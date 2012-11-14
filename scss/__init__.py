@@ -2770,7 +2770,7 @@ def _sprite_map(g, **kwargs):
                 times.append(int(os.path.getmtime(file)))
 
         map_name = os.path.normpath(os.path.dirname(g)).replace('\\', '_').replace('/', '_')
-        key = list(zip(*files)[0]) + times + [repr(kwargs)]
+        key = list(zip(*files)[0]) + times + [repr(kwargs), ASSETS_URL]
         key = map_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
