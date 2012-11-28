@@ -343,15 +343,34 @@ class Scss(object):
     # configuration:
     construct = 'self'
 
-    def __init__(self, scss_vars=None, scss_opts=None, scss_files=None, super_selector=None, func_registry=scss.functions.function_registry):
+    def __init__(self, scss_vars=None, scss_opts=None, scss_files=None, super_selector=None, func_registry=scss.functions.function_registry, search_paths=None):
         if super_selector:
             self.super_selector = super_selector + ' '
         else:
             self.super_selector = ''
         self._scss_vars = scss_vars
-        self._scss_opts = scss_opts
+        self._scss_opts = scss_opts or {}
         self._scss_files = scss_files
         self._func_registry = func_registry
+
+        # Figure out search paths.  Fall back from provided explicitly to
+        # defined globally to just searching the current directory
+        if search_paths is not None:
+            assert not isinstance(search_paths, basestring), \
+                "`search_paths` should be an iterable, not a string"
+            self._search_paths = search_paths
+        else:
+            self._search_paths = ["."]
+
+            if LOAD_PATHS:
+                if isinstance(LOAD_PATHS, basestring):
+                    # Back-compat: allow comma-delimited
+                    self._search_paths.extend(LOAD_PATHS.split(','))
+                else:
+                    self._search_paths.extend(LOAD_PATHS)
+
+            self._search_paths.extend(self._scss_opts.get('load_paths', []))
+
         self.reset()
 
     def get_scss_constants(self):
@@ -874,80 +893,77 @@ class Scss(object):
         Implements @import
         Load and import mixins and functions and rules
         """
+        # Protect against going to prohibited places...
+        if '..' in name or '://' in name or 'url(' in name:
+            rule[PROPERTIES].append((c_lineno, c_property, None))
+            return
+
         full_filename = None
         i_codestr = None
-        if '..' not in name and '://' not in name and 'url(' not in name:  # Protect against going to prohibited places...
-            names = name.split(',')
-            for name in names:
-                name = dequote(name.strip())
-                if '@import ' + name not in rule[OPTIONS]:  # If already imported in this scope, skip...
-                    unsupported = []
-                    load_paths = []
-                    try:
-                        i_codestr = self.scss_files[name]
-                    except KeyError:
-                        filename = os.path.basename(name)
-                        dirname = os.path.dirname(name)
+        names = name.split(',')
+        for name in names:
+            name = dequote(name.strip())
+            if '@import ' + name not in rule[OPTIONS]:
+                # If already imported in this scope, skip
+                continue
+
+            unsupported = []
+            load_paths = []
+            try:
+                i_codestr = self.scss_files[name]
+            except KeyError:
+                filename = os.path.basename(name)
+                dirname = os.path.dirname(name)
+                i_codestr = None
+
+                for path in self._search_paths:
+                    for basepath in ['./', os.path.dirname(rule[PATH])]:
                         i_codestr = None
-
-                        # TODO: Convert global LOAD_PATHS to a list. Use it directly.
-                        # Doing the above will break backwards compatibility!
-                        if hasattr(LOAD_PATHS, 'split'):
-                            load_path_list = LOAD_PATHS.split(',')  # Old style
-                        else:
-                            load_path_list = LOAD_PATHS  # New style
-
-                        load_path_list.extend(self._scss_opts['load_paths'] if self._scss_opts and self._scss_opts.has_key('load_paths') else [])
-
-                        for path in ['./'] + load_path_list:
-                            for basepath in ['./', os.path.dirname(rule[PATH])]:
-                                i_codestr = None
-                                full_path = os.path.realpath(os.path.join(path, basepath, dirname))
-                                if full_path not in load_paths:
+                        full_path = os.path.realpath(os.path.join(path, basepath, dirname))
+                        if full_path in load_paths:
+                            continue
+                        try:
+                            full_filename = os.path.join(full_path, '_' + filename)
+                            i_codestr = open(full_filename + '.scss').read()
+                            full_filename += '.scss'
+                        except IOError:
+                            if os.path.exists(full_filename + '.sass'):
+                                unsupported.append(full_filename + '.sass')
+                            try:
+                                full_filename = os.path.join(full_path, filename)
+                                i_codestr = open(full_filename + '.scss').read()
+                                full_filename += '.scss'
+                            except IOError:
+                                if os.path.exists(full_filename + '.sass'):
+                                    unsupported.append(full_filename + '.sass')
+                                try:
+                                    full_filename = os.path.join(full_path, '_' + filename)
+                                    i_codestr = open(full_filename).read()
+                                except IOError:
                                     try:
-                                        full_filename = os.path.join(full_path, '_' + filename)
-                                        i_codestr = open(full_filename + '.scss').read()
-                                        full_filename += '.scss'
+                                        full_filename = os.path.join(full_path, filename)
+                                        i_codestr = open(full_filename).read()
                                     except IOError:
-                                        if os.path.exists(full_filename + '.sass'):
-                                            unsupported.append(full_filename + '.sass')
-                                        try:
-                                            full_filename = os.path.join(full_path, filename)
-                                            i_codestr = open(full_filename + '.scss').read()
-                                            full_filename += '.scss'
-                                        except IOError:
-                                            if os.path.exists(full_filename + '.sass'):
-                                                unsupported.append(full_filename + '.sass')
-                                            try:
-                                                full_filename = os.path.join(full_path, '_' + filename)
-                                                i_codestr = open(full_filename).read()
-                                            except IOError:
-                                                try:
-                                                    full_filename = os.path.join(full_path, filename)
-                                                    i_codestr = open(full_filename).read()
-                                                except IOError:
-                                                    pass
-                                    if i_codestr is not None:
-                                        break
-                                    else:
-                                        load_paths.append(full_path)
-                            if i_codestr is not None:
-                                break
-                        if i_codestr is None:
-                            i_codestr = self._do_magic_import(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
-                        i_codestr = self.scss_files[name] = i_codestr and self.load_string(i_codestr, full_filename)
-                        if name not in self.scss_files:
-                            self._scss_files_order.append(name)
-                    if i_codestr is None:
-                        load_paths = load_paths and "\nLoad paths:\n\t%s" % "\n\t".join(load_paths) or ''
-                        unsupported = unsupported and "\nPossible matches (for unsupported file format SASS):\n\t%s" % "\n\t".join(unsupported) or ''
-                        log.warn("File to import not found or unreadable: '%s' (%s)%s%s", filename, rule[INDEX][rule[LINENO]], load_paths, unsupported)
-                    else:
-                        _rule = spawn_rule(rule, codestr=i_codestr, path=full_filename, lineno=c_lineno)
-                        self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
-                        rule[OPTIONS]['@import ' + name] = True
-        else:
-            rule[PROPERTIES].append((c_lineno, c_property, None))
+                                        pass
+                        if i_codestr is not None:
+                            break
+                        else:
+                            load_paths.append(full_path)
+                    if i_codestr is not None:
+                        break
+                if i_codestr is None:
+                    i_codestr = self._do_magic_import(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                i_codestr = self.scss_files[name] = i_codestr and self.load_string(i_codestr, full_filename)
+                if name not in self.scss_files:
+                    self._scss_files_order.append(name)
+            if i_codestr is None:
+                load_paths = load_paths and "\nLoad paths:\n\t%s" % "\n\t".join(load_paths) or ''
+                unsupported = unsupported and "\nPossible matches (for unsupported file format SASS):\n\t%s" % "\n\t".join(unsupported) or ''
+                log.warn("File to import not found or unreadable: '%s' (%s)%s%s", filename, rule[INDEX][rule[LINENO]], load_paths, unsupported)
+            else:
+                _rule = spawn_rule(rule, codestr=i_codestr, path=full_filename, lineno=c_lineno)
+                self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
+                rule[OPTIONS]['@import ' + name] = True
 
     @print_timing(10)
     def _do_magic_import(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
