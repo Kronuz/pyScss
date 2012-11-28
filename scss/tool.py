@@ -36,10 +36,10 @@ def main():
     parser.add_option("--time", action="store_true",
                       help="Display compliation times")
     parser.add_option("--debug-info", action="store_true",
-                      help="Turns on scss's debuging information")
+                      help="Turns on scss's debugging information")
     parser.add_option("--no-debug-info", action="store_false",
                       dest="debug_info", default=False,
-                      help="Turns off scss's debuging information")
+                      help="Turns off scss's debugging information")
     parser.add_option("-t", "--test", action="store_true", help=SUPPRESS_HELP)
     parser.add_option("-C", "--no-compress", action="store_false",
                       dest="compress", default=True,
