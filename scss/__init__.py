@@ -903,7 +903,7 @@ class Scss(object):
         names = name.split(',')
         for name in names:
             name = dequote(name.strip())
-            if '@import ' + name not in rule[OPTIONS]:
+            if '@import ' + name in rule[OPTIONS]:
                 # If already imported in this scope, skip
                 continue
 
