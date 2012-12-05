@@ -155,8 +155,9 @@ _expr_glob_re = re.compile(r'''
     \#\{(.*?)\}                   # Global Interpolation only
 ''', re.VERBOSE)
 
+# XXX these still need to be fixed; the //-in-functions thing is a chumpy hack
 _ml_comment_re = re.compile(r'\/\*(.*?)\*\/', re.DOTALL)
-_sl_comment_re = re.compile(r'(?<!\burl[(])(?<!\w{2}:)\/\/.*')
+_sl_comment_re = re.compile(r'(?<![(])(?<!\w{2}:)\/\/.*')
 _zero_units_re = re.compile(r'\b0(' + '|'.join(map(re.escape, _zero_units)) + r')(?!\w)', re.IGNORECASE)
 _zero_re = re.compile(r'\b0\.(?=\d)')
 
