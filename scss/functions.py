@@ -44,8 +44,47 @@ del re
 
 
 ################################################################################
+# Function registry
+
+class FunctionRegistry(object):
+    def __init__(self):
+        self._function_dict = {}
+
+    def legacy_register(self, str_key, func):
+        name, argc = str_key.split(':')
+        if argc == "n":
+            argc = None
+        else:
+            argc = int(argc)
+
+        key = name, argc
+        self._function_dict[key] = func
+
+    def register(self, name, argc=None):
+        key = (name, argc)
+
+        def decorator(f):
+            self._function_dict[key] = f
+            return f
+
+        return decorator
+
+    def lookup(self, name, argc=None):
+        """Find a function given its name and the number of arguments it takes.
+        """
+        try:
+            # Try the given arity first
+            if argc is not None:
+                return self._function_dict[name, argc]
+        except KeyError:
+            # Fall back to arbitrary-arity
+            return self._function_dict[name, None]
+
+################################################################################
 # Sass/Compass Library Functions:
 
+scss_builtins = FunctionRegistry()
+register = scss_builtins.register
 
 def _rgb(r, g, b, type='rgb'):
     return _rgba(r, g, b, 1.0, type)
@@ -2075,19 +2114,5 @@ fnct = {
 for u in _units:
     fnct[u + ':2'] = _convert_to
 
-class FunctionRegistry(object):
-    def __init__(self, function_dict):
-        self.function_dict = function_dict
-
-    def lookup(self, name, argc):
-        """Find a function given its name and the number of arguments it takes.
-        """
-        # Try foo:1 first
-        specific_name = "{0}:{1}".format(name, argc)
-        if specific_name in self.function_dict:
-            return self.function_dict[specific_name]
-
-        # Fall back to foo:n
-        return self.function_dict["{0}:n".format(name)]
-
-function_registry = FunctionRegistry(fnct)
+for str_key, func in fnct.items():
+    scss_builtins.legacy_register(str_key, func)

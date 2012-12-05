@@ -343,7 +343,7 @@ class Scss(object):
     # configuration:
     construct = 'self'
 
-    def __init__(self, scss_vars=None, scss_opts=None, scss_files=None, super_selector=None, func_registry=scss.functions.function_registry, search_paths=None):
+    def __init__(self, scss_vars=None, scss_opts=None, scss_files=None, super_selector=None, func_registry=scss.functions.scss_builtins, search_paths=None):
         if super_selector:
             self.super_selector = super_selector + ' '
         else:
