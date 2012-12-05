@@ -909,11 +909,12 @@ class Scss(object):
 
             unsupported = []
             load_paths = []
+            filename = os.path.basename(name)
+            dirname = os.path.dirname(name)
+
             try:
                 i_codestr = self.scss_files[name]
             except KeyError:
-                filename = os.path.basename(name)
-                dirname = os.path.dirname(name)
                 i_codestr = None
 
                 for path in self._search_paths:
