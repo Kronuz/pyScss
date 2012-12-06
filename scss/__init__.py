@@ -777,52 +777,54 @@ class Scss(object):
         """
         Implements @mixin and @function
         """
-        if name:
-            funct, params, _ = name.partition('(')
-            funct = funct.strip()
-            params = split_params(depar(params + _))
-            defaults = {}
-            new_params = []
-            for param in params:
-                param, _, default = param.partition(':')
-                param = param.strip()
-                default = default.strip()
-                if param:
-                    new_params.append(param)
-                    if default:
-                        default = self.apply_vars(default, rule[CONTEXT], None, rule)
-                        defaults[param] = default
-            context = rule[CONTEXT].copy()
-            for p in new_params:
-                context.pop(p, None)
-            mixin = [list(new_params), defaults, self.apply_vars(c_codestr, context, None, rule)]
-            if code == '@function':
-                def _call(mixin):
-                    def __call(R, *args, **kwargs):
-                        m_params = mixin[0]
-                        m_vars = rule[CONTEXT].copy()
-                        m_vars.update(mixin[1])
-                        m_codestr = mixin[2]
-                        for i, a in enumerate(args):
-                            m_vars[m_params[i]] = a
-                        m_vars.update(kwargs)
-                        _options = rule[OPTIONS].copy()
-                        _rule = spawn_rule(R, codestr=m_codestr, context=m_vars, options=_options, deps=set(), properties=[], final=False, lineno=c_lineno)
-                        self.manage_children(_rule, p_selectors, p_parents, p_children, (scope or '') + '', R[MEDIA])
-                        ret = _rule[OPTIONS].pop('@return', '')
-                        return ret
-                    return __call
-                _mixin = _call(mixin)
-                _mixin.mixin = mixin
-                mixin = _mixin
-            # Insert as many @mixin options as the default parameters:
-            while len(new_params):
-                rule[OPTIONS]['%s %s:%d' % (code, funct, len(new_params))] = mixin
-                param = new_params.pop()
-                if param not in defaults:
-                    break
-            if not new_params:
-                rule[OPTIONS][code + ' ' + funct + ':0'] = mixin
+        if not name:
+            return
+
+        funct, params, _ = name.partition('(')
+        funct = funct.strip()
+        params = split_params(depar(params + _))
+        defaults = {}
+        new_params = []
+        for param in params:
+            param, _, default = param.partition(':')
+            param = param.strip()
+            default = default.strip()
+            if param:
+                new_params.append(param)
+                if default:
+                    default = self.apply_vars(default, rule[CONTEXT], None, rule)
+                    defaults[param] = default
+        context = rule[CONTEXT].copy()
+        for p in new_params:
+            context.pop(p, None)
+        mixin = [list(new_params), defaults, self.apply_vars(c_codestr, context, None, rule)]
+        if code == '@function':
+            def _call(mixin):
+                def __call(R, *args, **kwargs):
+                    m_params = mixin[0]
+                    m_vars = rule[CONTEXT].copy()
+                    m_vars.update(mixin[1])
+                    m_codestr = mixin[2]
+                    for i, a in enumerate(args):
+                        m_vars[m_params[i]] = a
+                    m_vars.update(kwargs)
+                    _options = rule[OPTIONS].copy()
+                    _rule = spawn_rule(R, codestr=m_codestr, context=m_vars, options=_options, deps=set(), properties=[], final=False, lineno=c_lineno)
+                    self.manage_children(_rule, p_selectors, p_parents, p_children, (scope or '') + '', R[MEDIA])
+                    ret = _rule[OPTIONS].pop('@return', '')
+                    return ret
+                return __call
+            _mixin = _call(mixin)
+            _mixin.mixin = mixin
+            mixin = _mixin
+        # Insert as many @mixin options as the default parameters:
+        while len(new_params):
+            rule[OPTIONS]['%s %s:%d' % (code, funct, len(new_params))] = mixin
+            param = new_params.pop()
+            if param not in defaults:
+                break
+        if not new_params:
+            rule[OPTIONS][code + ' ' + funct + ':0'] = mixin
 
     @print_timing(10)
     def _do_include(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
@@ -853,29 +855,30 @@ class Scss(object):
             mixin = rule[OPTIONS].get('@mixin %s:1' % (funct,))
             if mixin and all(map(lambda o: isinstance(o, int), new_params.keys())):
                 new_params = {0: ', '.join(new_params.values())}
-        if mixin:
-            m_params = mixin[0]
-            m_vars = mixin[1].copy()
-            m_codestr = mixin[2]
-            for varname, value in new_params.items():
-                try:
-                    m_param = m_params[varname]
-                except:
-                    m_param = varname
-                value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
-                m_vars[m_param] = value
-            for p in m_params:
-                if p not in new_params:
-                    if isinstance(m_vars[p], basestring):
-                        value = self.calculate(m_vars[p], m_vars, rule[OPTIONS], rule)
-                        m_vars[p] = value
-            _context = rule[CONTEXT].copy()
-            _context.update(m_vars)
-            _rule = spawn_rule(rule, codestr=m_codestr, context=_context, lineno=c_lineno)
-            _rule[OPTIONS]['@content'] = c_codestr
-            self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
-        else:
+        if not mixin:
             log.error("Required mixin not found: %s:%d (%s)", funct, num_args, rule[INDEX][rule[LINENO]], extra={'stack': True})
+            return
+
+        m_params = mixin[0]
+        m_vars = mixin[1].copy()
+        m_codestr = mixin[2]
+        for varname, value in new_params.items():
+            try:
+                m_param = m_params[varname]
+            except:
+                m_param = varname
+            value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
+            m_vars[m_param] = value
+        for p in m_params:
+            if p not in new_params:
+                if isinstance(m_vars[p], basestring):
+                    value = self.calculate(m_vars[p], m_vars, rule[OPTIONS], rule)
+                    m_vars[p] = value
+        _context = rule[CONTEXT].copy()
+        _context.update(m_vars)
+        _rule = spawn_rule(rule, codestr=m_codestr, context=_context, lineno=c_lineno)
+        _rule[OPTIONS]['@content'] = c_codestr
+        self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
 
     @print_timing(10)
     def _do_content(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
@@ -1113,18 +1116,20 @@ class Scss(object):
         """
         var, _, name = name.partition(' in ')
         name = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
-        if name:
-            name = ListValue(name)
-            var = var.strip()
-            var = self.do_glob_math(var, rule[CONTEXT], rule[OPTIONS], rule, True)
+        if not name:
+            return
 
-            for n, v in name.items():
-                v = to_str(v)
-                rule[CODESTR] = c_codestr
-                rule[CONTEXT][var] = v
-                if not isinstance(n, int):
-                    rule[CONTEXT][n] = v
-                self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+        name = ListValue(name)
+        var = var.strip()
+        var = self.do_glob_math(var, rule[CONTEXT], rule[OPTIONS], rule, True)
+
+        for n, v in name.items():
+            v = to_str(v)
+            rule[CODESTR] = c_codestr
+            rule[CONTEXT][var] = v
+            if not isinstance(n, int):
+                rule[CONTEXT][n] = v
+            self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
 
     # @print_timing(10)
     # def _do_while(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
@@ -1166,38 +1171,40 @@ class Scss(object):
             is_var = False
         prop = prop.strip()
         prop = self.do_glob_math(prop, rule[CONTEXT], rule[OPTIONS], rule, True)
-        if prop:
-            if value:
-                value = value.strip()
-                value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
-            _prop = (scope or '') + prop
-            if is_var or prop.startswith('$') and value is not None:
-                in_context = rule[CONTEXT].get(_prop)
-                is_defined = not (in_context is None or isinstance(in_context, basestring) and _undefined_re.match(in_context))
-                if isinstance(value, basestring):
-                    if '!default' in value:
+        if not prop:
+            return
+
+        if value:
+            value = value.strip()
+            value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
+        _prop = (scope or '') + prop
+        if is_var or prop.startswith('$') and value is not None:
+            in_context = rule[CONTEXT].get(_prop)
+            is_defined = not (in_context is None or isinstance(in_context, basestring) and _undefined_re.match(in_context))
+            if isinstance(value, basestring):
+                if '!default' in value:
+                    if is_defined:
+                        value = None
+                    if value is not None:
+                        value = value.replace('!default', '').replace('  ', ' ').strip()
+                if value is not None and prop.startswith('$') and prop[1].isupper():
+                    if is_defined:
+                        log.warn("Constant %r redefined", prop)
+            elif isinstance(value, ListValue):
+                value = ListValue(value)
+                for k, v in value.value.items():
+                    if v == '!default':
                         if is_defined:
                             value = None
                         if value is not None:
-                            value = value.replace('!default', '').replace('  ', ' ').strip()
-                    if value is not None and prop.startswith('$') and prop[1].isupper():
-                        if is_defined:
-                            log.warn("Constant %r redefined", prop)
-                elif isinstance(value, ListValue):
-                    value = ListValue(value)
-                    for k, v in value.value.items():
-                        if v == '!default':
-                            if is_defined:
-                                value = None
-                            if value is not None:
-                                del value.value[k]
-                                value = value.first() if len(value) == 1 else value
-                            break
-                if value is not None:
-                    rule[CONTEXT][_prop] = value
-            else:
-                _prop = self.apply_vars(_prop, rule[CONTEXT], rule[OPTIONS], rule, True)
-                rule[PROPERTIES].append((c_lineno, _prop, to_str(value) if value is not None else None))
+                            del value.value[k]
+                            value = value.first() if len(value) == 1 else value
+                        break
+            if value is not None:
+                rule[CONTEXT][_prop] = value
+        else:
+            _prop = self.apply_vars(_prop, rule[CONTEXT], rule[OPTIONS], rule, True)
+            rule[PROPERTIES].append((c_lineno, _prop, to_str(value) if value is not None else None))
 
     @print_timing(10)
     def _nest_rules(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr):
@@ -1331,44 +1338,49 @@ class Scss(object):
             parents_left = False
             for _selectors in self.parts.keys():
                 selectors, _, parent = _selectors.partition(' extends ')
-                if parent:
-                    parents_left = True
-                    if _selectors not in self.parts:
-                        continue  # Nodes might have been renamed while linking parents...
+                if not parent:
+                    continue
 
-                    rules = self.parts[_selectors]
+                parents_left = True
+                if _selectors not in self.parts:
+                    continue  # Nodes might have been renamed while linking parents...
 
-                    del self.parts[_selectors]
-                    self.parts.setdefault(selectors, [])
-                    self.parts[selectors].extend(rules)
+                rules = self.parts[_selectors]
 
-                    parents = self.link_with_parents(parent, selectors, rules)
+                del self.parts[_selectors]
+                self.parts.setdefault(selectors, [])
+                self.parts[selectors].extend(rules)
 
-                    if parents is None:
-                        log.warn("Parent rule not found: %s", parent)
-                    else:
-                        # from the parent, inherit the context and the options:
-                        new_context = {}
-                        new_options = {}
-                        for parent in parents:
-                            new_context.update(parent[CONTEXT])
-                            new_options.update(parent[OPTIONS])
-                        for rule in rules:
-                            _new_context = new_context.copy()
-                            _new_context.update(rule[CONTEXT])
-                            rule[CONTEXT] = _new_context
-                            _new_options = new_options.copy()
-                            _new_options.update(rule[OPTIONS])
-                            rule[OPTIONS] = _new_options
+                parents = self.link_with_parents(parent, selectors, rules)
+
+                if parents is None:
+                    log.warn("Parent rule not found: %s", parent)
+                    continue
+
+                # from the parent, inherit the context and the options:
+                new_context = {}
+                new_options = {}
+                for parent in parents:
+                    new_context.update(parent[CONTEXT])
+                    new_options.update(parent[OPTIONS])
+                for rule in rules:
+                    _new_context = new_context.copy()
+                    _new_context.update(rule[CONTEXT])
+                    rule[CONTEXT] = _new_context
+                    _new_options = new_options.copy()
+                    _new_options.update(rule[OPTIONS])
+                    rule[OPTIONS] = _new_options
 
     @print_timing(3)
     def manage_order(self):
         # order rules according with their dependencies
         for rule in self.rules:
-            if rule[POSITION] is not None:
-                rule[DEPS].add(rule[POSITION] + 1)
-                # This moves the rules just above the topmost dependency during the sorted() below:
-                rule[POSITION] = min(rule[DEPS])
+            if rule[POSITION] is None:
+                continue
+
+            rule[DEPS].add(rule[POSITION] + 1)
+            # This moves the rules just above the topmost dependency during the sorted() below:
+            rule[POSITION] = min(rule[DEPS])
         self.rules = sorted(self.rules, key=lambda o: o[POSITION])
 
     @print_timing(3)
@@ -1429,110 +1441,107 @@ class Scss(object):
         result = ''
         for rule in rules:
             #print >>sys.stderr, rule[FILEID], rule[MEDIA], rule[POSITION], [ c for c in rule[CONTEXT] if not c.startswith('$__') ], rule[OPTIONS].keys(), rule[SELECTORS], rule[DEPS]
-            if rule[POSITION] is not None and rule[PROPERTIES]:
-                selectors = rule[SELECTORS]
-                media = rule[MEDIA]
-                _tb = tb if old_media else ''
-                if old_media != media or media is not None:
-                    if open_selectors:
-                        if not skip_selectors:
-                            if not sc:
-                                if result[-1] == ';':
-                                    result = result[:-1]
-                            result += _tb + '}' + nl
-                        open_selectors = False
-                        skip_selectors = False
-                    if open_media:
-                        if not sc:
-                            if result[-1] == ';':
-                                result = result[:-1]
-                        result += '}' + nl
-                        open_media = False
-                    if media:
-                        result += '@media ' + (' and ').join(set(media)) + sp + '{' + nl
-                        open_media = True
-                    old_media = media
-                    old_selectors = None  # force entrance to add a new selector
-                _tb = tb if media else ''
-                if old_selectors != selectors or selectors is not None:
-                    if open_selectors:
-                        if not skip_selectors:
-                            if not sc:
-                                if result[-1] == ';':
-                                    result = result[:-1]
-                            result += _tb + '}' + nl
-                        open_selectors = False
-                        skip_selectors = False
-                    if selectors:
-                        _selectors = [s for s in selectors.split(',') if '%' not in s]
-                        if _selectors:
-                            total_rules += 1
-                            total_selectors += len(_selectors)
-                            if debug_info:
-                                _lineno = rule[LINENO]
-                                line = rule[INDEX][_lineno]
-                                filename, lineno = line.rsplit(':', 1)
-                                real_filename, real_lineno = filename, lineno
-                                # Walk up to a non-library file:
-                                # while _lineno >= 0:
-                                #     path, name = os.path.split(line)
-                                #     if not name.startswith('_'):
-                                #         filename, lineno = line.rsplit(':', 1)
-                                #         break
-                                #     line = rule[INDEX][_lineno]
-                                #     _lineno -= 1
-                                sass_debug_info = ''
-                                if filename.startswith('<string '):
-                                    filename = '<unknown>'
-                                if real_filename.startswith('<string '):
-                                    real_filename = '<unknown>'
-                                if real_filename != filename or real_lineno != lineno:
-                                    if debug_info == 'comments':
-                                        sass_debug_info += '/* file: %s, line: %s */' % (real_filename, real_lineno) + nl
-                                    else:
-                                        real_filename = _escape_chars_re.sub(r'\\\1', real_filename)
-                                        sass_debug_info += "@media -sass-debug-info{filename{font-family:file\:\/%s;}line{font-family:'%s';}}" % (real_filename, real_lineno) + nl
-                                if debug_info == 'comments':
-                                    sass_debug_info += '/* file: %s, line: %s */' % (filename, lineno) + nl
-                                else:
-                                    filename = _escape_chars_re.sub(r'\\\1', filename)
-                                    sass_debug_info += "@media -sass-debug-info{filename{font-family:file\:\/%s;}line{font-family:'%s';}}" % (filename, lineno) + nl
-                                result += sass_debug_info
-                            selector = (',' + sp).join('%s%s' % (self.super_selector, s) for s in _selectors) + sp + '{'
-                            if nl:
-                                selector = nl.join(wrap(selector))
-                            result += _tb + selector + nl
-                        else:
-                            skip_selectors = True
-                        open_selectors = True
-                    old_selectors = selectors
-                    scope = set()
+            if rule[POSITION] is None or not rule[PROPERTIES]:
+                continue
+
+            selectors = rule[SELECTORS]
+            media = rule[MEDIA]
+            _tb = tb if old_media else ''
+            if old_media != media or media is not None:
+                if open_selectors:
+                    if not skip_selectors:
+                        if not sc and result[-1] == ';':
+                            result = result[:-1]
+                        result += _tb + '}' + nl
+                    open_selectors = False
+                    skip_selectors = False
+                if open_media:
+                    if not sc and result[-1] == ';':
+                        result = result[:-1]
+                    result += '}' + nl
+                    open_media = False
+                if media:
+                    result += '@media ' + (' and ').join(set(media)) + sp + '{' + nl
+                    open_media = True
+                old_media = media
+                old_selectors = None  # force entrance to add a new selector
+            _tb = tb if media else ''
+            if old_selectors != selectors or selectors is not None:
+                if open_selectors:
+                    if not skip_selectors:
+                        if not sc and result[-1] == ';':
+                            result = result[:-1]
+                        result += _tb + '}' + nl
+                    open_selectors = False
+                    skip_selectors = False
                 if selectors:
-                    _tb += tb
-                if rule[OPTIONS].get('verbosity', 0) > 1:
-                    result += _tb + '/* file: ' + rule[FILEID] + ' */' + nl
-                    if rule[CONTEXT]:
-                        result += _tb + '/* vars:' + nl
-                        for k, v in rule[CONTEXT].items():
-                            result += _tb + _tb + k + ' = ' + v + ';' + nl
-                        result += _tb + '*/' + nl
-                if not skip_selectors:
-                    result += self._print_properties(rule[PROPERTIES], scope, [old_property], sc, sp, _tb, nl, wrap)
+                    _selectors = [s for s in selectors.split(',') if '%' not in s]
+                    if _selectors:
+                        total_rules += 1
+                        total_selectors += len(_selectors)
+                        if debug_info:
+                            _lineno = rule[LINENO]
+                            line = rule[INDEX][_lineno]
+                            filename, lineno = line.rsplit(':', 1)
+                            real_filename, real_lineno = filename, lineno
+                            # Walk up to a non-library file:
+                            # while _lineno >= 0:
+                            #     path, name = os.path.split(line)
+                            #     if not name.startswith('_'):
+                            #         filename, lineno = line.rsplit(':', 1)
+                            #         break
+                            #     line = rule[INDEX][_lineno]
+                            #     _lineno -= 1
+                            sass_debug_info = ''
+                            if filename.startswith('<string '):
+                                filename = '<unknown>'
+                            if real_filename.startswith('<string '):
+                                real_filename = '<unknown>'
+                            if real_filename != filename or real_lineno != lineno:
+                                if debug_info == 'comments':
+                                    sass_debug_info += '/* file: %s, line: %s */' % (real_filename, real_lineno) + nl
+                                else:
+                                    real_filename = _escape_chars_re.sub(r'\\\1', real_filename)
+                                    sass_debug_info += "@media -sass-debug-info{filename{font-family:file\:\/%s;}line{font-family:'%s';}}" % (real_filename, real_lineno) + nl
+                            if debug_info == 'comments':
+                                sass_debug_info += '/* file: %s, line: %s */' % (filename, lineno) + nl
+                            else:
+                                filename = _escape_chars_re.sub(r'\\\1', filename)
+                                sass_debug_info += "@media -sass-debug-info{filename{font-family:file\:\/%s;}line{font-family:'%s';}}" % (filename, lineno) + nl
+                            result += sass_debug_info
+                        selector = (',' + sp).join('%s%s' % (self.super_selector, s) for s in _selectors) + sp + '{'
+                        if nl:
+                            selector = nl.join(wrap(selector))
+                        result += _tb + selector + nl
+                    else:
+                        skip_selectors = True
+                    open_selectors = True
+                old_selectors = selectors
+                scope = set()
+            if selectors:
+                _tb += tb
+            if rule[OPTIONS].get('verbosity', 0) > 1:
+                result += _tb + '/* file: ' + rule[FILEID] + ' */' + nl
+                if rule[CONTEXT]:
+                    result += _tb + '/* vars:' + nl
+                    for k, v in rule[CONTEXT].items():
+                        result += _tb + _tb + k + ' = ' + v + ';' + nl
+                    result += _tb + '*/' + nl
+            if not skip_selectors:
+                result += self._print_properties(rule[PROPERTIES], scope, [old_property], sc, sp, _tb, nl, wrap)
 
         if open_media:
             _tb = tb
         else:
             _tb = ''
         if open_selectors and not skip_selectors:
-            if not sc:
-                if result[-1] == ';':
-                    result = result[:-1]
+            if not sc and result[-1] == ';':
+                result = result[:-1]
             result += _tb + '}' + nl
 
         if open_media:
-            if not sc:
-                if result[-1] == ';':
-                    result = result[:-1]
+            if not sc and result[-1] == ';':
+                result = result[:-1]
             result += '}' + nl
 
         return (result, total_rules, total_selectors)
