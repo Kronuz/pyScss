@@ -50,6 +50,14 @@ class FunctionRegistry(object):
     def __init__(self):
         self._function_dict = {}
 
+    def derive(self):
+        """Returns a new registry object, pre-populated with all the functions
+        in this registry.
+        """
+        new = type(self)()
+        new._function_dict.update(self._function_dict)
+        return new
+
     def legacy_register(self, str_key, func):
         name, argc = str_key.split(':')
         if argc == "n":
