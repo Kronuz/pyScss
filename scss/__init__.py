@@ -863,7 +863,10 @@ class Scss(object):
         m_vars = mixin[1].copy()
         m_codestr = mixin[2]
         for varname, value in new_params.items():
-            m_param = m_params.get(varname, varname)
+            try:
+                m_param = m_params[varname]
+            except KeyError:
+                m_param = varname
             value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
             m_vars[m_param] = value
         for p in m_params:
