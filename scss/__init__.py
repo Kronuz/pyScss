@@ -863,17 +863,13 @@ class Scss(object):
         m_vars = mixin[1].copy()
         m_codestr = mixin[2]
         for varname, value in new_params.items():
-            try:
-                m_param = m_params[varname]
-            except:
-                m_param = varname
+            m_param = m_params.get(varname, varname)
             value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
             m_vars[m_param] = value
         for p in m_params:
-            if p not in new_params:
-                if isinstance(m_vars[p], basestring):
-                    value = self.calculate(m_vars[p], m_vars, rule[OPTIONS], rule)
-                    m_vars[p] = value
+            if p not in new_params and isinstance(m_vars[p], basestring):
+                value = self.calculate(m_vars[p], m_vars, rule[OPTIONS], rule)
+                m_vars[p] = value
         _context = rule[CONTEXT].copy()
         _context.update(m_vars)
         _rule = spawn_rule(rule, codestr=m_codestr, context=_context, lineno=c_lineno)
@@ -983,69 +979,71 @@ class Scss(object):
             files = glob.glob(glob_path)
             files = sorted((file[len(STATIC_ROOT):], None) for file in files)
 
-        if files:
-            # Build magic context
-            map_name = os.path.normpath(os.path.dirname(name)).replace('\\', '_').replace('/', '_')
-            kwargs = {}
+        if not files:
+            return
 
-            def setdefault(var, val):
-                _var = '$' + map_name + '-' + var
-                if _var in rule[CONTEXT]:
-                    kwargs[var] = interpolate(rule[CONTEXT][_var], rule, self._func_registry)
-                else:
-                    rule[CONTEXT][_var] = val
-                    kwargs[var] = interpolate(val, rule, self._func_registry)
-                return rule[CONTEXT][_var]
+        # Build magic context
+        map_name = os.path.normpath(os.path.dirname(name)).replace('\\', '_').replace('/', '_')
+        kwargs = {}
 
-            setdefault('sprite-base-class', StringValue('.' + map_name + '-sprite'))
-            setdefault('sprite-dimensions', BooleanValue(False))
-            position = setdefault('position', NumberValue(0, '%'))
-            spacing = setdefault('spacing', NumberValue(0))
-            repeat = setdefault('repeat', StringValue('no-repeat'))
-            names = tuple(os.path.splitext(os.path.basename(file))[0] for file, storage in files)
-            for n in names:
-                setdefault(n + '-position', position)
-                setdefault(n + '-spacing', spacing)
-                setdefault(n + '-repeat', repeat)
-            sprite_map = _sprite_map(name, **kwargs)
-            rule[CONTEXT]['$' + map_name + '-' + 'sprites'] = sprite_map
-            ret = '''
-                @import "compass/utilities/sprites/base";
+        def setdefault(var, val):
+            _var = '$' + map_name + '-' + var
+            if _var in rule[CONTEXT]:
+                kwargs[var] = interpolate(rule[CONTEXT][_var], rule, self._func_registry)
+            else:
+                rule[CONTEXT][_var] = val
+                kwargs[var] = interpolate(val, rule, self._func_registry)
+            return rule[CONTEXT][_var]
 
-                // All sprites should extend this class
-                // The %(map_name)s-sprite mixin will do so for you.
-                #{$%(map_name)s-sprite-base-class} {
-                    background: $%(map_name)s-sprites;
-                }
+        setdefault('sprite-base-class', StringValue('.' + map_name + '-sprite'))
+        setdefault('sprite-dimensions', BooleanValue(False))
+        position = setdefault('position', NumberValue(0, '%'))
+        spacing = setdefault('spacing', NumberValue(0))
+        repeat = setdefault('repeat', StringValue('no-repeat'))
+        names = tuple(os.path.splitext(os.path.basename(file))[0] for file, storage in files)
+        for n in names:
+            setdefault(n + '-position', position)
+            setdefault(n + '-spacing', spacing)
+            setdefault(n + '-repeat', repeat)
+        sprite_map = _sprite_map(name, **kwargs)
+        rule[CONTEXT]['$' + map_name + '-' + 'sprites'] = sprite_map
+        ret = '''
+            @import "compass/utilities/sprites/base";
 
-                // Use this to set the dimensions of an element
-                // based on the size of the original image.
-                @mixin %(map_name)s-sprite-dimensions($name) {
-                    @include sprite-dimensions($%(map_name)s-sprites, $name);
-                }
+            // All sprites should extend this class
+            // The %(map_name)s-sprite mixin will do so for you.
+            #{$%(map_name)s-sprite-base-class} {
+                background: $%(map_name)s-sprites;
+            }
 
-                // Move the background position to display the sprite.
-                @mixin %(map_name)s-sprite-position($name, $offset-x: 0, $offset-y: 0) {
-                    @include sprite-position($%(map_name)s-sprites, $name, $offset-x, $offset-y);
-                }
+            // Use this to set the dimensions of an element
+            // based on the size of the original image.
+            @mixin %(map_name)s-sprite-dimensions($name) {
+                @include sprite-dimensions($%(map_name)s-sprites, $name);
+            }
 
-                // Extends the sprite base class and set the background position for the desired sprite.
-                // It will also apply the image dimensions if $dimensions is true.
-                @mixin %(map_name)s-sprite($name, $dimensions: $%(map_name)s-sprite-dimensions, $offset-x: 0, $offset-y: 0) {
-                    @extend #{$%(map_name)s-sprite-base-class};
-                    @include sprite($%(map_name)s-sprites, $name, $dimensions, $offset-x, $offset-y);
-                }
+            // Move the background position to display the sprite.
+            @mixin %(map_name)s-sprite-position($name, $offset-x: 0, $offset-y: 0) {
+                @include sprite-position($%(map_name)s-sprites, $name, $offset-x, $offset-y);
+            }
 
-                @mixin %(map_name)s-sprites($sprite-names, $dimensions: $%(map_name)s-sprite-dimensions) {
-                    @include sprites($%(map_name)s-sprites, $sprite-names, $%(map_name)s-sprite-base-class, $dimensions);
-                }
+            // Extends the sprite base class and set the background position for the desired sprite.
+            // It will also apply the image dimensions if $dimensions is true.
+            @mixin %(map_name)s-sprite($name, $dimensions: $%(map_name)s-sprite-dimensions, $offset-x: 0, $offset-y: 0) {
+                @extend #{$%(map_name)s-sprite-base-class};
+                @include sprite($%(map_name)s-sprites, $name, $dimensions, $offset-x, $offset-y);
+            }
 
-                // Generates a class for each sprited image.
-                @mixin all-%(map_name)s-sprites($dimensions: $%(map_name)s-sprite-dimensions) {
-                    @include %(map_name)s-sprites(%(sprites)s, $dimensions);
-                }
-            ''' % {'map_name': map_name, 'sprites': ' '.join(names)}
-            return ret
+            @mixin %(map_name)s-sprites($sprite-names, $dimensions: $%(map_name)s-sprite-dimensions) {
+                @include sprites($%(map_name)s-sprites, $sprite-names, $%(map_name)s-sprite-base-class, $dimensions);
+            }
+
+            // Generates a class for each sprited image.
+            @mixin all-%(map_name)s-sprites($dimensions: $%(map_name)s-sprite-dimensions) {
+                @include %(map_name)s-sprites(%(sprites)s, $dimensions);
+            }
+        ''' % {'map_name': map_name, 'sprites': ' '.join(names)}
+        return ret
 
     @print_timing(10)
     def _do_if(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
@@ -1094,20 +1092,22 @@ class Scss(object):
             frm = int(float(frm))
             through = int(float(through))
         except ValueError:
-            pass
-        else:
-            if frm > through:
-                frm, through = through, frm
-                rev = reversed
-            else:
-                rev = lambda x: x
-            var = var.strip()
-            var = self.do_glob_math(var, rule[CONTEXT], rule[OPTIONS], rule, True)
+            return
+        except Exception:
+            raise
 
-            for i in rev(range(frm, through + 1)):
-                rule[CODESTR] = c_codestr
-                rule[CONTEXT][var] = str(i)
-                self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+        if frm > through:
+            frm, through = through, frm
+            rev = reversed
+        else:
+            rev = lambda x: x
+        var = var.strip()
+        var = self.do_glob_math(var, rule[CONTEXT], rule[OPTIONS], rule, True)
+
+        for i in rev(range(frm, through + 1)):
+            rule[CODESTR] = c_codestr
+            rule[CONTEXT][var] = str(i)
+            self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
 
     @print_timing(10)
     def _do_each(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
@@ -1214,35 +1214,36 @@ class Scss(object):
         if c_property == self.construct and rule[MEDIA] == media:
             rule[CODESTR] = c_codestr
             self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
-        else:
-            c_property = self.apply_vars(c_property, rule[CONTEXT], rule[OPTIONS], rule, True)
+            return
 
-            c_selectors = self.normalize_selectors(c_property)
-            c_selectors, _, c_parents = c_selectors.partition(' extends ')
+        c_property = self.apply_vars(c_property, rule[CONTEXT], rule[OPTIONS], rule, True)
 
-            better_selectors = set()
-            c_selectors = c_selectors.split(',')
-            for c_selector in c_selectors:
-                for p_selector in p_selectors:
-                    if c_selector == self.construct:
-                        better_selectors.add(p_selector)
-                    elif '&' in c_selector:  # Parent References
-                        better_selectors.add(c_selector.replace('&', p_selector))
-                    elif p_selector:
-                        better_selectors.add(p_selector + ' ' + c_selector)
-                    else:
-                        better_selectors.add(c_selector)
-            better_selectors = ','.join(sorted(better_selectors))
+        c_selectors = self.normalize_selectors(c_property)
+        c_selectors, _, c_parents = c_selectors.partition(' extends ')
 
-            if c_parents:
-                parents = set(p.strip() for p in c_parents.split('&'))
-                parents.discard('')
-                if parents:
-                    better_selectors += ' extends ' + '&'.join(sorted(parents))
+        better_selectors = set()
+        c_selectors = c_selectors.split(',')
+        for c_selector in c_selectors:
+            for p_selector in p_selectors:
+                if c_selector == self.construct:
+                    better_selectors.add(p_selector)
+                elif '&' in c_selector:  # Parent References
+                    better_selectors.add(c_selector.replace('&', p_selector))
+                elif p_selector:
+                    better_selectors.add(p_selector + ' ' + c_selector)
+                else:
+                    better_selectors.add(c_selector)
+        better_selectors = ','.join(sorted(better_selectors))
 
-            _rule = spawn_rule(rule, codestr=c_codestr, deps=set(), context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=better_selectors, properties=[], final=False, media=media, lineno=c_lineno)
+        if c_parents:
+            parents = set(p.strip() for p in c_parents.split('&'))
+            parents.discard('')
+            if parents:
+                better_selectors += ' extends ' + '&'.join(sorted(parents))
 
-            p_children.appendleft(_rule)
+        _rule = spawn_rule(rule, codestr=c_codestr, deps=set(), context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=better_selectors, properties=[], final=False, media=media, lineno=c_lineno)
+
+        p_children.appendleft(_rule)
 
     @print_timing(4)
     def link_with_parents(self, parent, c_selectors, c_rules):
@@ -1264,28 +1265,30 @@ class Scss(object):
             # `.specialClass` for that rule, but if there's also a `.baseClass a`
             # it also should create `.specialClass a`
             for p_selector in _p_selectors:
-                if parent in p_selector:
-                    # get the new child selector to add (same as the parent selector but with the child name)
-                    # since selectors can be together, separated with # or . (i.e. something.parent) check that too:
-                    for c_selector in c_selectors.split(','):
-                        # Get whatever is different between the two selectors:
-                        _c_selector, _parent = c_selector, parent
-                        lcp = self.longest_common_prefix(_c_selector, _parent)
-                        if lcp:
-                            _c_selector = _c_selector[lcp:]
-                            _parent = _parent[lcp:]
-                        lcs = self.longest_common_suffix(_c_selector, _parent)
-                        if lcs:
-                            _c_selector = _c_selector[:-lcs]
-                            _parent = _parent[:-lcs]
-                        if _c_selector and _parent:
-                            # Get the new selectors:
-                            prev_symbol = '(?<![%#.:])' if _parent[0] in ('%', '#', '.', ':') else r'(?<![-\w%#.:])'
-                            post_symbol = r'(?![-\w])'
-                            new_parent = re.sub(prev_symbol + _parent + post_symbol, _c_selector, p_selector)
-                            if p_selector != new_parent:
-                                new_selectors.add(new_parent)
-                                found = True
+                if parent not in p_selector:
+                    continue
+
+                # get the new child selector to add (same as the parent selector but with the child name)
+                # since selectors can be together, separated with # or . (i.e. something.parent) check that too:
+                for c_selector in c_selectors.split(','):
+                    # Get whatever is different between the two selectors:
+                    _c_selector, _parent = c_selector, parent
+                    lcp = self.longest_common_prefix(_c_selector, _parent)
+                    if lcp:
+                        _c_selector = _c_selector[lcp:]
+                        _parent = _parent[lcp:]
+                    lcs = self.longest_common_suffix(_c_selector, _parent)
+                    if lcs:
+                        _c_selector = _c_selector[:-lcs]
+                        _parent = _parent[:-lcs]
+                    if _c_selector and _parent:
+                        # Get the new selectors:
+                        prev_symbol = '(?<![%#.:])' if _parent[0] in ('%', '#', '.', ':') else r'(?<![-\w%#.:])'
+                        post_symbol = r'(?![-\w])'
+                        new_parent = re.sub(prev_symbol + _parent + post_symbol, _c_selector, p_selector)
+                        if p_selector != new_parent:
+                            new_selectors.add(new_parent)
+                            found = True
 
             if found:
                 # add parent:
