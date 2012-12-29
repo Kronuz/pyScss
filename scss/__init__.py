@@ -1940,7 +1940,10 @@ class Scss(object):
         return __calculate_expr
 
     def do_glob_math(self, cont, context, options, rule, _dequote=False):
-        cont = unicode(cont)
+        try:
+            cont = unicode(cont)
+        except UnicodeDecodeError:
+            cont = unicode(str(cont), 'utf-8', 'strict')
         if '#{' not in cont:
             return cont
         cont = _expr_glob_re.sub(self._calculate_expr(context, options, rule, _dequote), cont)
