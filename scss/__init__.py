@@ -2080,7 +2080,11 @@ def eval_expr(expr, rule, func_registry, raw=False):
                 log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule[INDEX][rule[LINENO]])
                 if DEBUG:
                     raise
-            if '$' not in expr:
+
+            # TODO this is a clumsy hack for nondeterministic functions;
+            # something better (and per-compiler rather than global) would be
+            # nice
+            if '$' not in expr and '(' not in expr:
                 expr_cache[expr] = results
 
     if not raw and results is not None:
