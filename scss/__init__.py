@@ -634,11 +634,9 @@ class Scss(object):
     @print_timing(3)
     def parse_children(self):
         pos = 0
-        while True:
-            try:
-                rule = self.children.popleft()
-            except:
-                break
+        while self.children:
+            rule = self.children.popleft()
+
             # Check if the block has nested blocks and work it out:
             _selectors, _, _parents = rule[SELECTORS].partition(' extends ')
             _selectors = _selectors.split(',')
@@ -865,7 +863,7 @@ class Scss(object):
         for varname, value in new_params.items():
             try:
                 m_param = m_params[varname]
-            except KeyError:
+            except (IndexError, KeyError):
                 m_param = varname
             value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
             m_vars[m_param] = value
@@ -1428,7 +1426,8 @@ class Scss(object):
         return self._create_css(rules, scope, sc, sp, tb, nl, not compress and self.scss_opts.get('debug_info', False))
 
     def _create_css(self, rules, scope=None, sc=True, sp=' ', tb='  ', nl='\n', debug_info=False):
-        scope = set() if scope is None else scope
+        if scope is None:
+            scope = set()
 
         open_selectors = False
         skip_selectors = False
@@ -1557,9 +1556,12 @@ class Scss(object):
             wrap = textwrap.TextWrapper(break_long_words=False)
             wrap.wordsep_re = re.compile(r'(?<=,)(\s*)')
             wrap = wrap.wrap
+        if old_property is None:
+            old_property = [None]
+        if scope is None:
+            scope = set()
+
         result = ''
-        old_property = [None] if old_property is None else old_property
-        scope = set() if scope is None else scope
         for lineno, prop, value in properties:
             if value is not None:
                 if nl:
@@ -2066,9 +2068,9 @@ def eval_expr(expr, rule, func_registry, raw=False):
             results = expr
 
     if results is None:
-        try:
+        if expr in expr_cache:
             results = expr_cache[expr]
-        except KeyError:
+        else:
             try:
                 P = Calculator(CalculatorScanner(), func_registry)
                 P.reset(expr)
