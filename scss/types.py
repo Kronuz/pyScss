@@ -226,7 +226,7 @@ class NumberValue(Value):
             self.units = tokens.units.copy()
             if tokens.units:
                 type = None
-        elif isinstance(tokens, (StringValue, basestring)):
+        elif isinstance(tokens, (StringValue,)):
             tokens = getattr(tokens, 'value', tokens)
             if _undefined_re.match(tokens):
                 raise ValueError("Value is not a Number! (%s)" % tokens)
@@ -240,12 +240,8 @@ class NumberValue(Value):
                 raise ValueError("Value is not a Number! (%s)" % tokens)
         elif isinstance(tokens, (int, float)):
             self.value = float(tokens)
-        elif isinstance(tokens, (list, tuple)):
-            raise ValueError("Value is not a Number! (%r)" % list(tokens))
-        elif isinstance(tokens, (dict, ListValue)):
-            raise ValueError("Value is not a Number! (%r)" % tokens.values())
         else:
-            raise ValueError("Value is not a Number! (%s)" % tokens)
+            raise ValueError("Can't convert to CSS number: %r" % tokens)
         if type is not None:
             self.units = {type: _units_weights.get(type, 1), '_': type}
 
@@ -302,13 +298,9 @@ class NumberValue(Value):
                 ret.value[k] = op(first, ret.value[k])
             return ret
 
-        if isinstance(first, basestring):
-            first = StringValue(first)
-        elif isinstance(first, (int, float)):
+        if isinstance(first, (int, float)):
             first = NumberValue(first)
-        if isinstance(second, basestring):
-            second = StringValue(second)
-        elif isinstance(second, (int, float)):
+        if isinstance(second, (int, float)):
             second = NumberValue(second)
 
         if op in (operator.__div__, operator.__sub__):
@@ -486,8 +478,6 @@ class ListValue(Value):
 
     def first(self):
         for v in self.values():
-            if isinstance(v, basestring) and _undefined_re.match(v):
-                continue
             if bool(v):
                 return v
         return v
@@ -751,7 +741,7 @@ class StringValue(QuotedStringValue):
         if self.__class__ == QuotedStringValue or other.__class__ == QuotedStringValue:
             string_class = QuotedStringValue
         other = string_class(other)
-        if not isinstance(other, (QuotedStringValue, basestring)):
+        if not isinstance(other, QuotedStringValue):
             return string_class(self.value + '+' + other.value)
         return string_class(self.value + other.value)
 
