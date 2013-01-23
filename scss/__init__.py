@@ -856,7 +856,7 @@ class Scss(object):
         for varname, value in new_params.items():
             try:
                 m_param = m_params[varname]
-            except (IndexError, KeyError):
+            except (IndexError, KeyError, TypeError):
                 m_param = varname
             value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
             m_vars[m_param] = value
