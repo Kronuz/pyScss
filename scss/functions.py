@@ -77,6 +77,10 @@ class FunctionRegistry(object):
 
         return decorator
 
+    def add(self, function, name, argc=None):
+        key = (name, argc)
+        self._function_dict[key] = function
+
     def lookup(self, name, argc=None):
         """Find a function given its name and the number of arguments it takes.
         """
