@@ -28,4 +28,4 @@ def test_pair(scss_fn, css_fn):
     actual = actual.strip('\n')
     expected = expected.strip('\n')
 
-    assert actual == expected
+    assert expected == actual
