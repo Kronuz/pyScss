@@ -64,3 +64,10 @@ def depar(s):
     while s and s[0] == '(' and s[-1] == ')':
         s = s[1:-1]
     return s
+
+def normalize_var(var):
+    """Sass defines `foo_bar` and `foo-bar` as being identical, both in
+    variable names and functions/mixins.  This normalizes everything to use
+    dashes.
+    """
+    return var.replace('_', '-')

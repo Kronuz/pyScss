@@ -59,7 +59,7 @@ import scss.functions
 from scss.functions import _sprite_map
 from scss.parseutil import _inv
 from scss.types import BooleanValue, ColorValue, ListValue, NumberValue, ParserValue, QuotedStringValue, StringValue
-from scss.util import depar, dequote, split_params, to_str
+from scss.util import depar, dequote, normalize_var, split_params, to_str
 
 log = logging.getLogger(__name__)
 
@@ -97,13 +97,13 @@ _default_scss_files = {}  # Files to be compiled ({file: content, ...})
 _default_scss_index = {0: '<unknown>:0'}
 
 _default_scss_vars = {
-    '$BUILD_INFO': BUILD_INFO,
+    '$BUILD-INFO': BUILD_INFO,
     '$PROJECT': PROJECT,
     '$VERSION': VERSION,
     '$REVISION': REVISION,
     '$URL': URL,
     '$AUTHOR': AUTHOR,
-    '$AUTHOR_EMAIL': AUTHOR_EMAIL,
+    '$AUTHOR-EMAIL': AUTHOR_EMAIL,
     '$LICENSE': LICENSE,
 
     # unsafe chars will be hidden as vars
@@ -607,7 +607,7 @@ class Scss(object):
 
                 # Interpolate variables:
                 def _av(m):
-                    v = flat_context.get(m.group(2))
+                    v = flat_context.get(normalize_var(m.group(2)))
                     if v:
                         v = to_str(v)
                         if _dequote and m.group(1):
@@ -772,13 +772,13 @@ class Scss(object):
             return
 
         funct, params, _ = name.partition('(')
-        funct = funct.strip()
+        funct = normalize_var(funct.strip())
         params = split_params(depar(params + _))
         defaults = {}
         new_params = []
         for param in params:
             param, _, default = param.partition(':')
-            param = param.strip()
+            param = normalize_var(param.strip())
             default = default.strip()
             if param:
                 new_params.append(param)
@@ -798,7 +798,8 @@ class Scss(object):
                     m_codestr = mixin[2]
                     for i, a in enumerate(args):
                         m_vars[m_params[i]] = a
-                    m_vars.update(kwargs)
+                    for k, v in kwargs.items():
+                        m_vars['$' + normalize_var(k)] = v
                     _options = rule[OPTIONS].copy()
                     _rule = spawn_rule(R, codestr=m_codestr, context=m_vars, options=_options, deps=set(), properties=[], final=False, lineno=c_lineno)
                     self.manage_children(_rule, p_selectors, p_parents, p_children, (scope or '') + '', R[MEDIA])
@@ -823,7 +824,7 @@ class Scss(object):
         Implements @include, for @mixins
         """
         funct, params, _ = name.partition('(')
-        funct = funct.strip()
+        funct = normalize_var(funct.strip())
         funct = self.do_glob_math(funct, rule[CONTEXT], rule[OPTIONS], rule, True)
         params = split_params(depar(params + _))
         new_params = {}
@@ -1173,6 +1174,7 @@ class Scss(object):
             value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
         _prop = (scope or '') + prop
         if is_var or prop.startswith('$') and value is not None:
+            _prop = normalize_var(_prop)
             in_context = rule[CONTEXT].get(_prop)
             is_defined = not (in_context is None or isinstance(in_context, basestring) and _undefined_re.match(in_context))
             if isinstance(value, basestring):
@@ -1637,20 +1639,21 @@ class Scss(object):
 
 
 
-def interpolate(v, R, func_registry):
-    C, O = R[CONTEXT], R[OPTIONS]
-    vi = C.get(v, v)
-    if v != vi and isinstance(vi, basestring):
-        _vi = eval_expr(vi, R, func_registry, True)
+def interpolate(var, rule, func_registry):
+    context = rule[CONTEXT]
+    var = normalize_var(var)
+    value = context.get(var, var)
+    if var != value and isinstance(value, basestring):
+        _vi = eval_expr(value, rule, func_registry, True)
         if _vi is not None:
-            vi = _vi
-    return vi
+            value = _vi
+    return value
 
 
 def call(name, args, R, func_registry, is_function=True):
     C, O = R[CONTEXT], R[OPTIONS]
     # Function call:
-    _name = name.replace('_', '-')
+    _name = normalize_var(name)
     s = args and args.value.items() or []
     _args = [v for n, v in s if isinstance(n, int)]
     _kwargs = dict((str(n[1:]).replace('-', '_'), v) for n, v in s if not isinstance(n, int) and n != '_')
@@ -2049,6 +2052,8 @@ def eval_expr(expr, rule, func_registry, raw=False):
         results = expr
 
     if results is None:
+        if _variable_re.match(expr):
+            expr = normalize_var(expr)
         if expr in rule[CONTEXT]:
             chkd = {}
             while expr in rule[CONTEXT] and expr not in chkd:
