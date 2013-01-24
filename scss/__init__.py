@@ -35,8 +35,9 @@ xCSS:
     http://xcss.antpaw.org/docs/
 
 """
+from __future__ import absolute_import
 
-from scss_meta import BUILD_INFO, PROJECT, VERSION, REVISION, URL, AUTHOR, AUTHOR_EMAIL, LICENSE
+from scss.scss_meta import BUILD_INFO, PROJECT, VERSION, REVISION, URL, AUTHOR, AUTHOR_EMAIL, LICENSE
 
 __project__ = PROJECT
 __version__ = VERSION
@@ -68,10 +69,10 @@ log = logging.getLogger(__name__)
 locate_blocks = None
 Scanner = None
 try:
-    from _speedups import locate_blocks, Scanner, NoMoreTokens
+    from scss._speedups import locate_blocks, Scanner, NoMoreTokens
 except ImportError:
     print >>sys.stderr, "Scanning acceleration disabled (_speedups not found)!"
-    from _native import locate_blocks, Scanner, NoMoreTokens
+    from scss._native import locate_blocks, Scanner, NoMoreTokens
     pass
 
 ################################################################################
