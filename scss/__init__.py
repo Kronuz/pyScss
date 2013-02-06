@@ -1217,7 +1217,7 @@ class Scss(object):
             _rule[OPTIONS]['@content'] = c_codestr
             self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
         else:
-            log.error("Required mixin not found: %s:%d (%s)", funct, num_args, rule[INDEX][rule[LINENO]])
+            log.error("Required mixin not found: %s:%d (%s)", funct, num_args, rule[INDEX][rule[LINENO]], extra={'stack': True})
 
     @print_timing(10)
     def _do_content(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
@@ -3030,7 +3030,7 @@ def _sprite_map_name(map):
     map = StringValue(map).value
     sprite_map = sprite_maps.get(map)
     if not sprite_map:
-        log.error("No sprite map found: %s", map)
+        log.error("No sprite map found: %s", map, extra={'stack': True})
     if sprite_map:
         return StringValue(sprite_map['*n*'])
     return StringValue(None)
@@ -3047,9 +3047,9 @@ def _sprite_file(map, sprite):
     sprite_map = sprite_maps.get(map)
     sprite = sprite_map and sprite_map.get(sprite_name)
     if not sprite_map:
-        log.error("No sprite map found: %s", map)
+        log.error("No sprite map found: %s", map, extra={'stack': True})
     elif not sprite:
-        log.error("No sprite found: %s in %s", sprite_name, sprite_map['*n*'])
+        log.error("No sprite found: %s in %s", sprite_name, sprite_map['*n*'], extra={'stack': True})
     if sprite:
         return QuotedStringValue(sprite[1][0])
     return StringValue(None)
@@ -3071,9 +3071,9 @@ def _sprite(map, sprite, offset_x=None, offset_y=None):
     sprite_map = sprite_maps.get(map)
     sprite = sprite_map and sprite_map.get(sprite_name)
     if not sprite_map:
-        log.error("No sprite map found: %s", map)
+        log.error("No sprite map found: %s", map, extra={'stack': True})
     elif not sprite:
-        log.error("No sprite found: %s in %s", sprite_name, sprite_map['*n*'])
+        log.error("No sprite found: %s in %s", sprite_name, sprite_map['*n*'], extra={'stack': True})
     if sprite:
         url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
         x = NumberValue(offset_x or 0, 'px')
@@ -3094,7 +3094,7 @@ def _sprite_url(map):
     map = StringValue(map).value
     sprite_map = sprite_maps.get(map)
     if not sprite_map:
-        log.error("No sprite map found: %s", map)
+        log.error("No sprite map found: %s", map, extra={'stack': True})
     if sprite_map:
         url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
         url = "url(%s)" % escape(url)
@@ -3112,9 +3112,9 @@ def _sprite_position(map, sprite, offset_x=None, offset_y=None):
     sprite_map = sprite_maps.get(map)
     sprite = sprite_map and sprite_map.get(sprite_name)
     if not sprite_map:
-        log.error("No sprite map found: %s", map)
+        log.error("No sprite map found: %s", map, extra={'stack': True})
     elif not sprite:
-        log.error("No sprite found: %s in %s", sprite_name, sprite_map['*n*'])
+        log.error("No sprite found: %s in %s", sprite_name, sprite_map['*n*'], extra={'stack': True})
     if sprite:
         x = None
         if offset_x is not None and not isinstance(offset_x, NumberValue):
@@ -4993,7 +4993,7 @@ def call(name, args, R, is_function=True):
         sp = args and args.value.get('_') or ''
         if is_function:
             if not _css_functions_re.match(_name):
-                log.error("Required function not found: %s (%s)", _fn_a, R[INDEX][R[LINENO]])
+                log.error("Required function not found: %s (%s)", _fn_a, R[INDEX][R[LINENO]], extra={'stack': True})
             _args = (sp + ' ').join(to_str(v) for n, v in s if isinstance(n, int))
             _kwargs = (sp + ' ').join('%s: %s' % (n, to_str(v)) for n, v in s if not isinstance(n, int) and n != '_')
             if _args and _kwargs:
@@ -5513,7 +5513,7 @@ def eval_expr(expr, rule, raw=False):
                 if DEBUG:
                     raise
             except Exception, e:
-                log.error("Exception raised: %s in `%s' (%s)", e, expr, rule[INDEX][rule[LINENO]])
+                log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule[INDEX][rule[LINENO]])
                 if DEBUG:
                     raise
             if '$' not in expr:
