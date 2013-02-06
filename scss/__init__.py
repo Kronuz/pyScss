@@ -491,16 +491,16 @@ def spawn_rule(rule=None, **kwargs):
 def print_timing(level=0):
     def _print_timing(func):
         if VERBOSITY:
-            def wrapper(*arg):
+            def wrapper(*args, **kwargs):
                 if VERBOSITY >= level:
                     t1 = time.time()
-                    res = func(*arg)
+                    res = func(*args, **kwargs)
                     t2 = time.time()
                     profiling.setdefault(func.func_name, 0)
                     profiling[func.func_name] += (t2 - t1)
                     return res
                 else:
-                    return func(*arg)
+                    return func(*args, **kwargs)
             return wrapper
         else:
             return func
