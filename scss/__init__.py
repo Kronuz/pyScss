@@ -71,6 +71,7 @@ except ImportError:
 import re
 import sys
 import time
+import tempfile
 import textwrap
 from collections import deque
 try:
@@ -2920,7 +2921,13 @@ def _sprite_map(g, **kwargs):
             map['*k*'] = key
             map['*n*'] = map_name
             map['*t*'] = filetime
-            pickle.dump((asset, map, zip(files, sizes)), open(asset_path + '.cache', 'w'))
+
+            tmp_dir = ASSETS_ROOT
+            cache_tmp = tempfile.NamedTemporaryFile(delete=False, dir=tmp_dir)
+            pickle.dump((asset, map, zip(files, sizes)), cache_tmp)
+            cache_tmp.close()
+            os.rename(cache_tmp.name, asset_path + '.cache')
+
             sprite_maps[asset] = map
         for file, size in sizes:
             sprite_images[file] = size
