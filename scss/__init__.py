@@ -3935,7 +3935,7 @@ def _nest(*arguments):
         lst = arguments[0].values()
     else:
         lst = StringValue(arguments[0]).value.split(',')
-    ret = [s.strip() for s in lst if s.strip()]
+    ret = [unicode(s).strip() for s in lst if unicode(s).strip()]
     for arg in arguments[1:]:
         if isinstance(arg, ListValue):
             lst = arg.values()
@@ -3943,7 +3943,7 @@ def _nest(*arguments):
             lst = StringValue(arg).value.split(',')
         new_ret = []
         for s in lst:
-            s = s.strip()
+            s = unicode(s).strip()
             if s:
                 for r in ret:
                     new_ret.append(r + ' ' + s)
@@ -4716,6 +4716,9 @@ class QuotedStringValue(Value):
         return QuotedStringValue(self.value + type)
 
     def __str__(self):
+        return str(self.__unicode__())
+
+    def __unicode__(self):
         return '"%s"' % escape(self.value)
 
     @classmethod
@@ -4769,6 +4772,9 @@ class StringValue(QuotedStringValue):
         return hash((False, self.value))
 
     def __str__(self):
+        return str(self.__unicode__())
+
+    def __unicode__(self):
         return self.value
 
     def __add__(self, other):
