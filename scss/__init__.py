@@ -3946,7 +3946,13 @@ def _nest(*arguments):
             s = unicode(s).strip()
             if s:
                 for r in ret:
-                    new_ret.append(r + ' ' + s)
+                    if '&' in s:
+                        new_ret.append(s.replace('&', r))
+                    else:
+                        if r[-1] in ('.', ':', '#'):
+                            new_ret.append(r + s)
+                        else:
+                            new_ret.append(r + ' ' + s)
         ret = new_ret
     ret = sorted(set(ret))
     ret = dict(enumerate(ret))
