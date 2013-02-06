@@ -764,14 +764,14 @@ class Scss(object):
         self.clean()
 
     #@profile
-    @print_timing(2)
-    def Compilation(self, scss_string=None, scss_file=None, super_selector=None):
+    #@print_timing(2)
+    def Compilation(self, scss_string=None, scss_file=None, super_selector=None, filename=None):
         if super_selector:
             self.super_selector = super_selector + ' '
         if scss_string is not None:
-            self._scss_files = {'<string %r>' % (scss_string.strip()[:50] + '...'): scss_string}
+            self._scss_files = {filename or '<string %r>' % (scss_string.strip()[:50] + '...'): scss_string}
         elif scss_file is not None:
-            self._scss_files = {scss_file: open(scss_file).read()}
+            self._scss_files = {filename or scss_file: open(scss_file).read()}
 
         self.reset()
 
