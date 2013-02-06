@@ -331,9 +331,9 @@ _default_scss_opts = {
 }
 
 SEPARATOR = '\x00'
-_nl_re = re.compile(r'\s*\n\s*', re.MULTILINE)
+_nl_re = re.compile(r'[ \t\r\f\v]*\n[ \t\r\f\v]*', re.MULTILINE)
 _nl_num_re = re.compile(r'\n.+' + SEPARATOR, re.MULTILINE)
-_nl_num_nl_re = re.compile(r'\n.+' + SEPARATOR + r'\s*\n', re.MULTILINE)
+_nl_num_nl_re = re.compile(r'\n.+' + SEPARATOR + r'[ \t\r\f\v]*\n', re.MULTILINE)
 
 _short_color_re = re.compile(r'(?<!\w)#([a-f0-9])\1([a-f0-9])\2([a-f0-9])\3\b', re.IGNORECASE)
 _long_color_re = re.compile(r'(?<!\w)#([a-f0-9]){2}([a-f0-9]){2}([a-f0-9]){2}\b', re.IGNORECASE)
