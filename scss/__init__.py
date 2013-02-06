@@ -2776,10 +2776,10 @@ def _sprite_map(g, **kwargs):
         asset_file = key + '.png'
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
 
-        if os.path.exists(asset_path + '.cache'):
+        try:
             asset, map, sizes = pickle.load(open(asset_path + '.cache'))
             sprite_maps[asset] = map
-        else:
+        except:
             def images():
                 for file, storage in files:
                     yield Image.open(storage.open(file)) if storage is not None else Image.open(file)
