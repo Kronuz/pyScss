@@ -1259,6 +1259,8 @@ class Scss(object):
                         else:
                             load_path_list = LOAD_PATHS  # New style
 
+                        load_path_list.extend(self._scss_opts['load_paths'] if self._scss_opts and self._scss_opts.has_key('load_paths') else [])
+
                         for path in ['./'] + load_path_list:
                             for basepath in ['./', os.path.dirname(rule[PATH])]:
                                 i_codestr = None
@@ -1736,6 +1738,7 @@ class Scss(object):
         """
         Generate the final CSS string
         """
+        
         if fileid:
             rules = self._rules.get(fileid) or []
         else:
