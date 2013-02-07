@@ -50,11 +50,11 @@ __license__ = LICENSE
 import os
 PROJECT_ROOT = os.path.normpath(os.path.dirname(os.path.abspath(__file__)))
 # Sass @import load_paths:
-LOAD_PATHS = os.path.join(PROJECT_ROOT, 'sass/frameworks/')
+LOAD_PATHS = os.path.join(PROJECT_ROOT, 'sass/frameworks')
 # Assets path, where new sprite files are created:
-STATIC_ROOT = os.path.join(PROJECT_ROOT, 'static/')
+STATIC_ROOT = os.path.join(PROJECT_ROOT, 'static')
 # Assets path, where new sprite files are created:
-ASSETS_ROOT = os.path.join(PROJECT_ROOT, 'static/assets/')
+ASSETS_ROOT = os.path.join(PROJECT_ROOT, 'static/assets')
 # Urls for the static and assets:
 STATIC_URL = '/static/'
 ASSETS_URL = '/static/assets/'
@@ -3226,7 +3226,7 @@ def _stylesheet_url(path, only_path=False, cache_buster=True):
         except:
             filetime = 'NA'
     else:
-        _path = os.path.join(STATIC_ROOT, filepath)
+        _path = os.path.join(STATIC_ROOT, filepath.strip('/'))
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
         else:
@@ -3254,7 +3254,7 @@ def __font_url(path, only_path=False, cache_buster=True, inline=False):
         except:
             filetime = 'NA'
     else:
-        _path = os.path.join(STATIC_ROOT, filepath)
+        _path = os.path.join(STATIC_ROOT, filepath.strip('/'))
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
             if inline:
@@ -3351,9 +3351,7 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
         except:
             filetime = 'NA'
     else:
-        if filepath.startswith('/'):
-            filepath = filepath[1:]
-        _path = os.path.join(STATIC_ROOT, filepath)
+        _path = os.path.join(STATIC_ROOT, filepath.strip('/'))
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
             if inline or dst_color or spacing:
@@ -3486,27 +3484,27 @@ def _image_width(image):
     """
     if not Image:
         raise Exception("Images manipulation require PIL")
-    file = StringValue(image).value
+    filepath = StringValue(image).value
     path = None
     try:
-        width = sprite_images[file][0]
+        width = sprite_images[filepath][0]
     except KeyError:
         width = 0
         if callable(STATIC_ROOT):
             try:
-                _file, _storage = list(STATIC_ROOT(file))[0]
+                _file, _storage = list(STATIC_ROOT(filepath))[0]
                 path = _storage.open(_file)
             except:
                 pass
         else:
-            _path = os.path.join(STATIC_ROOT, file)
+            _path = os.path.join(STATIC_ROOT, filepath.strip('/'))
             if os.path.exists(_path):
                 path = open(_path, 'rb')
         if path:
             image = Image.open(path)
             size = image.size
             width = size[0]
-            sprite_images[file] = size
+            sprite_images[filepath] = size
     return NumberValue(width, 'px')
 
 
@@ -3517,27 +3515,27 @@ def _image_height(image):
     """
     if not Image:
         raise Exception("Images manipulation require PIL")
-    file = StringValue(image).value
+    filepath = StringValue(image).value
     path = None
     try:
-        height = sprite_images[file][1]
+        height = sprite_images[filepath][1]
     except KeyError:
         height = 0
         if callable(STATIC_ROOT):
             try:
-                _file, _storage = list(STATIC_ROOT(file))[0]
+                _file, _storage = list(STATIC_ROOT(filepath))[0]
                 path = _storage.open(_file)
             except:
                 pass
         else:
-            _path = os.path.join(STATIC_ROOT, file)
+            _path = os.path.join(STATIC_ROOT, filepath.strip('/'))
             if os.path.exists(_path):
                 path = open(_path, 'rb')
         if path:
             image = Image.open(path)
             size = image.size
             height = size[1]
-            sprite_images[file] = size
+            sprite_images[filepath] = size
     return NumberValue(height, 'px')
 
 
