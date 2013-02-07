@@ -2777,6 +2777,8 @@ def _sprite_map(g, **kwargs):
         key = list(zip(*files)[0]) + times + [repr(kwargs), ASSETS_URL]
         key = map_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
+        if not os.path.exists(ASSETS_ROOT):
+            os.makedirs(ASSETS_ROOT)
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
 
         try:
@@ -3500,6 +3502,8 @@ def _image_width(image):
                 pass
         else:
             _path = os.path.join(STATIC_ROOT, file)
+            if not os.path.exists(_path):
+                _path = STATIC_ROOT + file
             if os.path.exists(_path):
                 path = open(_path, 'rb')
         if path:
@@ -3531,6 +3535,8 @@ def _image_height(image):
                 pass
         else:
             _path = os.path.join(STATIC_ROOT, file)
+            if not os.path.exists(_path):
+                _path = STATIC_ROOT + file
             if os.path.exists(_path):
                 path = open(_path, 'rb')
         if path:
