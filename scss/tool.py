@@ -58,6 +58,8 @@ def main():
                       help="Static root path (Where images and static resources are located)")
     paths_group.add_option("-A", "--assets-root", metavar="PATH", dest="assets_root",
                       help="Assets root path (Sprite images will be created here)")
+    paths_group.add_option("-a", "--assets-url", metavar="URL", dest="assets_url",
+                      help="URL to reach the files in your assets_root")
     parser.add_option_group(paths_group)
 
     (options, args) = parser.parse_args()
@@ -89,6 +91,8 @@ def main():
             scss.LOAD_PATHS = ','.join(load_path_list)
         else:
             scss.LOAD_PATHS = load_path_list
+    if options.assets_url is not None:
+        scss.ASSETS_URL = options.assets_url
 
     # Execution modes
     if options.test:
