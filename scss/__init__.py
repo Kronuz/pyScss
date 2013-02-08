@@ -1775,6 +1775,7 @@ class Parser(object):
 ################################################################################
 #'(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'
 ## Grammar compiled using Yapps:
+
 class CalculatorScanner(CachedScanner):
     patterns = None
     _patterns = [
@@ -1821,10 +1822,6 @@ class CalculatorScanner(CachedScanner):
 
 
 class Calculator(Parser):
-    def __init__(self, scanner, func_registry):
-        self._func_registry = func_registry
-        super(Calculator, self).__init__(scanner)
-
     def goal(self, R):
         expr_lst = self.expr_lst(R)
         v = expr_lst.first() if len(expr_lst) == 1 else expr_lst
@@ -2040,6 +2037,11 @@ class Calculator(Parser):
 
 
     expr_lst_rsts_ = None
+
+    def __init__(self, scanner, func_registry):
+        self._func_registry = func_registry
+        super(Calculator, self).__init__(scanner)
+
 
 ### Grammar ends.
 ################################################################################

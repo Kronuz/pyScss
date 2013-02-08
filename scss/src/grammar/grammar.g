@@ -26,11 +26,11 @@ def _reorder_list(lst):
     return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
 
 
-def interpolate(v, R):
+def interpolate(v, R, func_registry):
     return v
 
 
-def call(fn, args, R, function=True):
+def call(fn, args, R, func_registry, function=True):
     print 'call: ', fn, args
     return args
 
@@ -72,52 +72,52 @@ parser Calculator:
                               END                           {{ return v }}
     rule expr<<R>>:         and_test<<R>>                   {{ v = and_test }}
                               (
-                                  OR and_test<<R>>          {{ v = and_test if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) else (v or and_test) }}
+                                  OR and_test<<R>>          {{ v = and_test if isinstance(v, basestring) and _undefined_re.match(v) else (v or and_test) }}
                               )*                            {{ return v }}
     rule and_test<<R>>:     not_test<<R>>                   {{ v = not_test }}
                               (
-                                  AND not_test<<R>>         {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) else (v and not_test) }}
+                                  AND not_test<<R>>         {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) else (v and not_test) }}
                               )*                            {{ return v }}
     rule not_test<<R>>:     comparison<<R>>                 {{ return comparison }}
                               |
                               (
-                                  NOT not_test<<R>>         {{ v = 'undefined' if isinstance(not_test, basestring) and (not_test == 'undefined' or not_test.startswith('$')) else (not not_test) }}
+                                  NOT not_test<<R>>         {{ v = 'undefined' if isinstance(not_test, basestring) and _undefined_re.match(not_test) else (not not_test) }}
                                   |
-                                  INV not_test<<R>>         {{ v = 'undefined' if isinstance(not_test, basestring) and (not_test == 'undefined' or not_test.startswith('$')) else _inv('!', not_test) }}
+                                  INV not_test<<R>>         {{ v = 'undefined' if isinstance(not_test, basestring) and _undefined_re.match(not_test) else _inv('!', not_test) }}
                               )+                            {{ return v }}
     rule comparison<<R>>:   a_expr<<R>>                     {{ v = a_expr }}
                               (
-                                  LT a_expr<<R>>            {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else (v < a_expr) }}
+                                  LT a_expr<<R>>            {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v < a_expr) }}
                                   |
-                                  GT a_expr<<R>>            {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else (v > a_expr) }}
+                                  GT a_expr<<R>>            {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v > a_expr) }}
                                   |
-                                  LE a_expr<<R>>            {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else (v <= a_expr) }}
+                                  LE a_expr<<R>>            {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v <= a_expr) }}
                                   |
-                                  GE a_expr<<R>>            {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else (v >= a_expr) }}
+                                  GE a_expr<<R>>            {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v >= a_expr) }}
                                   |
-                                  EQ a_expr<<R>>            {{ v = (None if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) else v) == (None if isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else a_expr) }}
+                                  EQ a_expr<<R>>            {{ v = (None if isinstance(v, basestring) and _undefined_re.match(v) else v) == (None if isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else a_expr) }}
                                   |
-                                  NE a_expr<<R>>            {{ v = (None if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) else v) != (None if isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else a_expr) }}
+                                  NE a_expr<<R>>            {{ v = (None if isinstance(v, basestring) and _undefined_re.match(v) else v) != (None if isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else a_expr) }}
                               )*                            {{ return v }}
     rule a_expr<<R>>:       m_expr<<R>>                     {{ v = m_expr }}
                               (
-                                  ADD m_expr<<R>>           {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(m_expr, basestring) and (m_expr == 'undefined' or m_expr.startswith('$')) else (v + m_expr) }}
+                                  ADD m_expr<<R>>           {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(m_expr, basestring) and _undefined_re.match(m_expr) else (v + m_expr) }}
                                   |
-                                  SUB m_expr<<R>>           {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(m_expr, basestring) and (m_expr == 'undefined' or m_expr.startswith('$')) else (v - m_expr) }}
+                                  SUB m_expr<<R>>           {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(m_expr, basestring) and _undefined_re.match(m_expr) else (v - m_expr) }}
                               )*                            {{ return v }}
     rule m_expr<<R>>:       u_expr<<R>>                     {{ v = u_expr }}
                               (
-                                  MUL u_expr<<R>>           {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(u_expr, basestring) and (u_expr == 'undefined' or u_expr.startswith('$')) else (v * u_expr) }}
+                                  MUL u_expr<<R>>           {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else (v * u_expr) }}
                                   |
-                                  DIV u_expr<<R>>           {{ v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(u_expr, basestring) and (u_expr == 'undefined' or u_expr.startswith('$')) else (v / u_expr) }}
+                                  DIV u_expr<<R>>           {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else (v / u_expr) }}
                               )*                            {{ return v }}
-    rule u_expr<<R>>:       SIGN u_expr<<R>>                {{ return 'undefined' if isinstance(u_expr, basestring) and (u_expr == 'undefined' or u_expr.startswith('$')) else _inv('-', u_expr) }}
+    rule u_expr<<R>>:       SIGN u_expr<<R>>                {{ return 'undefined' if isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else _inv('-', u_expr) }}
                               |
-                              ADD u_expr<<R>>               {{ return 'undefined' if isinstance(u_expr, basestring) and (u_expr == 'undefined' or u_expr.startswith('$')) else u_expr }}
+                              ADD u_expr<<R>>               {{ return 'undefined' if isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else u_expr }}
                               |
                               atom<<R>>                     {{ v = atom }}
                               [
-                                  UNITS                     {{ v = call(UNITS, ListValue(ParserValue({0: v, 1: UNITS})), R, False) }}
+                                  UNITS                     {{ v = call(UNITS, ListValue(ParserValue({0: v, 1: UNITS})), R, self._func_registry, False) }}
                               ]                             {{ return v }}
     rule atom<<R>>:         LPAR expr_lst<<R>> RPAR         {{ return expr_lst.first() if len(expr_lst) == 1 else expr_lst }}
                               |
@@ -126,7 +126,7 @@ parser Calculator:
                               FNCT                          {{ v = None }}
                               LPAR [
                                   expr_lst<<R>>             {{ v = expr_lst }}
-                              ] RPAR                        {{ return call(FNCT, v, R) }}
+                              ] RPAR                        {{ return call(FNCT, v, R, self._func_registry) }}
                               |
                               NUM                           {{ return NumberValue(ParserValue(NUM)) }}
                               |
@@ -138,7 +138,7 @@ parser Calculator:
                               |
                               COLOR                         {{ return ColorValue(ParserValue(COLOR)) }}
                               |
-                              VAR                           {{ return interpolate(VAR, R) }}
+                              VAR                           {{ return interpolate(VAR, R, self._func_registry) }}
     rule expr_lst<<R>>:                                     {{ n = None }}
                               [
                                   VAR [
@@ -161,6 +161,11 @@ parser Calculator:
                               )*                            {{ return ListValue(ParserValue(v)) if len(v) > 1 else v[0] }}
 %%
     expr_lst_rsts_ = None
+
+    def __init__(self, scanner, func_registry):
+        self._func_registry = func_registry
+        super(Calculator, self).__init__(scanner)
+
 
 ### Grammar ends.
 ################################################################################

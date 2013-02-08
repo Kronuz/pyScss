@@ -26,11 +26,11 @@ def _reorder_list(lst):
     return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
 
 
-def interpolate(v, R):
+def interpolate(v, R, func_registry):
     return v
 
 
-def call(fn, args, R, function=True):
+def call(fn, args, R, func_registry, function=True):
     print 'call: ', fn, args
     return args
 
@@ -101,7 +101,7 @@ class Calculator(Parser):
         while self._peek(self.expr_rsts) == 'OR':
             OR = self._scan('OR')
             and_test = self.and_test(R)
-            v = and_test if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) else (v or and_test)
+            v = and_test if isinstance(v, basestring) and _undefined_re.match(v) else (v or and_test)
         return v
 
     def and_test(self, R):
@@ -110,7 +110,7 @@ class Calculator(Parser):
         while self._peek(self.and_test_rsts) == 'AND':
             AND = self._scan('AND')
             not_test = self.not_test(R)
-            v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) else (v and not_test)
+            v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) else (v and not_test)
         return v
 
     def not_test(self, R):
@@ -124,11 +124,11 @@ class Calculator(Parser):
                 if _token_ == 'NOT':
                     NOT = self._scan('NOT')
                     not_test = self.not_test(R)
-                    v = 'undefined' if isinstance(not_test, basestring) and (not_test == 'undefined' or not_test.startswith('$')) else (not not_test)
+                    v = 'undefined' if isinstance(not_test, basestring) and _undefined_re.match(not_test) else (not not_test)
                 else:  # == 'INV'
                     INV = self._scan('INV')
                     not_test = self.not_test(R)
-                    v = 'undefined' if isinstance(not_test, basestring) and (not_test == 'undefined' or not_test.startswith('$')) else _inv('!', not_test)
+                    v = 'undefined' if isinstance(not_test, basestring) and _undefined_re.match(not_test) else _inv('!', not_test)
                 if self._peek(self.not_test_rsts_) not in self.not_test_chks:
                     break
             return v
@@ -141,27 +141,27 @@ class Calculator(Parser):
             if _token_ == 'LT':
                 LT = self._scan('LT')
                 a_expr = self.a_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else (v < a_expr)
+                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v < a_expr)
             elif _token_ == 'GT':
                 GT = self._scan('GT')
                 a_expr = self.a_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else (v > a_expr)
+                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v > a_expr)
             elif _token_ == 'LE':
                 LE = self._scan('LE')
                 a_expr = self.a_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else (v <= a_expr)
+                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v <= a_expr)
             elif _token_ == 'GE':
                 GE = self._scan('GE')
                 a_expr = self.a_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else (v >= a_expr)
+                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v >= a_expr)
             elif _token_ == 'EQ':
                 EQ = self._scan('EQ')
                 a_expr = self.a_expr(R)
-                v = (None if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) else v) == (None if isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else a_expr)
+                v = (None if isinstance(v, basestring) and _undefined_re.match(v) else v) == (None if isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else a_expr)
             else:  # == 'NE'
                 NE = self._scan('NE')
                 a_expr = self.a_expr(R)
-                v = (None if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) else v) != (None if isinstance(a_expr, basestring) and (a_expr == 'undefined' or a_expr.startswith('$')) else a_expr)
+                v = (None if isinstance(v, basestring) and _undefined_re.match(v) else v) != (None if isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else a_expr)
         return v
 
     def a_expr(self, R):
@@ -172,11 +172,11 @@ class Calculator(Parser):
             if _token_ == 'ADD':
                 ADD = self._scan('ADD')
                 m_expr = self.m_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(m_expr, basestring) and (m_expr == 'undefined' or m_expr.startswith('$')) else (v + m_expr)
+                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(m_expr, basestring) and _undefined_re.match(m_expr) else (v + m_expr)
             else:  # == 'SUB'
                 SUB = self._scan('SUB')
                 m_expr = self.m_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(m_expr, basestring) and (m_expr == 'undefined' or m_expr.startswith('$')) else (v - m_expr)
+                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(m_expr, basestring) and _undefined_re.match(m_expr) else (v - m_expr)
         return v
 
     def m_expr(self, R):
@@ -187,11 +187,11 @@ class Calculator(Parser):
             if _token_ == 'MUL':
                 MUL = self._scan('MUL')
                 u_expr = self.u_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(u_expr, basestring) and (u_expr == 'undefined' or u_expr.startswith('$')) else (v * u_expr)
+                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else (v * u_expr)
             else:  # == 'DIV'
                 DIV = self._scan('DIV')
                 u_expr = self.u_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and (v == 'undefined' or v.startswith('$')) or isinstance(u_expr, basestring) and (u_expr == 'undefined' or u_expr.startswith('$')) else (v / u_expr)
+                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else (v / u_expr)
         return v
 
     def u_expr(self, R):
@@ -199,17 +199,17 @@ class Calculator(Parser):
         if _token_ == 'SIGN':
             SIGN = self._scan('SIGN')
             u_expr = self.u_expr(R)
-            return 'undefined' if isinstance(u_expr, basestring) and (u_expr == 'undefined' or u_expr.startswith('$')) else _inv('-', u_expr)
+            return 'undefined' if isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else _inv('-', u_expr)
         elif _token_ == 'ADD':
             ADD = self._scan('ADD')
             u_expr = self.u_expr(R)
-            return 'undefined' if isinstance(u_expr, basestring) and (u_expr == 'undefined' or u_expr.startswith('$')) else u_expr
+            return 'undefined' if isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else u_expr
         else:  # in self.u_expr_chks
             atom = self.atom(R)
             v = atom
             if self._peek(self.u_expr_rsts_) == 'UNITS':
                 UNITS = self._scan('UNITS')
-                v = call(UNITS, ListValue(ParserValue({0: v, 1: UNITS})), R, False)
+                v = call(UNITS, ListValue(ParserValue({0: v, 1: UNITS})), R, self._func_registry, False)
             return v
 
     def atom(self, R):
@@ -230,7 +230,7 @@ class Calculator(Parser):
                 expr_lst = self.expr_lst(R)
                 v = expr_lst
             RPAR = self._scan('RPAR')
-            return call(FNCT, v, R)
+            return call(FNCT, v, R, self._func_registry)
         elif _token_ == 'NUM':
             NUM = self._scan('NUM')
             return NumberValue(ParserValue(NUM))
@@ -248,7 +248,7 @@ class Calculator(Parser):
             return ColorValue(ParserValue(COLOR))
         else:  # == 'VAR'
             VAR = self._scan('VAR')
-            return interpolate(VAR, R)
+            return interpolate(VAR, R, self._func_registry)
 
     def expr_lst(self, R):
         n = None
@@ -304,6 +304,11 @@ class Calculator(Parser):
 
 
     expr_lst_rsts_ = None
+
+    def __init__(self, scanner, func_registry):
+        self._func_registry = func_registry
+        super(Calculator, self).__init__(scanner)
+
 
 ### Grammar ends.
 ################################################################################
