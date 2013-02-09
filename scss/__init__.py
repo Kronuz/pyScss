@@ -35,7 +35,7 @@ xCSS:
     http://xcss.antpaw.org/docs/
 
 """
-
+import config
 from scss_meta import BUILD_INFO, PROJECT, VERSION, REVISION, URL, AUTHOR, AUTHOR_EMAIL, LICENSE
 
 __project__ = PROJECT
@@ -43,24 +43,7 @@ __version__ = VERSION
 __author__ = AUTHOR + ' <' + AUTHOR_EMAIL + '>'
 __license__ = LICENSE
 
-
-################################################################################
-# Configuration:
-
 import os
-PROJECT_ROOT = os.path.normpath(os.path.dirname(os.path.abspath(__file__)))
-# Sass @import load_paths:
-LOAD_PATHS = os.path.join(PROJECT_ROOT, 'sass/frameworks')
-# Assets path, where new sprite files are created:
-STATIC_ROOT = os.path.join(PROJECT_ROOT, 'static')
-# Assets path, where new sprite files are created:
-ASSETS_ROOT = os.path.join(PROJECT_ROOT, 'static/assets')
-# Urls for the static and assets:
-STATIC_URL = '/static/'
-ASSETS_URL = '/static/assets/'
-VERBOSITY = 1
-DEBUG = 0
-
 import logging
 log = logging.getLogger(__name__)
 
@@ -322,7 +305,7 @@ _default_scss_vars = {
 }
 
 _default_scss_opts = {
-    'verbosity': VERBOSITY,
+    'verbosity': config.VERBOSITY,
     'compress': 1,
     'compress_short_colors': 1,  # Converts things like #RRGGBB to #RGB
     'compress_reverse_colors': 1,  # Gets the shortest name of all for colors
@@ -490,9 +473,9 @@ def spawn_rule(rule=None, **kwargs):
 
 def print_timing(level=0):
     def _print_timing(func):
-        if VERBOSITY:
+        if config.VERBOSITY:
             def wrapper(*args, **kwargs):
-                if VERBOSITY >= level:
+                if config.VERBOSITY >= level:
                     t1 = time.time()
                     res = func(*args, **kwargs)
                     t2 = time.time()
@@ -976,11 +959,9 @@ class Scss(object):
     @print_timing(3)
     def parse_children(self):
         pos = 0
-        while True:
-            try:
-                rule = self.children.popleft()
-            except:
-                break
+        while self.children:
+            rule = self.children.popleft()
+
             # Check if the block has nested blocks and work it out:
             _selectors, _, _parents = rule[SELECTORS].partition(' extends ')
             _selectors = _selectors.split(',')
@@ -1043,14 +1024,13 @@ class Scss(object):
                 elif code == '@dump_options':
                     log.info(repr(rule[OPTIONS]))
                 elif code == '@debug':
-                    global DEBUG
                     name = name.strip()
                     if name.lower() in ('1', 'true', 't', 'yes', 'y', 'on'):
                         name = 1
                     elif name.lower() in ('0', 'false', 'f', 'no', 'n', 'off', 'undefined'):
                         name = 0
-                    DEBUG = name
-                    log.info("Debug mode is %s", 'On' if DEBUG else 'Off')
+                    config.DEBUG = name
+                    log.info("Debug mode is %s", 'On' if config.DEBUG else 'Off')
                 elif code == '@option':
                     self._settle_options(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@content':
@@ -1119,52 +1099,54 @@ class Scss(object):
         """
         Implements @mixin and @function
         """
-        if name:
-            funct, params, _ = name.partition('(')
-            funct = funct.strip()
-            params = split_params(depar(params + _))
-            defaults = {}
-            new_params = []
-            for param in params:
-                param, _, default = param.partition(':')
-                param = param.strip()
-                default = default.strip()
-                if param:
-                    new_params.append(param)
-                    if default:
-                        default = self.apply_vars(default, rule[CONTEXT], None, rule)
-                        defaults[param] = default
-            context = rule[CONTEXT].copy()
-            for p in new_params:
-                context.pop(p, None)
-            mixin = [list(new_params), defaults, self.apply_vars(c_codestr, context, None, rule)]
-            if code == '@function':
-                def _call(mixin):
-                    def __call(R, *args, **kwargs):
-                        m_params = mixin[0]
-                        m_vars = rule[CONTEXT].copy()
-                        m_vars.update(mixin[1])
-                        m_codestr = mixin[2]
-                        for i, a in enumerate(args):
-                            m_vars[m_params[i]] = a
-                        m_vars.update(kwargs)
-                        _options = rule[OPTIONS].copy()
-                        _rule = spawn_rule(R, codestr=m_codestr, context=m_vars, options=_options, deps=set(), properties=[], final=False, lineno=c_lineno)
-                        self.manage_children(_rule, p_selectors, p_parents, p_children, (scope or '') + '', R[MEDIA])
-                        ret = _rule[OPTIONS].pop('@return', '')
-                        return ret
-                    return __call
-                _mixin = _call(mixin)
-                _mixin.mixin = mixin
-                mixin = _mixin
-            # Insert as many @mixin options as the default parameters:
-            while len(new_params):
-                rule[OPTIONS]['%s %s:%d' % (code, funct, len(new_params))] = mixin
-                param = new_params.pop()
-                if param not in defaults:
-                    break
-            if not new_params:
-                rule[OPTIONS][code + ' ' + funct + ':0'] = mixin
+        if not name:
+            return
+
+        funct, params, _ = name.partition('(')
+        funct = funct.strip()
+        params = split_params(depar(params + _))
+        defaults = {}
+        new_params = []
+        for param in params:
+            param, _, default = param.partition(':')
+            param = param.strip()
+            default = default.strip()
+            if param:
+                new_params.append(param)
+                if default:
+                    default = self.apply_vars(default, rule[CONTEXT], None, rule)
+                    defaults[param] = default
+        context = rule[CONTEXT].copy()
+        for p in new_params:
+            context.pop(p, None)
+        mixin = [list(new_params), defaults, self.apply_vars(c_codestr, context, None, rule)]
+        if code == '@function':
+            def _call(mixin):
+                def __call(R, *args, **kwargs):
+                    m_params = mixin[0]
+                    m_vars = rule[CONTEXT].copy()
+                    m_vars.update(mixin[1])
+                    m_codestr = mixin[2]
+                    for i, a in enumerate(args):
+                        m_vars[m_params[i]] = a
+                    m_vars.update(kwargs)
+                    _options = rule[OPTIONS].copy()
+                    _rule = spawn_rule(R, codestr=m_codestr, context=m_vars, options=_options, deps=set(), properties=[], final=False, lineno=c_lineno)
+                    self.manage_children(_rule, p_selectors, p_parents, p_children, (scope or '') + '', R[MEDIA])
+                    ret = _rule[OPTIONS].pop('@return', '')
+                    return ret
+                return __call
+            _mixin = _call(mixin)
+            _mixin.mixin = mixin
+            mixin = _mixin
+        # Insert as many @mixin options as the default parameters:
+        while len(new_params):
+            rule[OPTIONS]['%s %s:%d' % (code, funct, len(new_params))] = mixin
+            param = new_params.pop()
+            if param not in defaults:
+                break
+        if not new_params:
+            rule[OPTIONS][code + ' ' + funct + ':0'] = mixin
 
     @print_timing(10)
     def _do_include(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
@@ -1195,29 +1177,30 @@ class Scss(object):
             mixin = rule[OPTIONS].get('@mixin %s:1' % (funct,))
             if mixin and all(map(lambda o: isinstance(o, int), new_params.keys())):
                 new_params = {0: ', '.join(new_params.values())}
-        if mixin:
-            m_params = mixin[0]
-            m_vars = mixin[1].copy()
-            m_codestr = mixin[2]
-            for varname, value in new_params.items():
-                try:
-                    m_param = m_params[varname]
-                except:
-                    m_param = varname
-                value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
-                m_vars[m_param] = value
-            for p in m_params:
-                if p not in new_params:
-                    if isinstance(m_vars[p], basestring):
-                        value = self.calculate(m_vars[p], m_vars, rule[OPTIONS], rule)
-                        m_vars[p] = value
-            _context = rule[CONTEXT].copy()
-            _context.update(m_vars)
-            _rule = spawn_rule(rule, codestr=m_codestr, context=_context, lineno=c_lineno)
-            _rule[OPTIONS]['@content'] = c_codestr
-            self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
-        else:
+        if not mixin:
             log.error("Required mixin not found: %s:%d (%s)", funct, num_args, rule[INDEX][rule[LINENO]], extra={'stack': True})
+            return
+
+        m_params = mixin[0]
+        m_vars = mixin[1].copy()
+        m_codestr = mixin[2]
+        for varname, value in new_params.items():
+            try:
+                m_param = m_params[varname]
+            except:
+                m_param = varname
+            value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
+            m_vars[m_param] = value
+        for p in m_params:
+            if p not in new_params:
+                if isinstance(m_vars[p], basestring):
+                    value = self.calculate(m_vars[p], m_vars, rule[OPTIONS], rule)
+                    m_vars[p] = value
+        _context = rule[CONTEXT].copy()
+        _context.update(m_vars)
+        _rule = spawn_rule(rule, codestr=m_codestr, context=_context, lineno=c_lineno)
+        _rule[OPTIONS]['@content'] = c_codestr
+        self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
 
     @print_timing(10)
     def _do_content(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
@@ -1236,80 +1219,86 @@ class Scss(object):
         Implements @import
         Load and import mixins and functions and rules
         """
+        # Protect against going to prohibited places...
+        if '..' in name or '://' in name or 'url(' in name:
+            rule[PROPERTIES].append((c_lineno, c_property, None))
+            return
+
         full_filename = None
         i_codestr = None
-        if '..' not in name and '://' not in name and 'url(' not in name:  # Protect against going to prohibited places...
-            names = name.split(',')
-            for name in names:
-                name = dequote(name.strip())
-                if '@import ' + name not in rule[OPTIONS]:  # If already imported in this scope, skip...
-                    unsupported = []
-                    load_paths = []
-                    try:
-                        i_codestr = self.scss_files[name]
-                    except KeyError:
-                        filename = os.path.basename(name)
-                        dirname = os.path.dirname(name)
+        names = name.split(',')
+        for name in names:
+            name = dequote(name.strip())
+            if '@import ' + name in rule[OPTIONS]:
+                # If already imported in this scope, skip
+                continue
+
+            unsupported = []
+            load_paths = []
+            filename = os.path.basename(name)
+            dirname = os.path.dirname(name)
+            try:
+                i_codestr = self.scss_files[name]
+            except KeyError:
+                i_codestr = None
+
+                # TODO: Convert global config.LOAD_PATHS to a list. Use it directly.
+                # Doing the above will break backwards compatibility!
+                if hasattr(config.LOAD_PATHS, 'split'):
+                    load_path_list = config.LOAD_PATHS.split(',')  # Old style
+                else:
+                    load_path_list = config.LOAD_PATHS  # New style
+
+                load_path_list.extend(self._scss_opts['load_paths'] if self._scss_opts and 'load_paths' in self._scss_opts else [])
+
+                for path in ['./'] + load_path_list:
+                    for basepath in ['./', os.path.dirname(rule[PATH])]:
                         i_codestr = None
-
-                        # TODO: Convert global LOAD_PATHS to a list. Use it directly.
-                        # Doing the above will break backwards compatibility!
-                        if hasattr(LOAD_PATHS, 'split'):
-                            load_path_list = LOAD_PATHS.split(',')  # Old style
-                        else:
-                            load_path_list = LOAD_PATHS  # New style
-
-                        load_path_list.extend(self._scss_opts['load_paths'] if self._scss_opts and self._scss_opts.has_key('load_paths') else [])
-
-                        for path in ['./'] + load_path_list:
-                            for basepath in ['./', os.path.dirname(rule[PATH])]:
-                                i_codestr = None
-                                full_path = os.path.realpath(os.path.join(path, basepath, dirname))
-                                if full_path not in load_paths:
+                        full_path = os.path.realpath(os.path.join(path, basepath, dirname))
+                        if full_path in load_paths:
+                            continue
+                        try:
+                            full_filename = os.path.join(full_path, '_' + filename)
+                            i_codestr = open(full_filename + '.scss').read()
+                            full_filename += '.scss'
+                        except IOError:
+                            if os.path.exists(full_filename + '.sass'):
+                                unsupported.append(full_filename + '.sass')
+                            try:
+                                full_filename = os.path.join(full_path, filename)
+                                i_codestr = open(full_filename + '.scss').read()
+                                full_filename += '.scss'
+                            except IOError:
+                                if os.path.exists(full_filename + '.sass'):
+                                    unsupported.append(full_filename + '.sass')
+                                try:
+                                    full_filename = os.path.join(full_path, '_' + filename)
+                                    i_codestr = open(full_filename).read()
+                                except IOError:
                                     try:
-                                        full_filename = os.path.join(full_path, '_' + filename)
-                                        i_codestr = open(full_filename + '.scss').read()
-                                        full_filename += '.scss'
+                                        full_filename = os.path.join(full_path, filename)
+                                        i_codestr = open(full_filename).read()
                                     except IOError:
-                                        if os.path.exists(full_filename + '.sass'):
-                                            unsupported.append(full_filename + '.sass')
-                                        try:
-                                            full_filename = os.path.join(full_path, filename)
-                                            i_codestr = open(full_filename + '.scss').read()
-                                            full_filename += '.scss'
-                                        except IOError:
-                                            if os.path.exists(full_filename + '.sass'):
-                                                unsupported.append(full_filename + '.sass')
-                                            try:
-                                                full_filename = os.path.join(full_path, '_' + filename)
-                                                i_codestr = open(full_filename).read()
-                                            except IOError:
-                                                try:
-                                                    full_filename = os.path.join(full_path, filename)
-                                                    i_codestr = open(full_filename).read()
-                                                except IOError:
-                                                    pass
-                                    if i_codestr is not None:
-                                        break
-                                    else:
-                                        load_paths.append(full_path)
-                            if i_codestr is not None:
-                                break
-                        if i_codestr is None:
-                            i_codestr = self._do_magic_import(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
-                        i_codestr = self.scss_files[name] = i_codestr and self.load_string(i_codestr, full_filename)
-                        if name not in self.scss_files:
-                            self._scss_files_order.append(name)
-                    if i_codestr is None:
-                        load_paths = load_paths and "\nLoad paths:\n\t%s" % "\n\t".join(load_paths) or ''
-                        unsupported = unsupported and "\nPossible matches (for unsupported file format SASS):\n\t%s" % "\n\t".join(unsupported) or ''
-                        log.warn("File to import not found or unreadable: '%s' (%s)%s%s", filename, rule[INDEX][rule[LINENO]], load_paths, unsupported)
-                    else:
-                        _rule = spawn_rule(rule, codestr=i_codestr, path=full_filename, lineno=c_lineno)
-                        self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
-                        rule[OPTIONS]['@import ' + name] = True
-        else:
-            rule[PROPERTIES].append((c_lineno, c_property, None))
+                                        pass
+                        if i_codestr is not None:
+                            break
+                        else:
+                            load_paths.append(full_path)
+                    if i_codestr is not None:
+                        break
+                if i_codestr is None:
+                    i_codestr = self._do_magic_import(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                i_codestr = self.scss_files[name] = i_codestr and self.load_string(i_codestr, full_filename)
+                if name not in self.scss_files:
+                    self._scss_files_order.append(name)
+            if i_codestr is None:
+                load_paths = load_paths and "\nLoad paths:\n\t%s" % "\n\t".join(load_paths) or ''
+                unsupported = unsupported and "\nPossible matches (for unsupported file format SASS):\n\t%s" % "\n\t".join(unsupported) or ''
+                log.warn("File to import not found or unreadable: '%s' (%s)%s%s", filename, rule[INDEX][rule[LINENO]], load_paths, unsupported)
+            else:
+                _rule = spawn_rule(rule, codestr=i_codestr, path=full_filename, lineno=c_lineno)
+                self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
+                rule[OPTIONS]['@import ' + name] = True
 
     @print_timing(10)
     def _do_magic_import(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
@@ -1317,76 +1306,78 @@ class Scss(object):
         Implements @import for sprite-maps
         Imports magic sprite map directories
         """
-        if callable(STATIC_ROOT):
-            files = sorted(STATIC_ROOT(name))
+        if callable(config.STATIC_ROOT):
+            files = sorted(config.STATIC_ROOT(name))
         else:
-            glob_path = os.path.join(STATIC_ROOT, name)
+            glob_path = os.path.join(config.STATIC_ROOT, name)
             files = glob.glob(glob_path)
-            files = sorted((file[len(STATIC_ROOT):], None) for file in files)
+            files = sorted((file[len(config.STATIC_ROOT):], None) for file in files)
 
-        if files:
-            # Build magic context
-            map_name = os.path.normpath(os.path.dirname(name)).replace('\\', '_').replace('/', '_')
-            kwargs = {}
+        if not files:
+            return
 
-            def setdefault(var, val):
-                _var = '$' + map_name + '-' + var
-                if _var in rule[CONTEXT]:
-                    kwargs[var] = interpolate(rule[CONTEXT][_var], rule)
-                else:
-                    rule[CONTEXT][_var] = val
-                    kwargs[var] = interpolate(val, rule)
-                return rule[CONTEXT][_var]
+        # Build magic context
+        map_name = os.path.normpath(os.path.dirname(name)).replace('\\', '_').replace('/', '_')
+        kwargs = {}
 
-            setdefault('sprite-base-class', StringValue('.' + map_name + '-sprite'))
-            setdefault('sprite-dimensions', BooleanValue(False))
-            position = setdefault('position', NumberValue(0, '%'))
-            spacing = setdefault('spacing', NumberValue(0))
-            repeat = setdefault('repeat', StringValue('no-repeat'))
-            names = tuple(os.path.splitext(os.path.basename(file))[0] for file, storage in files)
-            for n in names:
-                setdefault(n + '-position', position)
-                setdefault(n + '-spacing', spacing)
-                setdefault(n + '-repeat', repeat)
-            sprite_map = _sprite_map(name, **kwargs)
-            rule[CONTEXT]['$' + map_name + '-' + 'sprites'] = sprite_map
-            ret = '''
-                @import "compass/utilities/sprites/base";
+        def setdefault(var, val):
+            _var = '$' + map_name + '-' + var
+            if _var in rule[CONTEXT]:
+                kwargs[var] = interpolate(rule[CONTEXT][_var], rule)
+            else:
+                rule[CONTEXT][_var] = val
+                kwargs[var] = interpolate(val, rule)
+            return rule[CONTEXT][_var]
 
-                // All sprites should extend this class
-                // The %(map_name)s-sprite mixin will do so for you.
-                #{$%(map_name)s-sprite-base-class} {
-                    background: $%(map_name)s-sprites;
-                }
+        setdefault('sprite-base-class', StringValue('.' + map_name + '-sprite'))
+        setdefault('sprite-dimensions', BooleanValue(False))
+        position = setdefault('position', NumberValue(0, '%'))
+        spacing = setdefault('spacing', NumberValue(0))
+        repeat = setdefault('repeat', StringValue('no-repeat'))
+        names = tuple(os.path.splitext(os.path.basename(file))[0] for file, storage in files)
+        for n in names:
+            setdefault(n + '-position', position)
+            setdefault(n + '-spacing', spacing)
+            setdefault(n + '-repeat', repeat)
+        sprite_map = _sprite_map(name, **kwargs)
+        rule[CONTEXT]['$' + map_name + '-' + 'sprites'] = sprite_map
+        ret = '''
+            @import "compass/utilities/sprites/base";
 
-                // Use this to set the dimensions of an element
-                // based on the size of the original image.
-                @mixin %(map_name)s-sprite-dimensions($name) {
-                    @include sprite-dimensions($%(map_name)s-sprites, $name);
-                }
+            // All sprites should extend this class
+            // The %(map_name)s-sprite mixin will do so for you.
+            #{$%(map_name)s-sprite-base-class} {
+                background: $%(map_name)s-sprites;
+            }
 
-                // Move the background position to display the sprite.
-                @mixin %(map_name)s-sprite-position($name, $offset-x: 0, $offset-y: 0) {
-                    @include sprite-position($%(map_name)s-sprites, $name, $offset-x, $offset-y);
-                }
+            // Use this to set the dimensions of an element
+            // based on the size of the original image.
+            @mixin %(map_name)s-sprite-dimensions($name) {
+                @include sprite-dimensions($%(map_name)s-sprites, $name);
+            }
 
-                // Extends the sprite base class and set the background position for the desired sprite.
-                // It will also apply the image dimensions if $dimensions is true.
-                @mixin %(map_name)s-sprite($name, $dimensions: $%(map_name)s-sprite-dimensions, $offset-x: 0, $offset-y: 0) {
-                    @extend #{$%(map_name)s-sprite-base-class};
-                    @include sprite($%(map_name)s-sprites, $name, $dimensions, $offset-x, $offset-y);
-                }
+            // Move the background position to display the sprite.
+            @mixin %(map_name)s-sprite-position($name, $offset-x: 0, $offset-y: 0) {
+                @include sprite-position($%(map_name)s-sprites, $name, $offset-x, $offset-y);
+            }
 
-                @mixin %(map_name)s-sprites($sprite-names, $dimensions: $%(map_name)s-sprite-dimensions) {
-                    @include sprites($%(map_name)s-sprites, $sprite-names, $%(map_name)s-sprite-base-class, $dimensions);
-                }
+            // Extends the sprite base class and set the background position for the desired sprite.
+            // It will also apply the image dimensions if $dimensions is true.
+            @mixin %(map_name)s-sprite($name, $dimensions: $%(map_name)s-sprite-dimensions, $offset-x: 0, $offset-y: 0) {
+                @extend #{$%(map_name)s-sprite-base-class};
+                @include sprite($%(map_name)s-sprites, $name, $dimensions, $offset-x, $offset-y);
+            }
 
-                // Generates a class for each sprited image.
-                @mixin all-%(map_name)s-sprites($dimensions: $%(map_name)s-sprite-dimensions) {
-                    @include %(map_name)s-sprites(%(sprites)s, $dimensions);
-                }
-            ''' % {'map_name': map_name, 'sprites': ' '.join(names)}
-            return ret
+            @mixin %(map_name)s-sprites($sprite-names, $dimensions: $%(map_name)s-sprite-dimensions) {
+                @include sprites($%(map_name)s-sprites, $sprite-names, $%(map_name)s-sprite-base-class, $dimensions);
+            }
+
+            // Generates a class for each sprited image.
+            @mixin all-%(map_name)s-sprites($dimensions: $%(map_name)s-sprite-dimensions) {
+                @include %(map_name)s-sprites(%(sprites)s, $dimensions);
+            }
+        ''' % {'map_name': map_name, 'sprites': ' '.join(names)}
+        return ret
 
     @print_timing(10)
     def _do_if(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
@@ -1435,20 +1426,20 @@ class Scss(object):
             frm = int(float(frm))
             through = int(float(through))
         except ValueError:
-            pass
-        else:
-            if frm > through:
-                frm, through = through, frm
-                rev = reversed
-            else:
-                rev = lambda x: x
-            var = var.strip()
-            var = self.do_glob_math(var, rule[CONTEXT], rule[OPTIONS], rule, True)
+            return
 
-            for i in rev(range(frm, through + 1)):
-                rule[CODESTR] = c_codestr
-                rule[CONTEXT][var] = str(i)
-                self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+        if frm > through:
+            frm, through = through, frm
+            rev = reversed
+        else:
+            rev = lambda x: x
+        var = var.strip()
+        var = self.do_glob_math(var, rule[CONTEXT], rule[OPTIONS], rule, True)
+
+        for i in rev(range(frm, through + 1)):
+            rule[CODESTR] = c_codestr
+            rule[CONTEXT][var] = str(i)
+            self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
 
     @print_timing(10)
     def _do_each(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
@@ -1457,18 +1448,20 @@ class Scss(object):
         """
         var, _, name = name.partition(' in ')
         name = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
-        if name:
-            name = ListValue(name)
-            var = var.strip()
-            var = self.do_glob_math(var, rule[CONTEXT], rule[OPTIONS], rule, True)
+        if not name:
+            return
 
-            for n, v in name.items():
-                v = to_str(v)
-                rule[CODESTR] = c_codestr
-                rule[CONTEXT][var] = v
-                if not isinstance(n, int):
-                    rule[CONTEXT][n] = v
-                self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+        name = ListValue(name)
+        var = var.strip()
+        var = self.do_glob_math(var, rule[CONTEXT], rule[OPTIONS], rule, True)
+
+        for n, v in name.items():
+            v = to_str(v)
+            rule[CODESTR] = c_codestr
+            rule[CONTEXT][var] = v
+            if not isinstance(n, int):
+                rule[CONTEXT][n] = v
+            self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
 
     # @print_timing(10)
     # def _do_while(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
@@ -1510,38 +1503,40 @@ class Scss(object):
             is_var = False
         prop = prop.strip()
         prop = self.do_glob_math(prop, rule[CONTEXT], rule[OPTIONS], rule, True)
-        if prop:
-            if value:
-                value = value.strip()
-                value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
-            _prop = (scope or '') + prop
-            if is_var or prop.startswith('$') and value is not None:
-                in_context = rule[CONTEXT].get(_prop)
-                is_defined = not (in_context is None or isinstance(in_context, basestring) and _undefined_re.match(in_context))
-                if isinstance(value, basestring):
-                    if '!default' in value:
+        if not prop:
+            return
+
+        if value:
+            value = value.strip()
+            value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
+        _prop = (scope or '') + prop
+        if is_var or prop.startswith('$') and value is not None:
+            in_context = rule[CONTEXT].get(_prop)
+            is_defined = not (in_context is None or isinstance(in_context, basestring) and _undefined_re.match(in_context))
+            if isinstance(value, basestring):
+                if '!default' in value:
+                    if is_defined:
+                        value = None
+                    if value is not None:
+                        value = value.replace('!default', '').replace('  ', ' ').strip()
+                if value is not None and prop.startswith('$') and prop[1].isupper():
+                    if is_defined:
+                        log.warn("Constant %r redefined", prop)
+            elif isinstance(value, ListValue):
+                value = ListValue(value)
+                for k, v in value.value.items():
+                    if v == '!default':
                         if is_defined:
                             value = None
                         if value is not None:
-                            value = value.replace('!default', '').replace('  ', ' ').strip()
-                    if value is not None and prop.startswith('$') and prop[1].isupper():
-                        if is_defined:
-                            log.warn("Constant %r redefined", prop)
-                elif isinstance(value, ListValue):
-                    value = ListValue(value)
-                    for k, v in value.value.items():
-                        if v == '!default':
-                            if is_defined:
-                                value = None
-                            if value is not None:
-                                del value.value[k]
-                                value = value.first() if len(value) == 1 else value
-                            break
-                if value is not None:
-                    rule[CONTEXT][_prop] = value
-            else:
-                _prop = self.apply_vars(_prop, rule[CONTEXT], rule[OPTIONS], rule, True)
-                rule[PROPERTIES].append((c_lineno, _prop, to_str(value) if value is not None else None))
+                            del value.value[k]
+                            value = value.first() if len(value) == 1 else value
+                        break
+            if value is not None:
+                rule[CONTEXT][_prop] = value
+        else:
+            _prop = self.apply_vars(_prop, rule[CONTEXT], rule[OPTIONS], rule, True)
+            rule[PROPERTIES].append((c_lineno, _prop, to_str(value) if value is not None else None))
 
     @print_timing(10)
     def _nest_rules(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr):
@@ -1551,35 +1546,36 @@ class Scss(object):
         if c_property == self.construct and rule[MEDIA] == media:
             rule[CODESTR] = c_codestr
             self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
-        else:
-            c_property = self.apply_vars(c_property, rule[CONTEXT], rule[OPTIONS], rule, True)
+            return
 
-            c_selectors = self.normalize_selectors(c_property)
-            c_selectors, _, c_parents = c_selectors.partition(' extends ')
+        c_property = self.apply_vars(c_property, rule[CONTEXT], rule[OPTIONS], rule, True)
 
-            better_selectors = set()
-            c_selectors = c_selectors.split(',')
-            for c_selector in c_selectors:
-                for p_selector in p_selectors:
-                    if c_selector == self.construct:
-                        better_selectors.add(p_selector)
-                    elif '&' in c_selector:  # Parent References
-                        better_selectors.add(c_selector.replace('&', p_selector))
-                    elif p_selector:
-                        better_selectors.add(p_selector + ' ' + c_selector)
-                    else:
-                        better_selectors.add(c_selector)
-            better_selectors = ','.join(sorted(better_selectors))
+        c_selectors = self.normalize_selectors(c_property)
+        c_selectors, _, c_parents = c_selectors.partition(' extends ')
 
-            if c_parents:
-                parents = set(p.strip() for p in c_parents.split('&'))
-                parents.discard('')
-                if parents:
-                    better_selectors += ' extends ' + '&'.join(sorted(parents))
+        better_selectors = set()
+        c_selectors = c_selectors.split(',')
+        for c_selector in c_selectors:
+            for p_selector in p_selectors:
+                if c_selector == self.construct:
+                    better_selectors.add(p_selector)
+                elif '&' in c_selector:  # Parent References
+                    better_selectors.add(c_selector.replace('&', p_selector))
+                elif p_selector:
+                    better_selectors.add(p_selector + ' ' + c_selector)
+                else:
+                    better_selectors.add(c_selector)
+        better_selectors = ','.join(sorted(better_selectors))
 
-            _rule = spawn_rule(rule, codestr=c_codestr, deps=set(), context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=better_selectors, properties=[], final=False, media=media, lineno=c_lineno)
+        if c_parents:
+            parents = set(p.strip() for p in c_parents.split('&'))
+            parents.discard('')
+            if parents:
+                better_selectors += ' extends ' + '&'.join(sorted(parents))
 
-            p_children.appendleft(_rule)
+        _rule = spawn_rule(rule, codestr=c_codestr, deps=set(), context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=better_selectors, properties=[], final=False, media=media, lineno=c_lineno)
+
+        p_children.appendleft(_rule)
 
     @print_timing(4)
     def link_with_parents(self, parent, c_selectors, c_rules):
@@ -1601,28 +1597,30 @@ class Scss(object):
             # `.specialClass` for that rule, but if there's also a `.baseClass a`
             # it also should create `.specialClass a`
             for p_selector in _p_selectors:
-                if parent in p_selector:
-                    # get the new child selector to add (same as the parent selector but with the child name)
-                    # since selectors can be together, separated with # or . (i.e. something.parent) check that too:
-                    for c_selector in c_selectors.split(','):
-                        # Get whatever is different between the two selectors:
-                        _c_selector, _parent = c_selector, parent
-                        lcp = self.longest_common_prefix(_c_selector, _parent)
-                        if lcp:
-                            _c_selector = _c_selector[lcp:]
-                            _parent = _parent[lcp:]
-                        lcs = self.longest_common_suffix(_c_selector, _parent)
-                        if lcs:
-                            _c_selector = _c_selector[:-lcs]
-                            _parent = _parent[:-lcs]
-                        if _c_selector and _parent:
-                            # Get the new selectors:
-                            prev_symbol = '(?<![%#.:])' if _parent[0] in ('%', '#', '.', ':') else r'(?<![-\w%#.:])'
-                            post_symbol = r'(?![-\w])'
-                            new_parent = re.sub(prev_symbol + _parent + post_symbol, _c_selector, p_selector)
-                            if p_selector != new_parent:
-                                new_selectors.add(new_parent)
-                                found = True
+                if parent not in p_selector:
+                    continue
+
+                # get the new child selector to add (same as the parent selector but with the child name)
+                # since selectors can be together, separated with # or . (i.e. something.parent) check that too:
+                for c_selector in c_selectors.split(','):
+                    # Get whatever is different between the two selectors:
+                    _c_selector, _parent = c_selector, parent
+                    lcp = self.longest_common_prefix(_c_selector, _parent)
+                    if lcp:
+                        _c_selector = _c_selector[lcp:]
+                        _parent = _parent[lcp:]
+                    lcs = self.longest_common_suffix(_c_selector, _parent)
+                    if lcs:
+                        _c_selector = _c_selector[:-lcs]
+                        _parent = _parent[:-lcs]
+                    if _c_selector and _parent:
+                        # Get the new selectors:
+                        prev_symbol = '(?<![%#.:])' if _parent[0] in ('%', '#', '.', ':') else r'(?<![-\w%#.:])'
+                        post_symbol = r'(?![-\w])'
+                        new_parent = re.sub(prev_symbol + _parent + post_symbol, _c_selector, p_selector)
+                        if p_selector != new_parent:
+                            new_selectors.add(new_parent)
+                            found = True
 
             if found:
                 # add parent:
@@ -1675,44 +1673,49 @@ class Scss(object):
             parents_left = False
             for _selectors in self.parts.keys():
                 selectors, _, parent = _selectors.partition(' extends ')
-                if parent:
-                    parents_left = True
-                    if _selectors not in self.parts:
-                        continue  # Nodes might have been renamed while linking parents...
+                if not parent:
+                    continue
 
-                    rules = self.parts[_selectors]
+                parents_left = True
+                if _selectors not in self.parts:
+                    continue  # Nodes might have been renamed while linking parents...
 
-                    del self.parts[_selectors]
-                    self.parts.setdefault(selectors, [])
-                    self.parts[selectors].extend(rules)
+                rules = self.parts[_selectors]
 
-                    parents = self.link_with_parents(parent, selectors, rules)
+                del self.parts[_selectors]
+                self.parts.setdefault(selectors, [])
+                self.parts[selectors].extend(rules)
 
-                    if parents is None:
-                        log.warn("Parent rule not found: %s", parent)
-                    else:
-                        # from the parent, inherit the context and the options:
-                        new_context = {}
-                        new_options = {}
-                        for parent in parents:
-                            new_context.update(parent[CONTEXT])
-                            new_options.update(parent[OPTIONS])
-                        for rule in rules:
-                            _new_context = new_context.copy()
-                            _new_context.update(rule[CONTEXT])
-                            rule[CONTEXT] = _new_context
-                            _new_options = new_options.copy()
-                            _new_options.update(rule[OPTIONS])
-                            rule[OPTIONS] = _new_options
+                parents = self.link_with_parents(parent, selectors, rules)
+
+                if parents is None:
+                    log.warn("Parent rule not found: %s", parent)
+                    continue
+
+                # from the parent, inherit the context and the options:
+                new_context = {}
+                new_options = {}
+                for parent in parents:
+                    new_context.update(parent[CONTEXT])
+                    new_options.update(parent[OPTIONS])
+                for rule in rules:
+                    _new_context = new_context.copy()
+                    _new_context.update(rule[CONTEXT])
+                    rule[CONTEXT] = _new_context
+                    _new_options = new_options.copy()
+                    _new_options.update(rule[OPTIONS])
+                    rule[OPTIONS] = _new_options
 
     @print_timing(3)
     def manage_order(self):
         # order rules according with their dependencies
         for rule in self.rules:
-            if rule[POSITION] is not None:
-                rule[DEPS].add(rule[POSITION] + 1)
-                # This moves the rules just above the topmost dependency during the sorted() below:
-                rule[POSITION] = min(rule[DEPS])
+            if rule[POSITION] is None:
+                continue
+
+            rule[DEPS].add(rule[POSITION] + 1)
+            # This moves the rules just above the topmost dependency during the sorted() below:
+            rule[POSITION] = min(rule[DEPS])
         self.rules = sorted(self.rules, key=lambda o: o[POSITION])
 
     @print_timing(3)
@@ -1738,7 +1741,6 @@ class Scss(object):
         """
         Generate the final CSS string
         """
-        
         if fileid:
             rules = self._rules.get(fileid) or []
         else:
@@ -1754,7 +1756,8 @@ class Scss(object):
         return self._create_css(rules, scope, sc, sp, tb, nl, not compress and self.scss_opts.get('debug_info', False))
 
     def _create_css(self, rules, scope=None, sc=True, sp=' ', tb='  ', nl='\n', debug_info=False):
-        scope = set() if scope is None else scope
+        if scope is None:
+            scope = set()
 
         open_selectors = False
         skip_selectors = False
@@ -1773,110 +1776,107 @@ class Scss(object):
         result = ''
         for rule in rules:
             #print >>sys.stderr, rule[FILEID], rule[MEDIA], rule[POSITION], [ c for c in rule[CONTEXT] if not c.startswith('$__') ], rule[OPTIONS].keys(), rule[SELECTORS], rule[DEPS]
-            if rule[POSITION] is not None and rule[PROPERTIES]:
-                selectors = rule[SELECTORS]
-                media = rule[MEDIA]
-                _tb = tb if old_media else ''
-                if old_media != media or media is not None:
-                    if open_selectors:
-                        if not skip_selectors:
-                            if not sc:
-                                if result[-1] == ';':
-                                    result = result[:-1]
-                            result += _tb + '}' + nl
-                        open_selectors = False
-                        skip_selectors = False
-                    if open_media:
-                        if not sc:
-                            if result[-1] == ';':
-                                result = result[:-1]
-                        result += '}' + nl
-                        open_media = False
-                    if media:
-                        result += '@media ' + (' and ').join(set(media)) + sp + '{' + nl
-                        open_media = True
-                    old_media = media
-                    old_selectors = None  # force entrance to add a new selector
-                _tb = tb if media else ''
-                if old_selectors != selectors or selectors is not None:
-                    if open_selectors:
-                        if not skip_selectors:
-                            if not sc:
-                                if result[-1] == ';':
-                                    result = result[:-1]
-                            result += _tb + '}' + nl
-                        open_selectors = False
-                        skip_selectors = False
-                    if selectors:
-                        _selectors = [s for s in selectors.split(',') if '%' not in s]
-                        if _selectors:
-                            total_rules += 1
-                            total_selectors += len(_selectors)
-                            if debug_info:
-                                _lineno = rule[LINENO]
-                                line = rule[INDEX][_lineno]
-                                filename, lineno = line.rsplit(':', 1)
-                                real_filename, real_lineno = filename, lineno
-                                # Walk up to a non-library file:
-                                # while _lineno >= 0:
-                                #     path, name = os.path.split(line)
-                                #     if not name.startswith('_'):
-                                #         filename, lineno = line.rsplit(':', 1)
-                                #         break
-                                #     line = rule[INDEX][_lineno]
-                                #     _lineno -= 1
-                                sass_debug_info = ''
-                                if filename.startswith('<string '):
-                                    filename = '<unknown>'
-                                if real_filename.startswith('<string '):
-                                    real_filename = '<unknown>'
-                                if real_filename != filename or real_lineno != lineno:
-                                    if debug_info == 'comments':
-                                        sass_debug_info += '/* file: %s, line: %s */' % (real_filename, real_lineno) + nl
-                                    else:
-                                        real_filename = _escape_chars_re.sub(r'\\\1', real_filename)
-                                        sass_debug_info += "@media -sass-debug-info{filename{font-family:file\:\/%s;}line{font-family:'%s';}}" % (real_filename, real_lineno) + nl
-                                if debug_info == 'comments':
-                                    sass_debug_info += '/* file: %s, line: %s */' % (filename, lineno) + nl
-                                else:
-                                    filename = _escape_chars_re.sub(r'\\\1', filename)
-                                    sass_debug_info += "@media -sass-debug-info{filename{font-family:file\:\/%s;}line{font-family:'%s';}}" % (filename, lineno) + nl
-                                result += sass_debug_info
-                            selector = (',' + sp).join('%s%s' % (self.super_selector, s) for s in _selectors) + sp + '{'
-                            if nl:
-                                selector = nl.join(wrap(selector))
-                            result += _tb + selector + nl
-                        else:
-                            skip_selectors = True
-                        open_selectors = True
-                    old_selectors = selectors
-                    scope = set()
+            if rule[POSITION] is None or not rule[PROPERTIES]:
+                continue
+
+            selectors = rule[SELECTORS]
+            media = rule[MEDIA]
+            _tb = tb if old_media else ''
+            if old_media != media or media is not None:
+                if open_selectors:
+                    if not skip_selectors:
+                        if not sc and result[-1] == ';':
+                            result = result[:-1]
+                        result += _tb + '}' + nl
+                    open_selectors = False
+                    skip_selectors = False
+                if open_media:
+                    if not sc and result[-1] == ';':
+                        result = result[:-1]
+                    result += '}' + nl
+                    open_media = False
+                if media:
+                    result += '@media ' + (' and ').join(set(media)) + sp + '{' + nl
+                    open_media = True
+                old_media = media
+                old_selectors = None  # force entrance to add a new selector
+            _tb = tb if media else ''
+            if old_selectors != selectors or selectors is not None:
+                if open_selectors:
+                    if not skip_selectors:
+                        if not sc and result[-1] == ';':
+                            result = result[:-1]
+                        result += _tb + '}' + nl
+                    open_selectors = False
+                    skip_selectors = False
                 if selectors:
-                    _tb += tb
-                if rule[OPTIONS].get('verbosity', 0) > 1:
-                    result += _tb + '/* file: ' + rule[FILEID] + ' */' + nl
-                    if rule[CONTEXT]:
-                        result += _tb + '/* vars:' + nl
-                        for k, v in rule[CONTEXT].items():
-                            result += _tb + _tb + k + ' = ' + v + ';' + nl
-                        result += _tb + '*/' + nl
-                if not skip_selectors:
-                    result += self._print_properties(rule[PROPERTIES], scope, [old_property], sc, sp, _tb, nl, wrap)
+                    _selectors = [s for s in selectors.split(',') if '%' not in s]
+                    if _selectors:
+                        total_rules += 1
+                        total_selectors += len(_selectors)
+                        if debug_info:
+                            _lineno = rule[LINENO]
+                            line = rule[INDEX][_lineno]
+                            filename, lineno = line.rsplit(':', 1)
+                            real_filename, real_lineno = filename, lineno
+                            # Walk up to a non-library file:
+                            # while _lineno >= 0:
+                            #     path, name = os.path.split(line)
+                            #     if not name.startswith('_'):
+                            #         filename, lineno = line.rsplit(':', 1)
+                            #         break
+                            #     line = rule[INDEX][_lineno]
+                            #     _lineno -= 1
+                            sass_debug_info = ''
+                            if filename.startswith('<string '):
+                                filename = '<unknown>'
+                            if real_filename.startswith('<string '):
+                                real_filename = '<unknown>'
+                            if real_filename != filename or real_lineno != lineno:
+                                if debug_info == 'comments':
+                                    sass_debug_info += '/* file: %s, line: %s */' % (real_filename, real_lineno) + nl
+                                else:
+                                    real_filename = _escape_chars_re.sub(r'\\\1', real_filename)
+                                    sass_debug_info += "@media -sass-debug-info{filename{font-family:file\:\/%s;}line{font-family:'%s';}}" % (real_filename, real_lineno) + nl
+                            if debug_info == 'comments':
+                                sass_debug_info += '/* file: %s, line: %s */' % (filename, lineno) + nl
+                            else:
+                                filename = _escape_chars_re.sub(r'\\\1', filename)
+                                sass_debug_info += "@media -sass-debug-info{filename{font-family:file\:\/%s;}line{font-family:'%s';}}" % (filename, lineno) + nl
+                            result += sass_debug_info
+                        selector = (',' + sp).join('%s%s' % (self.super_selector, s) for s in _selectors) + sp + '{'
+                        if nl:
+                            selector = nl.join(wrap(selector))
+                        result += _tb + selector + nl
+                    else:
+                        skip_selectors = True
+                    open_selectors = True
+                old_selectors = selectors
+                scope = set()
+            if selectors:
+                _tb += tb
+            if rule[OPTIONS].get('verbosity', 0) > 1:
+                result += _tb + '/* file: ' + rule[FILEID] + ' */' + nl
+                if rule[CONTEXT]:
+                    result += _tb + '/* vars:' + nl
+                    for k, v in rule[CONTEXT].items():
+                        result += _tb + _tb + k + ' = ' + v + ';' + nl
+                    result += _tb + '*/' + nl
+            if not skip_selectors:
+                result += self._print_properties(rule[PROPERTIES], scope, [old_property], sc, sp, _tb, nl, wrap)
 
         if open_media:
             _tb = tb
         else:
             _tb = ''
         if open_selectors and not skip_selectors:
-            if not sc:
-                if result[-1] == ';':
-                    result = result[:-1]
+            if not sc and result[-1] == ';':
+                result = result[:-1]
             result += _tb + '}' + nl
 
         if open_media:
-            if not sc:
-                if result[-1] == ';':
-                    result = result[:-1]
+            if not sc and result[-1] == ';':
+                result = result[:-1]
             result += '}' + nl
 
         return (result, total_rules, total_selectors)
@@ -1886,9 +1886,12 @@ class Scss(object):
             wrap = textwrap.TextWrapper(break_long_words=False)
             wrap.wordsep_re = re.compile(r'(?<=,)(\s*)')
             wrap = wrap.wrap
+        if old_property is None:
+            old_property = [None]
+        if scope is None:
+            scope = set()
+
         result = ''
-        old_property = [None] if old_property is None else old_property
-        scope = set() if scope is None else scope
         for lineno, prop, value in properties:
             if value is not None:
                 if nl:
@@ -2752,14 +2755,14 @@ def _sprite_map(g, **kwargs):
             spacing = [int(NumberValue(spacing).value)]
         spacing = (spacing * 4)[:4]
 
-        if callable(STATIC_ROOT):
+        if callable(config.STATIC_ROOT):
             glob_path = g
-            rfiles = files = sorted(STATIC_ROOT(g))
+            rfiles = files = sorted(config.STATIC_ROOT(g))
         else:
-            glob_path = os.path.join(STATIC_ROOT, g)
+            glob_path = os.path.join(config.STATIC_ROOT, g)
             files = glob.glob(glob_path)
             files = sorted((f, None) for f in files)
-            rfiles = [(f[len(STATIC_ROOT):], s) for f, s in files]
+            rfiles = [(f[len(config.STATIC_ROOT):], s) for f, s in files]
 
         if not files:
             log.error("Nothing found at '%s'", glob_path)
@@ -2774,10 +2777,10 @@ def _sprite_map(g, **kwargs):
                 times.append(int(os.path.getmtime(file)))
 
         map_name = os.path.normpath(os.path.dirname(g)).replace('\\', '_').replace('/', '_')
-        key = list(zip(*files)[0]) + times + [repr(kwargs), ASSETS_URL]
+        key = list(zip(*files)[0]) + times + [repr(kwargs), config.ASSETS_URL]
         key = map_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
-        asset_path = os.path.join(ASSETS_ROOT, asset_file)
+        asset_path = os.path.join(config.ASSETS_ROOT, asset_file)
 
         try:
             asset, map, sizes = pickle.load(open(asset_path + '.cache'))
@@ -2911,7 +2914,7 @@ def _sprite_map(g, **kwargs):
                 log.exception("Error while saving image")
             filetime = int(time.mktime(datetime.datetime.now().timetuple()))
 
-            url = '%s%s?_=%s' % (ASSETS_URL, asset_file, filetime)
+            url = '%s%s?_=%s' % (config.ASSETS_URL, asset_file, filetime)
             asset = 'url("%s") %s' % (escape(url), repeat)
             # Use the sorted list to remove older elements (keep only 500 objects):
             if len(sprite_maps) > 1000:
@@ -2925,7 +2928,7 @@ def _sprite_map(g, **kwargs):
             map['*n*'] = map_name
             map['*t*'] = filetime
 
-            tmp_dir = ASSETS_ROOT
+            tmp_dir = config.ASSETS_ROOT
             cache_tmp = tempfile.NamedTemporaryFile(delete=False, dir=tmp_dir)
             pickle.dump((asset, map, zip(files, sizes)), cache_tmp)
             cache_tmp.close()
@@ -2985,13 +2988,13 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
         key = (columns, grid_color, baseline_color, background_color)
         key = grid_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
-        asset_path = os.path.join(ASSETS_ROOT, asset_file)
+        asset_path = os.path.join(config.ASSETS_ROOT, asset_file)
         try:
             new_image.save(asset_path)
         except IOError:
             log.exception("Error while saving image")
             inline = True  # Retry inline version
-        url = '%s%s' % (ASSETS_URL, asset_file)
+        url = '%s%s' % (config.ASSETS_URL, asset_file)
     if inline:
         output = StringIO()
         new_image.save(output, format='PNG')
@@ -3078,7 +3081,7 @@ def _sprite(map, sprite, offset_x=None, offset_y=None):
     elif not sprite:
         log.error("No sprite found: %s in %s", sprite_name, sprite_map['*n*'], extra={'stack': True})
     if sprite:
-        url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
+        url = '%s%s?_=%s' % (config.ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
         x = NumberValue(offset_x or 0, 'px')
         y = NumberValue(offset_y or 0, 'px')
         if not x or (x <= -1 or x >= 1) and x.unit != '%':
@@ -3099,7 +3102,7 @@ def _sprite_url(map):
     if not sprite_map:
         log.error("No sprite map found: %s", map, extra={'stack': True})
     if sprite_map:
-        url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
+        url = '%s%s?_=%s' % (config.ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
         url = "url(%s)" % escape(url)
         return StringValue(url)
     return StringValue(None)
@@ -3179,13 +3182,13 @@ def _background_noise(intensity=None, opacity=None, size=None, monochrome=False,
         asset_file = 'noise_%s%sx%s+%s+%s' % ('mono_' if monochrome else '', size, size, to_str(intensity).replace('.', '_'), to_str(opacity).replace('.', '_'))
         asset_file = asset_file + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = asset_file + '.png'
-        asset_path = os.path.join(ASSETS_ROOT, asset_file)
+        asset_path = os.path.join(config.ASSETS_ROOT, asset_file)
         try:
             new_image.save(asset_path)
         except IOError:
             log.exception("Error while saving image")
             inline = True  # Retry inline version
-        url = '%s%s' % (ASSETS_URL, asset_file)
+        url = '%s%s' % (config.ASSETS_URL, asset_file)
     if inline:
         output = StringIO()
         new_image.save(output, format='PNG')
@@ -3218,20 +3221,20 @@ def _stylesheet_url(path, only_path=False, cache_buster=True):
     be returned instead of a `url()` function
     """
     filepath = StringValue(path).value
-    if callable(STATIC_ROOT):
+    if callable(config.STATIC_ROOT):
         try:
-            _file, _storage = list(STATIC_ROOT(filepath))[0]
+            _file, _storage = list(config.STATIC_ROOT(filepath))[0]
             d_obj = _storage.modified_time(_file)
             filetime = int(time.mktime(d_obj.timetuple()))
         except:
             filetime = 'NA'
     else:
-        _path = os.path.join(STATIC_ROOT, filepath.strip('/'))
+        _path = os.path.join(config.STATIC_ROOT, filepath.strip('/'))
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
         else:
             filetime = 'NA'
-    BASE_URL = STATIC_URL
+    BASE_URL = config.STATIC_URL
 
     url = '%s%s' % (BASE_URL, filepath)
     if cache_buster:
@@ -3244,9 +3247,9 @@ def _stylesheet_url(path, only_path=False, cache_buster=True):
 def __font_url(path, only_path=False, cache_buster=True, inline=False):
     filepath = StringValue(path).value
     path = None
-    if callable(STATIC_ROOT):
+    if callable(config.STATIC_ROOT):
         try:
-            _file, _storage = list(STATIC_ROOT(filepath))[0]
+            _file, _storage = list(config.STATIC_ROOT(filepath))[0]
             d_obj = _storage.modified_time(_file)
             filetime = int(time.mktime(d_obj.timetuple()))
             if inline:
@@ -3254,14 +3257,14 @@ def __font_url(path, only_path=False, cache_buster=True, inline=False):
         except:
             filetime = 'NA'
     else:
-        _path = os.path.join(STATIC_ROOT, filepath.strip('/'))
+        _path = os.path.join(config.STATIC_ROOT, filepath.strip('/'))
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
             if inline:
                 path = open(_path, 'rb')
         else:
             filetime = 'NA'
-    BASE_URL = STATIC_URL
+    BASE_URL = config.STATIC_URL
 
     if path and inline:
         mime_type = mimetypes.guess_type(filepath)[0]
@@ -3341,9 +3344,9 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
     filepath = StringValue(path).value
     mime_type = inline and (StringValue(mime_type).value or mimetypes.guess_type(filepath)[0])
     path = None
-    if callable(STATIC_ROOT):
+    if callable(config.STATIC_ROOT):
         try:
-            _file, _storage = list(STATIC_ROOT(filepath))[0]
+            _file, _storage = list(config.STATIC_ROOT(filepath))[0]
             d_obj = _storage.modified_time(_file)
             filetime = int(time.mktime(d_obj.timetuple()))
             if inline or dst_color or spacing:
@@ -3351,14 +3354,14 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
         except:
             filetime = 'NA'
     else:
-        _path = os.path.join(STATIC_ROOT, filepath.strip('/'))
+        _path = os.path.join(config.STATIC_ROOT, filepath.strip('/'))
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
             if inline or dst_color or spacing:
                 path = open(_path, 'rb')
         else:
             filetime = 'NA'
-    BASE_URL = STATIC_URL
+    BASE_URL = config.STATIC_URL
     if path:
         dst_colors = dst_color
         if isinstance(dst_colors, ListValue):
@@ -3386,11 +3389,11 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
         key = (filetime, src_color, dst_color, spacing)
         key = file_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + file_ext
-        asset_path = os.path.join(ASSETS_ROOT, asset_file)
+        asset_path = os.path.join(config.ASSETS_ROOT, asset_file)
 
         if os.path.exists(asset_path):
             filepath = asset_file
-            BASE_URL = ASSETS_URL
+            BASE_URL = config.ASSETS_URL
             if inline:
                 path = open(asset_path, 'rb')
                 url = 'data:' + mime_type + ';base64,' + base64.b64encode(path.read())
@@ -3432,13 +3435,13 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
                 try:
                     new_image.save(asset_path)
                     filepath = asset_file
-                    BASE_URL = ASSETS_URL
+                    BASE_URL = config.ASSETS_URL
                     if cache_buster:
                         filetime = int(os.path.getmtime(asset_path))
                 except IOError:
                     log.exception("Error while saving image")
                     inline = True  # Retry inline version
-                url = '%s%s' % (ASSETS_URL, asset_file)
+                url = '%s%s' % (config.ASSETS_URL, asset_file)
                 if cache_buster:
                     url = add_cache_buster(url, filetime)
             if inline:
@@ -3490,14 +3493,14 @@ def _image_width(image):
         width = sprite_images[filepath][0]
     except KeyError:
         width = 0
-        if callable(STATIC_ROOT):
+        if callable(config.STATIC_ROOT):
             try:
-                _file, _storage = list(STATIC_ROOT(filepath))[0]
+                _file, _storage = list(config.STATIC_ROOT(filepath))[0]
                 path = _storage.open(_file)
             except:
                 pass
         else:
-            _path = os.path.join(STATIC_ROOT, filepath.strip('/'))
+            _path = os.path.join(config.STATIC_ROOT, filepath.strip('/'))
             if os.path.exists(_path):
                 path = open(_path, 'rb')
         if path:
@@ -3521,14 +3524,14 @@ def _image_height(image):
         height = sprite_images[filepath][1]
     except KeyError:
         height = 0
-        if callable(STATIC_ROOT):
+        if callable(config.STATIC_ROOT):
             try:
-                _file, _storage = list(STATIC_ROOT(filepath))[0]
+                _file, _storage = list(config.STATIC_ROOT(filepath))[0]
                 path = _storage.open(_file)
             except:
                 pass
         else:
-            _path = os.path.join(STATIC_ROOT, filepath.strip('/'))
+            _path = os.path.join(config.STATIC_ROOT, filepath.strip('/'))
             if os.path.exists(_path):
                 path = open(_path, 'rb')
         if path:
@@ -5517,21 +5520,25 @@ def eval_expr(expr, rule, raw=False):
             results = expr
 
     if results is None:
-        try:
+        if expr in expr_cache:
             results = expr_cache[expr]
-        except KeyError:
+        else:
             try:
                 P = Calculator(CalculatorScanner())
                 P.reset(expr)
                 results = P.goal(rule)
             except SyntaxError:
-                if DEBUG:
+                if config.DEBUG:
                     raise
             except Exception, e:
                 log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule[INDEX][rule[LINENO]])
-                if DEBUG:
+                if config.DEBUG:
                     raise
-            if '$' not in expr:
+
+            # TODO this is a clumsy hack for nondeterministic functions;
+            # something better (and per-compiler rather than global) would be
+            # nice
+            if '$' not in expr and '(' not in expr:
                 expr_cache[expr] = results
 
     if not raw and results is not None:
