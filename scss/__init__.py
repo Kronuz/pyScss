@@ -54,7 +54,7 @@ import sys
 import textwrap
 import time
 
-from scss.config import DEBUG, LOAD_PATHS, STATIC_ROOT, VERBOSITY
+from scss import config
 from scss.cssdefs import _colors, _units, _zero_units
 import scss.functions
 from scss.functions import _sprite_map
@@ -122,7 +122,7 @@ _default_scss_vars = {
 }
 
 _default_scss_opts = {
-    'verbosity': VERBOSITY,
+    'verbosity': config.VERBOSITY,
     'compress': 1,
     'compress_short_colors': 1,  # Converts things like #RRGGBB to #RGB
     'compress_reverse_colors': 1,  # Gets the shortest name of all for colors
@@ -291,9 +291,9 @@ def spawn_rule(rule=None, **kwargs):
 
 def print_timing(level=0):
     def _print_timing(func):
-        if VERBOSITY:
+        if config.VERBOSITY:
             def wrapper(*args, **kwargs):
-                if VERBOSITY >= level:
+                if config.VERBOSITY >= level:
                     t1 = time.time()
                     res = func(*args, **kwargs)
                     t2 = time.time()
@@ -364,12 +364,12 @@ class Scss(object):
         else:
             self._search_paths = ["."]
 
-            if LOAD_PATHS:
-                if isinstance(LOAD_PATHS, basestring):
+            if config.LOAD_PATHS:
+                if isinstance(config.LOAD_PATHS, basestring):
                     # Back-compat: allow comma-delimited
-                    self._search_paths.extend(LOAD_PATHS.split(','))
+                    self._search_paths.extend(config.LOAD_PATHS.split(','))
                 else:
-                    self._search_paths.extend(LOAD_PATHS)
+                    self._search_paths.extend(config.LOAD_PATHS)
 
             self._search_paths.extend(self._scss_opts.get('load_paths', []))
 
@@ -693,14 +693,13 @@ class Scss(object):
                 elif code == '@dump_options':
                     log.info(repr(rule[OPTIONS]))
                 elif code == '@debug':
-                    global DEBUG
                     name = name.strip()
                     if name.lower() in ('1', 'true', 't', 'yes', 'y', 'on'):
                         name = 1
                     elif name.lower() in ('0', 'false', 'f', 'no', 'n', 'off', 'undefined'):
                         name = 0
-                    DEBUG = name
-                    log.info("Debug mode is %s", 'On' if DEBUG else 'Off')
+                    config.DEBUG = name
+                    log.info("Debug mode is %s", 'On' if config.DEBUG else 'Off')
                 elif code == '@option':
                     self._settle_options(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@content':
@@ -968,12 +967,12 @@ class Scss(object):
         Implements @import for sprite-maps
         Imports magic sprite map directories
         """
-        if callable(STATIC_ROOT):
-            files = sorted(STATIC_ROOT(name))
+        if callable(config.STATIC_ROOT):
+            files = sorted(config.STATIC_ROOT(name))
         else:
-            glob_path = os.path.join(STATIC_ROOT, name)
+            glob_path = os.path.join(config.STATIC_ROOT, name)
             files = glob.glob(glob_path)
-            files = sorted((file[len(STATIC_ROOT):], None) for file in files)
+            files = sorted((file[len(config.STATIC_ROOT):], None) for file in files)
 
         if not files:
             return
@@ -2077,11 +2076,11 @@ def eval_expr(expr, rule, func_registry, raw=False):
                 P.reset(expr)
                 results = P.goal(rule)
             except SyntaxError:
-                if DEBUG:
+                if config.DEBUG:
                     raise
             except Exception, e:
                 log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule[INDEX][rule[LINENO]])
-                if DEBUG:
+                if config.DEBUG:
                     raise
 
             # TODO this is a clumsy hack for nondeterministic functions;

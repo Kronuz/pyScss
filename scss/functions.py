@@ -15,7 +15,7 @@ import random
 import tempfile
 import time
 
-from scss.config import ASSETS_ROOT, ASSETS_URL, STATIC_ROOT, STATIC_URL
+from scss import config
 from scss.cssdefs import _conv_type, _units, _units_weights
 from scss.types import BooleanValue, ColorValue, ListValue, NumberValue, QuotedStringValue, StringValue, Value
 from scss.util import escape, split_params, to_float, to_str
@@ -97,6 +97,7 @@ class FunctionRegistry(object):
 
 scss_builtins = FunctionRegistry()
 register = scss_builtins.register
+
 
 def _rgb(r, g, b, type='rgb'):
     return _rgba(r, g, b, 1.0, type)
@@ -817,14 +818,14 @@ def _sprite_map(g, **kwargs):
             spacing = [int(NumberValue(spacing).value)]
         spacing = (spacing * 4)[:4]
 
-        if callable(STATIC_ROOT):
+        if callable(config.STATIC_ROOT):
             glob_path = g
-            rfiles = files = sorted(STATIC_ROOT(g))
+            rfiles = files = sorted(config.STATIC_ROOT(g))
         else:
-            glob_path = os.path.join(STATIC_ROOT, g)
+            glob_path = os.path.join(config.STATIC_ROOT, g)
             files = glob.glob(glob_path)
             files = sorted((f, None) for f in files)
-            rfiles = [(f[len(STATIC_ROOT):], s) for f, s in files]
+            rfiles = [(f[len(config.STATIC_ROOT):], s) for f, s in files]
 
         if not files:
             log.error("Nothing found at '%s'", glob_path)
@@ -839,10 +840,10 @@ def _sprite_map(g, **kwargs):
                 times.append(int(os.path.getmtime(file)))
 
         map_name = os.path.normpath(os.path.dirname(g)).replace('\\', '_').replace('/', '_')
-        key = list(zip(*files)[0]) + times + [repr(kwargs), ASSETS_URL]
+        key = list(zip(*files)[0]) + times + [repr(kwargs), config.ASSETS_URL]
         key = map_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
-        asset_path = os.path.join(ASSETS_ROOT, asset_file)
+        asset_path = os.path.join(config.ASSETS_ROOT, asset_file)
 
         try:
             asset, map, sizes = pickle.load(open(asset_path + '.cache'))
@@ -974,7 +975,7 @@ def _sprite_map(g, **kwargs):
                 log.exception("Error while saving image")
             filetime = int(time.mktime(datetime.datetime.now().timetuple()))
 
-            url = '%s%s?_=%s' % (ASSETS_URL, asset_file, filetime)
+            url = '%s%s?_=%s' % (config.ASSETS_URL, asset_file, filetime)
             asset = 'url("%s") %s' % (escape(url), repeat)
             # Use the sorted list to remove older elements (keep only 500 objects):
             if len(sprite_maps) > 1000:
@@ -988,7 +989,7 @@ def _sprite_map(g, **kwargs):
             map['*n*'] = map_name
             map['*t*'] = filetime
 
-            tmp_dir = ASSETS_ROOT
+            tmp_dir = config.ASSETS_ROOT
             cache_tmp = tempfile.NamedTemporaryFile(delete=False, dir=tmp_dir)
             pickle.dump((asset, map, zip(files, sizes)), cache_tmp)
             cache_tmp.close()
@@ -1048,13 +1049,13 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
         key = (columns, grid_color, baseline_color, background_color)
         key = grid_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
-        asset_path = os.path.join(ASSETS_ROOT, asset_file)
+        asset_path = os.path.join(config.ASSETS_ROOT, asset_file)
         try:
             new_image.save(asset_path)
         except IOError:
             log.exception("Error while saving image")
             inline = True  # Retry inline version
-        url = '%s%s' % (ASSETS_URL, asset_file)
+        url = '%s%s' % (config.ASSETS_URL, asset_file)
     if inline:
         output = StringIO()
         new_image.save(output, format='PNG')
@@ -1141,7 +1142,7 @@ def _sprite(map, sprite, offset_x=None, offset_y=None):
     elif not sprite:
         log.error("No sprite found: %s in %s", sprite_name, sprite_map['*n*'], extra={'stack': True})
     if sprite:
-        url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
+        url = '%s%s?_=%s' % (config.ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
         x = NumberValue(offset_x or 0, 'px')
         y = NumberValue(offset_y or 0, 'px')
         if not x or (x <= -1 or x >= 1) and x.unit != '%':
@@ -1162,7 +1163,7 @@ def _sprite_url(map):
     if not sprite_map:
         log.error("No sprite map found: %s", map, extra={'stack': True})
     if sprite_map:
-        url = '%s%s?_=%s' % (ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
+        url = '%s%s?_=%s' % (config.ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
         url = "url(%s)" % escape(url)
         return StringValue(url)
     return StringValue(None)
@@ -1242,13 +1243,13 @@ def _background_noise(intensity=None, opacity=None, size=None, monochrome=False,
         asset_file = 'noise_%s%sx%s+%s+%s' % ('mono_' if monochrome else '', size, size, to_str(intensity).replace('.', '_'), to_str(opacity).replace('.', '_'))
         asset_file = asset_file + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = asset_file + '.png'
-        asset_path = os.path.join(ASSETS_ROOT, asset_file)
+        asset_path = os.path.join(config.ASSETS_ROOT, asset_file)
         try:
             new_image.save(asset_path)
         except IOError:
             log.exception("Error while saving image")
             inline = True  # Retry inline version
-        url = '%s%s' % (ASSETS_URL, asset_file)
+        url = '%s%s' % (config.ASSETS_URL, asset_file)
     if inline:
         output = StringIO()
         new_image.save(output, format='PNG')
@@ -1281,20 +1282,20 @@ def _stylesheet_url(path, only_path=False, cache_buster=True):
     be returned instead of a `url()` function
     """
     filepath = StringValue(path).value
-    if callable(STATIC_ROOT):
+    if callable(config.STATIC_ROOT):
         try:
-            _file, _storage = list(STATIC_ROOT(filepath))[0]
+            _file, _storage = list(config.STATIC_ROOT(filepath))[0]
             d_obj = _storage.modified_time(_file)
             filetime = int(time.mktime(d_obj.timetuple()))
         except:
             filetime = 'NA'
     else:
-        _path = os.path.join(STATIC_ROOT, filepath.strip('/'))
+        _path = os.path.join(config.STATIC_ROOT, filepath.strip('/'))
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
         else:
             filetime = 'NA'
-    BASE_URL = STATIC_URL
+    BASE_URL = config.STATIC_URL
 
     url = '%s%s' % (BASE_URL, filepath)
     if cache_buster:
@@ -1307,9 +1308,9 @@ def _stylesheet_url(path, only_path=False, cache_buster=True):
 def __font_url(path, only_path=False, cache_buster=True, inline=False):
     filepath = StringValue(path).value
     path = None
-    if callable(STATIC_ROOT):
+    if callable(config.STATIC_ROOT):
         try:
-            _file, _storage = list(STATIC_ROOT(filepath))[0]
+            _file, _storage = list(config.STATIC_ROOT(filepath))[0]
             d_obj = _storage.modified_time(_file)
             filetime = int(time.mktime(d_obj.timetuple()))
             if inline:
@@ -1317,14 +1318,14 @@ def __font_url(path, only_path=False, cache_buster=True, inline=False):
         except:
             filetime = 'NA'
     else:
-        _path = os.path.join(STATIC_ROOT, filepath.strip('/'))
+        _path = os.path.join(config.STATIC_ROOT, filepath.strip('/'))
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
             if inline:
                 path = open(_path, 'rb')
         else:
             filetime = 'NA'
-    BASE_URL = STATIC_URL
+    BASE_URL = config.STATIC_URL
 
     if path and inline:
         mime_type = mimetypes.guess_type(filepath)[0]
@@ -1404,9 +1405,9 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
     filepath = StringValue(path).value
     mime_type = inline and (StringValue(mime_type).value or mimetypes.guess_type(filepath)[0])
     path = None
-    if callable(STATIC_ROOT):
+    if callable(config.STATIC_ROOT):
         try:
-            _file, _storage = list(STATIC_ROOT(filepath))[0]
+            _file, _storage = list(config.STATIC_ROOT(filepath))[0]
             d_obj = _storage.modified_time(_file)
             filetime = int(time.mktime(d_obj.timetuple()))
             if inline or dst_color or spacing:
@@ -1414,14 +1415,14 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
         except:
             filetime = 'NA'
     else:
-        _path = os.path.join(STATIC_ROOT, filepath.strip('/'))
+        _path = os.path.join(config.STATIC_ROOT, filepath.strip('/'))
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
             if inline or dst_color or spacing:
                 path = open(_path, 'rb')
         else:
             filetime = 'NA'
-    BASE_URL = STATIC_URL
+    BASE_URL = config.STATIC_URL
     if path:
         dst_colors = dst_color
         if isinstance(dst_colors, ListValue):
@@ -1449,11 +1450,11 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
         key = (filetime, src_color, dst_color, spacing)
         key = file_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + file_ext
-        asset_path = os.path.join(ASSETS_ROOT, asset_file)
+        asset_path = os.path.join(config.ASSETS_ROOT, asset_file)
 
         if os.path.exists(asset_path):
             filepath = asset_file
-            BASE_URL = ASSETS_URL
+            BASE_URL = config.ASSETS_URL
             if inline:
                 path = open(asset_path, 'rb')
                 url = 'data:' + mime_type + ';base64,' + base64.b64encode(path.read())
@@ -1495,13 +1496,13 @@ def __image_url(path, only_path=False, cache_buster=True, dst_color=None, src_co
                 try:
                     new_image.save(asset_path)
                     filepath = asset_file
-                    BASE_URL = ASSETS_URL
+                    BASE_URL = config.ASSETS_URL
                     if cache_buster:
                         filetime = int(os.path.getmtime(asset_path))
                 except IOError:
                     log.exception("Error while saving image")
                     inline = True  # Retry inline version
-                url = '%s%s' % (ASSETS_URL, asset_file)
+                url = '%s%s' % (config.ASSETS_URL, asset_file)
                 if cache_buster:
                     url = add_cache_buster(url, filetime)
             if inline:
@@ -1553,14 +1554,14 @@ def _image_width(image):
         width = sprite_images[filepath][0]
     except KeyError:
         width = 0
-        if callable(STATIC_ROOT):
+        if callable(config.STATIC_ROOT):
             try:
-                _file, _storage = list(STATIC_ROOT(filepath))[0]
+                _file, _storage = list(config.STATIC_ROOT(filepath))[0]
                 path = _storage.open(_file)
             except:
                 pass
         else:
-            _path = os.path.join(STATIC_ROOT, filepath.strip('/'))
+            _path = os.path.join(config.STATIC_ROOT, filepath.strip('/'))
             if os.path.exists(_path):
                 path = open(_path, 'rb')
         if path:
@@ -1584,14 +1585,14 @@ def _image_height(image):
         height = sprite_images[filepath][1]
     except KeyError:
         height = 0
-        if callable(STATIC_ROOT):
+        if callable(config.STATIC_ROOT):
             try:
-                _file, _storage = list(STATIC_ROOT(filepath))[0]
+                _file, _storage = list(config.STATIC_ROOT(filepath))[0]
                 path = _storage.open(_file)
             except:
                 pass
         else:
-            _path = os.path.join(STATIC_ROOT, filepath.strip('/'))
+            _path = os.path.join(config.STATIC_ROOT, filepath.strip('/'))
             if os.path.exists(_path):
                 path = open(_path, 'rb')
         if path:
