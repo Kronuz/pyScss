@@ -1088,8 +1088,6 @@ class Scss(object):
             through = int(float(through))
         except ValueError:
             return
-        except Exception:
-            raise
 
         if frm > through:
             frm, through = through, frm
@@ -1405,7 +1403,6 @@ class Scss(object):
         """
         Generate the final CSS string
         """
-
         if fileid:
             rules = self._rules.get(fileid) or []
         else:
@@ -1774,7 +1771,6 @@ class Parser(object):
 ################################################################################
 #'(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'
 ## Grammar compiled using Yapps:
-
 class CalculatorScanner(CachedScanner):
     patterns = None
     _patterns = [
