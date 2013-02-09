@@ -848,8 +848,10 @@ def _sprite_map(g, **kwargs):
         try:
             asset, map, sizes = pickle.load(open(asset_path + '.cache'))
             sprite_maps[asset] = map
-        except Exception:
-            images = tuple(Image.open(storage.open(file)) if storage is not None else Image.open(file) for file, storage in files)
+        except:
+            def images():
+                for file, storage in files:
+                    yield Image.open(storage.open(file)) if storage is not None else Image.open(file)
             names = tuple(os.path.splitext(os.path.basename(file))[0] for file, storage in files)
             positions = []
             spacings = []
@@ -884,7 +886,7 @@ def _sprite_map(g, **kwargs):
                 else:
                     tot_spacings.append(_spacing)
 
-            sizes = tuple((collapse_x or image.size[0], collapse_y or image.size[1]) for image in images)
+            sizes = tuple((collapse_x or image.size[0], collapse_y or image.size[1]) for image in images())
 
             _spacings = zip(*tot_spacings)
             if vertical:
@@ -903,7 +905,7 @@ def _sprite_map(g, **kwargs):
             offsets_x = []
             offsets_y = []
             offset = 0
-            for i, image in enumerate(images):
+            for i, image in enumerate(images()):
                 spacing = spacings[i]
                 position = positions[i]
                 iwidth, iheight = image.size
