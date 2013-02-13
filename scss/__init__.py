@@ -1836,13 +1836,17 @@ class Scss(object):
                                 if debug_info == 'comments':
                                     sass_debug_info += '/* file: %s, line: %s */' % (real_filename, real_lineno) + nl
                                 else:
-                                    real_filename = _escape_chars_re.sub(r'\\\1', real_filename)
-                                    sass_debug_info += "@media -sass-debug-info{filename{font-family:file\:\/%s;}line{font-family:'%s';}}" % (real_filename, real_lineno) + nl
+                                    _filename = real_filename
+                                    _lineno = real_lineno
+                                    _filename = _escape_chars_re.sub(r'\\\1', _filename)
+                                    sass_debug_info += "@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}" % (_filename, _lineno) + nl
                             if debug_info == 'comments':
                                 sass_debug_info += '/* file: %s, line: %s */' % (filename, lineno) + nl
                             else:
-                                filename = _escape_chars_re.sub(r'\\\1', filename)
-                                sass_debug_info += "@media -sass-debug-info{filename{font-family:file\:\/%s;}line{font-family:'%s';}}" % (filename, lineno) + nl
+                                _filename = filename
+                                _lineno = lineno
+                                _filename = _escape_chars_re.sub(r'\\\1', _filename)
+                                sass_debug_info += "@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}" % (_filename, _lineno) + nl
                             result += sass_debug_info
                         selector = (',' + sp).join('%s%s' % (self.super_selector, s) for s in _selectors) + sp + '{'
                         if nl:
