@@ -164,11 +164,11 @@ _zero_units_re = re.compile(r'\b(?<![.])0(' + '|'.join(map(re.escape, _zero_unit
 _zero_re = re.compile(r'\b0\.(?=\d)')
 
 _escape_chars_re = re.compile(r'([^-a-zA-Z0-9_])')
-_variable_re = re.compile('^\\$[-a-zA-Z0-9_]+$')
 _interpolate_re = re.compile(r'(#\{\s*)?(\$[-\w]+)(?(1)\s*\})')
 _spaces_re = re.compile(r'\s+')
 _expand_rules_space_re = re.compile(r'\s*{')
 _collapse_properties_space_re = re.compile(r'([:#])\s*{')
+_variable_re = re.compile('^\\$[-a-zA-Z0-9_]+$')
 _undefined_re = re.compile('^(?:\\$[-a-zA-Z0-9_]+|undefined)$')
 
 _strings_re = re.compile(r'([\'"]).*?\1')
