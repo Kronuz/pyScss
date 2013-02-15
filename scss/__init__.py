@@ -1062,31 +1062,31 @@ class Scss(object):
                     name = self.apply_vars(name, rule[CONTEXT], rule[OPTIONS], rule)
                     p_parents.update(p.strip() for p in name.replace(',', '&').split('&'))
                     p_parents.discard('')
-                elif c_codestr is not None and code in ('@mixin', '@function'):
-                    self._do_functions(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@return':
                     ret = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
                     rule[OPTIONS]['@return'] = ret
                 elif code == '@include':
                     self._do_include(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
-                elif c_codestr is not None and (code == '@if' or c_property.startswith('@else if ')):
+                elif c_codestr is None:
+                    rule[PROPERTIES].append((c_lineno, c_property, None))
+                elif code in ('@mixin', '@function'):
+                    self._do_functions(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                elif code == '@if' or c_property.startswith('@else if '):
                     self._do_if(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
-                elif c_codestr is not None and code == '@else':
+                elif code == '@else':
                     self._do_else(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
-                elif c_codestr is not None and code == '@for':
+                elif code == '@for':
                     self._do_for(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
-                elif c_codestr is not None and code == '@each':
+                elif code == '@each':
                     self._do_each(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
-                # elif c_codestr is not None and code == '@while':
+                # elif code == '@while':
                 #     self._do_while(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
-                elif c_codestr is not None and code in ('@variables', '@vars'):
+                elif code in ('@variables', '@vars'):
                     self._get_variables(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
-                elif c_codestr is not None and code == '@media':
+                elif code == '@media':
                     _media = (media or []) + [name]
                     rule[CODESTR] = self.construct + ' {' + c_codestr + '}'
                     self.manage_children(rule, p_selectors, p_parents, p_children, scope, _media)
-                elif c_codestr is None:
-                    rule[PROPERTIES].append((c_lineno, c_property, None))
                 elif scope is None:  # needs to have no scope to crawl down the nested rules
                     self._nest_rules(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
             ####################################################################
