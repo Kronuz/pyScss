@@ -3,69 +3,8 @@ from __future__ import absolute_import
 from scss.cssdefs import __elements_of_type
 from scss.types import BooleanValue, ListValue, NumberValue, StringValue
 
-def _enumerate(prefix, frm, through, separator='-'):
-    prefix = StringValue(prefix).value
-    separator = StringValue(separator).value
-    try:
-        frm = int(getattr(frm, 'value', frm))
-    except ValueError:
-        frm = 1
-    try:
-        through = int(getattr(through, 'value', through))
-    except ValueError:
-        through = frm
-    if frm > through:
-        frm, through = through, frm
-        rev = reversed
-    else:
-        rev = lambda x: x
-    if prefix:
-        ret = [prefix + separator + str(i) for i in rev(range(frm, through + 1))]
-    else:
-        ret = [NumberValue(i) for i in rev(range(frm, through + 1))]
-    ret = dict(enumerate(ret))
-    ret['_'] = ','
-    return ret
-
-
-def _range(frm, through=None):
-    if through is None:
-        through = frm
-        frm = 1
-    return _enumerate(None, frm, through)
-
-def _headers(frm=None, to=None):
-    if frm and to is None:
-        if isinstance(frm, StringValue) and frm.value.lower() == 'all':
-            frm = 1
-            to = 6
-        else:
-            frm = 1
-            try:
-                to = int(getattr(frm, 'value', frm))
-            except ValueError:
-                to = 6
-    else:
-        try:
-            frm = 1 if frm is None else int(getattr(frm, 'value', frm))
-        except ValueError:
-            frm = 1
-        try:
-            to = 6 if to is None else int(getattr(to, 'value', to))
-        except ValueError:
-            to = 6
-    ret = ['h' + str(i) for i in range(frm, to + 1)]
-    ret = dict(enumerate(ret))
-    ret['_'] = ','
-    return ret
-
-def _convert_to(value, type):
-    return value.convert_to(type)
-
-
 
 ################################################################################
-# Specific to pyScss parser functions:
 
 
 def _elements_of_type(display):
@@ -119,6 +58,70 @@ def _append_selector(selector, to_append):
     return ret
 
 
+def _headers(frm=None, to=None):
+    if frm and to is None:
+        if isinstance(frm, StringValue) and frm.value.lower() == 'all':
+            frm = 1
+            to = 6
+        else:
+            frm = 1
+            try:
+                to = int(getattr(frm, 'value', frm))
+            except ValueError:
+                to = 6
+    else:
+        try:
+            frm = 1 if frm is None else int(getattr(frm, 'value', frm))
+        except ValueError:
+            frm = 1
+        try:
+            to = 6 if to is None else int(getattr(to, 'value', to))
+        except ValueError:
+            to = 6
+    ret = ['h' + str(i) for i in range(frm, to + 1)]
+    ret = dict(enumerate(ret))
+    ret['_'] = ','
+    return ret
+
+
+def _enumerate(prefix, frm, through, separator='-'):
+    prefix = StringValue(prefix).value
+    separator = StringValue(separator).value
+    try:
+        frm = int(getattr(frm, 'value', frm))
+    except ValueError:
+        frm = 1
+    try:
+        through = int(getattr(through, 'value', through))
+    except ValueError:
+        through = frm
+    if frm > through:
+        frm, through = through, frm
+        rev = reversed
+    else:
+        rev = lambda x: x
+    if prefix:
+        ret = [prefix + separator + str(i) for i in rev(range(frm, through + 1))]
+    else:
+        ret = [NumberValue(i) for i in rev(range(frm, through + 1))]
+    ret = dict(enumerate(ret))
+    ret['_'] = ','
+    return ret
+
+
+def _range(frm, through=None):
+    if through is None:
+        through = frm
+        frm = 1
+    return _enumerate(None, frm, through)
+
+
+################################################################################
+# Specific to pyScss parser functions:
+
+
+def _convert_to(value, type):
+    return value.convert_to(type)
 
 
 def _inv(sign, value):
