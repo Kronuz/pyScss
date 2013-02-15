@@ -76,49 +76,6 @@ except ImportError:
 
 profiling = {}
 
-# units and conversions
-_units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
-          'grad', 'ms', 's', 'hz', 'khz', '%']
-_zero_units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc']  # units that can be zeroed
-_units_weights = {
-    'em': 10,
-    'mm': 10,
-    'ms': 10,
-    'hz': 10,
-    '%': 100,
-}
-_conv = {
-    'size': {
-        'em': 13.0,
-        'px': 1.0
-    },
-    'length': {
-        'mm':  1.0,
-        'cm':  10.0,
-        'in':  25.4,
-        'pt':  25.4 / 72,
-        'pc':  25.4 / 6
-    },
-    'time': {
-        'ms':  1.0,
-        's':   1000.0
-    },
-    'freq': {
-        'hz':  1.0,
-        'khz': 1000.0
-    },
-    'any': {
-        '%': 1.0 / 100
-    }
-}
-_conv_type = {}
-_conv_factor = {}
-for t, m in _conv.items():
-    for k, f in m.items():
-        _conv_type[k] = t
-        _conv_factor[k] = f
-del t, m, k, f
-
 # color literals
 _colors = {
     'aliceblue': '#f0f8ff',
@@ -263,6 +220,50 @@ _colors = {
     'yellowgreen': '#9acd32'
 }
 
+_units_weights = {
+    'em': 10,
+    'mm': 10,
+    'ms': 10,
+    'hz': 10,
+    '%': 100,
+}
+_conv = {
+    'size': {
+        'em': 13.0,
+        'px': 1.0
+    },
+    'length': {
+        'mm':  1.0,
+        'cm':  10.0,
+        'in':  25.4,
+        'pt':  25.4 / 72,
+        'pc':  25.4 / 6
+    },
+    'time': {
+        'ms':  1.0,
+        's':   1000.0
+    },
+    'freq': {
+        'hz':  1.0,
+        'khz': 1000.0
+    },
+    'any': {
+        '%': 1.0 / 100
+    }
+}
+
+# units and conversions
+_units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
+          'grad', 'ms', 's', 'hz', 'khz', '%']
+_zero_units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc']  # units that can be zeroed
+_conv_type = {}
+_conv_factor = {}
+for t, m in _conv.items():
+    for k, f in m.items():
+        _conv_type[k] = t
+        _conv_factor[k] = f
+del t, m, k, f
+
 _safe_strings = {
     '^doubleslash^': '//',
     '^bigcopen^': '/*',
@@ -347,11 +348,11 @@ _zero_units_re = re.compile(r'\b0(' + '|'.join(map(re.escape, _zero_units)) + r'
 _zero_re = re.compile(r'\b0\.(?=\d)')
 
 _escape_chars_re = re.compile(r'([^-a-zA-Z0-9_])')
-_variable_re = re.compile('^\\$[-a-zA-Z0-9_]+$')
 _interpolate_re = re.compile(r'(#\{\s*)?(\$[-\w]+)(?(1)\s*\})')
 _spaces_re = re.compile(r'\s+')
 _expand_rules_space_re = re.compile(r'\s*{')
 _collapse_properties_space_re = re.compile(r'([:#])\s*{')
+_variable_re = re.compile('^\\$[-a-zA-Z0-9_]+$')
 _undefined_re = re.compile('^(?:\\$[-a-zA-Z0-9_]+|undefined)$')
 
 _strings_re = re.compile(r'([\'"]).*?\1')
@@ -388,6 +389,7 @@ _has_code_re = re.compile('''
     )
 ''', re.VERBOSE)
 
+# Known function names
 FUNCTIONS_CSS2 = 'attr counter counters url rgb rect'
 ## CSS3
 FUNCTIONS_UNITS = 'calc min max cycle'  # http://www.w3.org/TR/css3-values/
@@ -4993,14 +4995,14 @@ for u in _units:
     fnct[u + ':2'] = _convert_to
 
 
-def interpolate(v, R):
-    C, O = R[CONTEXT], R[OPTIONS]
-    vi = C.get(v, v)
-    if v != vi and isinstance(vi, basestring):
-        _vi = eval_expr(vi, R, True)
+def interpolate(var, rule):
+    context = rule[CONTEXT]
+    value = context.get(var, var)
+    if var != value and isinstance(value, basestring):
+        _vi = eval_expr(value, rule, True)
         if _vi is not None:
-            vi = _vi
-    return vi
+            value = _vi
+    return value
 
 
 def call(name, args, R, is_function=True):
@@ -5034,6 +5036,55 @@ def call(name, args, R, is_function=True):
         else:
             node = StringValue((sp + ' ').join(str(v) for n, v in s if n != '_'))
     return node
+
+
+expr_cache = {}
+def eval_expr(expr, rule, raw=False):
+    # print >>sys.stderr, '>>',expr,'<<'
+    results = None
+
+    if not isinstance(expr, basestring):
+        results = expr
+
+    if results is None:
+        if expr in rule[CONTEXT]:
+            chkd = {}
+            while expr in rule[CONTEXT] and expr not in chkd:
+                chkd[expr] = 1
+                _expr = rule[CONTEXT][expr]
+                if _expr == expr:
+                    break
+                expr = _expr
+        if not isinstance(expr, basestring):
+            results = expr
+
+    if results is None:
+        if expr in expr_cache:
+            results = expr_cache[expr]
+        else:
+            try:
+                P = Calculator(CalculatorScanner())
+                P.reset(expr)
+                results = P.goal(rule)
+            except SyntaxError:
+                if config.DEBUG:
+                    raise
+            except Exception, e:
+                log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule[INDEX][rule[LINENO]])
+                if config.DEBUG:
+                    raise
+
+            # TODO this is a clumsy hack for nondeterministic functions;
+            # something better (and per-compiler rather than global) would be
+            # nice
+            if '$' not in expr and '(' not in expr:
+                expr_cache[expr] = results
+
+    if not raw and results is not None:
+        results = to_str(results)
+
+    # print >>sys.stderr, repr(expr),'==',results,'=='
+    return results
 
 
 ################################################################################
@@ -5514,51 +5565,3 @@ class Calculator(Parser):
 
 ### Grammar ends.
 ################################################################################
-
-expr_cache = {}
-def eval_expr(expr, rule, raw=False):
-    # print >>sys.stderr, '>>',expr,'<<'
-    results = None
-
-    if not isinstance(expr, basestring):
-        results = expr
-
-    if results is None:
-        if expr in rule[CONTEXT]:
-            chkd = {}
-            while expr in rule[CONTEXT] and expr not in chkd:
-                chkd[expr] = 1
-                _expr = rule[CONTEXT][expr]
-                if _expr == expr:
-                    break
-                expr = _expr
-        if not isinstance(expr, basestring):
-            results = expr
-
-    if results is None:
-        if expr in expr_cache:
-            results = expr_cache[expr]
-        else:
-            try:
-                P = Calculator(CalculatorScanner())
-                P.reset(expr)
-                results = P.goal(rule)
-            except SyntaxError:
-                if config.DEBUG:
-                    raise
-            except Exception, e:
-                log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule[INDEX][rule[LINENO]])
-                if config.DEBUG:
-                    raise
-
-            # TODO this is a clumsy hack for nondeterministic functions;
-            # something better (and per-compiler rather than global) would be
-            # nice
-            if '$' not in expr and '(' not in expr:
-                expr_cache[expr] = results
-
-    if not raw and results is not None:
-        results = to_str(results)
-
-    # print >>sys.stderr, repr(expr),'==',results,'=='
-    return results
