@@ -4,9 +4,9 @@
 pyScss, a Scss compiler for Python
 
 @author     German M. Bravo (Kronuz) <german.mb@gmail.com>
-@version    1.1.4
+@version    1.1.5
 @see        https://github.com/Kronuz/pyScss
-@copyright  (c) 2012 German M. Bravo (Kronuz)
+@copyright  (c) 2012-2013 German M. Bravo (Kronuz)
 @license    MIT License
             http://www.opensource.org/licenses/mit-license.php
 
