@@ -2032,14 +2032,6 @@ def to_float(num):
         return float(num)
 
 
-hex2rgba = {
-    9: lambda c: (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), int(c[7:9], 16)),
-    7: lambda c: (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), 1.0),
-    5: lambda c: (int(c[1] * 2, 16), int(c[2] * 2, 16), int(c[3] * 2, 16), int(c[4] * 2, 16)),
-    4: lambda c: (int(c[1] * 2, 16), int(c[2] * 2, 16), int(c[3] * 2, 16), 1.0),
-}
-
-
 def escape(s):
     return re.sub(r'''(["'])''', r'\\\1', s)
 
@@ -4562,6 +4554,13 @@ class ListValue(Value):
 
 
 class ColorValue(Value):
+    HEX2RGBA = {
+        9: lambda c: (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), int(c[7:9], 16)),
+        7: lambda c: (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), 1.0),
+        5: lambda c: (int(c[1] * 2, 16), int(c[2] * 2, 16), int(c[3] * 2, 16), int(c[4] * 2, 16)),
+        4: lambda c: (int(c[1] * 2, 16), int(c[2] * 2, 16), int(c[3] * 2, 16), 1.0),
+    }
+
     def __init__(self, tokens):
         self.tokens = tokens
         self.value = (0, 0, 0, 1)
@@ -4570,7 +4569,7 @@ class ColorValue(Value):
             self.value = (0, 0, 0, 1)
         elif isinstance(tokens, ParserValue):
             hex = tokens.value
-            self.value = hex2rgba[len(hex)](hex)
+            self.value = self.HEX2RGBA[len(hex)](hex)
             self.types = {'rgba': 1}
         elif isinstance(tokens, ColorValue):
             self.value = tokens.value
@@ -4597,7 +4596,7 @@ class ColorValue(Value):
             if _undefined_re.match(tokens):
                 raise ValueError("Value is not a Color! (%s)" % tokens)
             try:
-                self.value = hex2rgba[len(tokens)](tokens)
+                self.value = self.HEX2RGBA[len(tokens)](tokens)
             except:
                 try:
                     val = to_float(tokens)
