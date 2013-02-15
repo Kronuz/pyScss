@@ -129,6 +129,8 @@ _default_scss_opts = {
     'reverse_colors': 0,  # Gets the shortest name of all for colors
 }
 
+_default_search_paths = ['.']
+
 SEPARATOR = '\x00'
 _nl_re = re.compile(r'[ \t\r\f\v]*\n[ \t\r\f\v]*', re.MULTILINE)
 _nl_num_re = re.compile(r'\n.+' + SEPARATOR, re.MULTILINE)
@@ -266,27 +268,10 @@ class Scss(object):
         else:
             self.super_selector = ''
         self._scss_vars = scss_vars
-        self._scss_opts = scss_opts or {}
+        self._scss_opts = scss_opts
         self._scss_files = scss_files
         self._func_registry = func_registry
-
-        # Figure out search paths.  Fall back from provided explicitly to
-        # defined globally to just searching the current directory
-        if search_paths is not None:
-            assert not isinstance(search_paths, basestring), \
-                "`search_paths` should be an iterable, not a string"
-            self._search_paths = search_paths
-        else:
-            self._search_paths = ["."]
-
-            if config.LOAD_PATHS:
-                if isinstance(config.LOAD_PATHS, basestring):
-                    # Back-compat: allow comma-delimited
-                    self._search_paths.extend(config.LOAD_PATHS.split(','))
-                else:
-                    self._search_paths.extend(config.LOAD_PATHS)
-
-            self._search_paths.extend(self._scss_opts.get('load_paths', []))
+        self._search_paths = search_paths
 
         self.reset()
 
@@ -318,6 +303,23 @@ class Scss(object):
         self.scss_opts = _default_scss_opts.copy()
         if self._scss_opts is not None:
             self.scss_opts.update(self._scss_opts)
+
+        # Figure out search paths.  Fall back from provided explicitly to
+        # defined globally to just searching the current directory
+        self.search_paths = list(_default_search_paths)
+        if self._search_paths is not None:
+            assert not isinstance(self._search_paths, basestring), \
+                "`search_paths` should be an iterable, not a string"
+            self.search_paths.extend(self._search_paths)
+        else:
+            if config.LOAD_PATHS:
+                if isinstance(config.LOAD_PATHS, basestring):
+                    # Back-compat: allow comma-delimited
+                    self.search_paths.extend(config.LOAD_PATHS.split(','))
+                else:
+                    self.search_paths.extend(config.LOAD_PATHS)
+
+            self.search_paths.extend(self.scss_opts.get('load_paths', []))
 
         self.scss_files = {}
         self._scss_files_order = []
@@ -827,8 +829,8 @@ class Scss(object):
             except KeyError:
                 i_codestr = None
 
-                for path in self._search_paths:
-                    for basepath in ['./', os.path.dirname(rule[PATH])]:
+                for path in self.search_paths:
+                    for basepath in ['.', os.path.dirname(rule[PATH])]:
                         i_codestr = None
                         full_path = os.path.realpath(os.path.join(path, basepath, dirname))
                         if full_path in load_paths:
