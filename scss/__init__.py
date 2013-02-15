@@ -313,6 +313,8 @@ _default_scss_opts = {
     'reverse_colors': 0,  # Gets the shortest name of all for colors
 }
 
+_default_search_paths = ['.']
+
 SEPARATOR = '\x00'
 _nl_re = re.compile(r'[ \t\r\f\v]*\n[ \t\r\f\v]*', re.MULTILINE)
 _nl_num_re = re.compile(r'\n.+' + SEPARATOR, re.MULTILINE)
@@ -689,7 +691,7 @@ class Scss(object):
     # configuration:
     construct = 'self'
 
-    def __init__(self, scss_vars=None, scss_opts=None, scss_files=None, super_selector=None):
+    def __init__(self, scss_vars=None, scss_opts=None, scss_files=None, super_selector=None, search_paths=None):
         if super_selector:
             self.super_selector = super_selector + ' '
         else:
@@ -697,6 +699,8 @@ class Scss(object):
         self._scss_vars = scss_vars
         self._scss_opts = scss_opts
         self._scss_files = scss_files
+        self._search_paths = search_paths
+
         self.reset()
 
     def get_scss_constants(self):
@@ -727,6 +731,23 @@ class Scss(object):
         self.scss_opts = _default_scss_opts.copy()
         if self._scss_opts is not None:
             self.scss_opts.update(self._scss_opts)
+
+        # Figure out search paths.  Fall back from provided explicitly to
+        # defined globally to just searching the current directory
+        self.search_paths = list(_default_search_paths)
+        if self._search_paths is not None:
+            assert not isinstance(self._search_paths, basestring), \
+                "`search_paths` should be an iterable, not a string"
+            self.search_paths.extend(self._search_paths)
+        else:
+            if config.LOAD_PATHS:
+                if isinstance(config.LOAD_PATHS, basestring):
+                    # Back-compat: allow comma-delimited
+                    self.search_paths.extend(config.LOAD_PATHS.split(','))
+                else:
+                    self.search_paths.extend(config.LOAD_PATHS)
+
+            self.search_paths.extend(self.scss_opts.get('load_paths', []))
 
         self.scss_files = {}
         self._scss_files_order = []
@@ -1237,22 +1258,14 @@ class Scss(object):
             load_paths = []
             filename = os.path.basename(name)
             dirname = os.path.dirname(name)
+
             try:
                 i_codestr = self.scss_files[name]
             except KeyError:
                 i_codestr = None
 
-                # TODO: Convert global config.LOAD_PATHS to a list. Use it directly.
-                # Doing the above will break backwards compatibility!
-                if hasattr(config.LOAD_PATHS, 'split'):
-                    load_path_list = config.LOAD_PATHS.split(',')  # Old style
-                else:
-                    load_path_list = config.LOAD_PATHS  # New style
-
-                load_path_list.extend(self._scss_opts['load_paths'] if self._scss_opts and 'load_paths' in self._scss_opts else [])
-
-                for path in ['./'] + load_path_list:
-                    for basepath in ['./', os.path.dirname(rule[PATH])]:
+                for path in self.search_paths:
+                    for basepath in ['.', os.path.dirname(rule[PATH])]:
                         i_codestr = None
                         full_path = os.path.realpath(os.path.join(path, basepath, dirname))
                         if full_path in load_paths:
