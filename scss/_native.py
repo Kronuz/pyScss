@@ -4,9 +4,9 @@ import re
 
 # TODO copied from __init__
 SEPARATOR = '\x00'
-_nl_re = re.compile(r'\s*\n\s*', re.MULTILINE)
+_nl_re = re.compile(r'[ \t\r\f\v]*\n[ \t\r\f\v]*', re.MULTILINE)
 _nl_num_re = re.compile(r'\n.+' + SEPARATOR, re.MULTILINE)
-_nl_num_nl_re = re.compile(r'\n.+' + SEPARATOR + r'\s*\n', re.MULTILINE)
+_nl_num_nl_re = re.compile(r'\n.+' + SEPARATOR + r'[ \t\r\f\v]*\n', re.MULTILINE)
 _blocks_re = re.compile(r'[{},;()\'"\n]')
 
 def _strip_selprop(selprop, lineno):
