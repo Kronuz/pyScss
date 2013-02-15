@@ -1213,10 +1213,9 @@ class Scss(object):
             value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
             m_vars[m_param] = value
         for p in m_params:
-            if p not in new_params:
-                if isinstance(m_vars[p], basestring):
-                    value = self.calculate(m_vars[p], m_vars, rule[OPTIONS], rule)
-                    m_vars[p] = value
+            if p not in new_params and isinstance(m_vars[p], basestring):
+                value = self.calculate(m_vars[p], m_vars, rule[OPTIONS], rule)
+                m_vars[p] = value
         _context = rule[CONTEXT].copy()
         _context.update(m_vars)
         _rule = spawn_rule(rule, codestr=m_codestr, context=_context, lineno=c_lineno)
