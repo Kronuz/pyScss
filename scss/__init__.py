@@ -4457,7 +4457,10 @@ class NumberValue(Value):
             val *= _conv_factor.get(type, 1.0)
         ret = NumberValue(val)
         if type == 'deg':
-            ret.value = ret.value % 360.0
+            # leave 360 intact
+            # e.g. needed for: transform: rotate(0deg); ...up to... transform: rotate(360deg);
+            if ret.value != NumberValue(360.0):
+                ret.value = ret.value % 360.0
         ret.units = {type: _units_weights.get(type, 1), '_': type}
         return ret
 
