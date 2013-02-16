@@ -1851,7 +1851,9 @@ class Scss(object):
                     open_selectors = False
                     skip_selectors = False
                 if selectors:
-                    _selectors = [s for s in selectors.split(',') if '%' not in s]
+                    # ensure no 'placeholder selectors' (see sass ref) but allow percentage data type (see @keyframes)
+                    without_placeholder = re.compile("^([^%]+|\d{1,3}%)$");
+                    _selectors = [s for s in selectors.split(',') if without_placeholder.match(s)]
                     if _selectors:
                         total_rules += 1
                         total_selectors += len(_selectors)
