@@ -1231,6 +1231,128 @@ TESTS FOR REPORTED ISSUES
     }
 
 
+### Issue #75 test (part 1/2 - "@-[moz|webkit|o]-keyframes")
+
+    >>> print css.compile('''
+    ... @option compress:no;
+    ... p {
+    ...   color: #f00;
+    ... }
+    ... @-moz-keyframes spinnerRotate,
+    ... @-webkit-keyframes spinnerRotate,
+    ... @keyframes spinnerRotate {
+    ...  from {
+    ...    -webkit-transform: rotate(0deg);
+    ...    -moz-transform: rotate(0deg);
+    ...    transform: rotate(0deg);
+    ...   }
+    ...   75% {
+    ...     font-size: 300%;
+    ...     margin-left: 25%;
+    ...     width: 150%;
+    ...   }
+    ...  to {
+    ...    -webkit-transform: rotate(360deg);
+    ...    -moz-transform: rotate(360deg);
+    ...    transform: rotate(360deg);
+    ...   }
+    ... }
+    ... @-webkit-keyframes spinnerRotate {
+    ...   0% { top: 0; left: 0; }
+    ...   30% { top: 50px; }
+    ...   68%, 72% { left: 50px; }
+    ...   100% { top: 100px; left: 100%; }
+    ... }
+    ... a {
+    ...   color: #0f0;
+    ... }
+    ... ''') #doctest: +NORMALIZE_WHITESPACE
+    p {
+      color: #f00;
+    }
+    @-moz-keyframes spinnerRotate,
+    @-webkit-keyframes spinnerRotate,
+    @keyframes spinnerRotate {
+     from {
+       -webkit-transform: rotate(0deg);
+       -moz-transform: rotate(0deg);
+       transform: rotate(0deg);
+      }
+      75% {
+        font-size: 300%;
+        margin-left: 25%;
+        width: 150%;
+      }
+     to {
+       -webkit-transform: rotate(360deg);
+       -moz-transform: rotate(360deg);
+       transform: rotate(360deg);
+      }
+    }
+    @-webkit-keyframes spinnerRotate {
+      0% {
+        top: 0;
+        left: 0;
+      }
+      30% {
+        top: 50px;
+      }
+      68%, 72% {
+        left: 50px;
+      }
+      100% {
+        top: 100px;
+        left: 100%;
+      }
+    }
+    a {
+      color: #0f0;
+    }
+
+
+### Issue #75 test (part 2/2 - "@-moz-document")
+
+    >>> print css.compile('''
+    ... @option compress:no;
+    ... h1 {
+    ...   color: #f00;
+    ... }
+    ... @-moz-document (http://www.w3.org/), url-prefix(http://www.w3.org/Style/) {
+    ...   #search input {
+    ...     border-radius: 0;
+    ...     width: 154px;
+    ...     padding: 3px 2px;
+    ...     margin: 0;
+    ...     font-size: 14px;
+    ...   }
+    ...   .hbox {
+    ...     width: 100%;
+    ...   }
+    ... }
+    ... h2 {
+    ...   color: #0f0;
+    ... }
+    ... ''') #doctest: +NORMALIZE_WHITESPACE
+    h1 {
+      color: #f00;
+    }
+    @-moz-document (http://www.w3.org/), url-prefix(http://www.w3.org/Style/) {
+      #search input {
+        border-radius: 0;
+        width: 154px;
+        padding: 3px 2px;
+        margin: 0;
+        font-size: 14px;
+      }
+      .hbox {
+        width: 100%;
+      }
+    }
+    h2 {
+      color: #0f0;
+    }
+
+
 ### Strings interpolation
 
     >>> print css.compile('''
@@ -1385,9 +1507,9 @@ UNSUPPORTED
 ... .cleanBox h1 {
 ...     font-size: 60px;
 ... }
-... 
+...
 ... http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
-... 
+...
 ... Any rule that uses a:hover will also work for .hoverlink, even if they have other selectors as well
 ... >>> print css.compile('''
 ... ... @option compress:no, short_colors:yes, reverse_colors:yes;
@@ -1398,8 +1520,8 @@ UNSUPPORTED
 ... .comment .hoverlink.user {
 ...     font-weight: bold;
 ... }
-... 
-... 
+...
+...
 ... Sometimes a selector sequence extends another selector that appears in another
 ... sequence. In this case, the two sequences need to be merged.
 ... While it would technically be possible to generate all selectors that could
@@ -1416,6 +1538,6 @@ UNSUPPORTED
 ... #demo .overview #admin .tabbar .fakelink {
 ...     font-weight: bold;
 ... }
-... 
+...
 ... --------------------------------------------------------------------------------
 ... """
