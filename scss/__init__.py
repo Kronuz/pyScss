@@ -441,6 +441,7 @@ INDEX = 9
 LINENO = 10
 FINAL = 11
 MEDIA = 12
+ATRULE = 13
 RULE_VARS = {
     'FILEID': FILEID,
     'POSITION': POSITION,
@@ -455,6 +456,7 @@ RULE_VARS = {
     'LINENO': LINENO,
     'FINAL': FINAL,
     'MEDIA': MEDIA,
+    'ATRULE': ATRULE,
 }
 
 
@@ -995,7 +997,7 @@ class Scss(object):
 
             # manage children or expand children:
             _children = deque()
-            self.manage_children(rule, _selectors, _parents, _children, None, rule[MEDIA])
+            self.manage_children(rule, _selectors, _parents, _children, None, rule[MEDIA], rule[ATRULE])
             self.children.extendleft(_children)
 
             # prepare maps:
@@ -1013,7 +1015,7 @@ class Scss(object):
             #for r in [rule]+list(self.children)[:5]: print >>sys.stderr, repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:80]+('...' if len(r[CODESTR])>80 else '')), dict((k, v) for k, v in r[CONTEXT].items() if k.startswith('$') and not k.startswith('$__')), dict(r[PROPERTIES]).keys()
 
     @print_timing(4)
-    def manage_children(self, rule, p_selectors, p_parents, p_children, scope, media):
+    def manage_children(self, rule, p_selectors, p_parents, p_children, scope, media, at_rule):
         for c_lineno, c_property, c_codestr in locate_blocks(rule[CODESTR]):
             if '@return' in rule[OPTIONS]:
                 return
@@ -1057,11 +1059,11 @@ class Scss(object):
                     config.DEBUG = name
                     log.info("Debug mode is %s", 'On' if config.DEBUG else 'Off')
                 elif code == '@option':
-                    self._settle_options(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._settle_options(rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@content':
-                    self._do_content(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._do_content(rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@import':
-                    self._do_import(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._do_import(rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@extend':
                     name = self.apply_vars(name, rule[CONTEXT], rule[OPTIONS], rule)
                     p_parents.update(p.strip() for p in name.replace(',', '&').split('&'))
@@ -1070,44 +1072,54 @@ class Scss(object):
                     ret = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
                     rule[OPTIONS]['@return'] = ret
                 elif code == '@include':
-                    self._do_include(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._do_include(rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name)
                 elif c_codestr is None:
                     rule[PROPERTIES].append((c_lineno, c_property, None))
                 elif code in ('@mixin', '@function'):
-                    self._do_functions(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._do_functions(rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@if' or c_property.startswith('@else if '):
-                    self._do_if(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._do_if(rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@else':
-                    self._do_else(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._do_else(rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@for':
-                    self._do_for(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._do_for(rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@each':
-                    self._do_each(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._do_each(rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name)
                 # elif code == '@while':
-                #     self._do_while(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                #     self._do_while(rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name)
                 elif code in ('@variables', '@vars'):
-                    self._get_variables(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
+                    self._get_variables(rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr)
                 elif code == '@media':
                     _media = (media or []) + [name]
                     rule[CODESTR] = self.construct + ' {' + c_codestr + '}'
-                    self.manage_children(rule, p_selectors, p_parents, p_children, scope, _media)
+                    self.manage_children(rule, p_selectors, p_parents, p_children, scope, _media, at_rule)
+                elif c_codestr is not None and code in ('@-moz-document', '@keyframes', '@-moz-keyframes', '@-webkit-keyframes', '@-o-keyframes'):
+                    # no need to support '@-document' => "deferred to CSS Level 4."
+                    #   http://www.w3.org/TR/css3-conditional/#changes
+                    # general docs
+                    #   https://developer.mozilla.org/en-US/docs/CSS/@document
+                    #   https://developer.mozilla.org/en-US/docs/CSS/@keyframes
+                    #   https://developer.mozilla.org/en-US/docs/CSS/At-rule
+                    _at_rule = (code, name)
+                    rule[CODESTR] = self.construct + ' {' + c_codestr + '}'
+                    self.manage_children(rule, p_selectors, p_parents, p_children, scope, media, _at_rule)
                 elif scope is None:  # needs to have no scope to crawl down the nested rules
-                    self._nest_rules(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
+                    self._nest_rules(rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr)
             ####################################################################
             # Properties
             elif c_codestr is None:
-                self._get_properties(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
+                self._get_properties(rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr)
             # Nested properties
             elif c_property.endswith(':'):
                 rule[CODESTR] = c_codestr
-                self.manage_children(rule, p_selectors, p_parents, p_children, (scope or '') + c_property[:-1] + '-', media)
+                self.manage_children(rule, p_selectors, p_parents, p_children, (scope or '') + c_property[:-1] + '-', media, at_rule)
             ####################################################################
             # Nested rules
             elif scope is None:  # needs to have no scope to crawl down the nested rules
-                self._nest_rules(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
+                self._nest_rules(rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr)
 
     @print_timing(10)
-    def _settle_options(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _settle_options(self, rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name):
         for option in name.split(','):
             option, value = (option.split(':', 1) + [''])[:2]
             option = option.strip().lower()
@@ -1120,7 +1132,7 @@ class Scss(object):
                 rule[OPTIONS][option] = value
 
     @print_timing(10)
-    def _do_functions(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_functions(self, rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @mixin and @function
         """
@@ -1157,7 +1169,7 @@ class Scss(object):
                     m_vars.update(kwargs)
                     _options = rule[OPTIONS].copy()
                     _rule = spawn_rule(R, codestr=m_codestr, context=m_vars, options=_options, deps=set(), properties=[], final=False, lineno=c_lineno)
-                    self.manage_children(_rule, p_selectors, p_parents, p_children, (scope or '') + '', R[MEDIA])
+                    self.manage_children(_rule, p_selectors, p_parents, p_children, (scope or '') + '', R[MEDIA], R[ATRULE])
                     ret = _rule[OPTIONS].pop('@return', '')
                     return ret
                 return __call
@@ -1174,7 +1186,7 @@ class Scss(object):
             rule[OPTIONS][code + ' ' + funct + ':0'] = mixin
 
     @print_timing(10)
-    def _do_include(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_include(self, rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @include, for @mixins
         """
@@ -1224,10 +1236,10 @@ class Scss(object):
         _context.update(m_vars)
         _rule = spawn_rule(rule, codestr=m_codestr, context=_context, lineno=c_lineno)
         _rule[OPTIONS]['@content'] = c_codestr
-        self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
+        self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media, at_rule)
 
     @print_timing(10)
-    def _do_content(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_content(self, rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @content
         """
@@ -1235,10 +1247,10 @@ class Scss(object):
             log.error("Content string not found for @content (%s)", rule[INDEX][rule[LINENO]])
         c_codestr = rule[OPTIONS].pop('@content', '')
         rule[CODESTR] = c_codestr
-        self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+        self.manage_children(rule, p_selectors, p_parents, p_children, scope, media, at_rule)
 
     @print_timing(10)
-    def _do_import(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_import(self, rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @import
         Load and import mixins and functions and rules
@@ -1303,7 +1315,7 @@ class Scss(object):
                     if i_codestr is not None:
                         break
                 if i_codestr is None:
-                    i_codestr = self._do_magic_import(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    i_codestr = self._do_magic_import(rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name)
                 i_codestr = self.scss_files[name] = i_codestr and self.load_string(i_codestr, full_filename)
                 if name not in self.scss_files:
                     self._scss_files_order.append(name)
@@ -1313,11 +1325,11 @@ class Scss(object):
                 log.warn("File to import not found or unreadable: '%s' (%s)%s%s", filename, rule[INDEX][rule[LINENO]], load_paths, unsupported)
             else:
                 _rule = spawn_rule(rule, codestr=i_codestr, path=full_filename, lineno=c_lineno)
-                self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
+                self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media, at_rule)
                 rule[OPTIONS]['@import ' + name] = True
 
     @print_timing(10)
-    def _do_magic_import(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_magic_import(self, rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @import for sprite-maps
         Imports magic sprite map directories
@@ -1396,7 +1408,7 @@ class Scss(object):
         return ret
 
     @print_timing(10)
-    def _do_if(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_if(self, rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @if and @else if
         """
@@ -1412,11 +1424,11 @@ class Scss(object):
             val = bool(False if not val or isinstance(val, basestring) and (val in ('0', 'false', 'undefined') or _variable_re.match(val)) else val)
             if val:
                 rule[CODESTR] = c_codestr
-                self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+                self.manage_children(rule, p_selectors, p_parents, p_children, scope, media, at_rule)
             rule[OPTIONS]['@if'] = val
 
     @print_timing(10)
-    def _do_else(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_else(self, rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @else
         """
@@ -1425,10 +1437,10 @@ class Scss(object):
         val = rule[OPTIONS].pop('@if', True)
         if not val:
             rule[CODESTR] = c_codestr
-            self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+            self.manage_children(rule, p_selectors, p_parents, p_children, scope, media, at_rule)
 
     @print_timing(10)
-    def _do_for(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_for(self, rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @for
         """
@@ -1455,10 +1467,10 @@ class Scss(object):
         for i in rev(range(frm, through + 1)):
             rule[CODESTR] = c_codestr
             rule[CONTEXT][var] = str(i)
-            self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+            self.manage_children(rule, p_selectors, p_parents, p_children, scope, media, at_rule)
 
     @print_timing(10)
-    def _do_each(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_each(self, rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @each
         """
@@ -1477,10 +1489,10 @@ class Scss(object):
             rule[CONTEXT][var] = v
             if not isinstance(n, int):
                 rule[CONTEXT][n] = v
-            self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+            self.manage_children(rule, p_selectors, p_parents, p_children, scope, media, at_rule)
 
     # @print_timing(10)
-    # def _do_while(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    # def _do_while(self, rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr, code, name):
     #     THIS DOES NOT WORK AS MODIFICATION OF INNER VARIABLES ARE NOT KNOWN AT THIS POINT!!
     #     """
     #     Implements @while
@@ -1494,21 +1506,21 @@ class Scss(object):
     #         if not val:
     #             break
     #         rule[CODESTR] = c_codestr
-    #         self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+    #         self.manage_children(rule, p_selectors, p_parents, p_children, scope, media, at_rule)
     #     rule[OPTIONS]['@if'] = first_val
 
     @print_timing(10)
-    def _get_variables(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr):
+    def _get_variables(self, rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr):
         """
         Implements @variables and @vars
         """
         _rule = list(rule)
         _rule[CODESTR] = c_codestr
         _rule[PROPERTIES] = rule[CONTEXT]
-        self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
+        self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media, at_rule)
 
     @print_timing(10)
-    def _get_properties(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr):
+    def _get_properties(self, rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr):
         """
         Implements properties and variables extraction and assignment
         """
@@ -1555,13 +1567,13 @@ class Scss(object):
             rule[PROPERTIES].append((c_lineno, _prop, to_str(value) if value is not None else None))
 
     @print_timing(10)
-    def _nest_rules(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr):
+    def _nest_rules(self, rule, p_selectors, p_parents, p_children, scope, media, at_rule, c_lineno, c_property, c_codestr):
         """
         Implements Nested CSS rules
         """
         if c_property == self.construct and rule[MEDIA] == media:
             rule[CODESTR] = c_codestr
-            self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+            self.manage_children(rule, p_selectors, p_parents, p_children, scope, media, at_rule)
             return
 
         c_property = self.apply_vars(c_property, rule[CONTEXT], rule[OPTIONS], rule, True)
@@ -1589,7 +1601,7 @@ class Scss(object):
             if parents:
                 better_selectors += ' extends ' + '&'.join(sorted(parents))
 
-        _rule = spawn_rule(rule, codestr=c_codestr, deps=set(), context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=better_selectors, properties=[], final=False, media=media, lineno=c_lineno)
+        _rule = spawn_rule(rule, codestr=c_codestr, deps=set(), context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=better_selectors, properties=[], final=False, media=media, atrule=at_rule, lineno=c_lineno)
 
         p_children.appendleft(_rule)
 
@@ -1779,7 +1791,9 @@ class Scss(object):
         skip_selectors = False
         old_selectors = None
         open_media = False
+        open_atrule = False
         old_media = None
+        old_at_rule = None
         old_property = None
 
         wrap = textwrap.TextWrapper(break_long_words=False, break_on_hyphens=False)
@@ -1797,8 +1811,9 @@ class Scss(object):
 
             selectors = rule[SELECTORS]
             media = rule[MEDIA]
-            _tb = tb if old_media else ''
-            if old_media != media or media is not None:
+            at_rule = rule[ATRULE]
+            _tb = tb if old_media or old_at_rule else ''
+            if (old_media != media or media is not None) or (old_at_rule != at_rule or at_rule is not None):
                 if open_selectors:
                     if not skip_selectors:
                         if not sc and result[-1] == ';':
@@ -1814,9 +1829,19 @@ class Scss(object):
                 if media:
                     result += '@media ' + (' and ').join(set(media)) + sp + '{' + nl
                     open_media = True
+                # @* (e.g. @keyframes, ...)
+                if open_atrule and (old_at_rule != at_rule or at_rule is None):
+                    if not sc and result[-1] == ';':
+                        result = result[:-1]
+                    result += '}' + nl
+                    open_atrule = False
+                if at_rule and not open_atrule:
+                    result += at_rule[0] + sp + at_rule[1] + sp + '{' + nl
+                    open_atrule = True
                 old_media = media
+                old_at_rule = at_rule
                 old_selectors = None  # force entrance to add a new selector
-            _tb = tb if media else ''
+            _tb = tb if media or at_rule else ''
             if old_selectors != selectors or selectors is not None:
                 if open_selectors:
                     if not skip_selectors:
@@ -1885,18 +1910,20 @@ class Scss(object):
             if not skip_selectors:
                 result += self._print_properties(rule[PROPERTIES], scope, [old_property], sc, sp, _tb, nl, wrap)
 
-        if open_media:
+        if open_media or open_atrule:
             _tb = tb
         else:
             _tb = ''
         if open_selectors and not skip_selectors:
-            if not sc and result[-1] == ';':
-                result = result[:-1]
+            if not sc:
+                if result[-1] == ';':
+                    result = result[:-1]
             result += _tb + '}' + nl
 
-        if open_media:
-            if not sc and result[-1] == ';':
-                result = result[:-1]
+        if open_media or open_atrule:
+            if not sc:
+                if result[-1] == ';':
+                    result = result[:-1]
             result += '}' + nl
 
         return (result, total_rules, total_selectors)
