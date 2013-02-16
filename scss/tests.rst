@@ -1231,6 +1231,51 @@ TESTS FOR REPORTED ISSUES
     }
 
 
+### Issue #69 test
+
+    >>> print css.compile('''
+    ... @option compress:no;
+    ... p {
+    ...   color: #f00;
+    ... }
+    ... @media screen, print {
+    ...   body {
+    ...     line-height: 1.2;
+    ...   }
+    ... }
+    ... @media (min-width: 700px), handheld and (orientation: landscape) {
+    ...   body {
+    ...     background: #123;
+    ...   }
+    ...   div {
+    ...     background: #456;
+    ...   }
+    ... }
+    ... a {
+    ...   color: #0f0;
+    ... }
+    ... ''') #doctest: +NORMALIZE_WHITESPACE
+    p {
+      color: #f00;
+    }
+    @media screen, print {
+      body {
+        line-height: 1.2;
+      }
+    }
+    @media (min-width: 700px), handheld and (orientation: landscape) {
+      body {
+        background: #123;
+      }
+      div {
+        background: #456;
+      }
+    }
+    a {
+      color: #0f0;
+    }
+
+
 ### Strings interpolation
 
     >>> print css.compile('''
@@ -1385,9 +1430,9 @@ UNSUPPORTED
 ... .cleanBox h1 {
 ...     font-size: 60px;
 ... }
-... 
+...
 ... http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
-... 
+...
 ... Any rule that uses a:hover will also work for .hoverlink, even if they have other selectors as well
 ... >>> print css.compile('''
 ... ... @option compress:no, short_colors:yes, reverse_colors:yes;
@@ -1398,8 +1443,8 @@ UNSUPPORTED
 ... .comment .hoverlink.user {
 ...     font-weight: bold;
 ... }
-... 
-... 
+...
+...
 ... Sometimes a selector sequence extends another selector that appears in another
 ... sequence. In this case, the two sequences need to be merged.
 ... While it would technically be possible to generate all selectors that could
@@ -1416,6 +1461,6 @@ UNSUPPORTED
 ... #demo .overview #admin .tabbar .fakelink {
 ...     font-weight: bold;
 ... }
-... 
+...
 ... --------------------------------------------------------------------------------
 ... """
