@@ -649,6 +649,7 @@ class Scss(object):
                 elif code in ('@variables', '@vars'):
                     self._get_variables(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
                 elif code == '@media':
+                    # https://developer.mozilla.org/en-US/docs/CSS/@media
                     _media = (media or []) + [name]
                     rule[CODESTR] = self.construct + ' {' + c_codestr + '}'
                     self.manage_children(rule, p_selectors, p_parents, p_children, scope, _media)
@@ -1369,12 +1370,12 @@ class Scss(object):
                         result += _tb + '}' + nl
                     open_selectors = False
                     skip_selectors = False
-                if open_media:
+                if open_media and (old_media != media or media is None):
                     if not sc and result[-1] == ';':
                         result = result[:-1]
                     result += '}' + nl
                     open_media = False
-                if media:
+                if media and not open_media:
                     result += '@media ' + (' and ').join(set(media)) + sp + '{' + nl
                     open_media = True
                 old_media = media
