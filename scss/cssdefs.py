@@ -190,6 +190,9 @@ for t, m in _conv.items():
 del t, m, k, f
 
 
+# ------------------------------------------------------------------------------
+# Built-in CSS function regex
+
 # Known function names
 FUNCTIONS_CSS2 = 'attr counter counters url rgb rect'
 ## CSS3
@@ -230,29 +233,69 @@ _css_functions_re = re.compile(r'^(%s)$' % (
     ]).split())))
 
 
-__elements_of_type_block = 'address, article, aside, blockquote, center, dd, details, dir, div, dl, dt, fieldset, figcaption, figure, footer, form, frameset, h1, h2, h3, h4, h5, h6, header, hgroup, hr, isindex, menu, nav, noframes, noscript, ol, p, pre, section, summary, ul'
-__elements_of_type_inline = 'a, abbr, acronym, audio, b, basefont, bdo, big, br, canvas, cite, code, command, datalist, dfn, em, embed, font, i, img, input, kbd, keygen, label, mark, meter, output, progress, q, rp, rt, ruby, s, samp, select, small, span, strike, strong, sub, sup, textarea, time, tt, u, var, video, wbr'
-__elements_of_type_table = 'table'
-__elements_of_type_list_item = 'li'
-__elements_of_type_table_row_group = 'tbody'
-__elements_of_type_table_header_group = 'thead'
-__elements_of_type_table_footer_group = 'tfoot'
-__elements_of_type_table_row = 'tr'
-__elements_of_type_table_cel = 'td, th'
-__elements_of_type_html5_block = 'article, aside, details, figcaption, figure, footer, header, hgroup, menu, nav, section, summary'
-__elements_of_type_html5_inline = 'audio, canvas, command, datalist, embed, keygen, mark, meter, output, progress, rp, rt, ruby, time, video, wbr'
-__elements_of_type_html5 = 'article, aside, audio, canvas, command, datalist, details, embed, figcaption, figure, footer, header, hgroup, keygen, mark, menu, meter, nav, output, progress, rp, rt, ruby, section, summary, time, video, wbr'
-__elements_of_type = {
-    'block': dict(enumerate(sorted(__elements_of_type_block.replace(' ', '').split(',')))),
-    'inline': dict(enumerate(sorted(__elements_of_type_inline.replace(' ', '').split(',')))),
-    'table': dict(enumerate(sorted(__elements_of_type_table.replace(' ', '').split(',')))),
-    'list-item': dict(enumerate(sorted(__elements_of_type_list_item.replace(' ', '').split(',')))),
-    'table-row-group': dict(enumerate(sorted(__elements_of_type_table_row_group.replace(' ', '').split(',')))),
-    'table-header-group': dict(enumerate(sorted(__elements_of_type_table_header_group.replace(' ', '').split(',')))),
-    'table-footer-group': dict(enumerate(sorted(__elements_of_type_table_footer_group.replace(' ', '').split(',')))),
-    'table-row': dict(enumerate(sorted(__elements_of_type_table_footer_group.replace(' ', '').split(',')))),
-    'table-cell': dict(enumerate(sorted(__elements_of_type_table_footer_group.replace(' ', '').split(',')))),
-    'html5-block': dict(enumerate(sorted(__elements_of_type_html5_block.replace(' ', '').split(',')))),
-    'html5-inline': dict(enumerate(sorted(__elements_of_type_html5_inline.replace(' ', '').split(',')))),
-    'html5': dict(enumerate(sorted(__elements_of_type_html5.replace(' ', '').split(',')))),
-}
+# ------------------------------------------------------------------------------
+# Bits and pieces of grammar, as regexen
+
+SEPARATOR = '\x00'
+_nl_re = re.compile(r'[ \t\r\f\v]*\n[ \t\r\f\v]*', re.MULTILINE)
+_nl_num_nl_re = re.compile(r'\n.+' + SEPARATOR + r'[ \t\r\f\v]*\n', re.MULTILINE)
+
+_short_color_re = re.compile(r'(?<!\w)#([a-f0-9])\1([a-f0-9])\2([a-f0-9])\3\b', re.IGNORECASE)
+_long_color_re = re.compile(r'(?<!\w)#([a-f0-9]){2}([a-f0-9]){2}([a-f0-9]){2}\b', re.IGNORECASE)
+_reverse_colors = dict((v, k) for k, v in _colors.items())
+for long_k, v in _colors.items():
+    # Calculate the different possible representations of a color:
+    short_k = _short_color_re.sub(r'#\1\2\3', v).lower()
+    rgb_k = _long_color_re.sub(lambda m: 'rgb(%d, %d, %d)' % (int(m.group(1), 16), int(m.group(2), 16), int(m.group(3), 16)), v)
+    rgba_k = _long_color_re.sub(lambda m: 'rgba(%d, %d, %d, 1)' % (int(m.group(1), 16), int(m.group(2), 16), int(m.group(3), 16)), v)
+    # get the shortest of all to use it:
+    k = min([short_k, long_k, rgb_k, rgba_k], key=len)
+    _reverse_colors[long_k] = k
+    _reverse_colors[short_k] = k
+    _reverse_colors[rgb_k] = k
+    _reverse_colors[rgba_k] = k
+_reverse_colors_re = re.compile(r'(?<![-\w.#$])(' + '|'.join(map(re.escape, _reverse_colors)) + r')(?![-\w])', re.IGNORECASE)
+_colors_re = re.compile(r'(?<![-\w.#$])(' + '|'.join(map(re.escape, _colors)) + r')(?![-\w])', re.IGNORECASE)
+
+_expr_glob_re = re.compile(r'''
+    \#\{(.*?)\}                   # Global Interpolation only
+''', re.VERBOSE)
+
+# XXX these still need to be fixed; the //-in-functions thing is a chumpy hack
+_ml_comment_re = re.compile(r'\/\*(.*?)\*\/', re.DOTALL)
+_sl_comment_re = re.compile(r'(?<![(])(?<!\w{2}:)\/\/.*')
+_zero_units_re = re.compile(r'\b(?<![.])0(' + '|'.join(map(re.escape, _zero_units)) + r')(?!\w)', re.IGNORECASE)
+_zero_re = re.compile(r'\b0\.(?=\d)')
+
+_escape_chars_re = re.compile(r'([^-a-zA-Z0-9_])')
+_interpolate_re = re.compile(r'(#\{\s*)?(\$[-\w]+)(?(1)\s*\})')
+_spaces_re = re.compile(r'\s+')
+_expand_rules_space_re = re.compile(r'\s*{')
+_collapse_properties_space_re = re.compile(r'([:#])\s*{')
+_variable_re = re.compile('^\\$[-a-zA-Z0-9_]+$')
+_undefined_re = re.compile('^(?:\\$[-a-zA-Z0-9_]+|undefined)$')
+
+_strings_re = re.compile(r'([\'"]).*?\1')
+
+_prop_split_re = re.compile(r'[:=]')
+_skip_word_re = re.compile(r'-?[_\w\s#.,:%]*$|[-_\w#.,:%]*$', re.MULTILINE)
+_has_code_re = re.compile('''
+    (?:^|(?<=[{;}]))            # the character just before it should be a '{', a ';' or a '}'
+    \s*                         # ...followed by any number of spaces
+    (?:
+        (?:
+            \+
+        | @include
+        | @warn
+        | @mixin
+        | @function
+        | @if
+        | @else
+        | @for
+        | @each
+        )
+        (?![^(:;}]*['"])
+    |
+        @import
+    )
+''', re.VERBOSE)

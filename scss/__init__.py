@@ -55,10 +55,22 @@ import textwrap
 import time
 
 from scss import config
-from scss.cssdefs import _colors, _zero_units
+from scss.cssdefs import (
+    SEPARATOR,
+    _colors, _zero_units,
+    _nl_re, _nl_num_nl_re,
+    _short_color_re, _reverse_colors, _reverse_colors_re, _colors_re,
+    _expr_glob_re,
+    _ml_comment_re, _sl_comment_re,
+    _zero_units_re, _zero_re,
+    _escape_chars_re, _interpolate_re,
+    _spaces_re, _expand_rules_space_re, _collapse_properties_space_re,
+    _variable_re, _undefined_re,
+    _strings_re, _prop_split_re, _skip_word_re,
+)
 from scss.expression import CalculatorScanner, eval_expr, interpolate
-import scss.functions
-from scss.functions import _sprite_map
+from scss.functions import ALL_BUILTINS_LIBRARY
+from scss.functions.compass.sprites import sprite_map
 from scss.rule import FILEID, POSITION, CODESTR, DEPS, CONTEXT, OPTIONS, SELECTORS, PROPERTIES, PATH, INDEX, LINENO, MEDIA, spawn_rule
 from scss.types import BooleanValue, ListValue, NumberValue, StringValue
 from scss.util import depar, dequote, normalize_var, split_params, to_str
@@ -131,80 +143,6 @@ _default_scss_opts = {
 
 _default_search_paths = ['.']
 
-SEPARATOR = '\x00'
-_nl_re = re.compile(r'[ \t\r\f\v]*\n[ \t\r\f\v]*', re.MULTILINE)
-_nl_num_re = re.compile(r'\n.+' + SEPARATOR, re.MULTILINE)
-_nl_num_nl_re = re.compile(r'\n.+' + SEPARATOR + r'[ \t\r\f\v]*\n', re.MULTILINE)
-
-_short_color_re = re.compile(r'(?<!\w)#([a-f0-9])\1([a-f0-9])\2([a-f0-9])\3\b', re.IGNORECASE)
-_long_color_re = re.compile(r'(?<!\w)#([a-f0-9]){2}([a-f0-9]){2}([a-f0-9]){2}\b', re.IGNORECASE)
-_reverse_colors = dict((v, k) for k, v in _colors.items())
-for long_k, v in _colors.items():
-    # Calculate the different possible representations of a color:
-    short_k = _short_color_re.sub(r'#\1\2\3', v).lower()
-    rgb_k = _long_color_re.sub(lambda m: 'rgb(%d, %d, %d)' % (int(m.group(1), 16), int(m.group(2), 16), int(m.group(3), 16)), v)
-    rgba_k = _long_color_re.sub(lambda m: 'rgba(%d, %d, %d, 1)' % (int(m.group(1), 16), int(m.group(2), 16), int(m.group(3), 16)), v)
-    # get the shortest of all to use it:
-    k = min([short_k, long_k, rgb_k, rgba_k], key=len)
-    _reverse_colors[long_k] = k
-    _reverse_colors[short_k] = k
-    _reverse_colors[rgb_k] = k
-    _reverse_colors[rgba_k] = k
-_reverse_colors_re = re.compile(r'(?<![-\w.#$])(' + '|'.join(map(re.escape, _reverse_colors)) + r')(?![-\w])', re.IGNORECASE)
-_colors_re = re.compile(r'(?<![-\w.#$])(' + '|'.join(map(re.escape, _colors)) + r')(?![-\w])', re.IGNORECASE)
-
-_expr_glob_re = re.compile(r'''
-    \#\{(.*?)\}                   # Global Interpolation only
-''', re.VERBOSE)
-
-# XXX these still need to be fixed; the //-in-functions thing is a chumpy hack
-_ml_comment_re = re.compile(r'\/\*(.*?)\*\/', re.DOTALL)
-_sl_comment_re = re.compile(r'(?<![(])(?<!\w{2}:)\/\/.*')
-_zero_units_re = re.compile(r'\b(?<![.])0(' + '|'.join(map(re.escape, _zero_units)) + r')(?!\w)', re.IGNORECASE)
-_zero_re = re.compile(r'\b0\.(?=\d)')
-
-_escape_chars_re = re.compile(r'([^-a-zA-Z0-9_])')
-_interpolate_re = re.compile(r'(#\{\s*)?(\$[-\w]+)(?(1)\s*\})')
-_spaces_re = re.compile(r'\s+')
-_expand_rules_space_re = re.compile(r'\s*{')
-_collapse_properties_space_re = re.compile(r'([:#])\s*{')
-_variable_re = re.compile('^\\$[-a-zA-Z0-9_]+$')
-_undefined_re = re.compile('^(?:\\$[-a-zA-Z0-9_]+|undefined)$')
-
-_strings_re = re.compile(r'([\'"]).*?\1')
-_blocks_re = re.compile(r'[{},;()\'"\n]')
-
-_prop_split_re = re.compile(r'[:=]')
-_skip_word_re = re.compile(r'-?[_\w\s#.,:%]*$|[-_\w#.,:%]*$', re.MULTILINE)
-_has_code_re = re.compile('''
-    (?:^|(?<=[{;}]))            # the character just before it should be a '{', a ';' or a '}'
-    \s*                         # ...followed by any number of spaces
-    (?:
-        (?:
-            \+
-        |
-            @include
-        |
-            @warn
-        |
-            @mixin
-        |
-            @function
-        |
-            @if
-        |
-            @else
-        |
-            @for
-        |
-            @each
-        )
-        (?![^(:;}]*['"])
-    |
-        @import
-    )
-''', re.VERBOSE)
-
 
 def print_timing(level=0):
     def _print_timing(func):
@@ -262,7 +200,7 @@ class Scss(object):
     # configuration:
     construct = 'self'
 
-    def __init__(self, scss_vars=None, scss_opts=None, scss_files=None, super_selector=None, func_registry=scss.functions.scss_builtins, search_paths=None):
+    def __init__(self, scss_vars=None, scss_opts=None, scss_files=None, super_selector=None, library=ALL_BUILTINS_LIBRARY, search_paths=None):
         if super_selector:
             self.super_selector = super_selector + ' '
         else:
@@ -270,7 +208,7 @@ class Scss(object):
         self._scss_vars = scss_vars
         self._scss_opts = scss_opts
         self._scss_files = scss_files
-        self._func_registry = func_registry
+        self._library = library
         self._search_paths = search_paths
 
         self.reset()
@@ -902,10 +840,10 @@ class Scss(object):
         def setdefault(var, val):
             _var = '$' + map_name + '-' + var
             if _var in rule[CONTEXT]:
-                kwargs[var] = interpolate(rule[CONTEXT][_var], rule, self._func_registry)
+                kwargs[var] = interpolate(rule[CONTEXT][_var], rule, self._library)
             else:
                 rule[CONTEXT][_var] = val
-                kwargs[var] = interpolate(val, rule, self._func_registry)
+                kwargs[var] = interpolate(val, rule, self._library)
             return rule[CONTEXT][_var]
 
         setdefault('sprite-base-class', StringValue('.' + map_name + '-sprite'))
@@ -918,8 +856,7 @@ class Scss(object):
             setdefault(n + '-position', position)
             setdefault(n + '-spacing', spacing)
             setdefault(n + '-repeat', repeat)
-        sprite_map = _sprite_map(name, **kwargs)
-        rule[CONTEXT]['$' + map_name + '-' + 'sprites'] = sprite_map
+        rule[CONTEXT]['$' + map_name + '-' + 'sprites'] = sprite_map(name, **kwargs)
         ret = '''
             @import "compass/utilities/sprites/base";
 
@@ -1506,7 +1443,7 @@ class Scss(object):
 
         better_expr_str = self.do_glob_math(better_expr_str, context, options, rule)
 
-        better_expr_str = eval_expr(better_expr_str, rule, self._func_registry, True)
+        better_expr_str = eval_expr(better_expr_str, rule, self._library, True)
 
         if better_expr_str is None:
             better_expr_str = self.apply_vars(_base_str, context, options, rule)
@@ -1517,7 +1454,7 @@ class Scss(object):
         def __calculate_expr(result):
             _group0 = result.group(1)
             _base_str = _group0
-            better_expr_str = eval_expr(_base_str, rule, self._func_registry)
+            better_expr_str = eval_expr(_base_str, rule, self._library)
 
             if better_expr_str is None:
                 better_expr_str = self.apply_vars(_base_str, context, options, rule)

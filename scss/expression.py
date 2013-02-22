@@ -4,8 +4,7 @@ import logging
 import re
 
 import scss.config as config
-from scss.cssdefs import _css_functions_re, _units
-from scss.parseutil import _inv
+from scss.cssdefs import _css_functions_re, _undefined_re, _units, _variable_re
 from scss.rule import CONTEXT, OPTIONS, INDEX, LINENO
 from scss.types import BooleanValue, ColorValue, ListValue, NumberValue, ParserValue, QuotedStringValue, StringValue
 from scss.util import normalize_var, to_str
@@ -20,23 +19,29 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
-# TODO redefined from __init__
-_variable_re = re.compile('^\\$[-a-zA-Z0-9_]+$')
-_undefined_re = re.compile('^(?:\\$[-a-zA-Z0-9_]+|undefined)$')
+
+def _inv(sign, value):
+    if isinstance(value, NumberValue):
+        return value * -1
+    elif isinstance(value, BooleanValue):
+        return not value
+    val = StringValue(value)
+    val.value = sign + val.value
+    return val
 
 
-def interpolate(var, rule, func_registry):
+def interpolate(var, rule, library):
     context = rule[CONTEXT]
     var = normalize_var(var)
     value = context.get(var, var)
     if var != value and isinstance(value, basestring):
-        _vi = eval_expr(value, rule, func_registry, True)
+        _vi = eval_expr(value, rule, library, True)
         if _vi is not None:
             value = _vi
     return value
 
 
-def call(name, args, R, func_registry, is_function=True):
+def call(name, args, R, library, is_function=True):
     C, O = R[CONTEXT], R[OPTIONS]
     # Function call:
     _name = normalize_var(name)
@@ -50,7 +55,7 @@ def call(name, args, R, func_registry, is_function=True):
         if fn:
             node = fn(R, *_args, **_kwargs)
         else:
-            fn = func_registry.lookup(_name, len(_args))
+            fn = library.lookup(_name, len(_args))
             node = fn(*_args, **_kwargs)
     except KeyError:
         sp = args and args.value.get('_') or ''
@@ -69,7 +74,7 @@ def call(name, args, R, func_registry, is_function=True):
 
 
 expr_cache = {}
-def eval_expr(expr, rule, func_registry, raw=False):
+def eval_expr(expr, rule, library, raw=False):
     # print >>sys.stderr, '>>',expr,'<<'
     results = None
 
@@ -95,7 +100,7 @@ def eval_expr(expr, rule, func_registry, raw=False):
             results = expr_cache[expr]
         else:
             try:
-                P = Calculator(CalculatorScanner(), func_registry)
+                P = Calculator(CalculatorScanner(), library)
                 P.reset(expr)
                 results = P.goal(rule)
             except SyntaxError:
@@ -375,7 +380,7 @@ class Calculator(Parser):
             v = atom
             if self._peek(self.u_expr_rsts_) == 'UNITS':
                 UNITS = self._scan('UNITS')
-                v = call(UNITS, ListValue(ParserValue({0: v, 1: UNITS})), R, self._func_registry, False)
+                v = call(UNITS, ListValue(ParserValue({0: v, 1: UNITS})), R, self._library, False)
             return v
 
     def atom(self, R):
@@ -396,7 +401,7 @@ class Calculator(Parser):
                 expr_lst = self.expr_lst(R)
                 v = expr_lst
             RPAR = self._scan('RPAR')
-            return call(FNCT, v, R, self._func_registry)
+            return call(FNCT, v, R, self._library)
         elif _token_ == 'NUM':
             NUM = self._scan('NUM')
             return NumberValue(ParserValue(NUM))
@@ -414,7 +419,7 @@ class Calculator(Parser):
             return ColorValue(ParserValue(COLOR))
         else:  # == 'VAR'
             VAR = self._scan('VAR')
-            return interpolate(VAR, R, self._func_registry)
+            return interpolate(VAR, R, self._library)
 
     def expr_lst(self, R):
         n = None
@@ -471,8 +476,8 @@ class Calculator(Parser):
 
     expr_lst_rsts_ = None
 
-    def __init__(self, scanner, func_registry):
-        self._func_registry = func_registry
+    def __init__(self, scanner, library):
+        self._library = library
         super(Calculator, self).__init__(scanner)
 
 

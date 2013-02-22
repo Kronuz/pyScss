@@ -26,11 +26,11 @@ def _reorder_list(lst):
     return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
 
 
-def interpolate(v, R, func_registry):
+def interpolate(v, R, library):
     return v
 
 
-def call(fn, args, R, func_registry, function=True):
+def call(fn, args, R, library, function=True):
     print 'call: ', fn, args
     return args
 
@@ -209,7 +209,7 @@ class Calculator(Parser):
             v = atom
             if self._peek(self.u_expr_rsts_) == 'UNITS':
                 UNITS = self._scan('UNITS')
-                v = call(UNITS, ListValue(ParserValue({0: v, 1: UNITS})), R, self._func_registry, False)
+                v = call(UNITS, ListValue(ParserValue({0: v, 1: UNITS})), R, self._library, False)
             return v
 
     def atom(self, R):
@@ -230,7 +230,7 @@ class Calculator(Parser):
                 expr_lst = self.expr_lst(R)
                 v = expr_lst
             RPAR = self._scan('RPAR')
-            return call(FNCT, v, R, self._func_registry)
+            return call(FNCT, v, R, self._library)
         elif _token_ == 'NUM':
             NUM = self._scan('NUM')
             return NumberValue(ParserValue(NUM))
@@ -248,7 +248,7 @@ class Calculator(Parser):
             return ColorValue(ParserValue(COLOR))
         else:  # == 'VAR'
             VAR = self._scan('VAR')
-            return interpolate(VAR, R, self._func_registry)
+            return interpolate(VAR, R, self._library)
 
     def expr_lst(self, R):
         n = None
@@ -305,8 +305,8 @@ class Calculator(Parser):
 
     expr_lst_rsts_ = None
 
-    def __init__(self, scanner, func_registry):
-        self._func_registry = func_registry
+    def __init__(self, scanner, library):
+        self._library = library
         super(Calculator, self).__init__(scanner)
 
 

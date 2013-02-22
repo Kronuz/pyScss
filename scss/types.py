@@ -3,18 +3,12 @@ from __future__ import absolute_import
 import colorsys
 import operator
 
-from scss.cssdefs import _conv_factor, _conv_type, _units_weights
+from scss.cssdefs import _conv_factor, _conv_type, _undefined_re, _units_weights
 from scss.util import dequote, escape, to_float, to_str
 
-# TODO copied from __init__.py
-import re
-_undefined_re = re.compile('^(?:\\$[-a-zA-Z0-9_]+|undefined)$')
-del re
 
 ################################################################################
 # pyScss data types:
-
-
 
 class ParserValue(object):
     def __init__(self, value):

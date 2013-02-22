@@ -26,11 +26,11 @@ def _reorder_list(lst):
     return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
 
 
-def interpolate(v, R, func_registry):
+def interpolate(v, R, library):
     return v
 
 
-def call(fn, args, R, func_registry, function=True):
+def call(fn, args, R, library, function=True):
     print 'call: ', fn, args
     return args
 
@@ -117,7 +117,7 @@ parser Calculator:
                               |
                               atom<<R>>                     {{ v = atom }}
                               [
-                                  UNITS                     {{ v = call(UNITS, ListValue(ParserValue({0: v, 1: UNITS})), R, self._func_registry, False) }}
+                                  UNITS                     {{ v = call(UNITS, ListValue(ParserValue({0: v, 1: UNITS})), R, self._library, False) }}
                               ]                             {{ return v }}
     rule atom<<R>>:         LPAR expr_lst<<R>> RPAR         {{ return expr_lst.first() if len(expr_lst) == 1 else expr_lst }}
                               |
@@ -126,7 +126,7 @@ parser Calculator:
                               FNCT                          {{ v = None }}
                               LPAR [
                                   expr_lst<<R>>             {{ v = expr_lst }}
-                              ] RPAR                        {{ return call(FNCT, v, R, self._func_registry) }}
+                              ] RPAR                        {{ return call(FNCT, v, R, self._library) }}
                               |
                               NUM                           {{ return NumberValue(ParserValue(NUM)) }}
                               |
@@ -138,7 +138,7 @@ parser Calculator:
                               |
                               COLOR                         {{ return ColorValue(ParserValue(COLOR)) }}
                               |
-                              VAR                           {{ return interpolate(VAR, R, self._func_registry) }}
+                              VAR                           {{ return interpolate(VAR, R, self._library) }}
     rule expr_lst<<R>>:                                     {{ n = None }}
                               [
                                   VAR [
@@ -162,8 +162,8 @@ parser Calculator:
 %%
     expr_lst_rsts_ = None
 
-    def __init__(self, scanner, func_registry):
-        self._func_registry = func_registry
+    def __init__(self, scanner, library):
+        self._library = library
         super(Calculator, self).__init__(scanner)
 
 
