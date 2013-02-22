@@ -43,16 +43,6 @@ class FunctionLibrary(object):
         new_functions.update(self._functions)
         self._functions = new_functions
 
-    def legacy_register(self, str_key, func):
-        name, argc = str_key.split(':')
-        if argc == "n":
-            argc = None
-        else:
-            argc = int(argc)
-
-        key = name, argc
-        self._functions[key] = func
-
     def register(self, name, argc=None):
         """Decorator for adding a function to this library."""
         # XXX: this should allow specifying names of keyword arguments, as
