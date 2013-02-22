@@ -657,7 +657,7 @@ class Scss(object):
                     for k, v in kwargs.items():
                         m_vars['$' + normalize_var(k)] = v
                     _options = rule[OPTIONS].copy()
-                    _rule = spawn_rule(R, codestr=m_codestr, context=m_vars, options=_options, deps=set(), properties=[], final=False, lineno=c_lineno)
+                    _rule = spawn_rule(R, codestr=m_codestr, context=m_vars, options=_options, deps=set(), properties=[], lineno=c_lineno)
                     self.manage_children(_rule, p_selectors, p_parents, p_children, (scope or '') + '', R[MEDIA])
                     ret = _rule[OPTIONS].pop('@return', '')
                     return ret
@@ -1090,7 +1090,7 @@ class Scss(object):
             if parents:
                 better_selectors += ' extends ' + '&'.join(sorted(parents))
 
-        _rule = spawn_rule(rule, codestr=c_codestr, deps=set(), context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=better_selectors, properties=[], final=False, media=media, lineno=c_lineno)
+        _rule = spawn_rule(rule, codestr=c_codestr, deps=set(), context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=better_selectors, properties=[], media=media, lineno=c_lineno)
 
         p_children.appendleft(_rule)
 
