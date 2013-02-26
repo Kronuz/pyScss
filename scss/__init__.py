@@ -197,9 +197,6 @@ def print_timing(level=0):
 
 
 class Scss(object):
-    # configuration:
-    construct = 'self'
-
     def __init__(self, scss_vars=None, scss_opts=None, scss_files=None, super_selector=None, library=ALL_BUILTINS_LIBRARY, search_paths=None):
         if super_selector:
             self.super_selector = super_selector + ' '
@@ -577,8 +574,9 @@ class Scss(object):
                 elif code == '@media':
                     # https://developer.mozilla.org/en-US/docs/CSS/@media
                     _media = (media or []) + [name]
-                    rule[CODESTR] = self.construct + ' {' + c_codestr + '}'
-                    self.manage_children(rule, p_selectors, p_parents, p_children, scope, _media)
+                    # Use '&' as a dummy selector to mean reusing the parent's
+                    # selectors
+                    self._nest_rules(rule, p_selectors, p_parents, p_children, scope, _media, c_lineno, "&", c_codestr)
                 elif scope is None:  # needs to have no scope to crawl down the nested rules
                     self._nest_rules(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
             ####################################################################
@@ -1048,11 +1046,6 @@ class Scss(object):
         """
         Implements Nested CSS rules
         """
-        if c_property == self.construct and rule[MEDIA] == media:
-            rule[CODESTR] = c_codestr
-            self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
-            return
-
         c_property = self.apply_vars(c_property, rule[CONTEXT], rule[OPTIONS], rule, True)
         c_selectors, c_parents = self.parse_selectors(c_property)
 
@@ -1065,7 +1058,8 @@ class Scss(object):
         better_selectors = set()
         for c_selector in c_selectors:
             for p_selector in p_selectors:
-                if c_selector == self.construct:
+                if c_selector == "self":
+                    # xCSS extension: "self" means to hoist to the parent
                     better_selectors.add(p_selector)
                 elif '&' in c_selector:  # Parent References
                     better_selectors.add(c_selector.replace('&', p_selector))
