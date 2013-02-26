@@ -988,7 +988,7 @@ class Scss(object):
         """
         Implements @variables and @vars
         """
-        _rule = list(rule)
+        _rule = rule.copy()
         _rule[CODESTR] = c_codestr
         _rule[PROPERTIES] = rule[CONTEXT]
         self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
@@ -1415,7 +1415,7 @@ class Scss(object):
         if _skip_word_re.match(better_expr_str) and '- ' not in better_expr_str and ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
             return better_expr_str
 
-        rule = list(rule)
+        rule = rule.copy()
         rule[CONTEXT] = context
         rule[OPTIONS] = options
 
