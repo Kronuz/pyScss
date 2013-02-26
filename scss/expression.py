@@ -5,7 +5,6 @@ import re
 
 import scss.config as config
 from scss.cssdefs import _css_functions_re, _undefined_re, _units, _variable_re
-from scss.rule import CONTEXT, OPTIONS, INDEX, LINENO
 from scss.types import BooleanValue, ColorValue, ListValue, NumberValue, ParserValue, QuotedStringValue, StringValue
 from scss.util import normalize_var, to_str
 
@@ -31,9 +30,8 @@ def _inv(sign, value):
 
 
 def interpolate(var, rule, library):
-    context = rule[CONTEXT]
     var = normalize_var(var)
-    value = context.get(var, var)
+    value = rule.context.get(var, var)
     if var != value and isinstance(value, basestring):
         _vi = eval_expr(value, rule, library, True)
         if _vi is not None:
@@ -42,7 +40,7 @@ def interpolate(var, rule, library):
 
 
 def call(name, args, R, library, is_function=True):
-    C, O = R[CONTEXT], R[OPTIONS]
+    C, O = R.context, R.options
     # Function call:
     _name = normalize_var(name)
     s = args and args.value.items() or []
@@ -61,7 +59,7 @@ def call(name, args, R, library, is_function=True):
         sp = args and args.value.get('_') or ''
         if is_function:
             if not _css_functions_re.match(_name):
-                log.error("Required function not found: %s (%s)", _fn_a, R[INDEX][R[LINENO]], extra={'stack': True})
+                log.error("Required function not found: %s (%s)", _fn_a, R.index[R.lineno], extra={'stack': True})
             _args = (sp + ' ').join(to_str(v) for n, v in s if isinstance(n, int))
             _kwargs = (sp + ' ').join('%s: %s' % (n, to_str(v)) for n, v in s if not isinstance(n, int) and n != '_')
             if _args and _kwargs:
@@ -84,11 +82,11 @@ def eval_expr(expr, rule, library, raw=False):
     if results is None:
         if _variable_re.match(expr):
             expr = normalize_var(expr)
-        if expr in rule[CONTEXT]:
+        if expr in rule.context:
             chkd = {}
-            while expr in rule[CONTEXT] and expr not in chkd:
+            while expr in rule.context and expr not in chkd:
                 chkd[expr] = 1
-                _expr = rule[CONTEXT][expr]
+                _expr = rule.context[expr]
                 if _expr == expr:
                     break
                 expr = _expr
@@ -107,7 +105,7 @@ def eval_expr(expr, rule, library, raw=False):
                 if config.DEBUG:
                     raise
             except Exception, e:
-                log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule[INDEX][rule[LINENO]])
+                log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule.index[rule.lineno])
                 if config.DEBUG:
                     raise
 
