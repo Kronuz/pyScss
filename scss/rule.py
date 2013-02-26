@@ -10,6 +10,7 @@ PATH = 8
 INDEX = 9
 LINENO = 10
 MEDIA = 11
+EXTENDS = 12
 RULE_VARS = {
     'FILEID': FILEID,
     'POSITION': POSITION,
@@ -23,6 +24,7 @@ RULE_VARS = {
     'INDEX': INDEX,
     'LINENO': LINENO,
     'MEDIA': MEDIA,
+    'EXTENDS': EXTENDS,
 }
 
 
@@ -35,6 +37,7 @@ def spawn_rule(rule=None, **kwargs):
         rule[PATH] = './'
         rule[INDEX] = {0: '<unknown>'}
         rule[LINENO] = 0
+        rule[EXTENDS] = set()
     else:
         rule = list(rule)
     for k, v in kwargs.items():

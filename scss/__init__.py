@@ -45,7 +45,7 @@ __author__ = AUTHOR + ' <' + AUTHOR_EMAIL + '>'
 __license__ = LICENSE
 
 
-from collections import deque
+from collections import defaultdict, deque
 import glob
 import logging
 import os.path
@@ -71,7 +71,7 @@ from scss.cssdefs import (
 from scss.expression import CalculatorScanner, eval_expr, interpolate
 from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
-from scss.rule import FILEID, POSITION, CODESTR, DEPS, CONTEXT, OPTIONS, SELECTORS, PROPERTIES, PATH, INDEX, LINENO, MEDIA, spawn_rule
+from scss.rule import FILEID, POSITION, CODESTR, DEPS, CONTEXT, OPTIONS, SELECTORS, PROPERTIES, PATH, INDEX, LINENO, MEDIA, EXTENDS, spawn_rule
 from scss.types import BooleanValue, ListValue, NumberValue, StringValue
 from scss.util import depar, dequote, normalize_var, split_params, to_str
 
@@ -225,7 +225,7 @@ class Scss(object):
         self.children = deque()
         self.rules = []
         self._rules = {}
-        self.parts = {}
+        self.parts = defaultdict(list)
 
     def reset(self, input_scss=None):
         if hasattr(CalculatorScanner, 'cleanup'):
@@ -300,7 +300,7 @@ class Scss(object):
         # this will manage rule: child objects inside of a node
         self.parse_children()
 
-        # this will manage rule: ' extends '
+        # this will manage @extends
         self.parse_extends()
 
         # this will manage the order of the rules
@@ -409,11 +409,11 @@ class Scss(object):
             start += 1
         return common
 
-    def normalize_selectors(self, _selectors, extra_selectors=None):
+    def parse_selectors(self, _selectors, extra_selectors=None):
         """
-        Normalizes or extends selectors in a string.
-        An optional extra parameter that can be a list of extra selectors to be
-        added to the final normalized selectors string.
+        Parses out the old xCSS "foo extends bar" syntax.
+
+        Returns a 2-tuple: a set of selectors, and a set of extended selectors.
         """
         # Fixe tabs and spaces in selectors
         _selectors = _spaces_re.sub(' ', _selectors)
@@ -426,19 +426,16 @@ class Scss(object):
                 child = child.strip()
                 parent = parent.strip()
                 selectors.add(child)
-                parents.update(s.strip() for s in parent.split('&') if s.strip())
+                parents.update(s.strip() for s in parent.split('&'))
         else:
-            selectors = set(s.strip() for s in _selectors.split(',') if s.strip())
+            selectors = set(s.strip() for s in _selectors.split(','))
         if extra_selectors:
-            selectors.update(s.strip() for s in extra_selectors if s.strip())
-        selectors.discard('')
-        if not selectors:
-            return ''
+            selectors.update(s.strip() for s in extra_selectors)
 
+        selectors.discard('')
         parents.discard('')
-        if parents:
-            return ','.join(sorted(selectors)) + ' extends ' + '&'.join(sorted(parents))
-        return ','.join(sorted(selectors))
+
+        return selectors, parents
 
     def apply_vars(self, cont, context, options=None, rule=None, _dequote=False):
         if isinstance(cont, basestring) and '$' in cont:
@@ -487,23 +484,21 @@ class Scss(object):
             rule = self.children.popleft()
 
             # Check if the block has nested blocks and work it out:
-            _selectors, _, _parents = rule[SELECTORS].partition(' extends ')
-            _selectors = _selectors.split(',')
-            _parents = set(_parents.split('&'))
-            _parents.discard('')
+            if ' extends ' in rule[SELECTORS]:
+                selectors, _, parents = rule[SELECTORS].partition(' extends ')
+                rule[SELECTORS] = selectors
+                rule[EXTENDS] = set(parents.split('&'))
+                rule[EXTENDS].discard('')
 
             # manage children or expand children:
             _children = deque()
-            self.manage_children(rule, _selectors, _parents, _children, None, rule[MEDIA])
+            self.manage_children(rule, rule[SELECTORS].split(','), rule[EXTENDS], _children, None, rule[MEDIA])
             self.children.extendleft(_children)
 
             # prepare maps:
-            if _parents:
-                rule[SELECTORS] = ','.join(_selectors) + ' extends ' + '&'.join(_parents)
             rule[POSITION] = pos
-            selectors = rule[SELECTORS]
-            self.parts.setdefault(selectors, [])
-            self.parts[selectors].append(rule)
+            key = rule[SELECTORS], frozenset(rule[EXTENDS])
+            self.parts[key].append(rule)
             self.rules.append(rule)
             pos += 1
 
@@ -563,8 +558,8 @@ class Scss(object):
                     self._do_import(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@extend':
                     name = self.apply_vars(name, rule[CONTEXT], rule[OPTIONS], rule)
-                    p_parents.update(p.strip() for p in name.replace(',', '&').split('&'))
-                    p_parents.discard('')
+                    rule[EXTENDS].update(p.strip() for p in name.replace(',', '&').split('&'))
+                    rule[EXTENDS].discard('')
                 elif code == '@return':
                     ret = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
                     rule[OPTIONS]['@return'] = ret
@@ -1067,11 +1062,9 @@ class Scss(object):
 
         c_property = self.apply_vars(c_property, rule[CONTEXT], rule[OPTIONS], rule, True)
 
-        c_selectors = self.normalize_selectors(c_property)
-        c_selectors, _, c_parents = c_selectors.partition(' extends ')
+        c_selectors, c_parents = self.parse_selectors(c_property)
 
         better_selectors = set()
-        c_selectors = c_selectors.split(',')
         for c_selector in c_selectors:
             for p_selector in p_selectors:
                 if c_selector == self.construct:
@@ -1084,13 +1077,7 @@ class Scss(object):
                     better_selectors.add(c_selector)
         better_selectors = ','.join(sorted(better_selectors))
 
-        if c_parents:
-            parents = set(p.strip() for p in c_parents.split('&'))
-            parents.discard('')
-            if parents:
-                better_selectors += ' extends ' + '&'.join(sorted(parents))
-
-        _rule = spawn_rule(rule, codestr=c_codestr, deps=set(), context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=better_selectors, properties=[], media=media, lineno=c_lineno)
+        _rule = spawn_rule(rule, codestr=c_codestr, deps=set(), context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=better_selectors, properties=[], media=media, lineno=c_lineno, extends=c_parents)
 
         p_children.appendleft(_rule)
 
@@ -1101,15 +1088,14 @@ class Scss(object):
         If parents found, returns a list of parent rules to the child
         """
         parent_found = None
-        for p_selectors, p_rules in self.parts.items():
-            _p_selectors, _, _ = p_selectors.partition(' extends ')
-            _p_selectors = _p_selectors.split(',')
+        for (p_selectors, p_extends), p_rules in self.parts.items():
+            _p_selectors = p_selectors.split(',')
 
             new_selectors = set()
             found = False
 
             # Finds all the parent selectors and parent selectors with another
-            # bind selectors behind. For example, if `.specialClass extends .baseClass`,
+            # bind selectors behind. For example, if `.specialClass` extends `.baseClass`,
             # and there is a `.baseClass` selector, the extension should create
             # `.specialClass` for that rule, but if there's also a `.baseClass a`
             # it also should create `.specialClass a`
@@ -1145,12 +1131,17 @@ class Scss(object):
                 parent_found.extend(p_rules)
 
             if new_selectors:
-                new_selectors = self.normalize_selectors(p_selectors, new_selectors)
+                # TODO this is useless work...  remove after all selectors are
+                # sets, not strings
+                new_selectors, new_parents = self.parse_selectors(p_selectors, new_selectors)
+                assert not new_parents
+                new_selectors = ','.join(sorted(new_selectors))
+
                 # rename node:
                 if new_selectors != p_selectors:
-                    del self.parts[p_selectors]
-                    self.parts.setdefault(new_selectors, [])
-                    self.parts[new_selectors].extend(p_rules)
+                    del self.parts[p_selectors, p_extends]
+                    new_key = new_selectors, p_extends
+                    self.parts[new_key].extend(p_rules)
 
                 deps = set()
                 # save child dependencies:
@@ -1167,41 +1158,41 @@ class Scss(object):
     @print_timing(3)
     def parse_extends(self):
         """
-        For each part, create the inheritance parts from the ' extends '
+        For each part, create the inheritance parts from the @extends
         """
         # To be able to manage multiple extends, you need to
         # destroy the actual node and create many nodes that have
         # mono extend. The first one gets all the css rules
-        for _selectors, rules in self.parts.items():
-            if ' extends ' in _selectors:
-                selectors, _, parent = _selectors.partition(' extends ')
-                parents = parent.split('&')
-                del self.parts[_selectors]
-                for parent in parents:
-                    new_selectors = selectors + ' extends ' + parent
-                    self.parts.setdefault(new_selectors, [])
-                    self.parts[new_selectors].extend(rules)
-                    rules = []  # further rules extending other parents will be empty
+        for (selectors, parents), rules in self.parts.items():
+            if len(parents) <= 1:
+                continue
+
+            del self.parts[selectors, parents]
+            for parent in parents:
+                new_key = selectors, frozenset((parent,))
+                self.parts[new_key].extend(rules)
+                rules = []  # further rules extending other parents will be empty
 
         cnt = 0
         parents_left = True
         while parents_left and cnt < 10:
             cnt += 1
             parents_left = False
-            for _selectors in self.parts.keys():
-                selectors, _, parent = _selectors.partition(' extends ')
-                if not parent:
+            for key in self.parts.keys():
+                if key not in self.parts:
+                    # Nodes might have been renamed while linking parents...
                     continue
 
+                selectors, orig_parents = key
+                if not orig_parents:
+                    continue
+
+                parent, = orig_parents
                 parents_left = True
-                if _selectors not in self.parts:
-                    continue  # Nodes might have been renamed while linking parents...
 
-                rules = self.parts[_selectors]
-
-                del self.parts[_selectors]
-                self.parts.setdefault(selectors, [])
-                self.parts[selectors].extend(rules)
+                rules = self.parts.pop(key)
+                new_key = selectors, frozenset()
+                self.parts[new_key].extend(rules)
 
                 parents = self.link_with_parents(parent, selectors, rules)
 
