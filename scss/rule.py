@@ -32,12 +32,12 @@ def spawn_rule(rule=None, **kwargs):
     if rule is None:
         rule = [None] * len(RULE_VARS)
         rule[DEPS] = set()
-        rule[SELECTORS] = ''
+        rule[SELECTORS] = frozenset()
         rule[PROPERTIES] = []
         rule[PATH] = './'
         rule[INDEX] = {0: '<unknown>'}
         rule[LINENO] = 0
-        rule[EXTENDS] = set()
+        rule[EXTENDS] = frozenset()
     else:
         rule = list(rule)
     for k, v in kwargs.items():

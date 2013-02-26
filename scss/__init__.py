@@ -483,16 +483,9 @@ class Scss(object):
         while self.children:
             rule = self.children.popleft()
 
-            # Check if the block has nested blocks and work it out:
-            if ' extends ' in rule[SELECTORS]:
-                selectors, _, parents = rule[SELECTORS].partition(' extends ')
-                rule[SELECTORS] = selectors
-                rule[EXTENDS] = set(parents.split('&'))
-                rule[EXTENDS].discard('')
-
             # manage children or expand children:
             _children = deque()
-            self.manage_children(rule, rule[SELECTORS].split(','), rule[EXTENDS], _children, None, rule[MEDIA])
+            self.manage_children(rule, rule[SELECTORS], rule[EXTENDS], _children, None, rule[MEDIA])
             self.children.extendleft(_children)
 
             # prepare maps:
@@ -1061,8 +1054,13 @@ class Scss(object):
             return
 
         c_property = self.apply_vars(c_property, rule[CONTEXT], rule[OPTIONS], rule, True)
-
         c_selectors, c_parents = self.parse_selectors(c_property)
+
+        if not p_selectors:
+            # If no parents, pretend there's a single dummy parent selector
+            # so the loop below runs once
+            # XXX this is grody man and leaks down through all over the place
+            p_selectors = frozenset(('',))
 
         better_selectors = set()
         for c_selector in c_selectors:
@@ -1075,9 +1073,8 @@ class Scss(object):
                     better_selectors.add(p_selector + ' ' + c_selector)
                 else:
                     better_selectors.add(c_selector)
-        better_selectors = ','.join(sorted(better_selectors))
 
-        _rule = spawn_rule(rule, codestr=c_codestr, deps=set(), context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=better_selectors, properties=[], media=media, lineno=c_lineno, extends=c_parents)
+        _rule = spawn_rule(rule, codestr=c_codestr, deps=set(), context=rule[CONTEXT].copy(), options=rule[OPTIONS].copy(), selectors=frozenset(better_selectors), properties=[], media=media, lineno=c_lineno, extends=c_parents)
 
         p_children.appendleft(_rule)
 
@@ -1089,8 +1086,6 @@ class Scss(object):
         """
         parent_found = None
         for (p_selectors, p_extends), p_rules in self.parts.items():
-            _p_selectors = p_selectors.split(',')
-
             new_selectors = set()
             found = False
 
@@ -1099,13 +1094,13 @@ class Scss(object):
             # and there is a `.baseClass` selector, the extension should create
             # `.specialClass` for that rule, but if there's also a `.baseClass a`
             # it also should create `.specialClass a`
-            for p_selector in _p_selectors:
+            for p_selector in p_selectors:
                 if parent not in p_selector:
                     continue
 
                 # get the new child selector to add (same as the parent selector but with the child name)
                 # since selectors can be together, separated with # or . (i.e. something.parent) check that too:
-                for c_selector in c_selectors.split(','):
+                for c_selector in c_selectors:
                     # Get whatever is different between the two selectors:
                     _c_selector, _parent = c_selector, parent
                     lcp = self.longest_common_prefix(_c_selector, _parent)
@@ -1130,12 +1125,10 @@ class Scss(object):
                 parent_found = parent_found or []
                 parent_found.extend(p_rules)
 
+            new_selectors = frozenset(new_selectors)
             if new_selectors:
-                # TODO this is useless work...  remove after all selectors are
-                # sets, not strings
-                new_selectors, new_parents = self.parse_selectors(p_selectors, new_selectors)
-                assert not new_parents
-                new_selectors = ','.join(sorted(new_selectors))
+                # Re-include parents
+                new_selectors |= p_selectors
 
                 # rename node:
                 if new_selectors != p_selectors:
@@ -1318,7 +1311,7 @@ class Scss(object):
                     open_selectors = False
                     skip_selectors = False
                 if selectors:
-                    _selectors = [s for s in selectors.split(',') if '%' not in s]
+                    _selectors = [s for s in sorted(selectors) if '%' not in s]
                     if _selectors:
                         total_rules += 1
                         total_selectors += len(_selectors)
