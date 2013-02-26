@@ -47,7 +47,7 @@ def call(name, args, R, library, is_function=True):
     _args = [v for n, v in s if isinstance(n, int)]
     _kwargs = dict((str(n[1:]).replace('-', '_'), v) for n, v in s if not isinstance(n, int) and n != '_')
     _fn_a = '%s:%d' % (_name, len(_args))
-    #print >>sys.stderr, '#', _fn_a, _args, _kwargs
+
     try:
         fn = O and O.get('@function ' + _fn_a)
         if fn:

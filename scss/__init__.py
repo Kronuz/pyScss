@@ -492,10 +492,6 @@ class Scss(object):
             self.rules.append(rule)
             pos += 1
 
-            #print >>sys.stderr, '='*80
-            #for r in [rule]+list(self.children)[:5]: print >>sys.stderr, repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:80]+('...' if len(r[CODESTR])>80 else ''))
-            #for r in [rule]+list(self.children)[:5]: print >>sys.stderr, repr(r[POSITION]), repr(r[SELECTORS]), repr(r[CODESTR][:80]+('...' if len(r[CODESTR])>80 else '')), dict((k, v) for k, v in r[CONTEXT].items() if k.startswith('$') and not k.startswith('$__')), dict(r[PROPERTIES]).keys()
-
     @print_timing(4)
     def manage_children(self, rule, p_selectors, p_parents, p_children, scope, media):
         for c_lineno, c_property, c_codestr in locate_blocks(rule.unparsed_contents):
@@ -1220,7 +1216,6 @@ class Scss(object):
         css_files = set()
         old_fileid = None
         for rule in self.rules:
-            #print >>sys.stderr, rule[FILEID], rule[POSITION], [ c for c in rule[CONTEXT] if c[1] != '_' ], rule[OPTIONS].keys(), rule[SELECTORS], rule.dependent_rules
             if rule.position is not None and rule.properties:
                 fileid = rule.file_id
                 self._rules.setdefault(fileid, [])
@@ -1270,7 +1265,6 @@ class Scss(object):
 
         result = ''
         for rule in rules:
-            #print >>sys.stderr, rule[FILEID], rule[MEDIA], rule[POSITION], [ c for c in rule[CONTEXT] if not c.startswith('$__') ], rule[OPTIONS].keys(), rule[SELECTORS], rule[DEPS]
             if rule.position is None or not rule.properties:
                 continue
 
