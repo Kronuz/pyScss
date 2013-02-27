@@ -219,18 +219,13 @@ class Scss(object):
         return dict((k, v) for k, v in scss_vars.items() if k and not (not k.startswith('$') or k.startswith('$') and k[1].isupper()))
 
     def clean(self):
-        self.children = deque()
         self.rules = []
-        self._rules = {}
-        self.parts = defaultdict(list)
 
     def reset(self, input_scss=None):
         if hasattr(CalculatorScanner, 'cleanup'):
             CalculatorScanner.cleanup()
 
         # Initialize
-        self.css_files = []
-
         self.scss_vars = _default_scss_vars.copy()
         if self._scss_vars is not None:
             self.scss_vars.update(self._scss_vars)
@@ -270,8 +265,6 @@ class Scss(object):
 
         self._scss_index = _default_scss_index.copy()
 
-        self._contexts = {}
-
         self.clean()
 
     #@profile
@@ -287,15 +280,16 @@ class Scss(object):
         self.reset()
 
         # Compile
+        children = deque()
         for fileid in self._scss_files_order:
             codestr = self.scss_files[fileid]
             codestr = self.load_string(codestr, fileid)
             self.scss_files[fileid] = codestr
             rule = spawn_rule(fileid=fileid, codestr=codestr, context=self.scss_vars, options=self.scss_opts, index=self._scss_index)
-            self.children.append(rule)
+            children.append(rule)
 
         # this will manage rule: child objects inside of a node
-        self.parse_children()
+        self.parse_children(children)
 
         # this will manage @extends
         self.parse_extends()
@@ -303,14 +297,15 @@ class Scss(object):
         # this will manage the order of the rules
         self.manage_order()
 
-        self.parse_properties()
+        rules_by_file_id, css_files = self.parse_properties()
 
         all_rules = 0
         all_selectors = 0
         exceeded = ''
         final_cont = ''
-        for fileid in self.css_files:
-            fcont, total_rules, total_selectors = self.create_css(fileid)
+        for fileid in css_files:
+            rules = rules_by_file_id[fileid]
+            fcont, total_rules, total_selectors = self.create_css(rules)
             all_rules += total_rules
             all_selectors += total_selectors
             if not exceeded and all_selectors > 4095:
@@ -326,6 +321,7 @@ class Scss(object):
         final_cont = self.post_process(final_cont)
 
         return final_cont
+
     compile = Compilation
 
     def load_string(self, codestr, filename=None):
@@ -475,20 +471,18 @@ class Scss(object):
         return cont
 
     @print_timing(3)
-    def parse_children(self):
+    def parse_children(self, children):
         pos = 0
-        while self.children:
-            rule = self.children.popleft()
+        while children:
+            rule = children.popleft()
 
             # manage children or expand children:
-            _children = deque()
-            self.manage_children(rule, rule.selectors, rule.extends_selectors, _children, None, rule.media)
-            self.children.extendleft(_children)
+            new_children = deque()
+            self.manage_children(rule, rule.selectors, rule.extends_selectors, new_children, None, rule.media)
+            children.extendleft(new_children)
 
             # prepare maps:
             rule.position = pos
-            key = rule.selectors, frozenset(rule.extends_selectors)
-            self.parts[key].append(rule)
             self.rules.append(rule)
             pos += 1
 
@@ -1069,13 +1063,13 @@ class Scss(object):
         p_children.appendleft(_rule)
 
     @print_timing(4)
-    def link_with_parents(self, parent, c_selectors, c_rules):
+    def link_with_parents(self, grouped_rules, parent, c_selectors, c_rules):
         """
         Link with a parent for the current child rule.
         If parents found, returns a list of parent rules to the child
         """
         parent_found = None
-        for (p_selectors, p_extends), p_rules in self.parts.items():
+        for (p_selectors, p_extends), p_rules in grouped_rules.items():
             new_selectors = set()
             found = False
 
@@ -1122,9 +1116,9 @@ class Scss(object):
 
                 # rename node:
                 if new_selectors != p_selectors:
-                    del self.parts[p_selectors, p_extends]
+                    del grouped_rules[p_selectors, p_extends]
                     new_key = new_selectors, p_extends
-                    self.parts[new_key].extend(p_rules)
+                    grouped_rules[new_key].extend(p_rules)
 
                 deps = set()
                 # save child dependencies:
@@ -1143,17 +1137,23 @@ class Scss(object):
         """
         For each part, create the inheritance parts from the @extends
         """
+        # First group rules by a tuple of (selectors, @extends)
+        grouped_rules = defaultdict(list)
+        for rule in self.rules:
+            key = rule.selectors, frozenset(rule.extends_selectors)
+            grouped_rules[key].append(rule)
+
         # To be able to manage multiple extends, you need to
         # destroy the actual node and create many nodes that have
         # mono extend. The first one gets all the css rules
-        for (selectors, parents), rules in self.parts.items():
+        for (selectors, parents), rules in grouped_rules.items():
             if len(parents) <= 1:
                 continue
 
-            del self.parts[selectors, parents]
+            del grouped_rules[selectors, parents]
             for parent in parents:
                 new_key = selectors, frozenset((parent,))
-                self.parts[new_key].extend(rules)
+                grouped_rules[new_key].extend(rules)
                 rules = []  # further rules extending other parents will be empty
 
         cnt = 0
@@ -1161,8 +1161,8 @@ class Scss(object):
         while parents_left and cnt < 10:
             cnt += 1
             parents_left = False
-            for key in self.parts.keys():
-                if key not in self.parts:
+            for key in grouped_rules.keys():
+                if key not in grouped_rules:
                     # Nodes might have been renamed while linking parents...
                     continue
 
@@ -1173,11 +1173,11 @@ class Scss(object):
                 parent, = orig_parents
                 parents_left = True
 
-                rules = self.parts.pop(key)
+                rules = grouped_rules.pop(key)
                 new_key = selectors, frozenset()
-                self.parts[new_key].extend(rules)
+                grouped_rules[new_key].extend(rules)
 
-                parents = self.link_with_parents(parent, selectors, rules)
+                parents = self.link_with_parents(grouped_rules, parent, selectors, rules)
 
                 if parents is None:
                     log.warn("Parent rule not found: %s", parent)
@@ -1211,31 +1211,28 @@ class Scss(object):
 
     @print_timing(3)
     def parse_properties(self):
-        self.css_files = []
-        self._rules = {}
-        css_files = set()
+        css_files = []
+        seen_files = set()
+        rules_by_file_id = {}
         old_fileid = None
+
         for rule in self.rules:
             if rule.position is not None and rule.properties:
                 fileid = rule.file_id
-                self._rules.setdefault(fileid, [])
-                self._rules[fileid].append(rule)
+                rules_by_file_id.setdefault(fileid, []).append(rule)
                 if old_fileid != fileid:
                     old_fileid = fileid
-                    if fileid not in css_files:
-                        css_files.add(fileid)
-                        self.css_files.append(fileid)
+                    if fileid not in seen_files:
+                        seen_files.add(fileid)
+                        css_files.append(fileid)
+
+        return rules_by_file_id, css_files
 
     @print_timing(3)
-    def create_css(self, fileid=None):
+    def create_css(self, rules):
         """
         Generate the final CSS string
         """
-        if fileid:
-            rules = self._rules.get(fileid) or []
-        else:
-            rules = self.rules
-
         compress = self.scss_opts.get('compress', True)
         if compress:
             sc, sp, tb, nl = False, '', '', ''
