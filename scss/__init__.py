@@ -478,7 +478,7 @@ class Scss(object):
 
             # manage children or expand children:
             new_children = deque()
-            self.manage_children(rule, rule.selectors, rule.extends_selectors, new_children, None, rule.media)
+            self.manage_children(rule, new_children, None, rule.media)
             children.extendleft(new_children)
 
             # prepare maps:
@@ -487,7 +487,7 @@ class Scss(object):
             pos += 1
 
     @print_timing(4)
-    def manage_children(self, rule, p_selectors, p_parents, p_children, scope, media):
+    def manage_children(self, rule, p_children, scope, media):
         for c_lineno, c_property, c_codestr in locate_blocks(rule.unparsed_contents):
             if '@return' in rule.options:
                 return
@@ -531,11 +531,11 @@ class Scss(object):
                     config.DEBUG = name
                     log.info("Debug mode is %s", 'On' if config.DEBUG else 'Off')
                 elif code == '@option':
-                    self._settle_options(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._settle_options(rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@content':
-                    self._do_content(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._do_content(rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@import':
-                    self._do_import(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._do_import(rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@extend':
                     name = self.apply_vars(name, rule.context, rule.options, rule)
                     rule.extends_selectors.update(p.strip() for p in name.replace(',', '&').split('&'))
@@ -544,46 +544,46 @@ class Scss(object):
                     ret = self.calculate(name, rule.context, rule.options, rule)
                     rule.options['@return'] = ret
                 elif code == '@include':
-                    self._do_include(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._do_include(rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif c_codestr is None:
                     rule.properties.append((c_lineno, c_property, None))
                 elif code in ('@mixin', '@function'):
-                    self._do_functions(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._do_functions(rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@if' or c_property.startswith('@else if '):
-                    self._do_if(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._do_if(rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@else':
-                    self._do_else(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._do_else(rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@for':
-                    self._do_for(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._do_for(rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code == '@each':
-                    self._do_each(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    self._do_each(rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 # elif code == '@while':
-                #     self._do_while(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                #     self._do_while(rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 elif code in ('@variables', '@vars'):
-                    self._get_variables(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
+                    self._get_variables(rule, p_children, scope, media, c_lineno, c_property, c_codestr)
                 elif code == '@media':
                     # https://developer.mozilla.org/en-US/docs/CSS/@media
                     _media = (media or []) + [name]
                     # Use '&' as a dummy selector to mean reusing the parent's
                     # selectors
-                    self._nest_rules(rule, p_selectors, p_parents, p_children, scope, _media, c_lineno, "&", c_codestr)
+                    self._nest_rules(rule, p_children, scope, _media, c_lineno, "&", c_codestr)
                 elif scope is None:  # needs to have no scope to crawl down the nested rules
-                    self._nest_rules(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
+                    self._nest_rules(rule, p_children, scope, media, c_lineno, c_property, c_codestr)
             ####################################################################
             # Properties
             elif c_codestr is None:
-                self._get_properties(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
+                self._get_properties(rule, p_children, scope, media, c_lineno, c_property, c_codestr)
             # Nested properties
             elif c_property.endswith(':'):
                 rule.unparsed_contents = c_codestr
-                self.manage_children(rule, p_selectors, p_parents, p_children, (scope or '') + c_property[:-1] + '-', media)
+                self.manage_children(rule, p_children, (scope or '') + c_property[:-1] + '-', media)
             ####################################################################
             # Nested rules
             elif scope is None:  # needs to have no scope to crawl down the nested rules
-                self._nest_rules(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr)
+                self._nest_rules(rule, p_children, scope, media, c_lineno, c_property, c_codestr)
 
     @print_timing(10)
-    def _settle_options(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _settle_options(self, rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         for option in name.split(','):
             option, value = (option.split(':', 1) + [''])[:2]
             option = option.strip().lower()
@@ -596,7 +596,7 @@ class Scss(object):
                 rule.options[option] = value
 
     @print_timing(10)
-    def _do_functions(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_functions(self, rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @mixin and @function
         """
@@ -634,7 +634,7 @@ class Scss(object):
                         m_vars['$' + normalize_var(k)] = v
                     _options = rule.options.copy()
                     _rule = spawn_rule(R, codestr=m_codestr, context=m_vars, options=_options, deps=set(), properties=[], lineno=c_lineno)
-                    self.manage_children(_rule, p_selectors, p_parents, p_children, (scope or '') + '', R.media)
+                    self.manage_children(_rule, p_children, (scope or '') + '', R.media)
                     ret = _rule.options.pop('@return', '')
                     return ret
                 return __call
@@ -651,7 +651,7 @@ class Scss(object):
             rule.options[code + ' ' + funct + ':0'] = mixin
 
     @print_timing(10)
-    def _do_include(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_include(self, rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @include, for @mixins
         """
@@ -701,10 +701,10 @@ class Scss(object):
         _context.update(m_vars)
         _rule = spawn_rule(rule, codestr=m_codestr, context=_context, lineno=c_lineno)
         _rule.options['@content'] = c_codestr
-        self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
+        self.manage_children(_rule, p_children, scope, media)
 
     @print_timing(10)
-    def _do_content(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_content(self, rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @content
         """
@@ -712,10 +712,10 @@ class Scss(object):
             log.error("Content string not found for @content (%s)", rule.index[rule.lineno])
         c_codestr = rule.options.pop('@content', '')
         rule.unparsed_contents = c_codestr
-        self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+        self.manage_children(rule, p_children, scope, media)
 
     @print_timing(10)
-    def _do_import(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_import(self, rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @import
         Load and import mixins and functions and rules
@@ -780,7 +780,7 @@ class Scss(object):
                     if i_codestr is not None:
                         break
                 if i_codestr is None:
-                    i_codestr = self._do_magic_import(rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
+                    i_codestr = self._do_magic_import(rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name)
                 i_codestr = self.scss_files[name] = i_codestr and self.load_string(i_codestr, full_filename)
                 if name not in self.scss_files:
                     self._scss_files_order.append(name)
@@ -790,11 +790,11 @@ class Scss(object):
                 log.warn("File to import not found or unreadable: '%s' (%s)%s%s", filename, rule.index[rule.lineno], load_paths, unsupported)
             else:
                 _rule = spawn_rule(rule, codestr=i_codestr, path=full_filename, lineno=c_lineno)
-                self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
+                self.manage_children(_rule, p_children, scope, media)
                 rule.options['@import ' + name] = True
 
     @print_timing(10)
-    def _do_magic_import(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_magic_import(self, rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @import for sprite-maps
         Imports magic sprite map directories
@@ -872,7 +872,7 @@ class Scss(object):
         return ret
 
     @print_timing(10)
-    def _do_if(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_if(self, rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @if and @else if
         """
@@ -888,11 +888,11 @@ class Scss(object):
             val = bool(False if not val or isinstance(val, basestring) and (val in ('0', 'false', 'undefined') or _variable_re.match(val)) else val)
             if val:
                 rule.unparsed_contents = c_codestr
-                self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+                self.manage_children(rule, p_children, scope, media)
             rule.options['@if'] = val
 
     @print_timing(10)
-    def _do_else(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_else(self, rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @else
         """
@@ -901,10 +901,10 @@ class Scss(object):
         val = rule.options.pop('@if', True)
         if not val:
             rule.unparsed_contents = c_codestr
-            self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+            self.manage_children(rule, p_children, scope, media)
 
     @print_timing(10)
-    def _do_for(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_for(self, rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @for
         """
@@ -931,10 +931,10 @@ class Scss(object):
         for i in rev(range(frm, through + 1)):
             rule.unparsed_contents = c_codestr
             rule.context[var] = str(i)
-            self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+            self.manage_children(rule, p_children, scope, media)
 
     @print_timing(10)
-    def _do_each(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    def _do_each(self, rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
         """
         Implements @each
         """
@@ -953,10 +953,10 @@ class Scss(object):
             rule.context[var] = v
             if not isinstance(n, int):
                 rule.context[n] = v
-            self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+            self.manage_children(rule, p_children, scope, media)
 
     # @print_timing(10)
-    # def _do_while(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
+    # def _do_while(self, rule, p_children, scope, media, c_lineno, c_property, c_codestr, code, name):
     #     THIS DOES NOT WORK AS MODIFICATION OF INNER VARIABLES ARE NOT KNOWN AT THIS POINT!!
     #     """
     #     Implements @while
@@ -970,21 +970,21 @@ class Scss(object):
     #         if not val:
     #             break
     #         rule.unparsed_contents = c_codestr
-    #         self.manage_children(rule, p_selectors, p_parents, p_children, scope, media)
+    #         self.manage_children(rule, p_children, scope, media)
     #     rule.options['@if'] = first_val
 
     @print_timing(10)
-    def _get_variables(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr):
+    def _get_variables(self, rule, p_children, scope, media, c_lineno, c_property, c_codestr):
         """
         Implements @variables and @vars
         """
         _rule = rule.copy()
         _rule.unparsed_contents = c_codestr
         _rule.properties = rule.context
-        self.manage_children(_rule, p_selectors, p_parents, p_children, scope, media)
+        self.manage_children(_rule, p_children, scope, media)
 
     @print_timing(10)
-    def _get_properties(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr):
+    def _get_properties(self, rule, p_children, scope, media, c_lineno, c_property, c_codestr):
         """
         Implements properties and variables extraction and assignment
         """
@@ -1032,13 +1032,14 @@ class Scss(object):
             rule.properties.append((c_lineno, _prop, to_str(value) if value is not None else None))
 
     @print_timing(10)
-    def _nest_rules(self, rule, p_selectors, p_parents, p_children, scope, media, c_lineno, c_property, c_codestr):
+    def _nest_rules(self, rule, p_children, scope, media, c_lineno, c_property, c_codestr):
         """
         Implements Nested CSS rules
         """
         c_property = self.apply_vars(c_property, rule.context, rule.options, rule, True)
         c_selectors, c_parents = self.parse_selectors(c_property)
 
+        p_selectors = rule.selectors
         if not p_selectors:
             # If no parents, pretend there's a single dummy parent selector
             # so the loop below runs once
