@@ -166,27 +166,17 @@ class SassRule(object):
 
 
 
-class UnparsedBlock(object):
-    """A Sass block whose contents have not yet been parsed.
 
-    At the top level, CSS (and Sass) documents consist of a sequence of blocks.
-    A block may be a ruleset:
+class RuleHeader(object):
+    """..."""
+    # TODO doc me depending on how UnparsedBlock is handled...
 
-        selector { block; block; block... }
+    is_atrule = False
+    is_scope = False
+    is_selector = False
 
-    Or it may be an @-rule:
+    def __init__(self, prop):
 
-        @rule arguments { block; block; block... }
-
-    Or it may be only a single property declaration:
-
-        property: value
-
-    pyScss's first parsing pass breaks the document into these blocks, and each
-    block becomes an instance of this class.
-    """
-
-    def __init__(self, lineno, prop, unparsed_contents):
         # Simple pre-processing
         if prop.startswith('+'):
             # Expand '+' at the beginning of a rule as @include
@@ -207,13 +197,12 @@ class UnparsedBlock(object):
             # TODO what is @prototype??
             prop = prop[11:]
 
-        # Basic properties
-        self.lineno = lineno
         self.prop = prop
-        self.unparsed_contents = unparsed_contents
 
         # Minor parsing
         if prop.startswith('@'):
+            self.is_atrule = True
+
             if prop.lower().startswith('@else if '):
                 self.directive = '@else if'
                 self.argument = prop[9:]
@@ -224,6 +213,52 @@ class UnparsedBlock(object):
             self.directive = None
             self.argument = None
 
+            if prop.endswith(':'):
+                self.is_scope = True
+            else:
+                self.is_selector = True
+
+
+
+class UnparsedBlock(object):
+    """A Sass block whose contents have not yet been parsed.
+
+    At the top level, CSS (and Sass) documents consist of a sequence of blocks.
+    A block may be a ruleset:
+
+        selector { block; block; block... }
+
+    Or it may be an @-rule:
+
+        @rule arguments { block; block; block... }
+
+    Or it may be only a single property declaration:
+
+        property: value
+
+    pyScss's first parsing pass breaks the document into these blocks, and each
+    block becomes an instance of this class.
+    """
+
+    def __init__(self, calculator, parent_rule, lineno, prop, unparsed_contents):
+        self.calculator = calculator
+        self.parent_rule = parent_rule
+        self.header = RuleHeader(prop)
+
+        # Basic properties
+        self.lineno = lineno
+        self.prop = prop
+        self.unparsed_contents = unparsed_contents
+
+
+
+    @property
+    def directive(self):
+        return self.header.directive
+
+    @property
+    def argument(self):
+        return self.header.argument
 
     ### What kind of thing is this?
 
