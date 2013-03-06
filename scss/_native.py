@@ -38,9 +38,6 @@ def locate_blocks(codestr):
     long as it's joined by `,`, or enclosed in `(` and `)`) with its code block
     (the one between `{` and `}`, which can be nested), or the "lose" code
     (properties) that doesn't have any blocks.
-
-    threshold is the number of blank lines before selectors are broken into
-    pieces (properties).
     """
     lineno = 0
 

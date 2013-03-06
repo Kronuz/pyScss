@@ -163,3 +163,74 @@ class SassRule(object):
             return self.extends_selectors
         else:
             raise KeyError(key)
+
+
+
+class UnparsedBlock(object):
+    """A Sass block whose contents have not yet been parsed.
+
+    At the top level, CSS (and Sass) documents consist of a sequence of blocks.
+    A block may be a ruleset:
+
+        selector { block; block; block... }
+
+    Or it may be an @-rule:
+
+        @rule arguments { block; block; block... }
+
+    Or it may be only a single property declaration:
+
+        property: value
+
+    pyScss's first parsing pass breaks the document into these blocks, and each
+    block becomes an instance of this class.
+    """
+
+    def __init__(self, lineno, prop, unparsed_contents):
+        # Simple pre-processing
+        if prop.startswith('+'):
+            # Expand '+' at the beginning of a rule as @include
+            prop = '@include ' + prop[1:]
+            # TODO what is this, partial sass syntax?
+            try:
+                if '(' not in prop or prop.index(':') < prop.index('('):
+                    prop = prop.replace(':', '(', 1)
+                    if '(' in prop:
+                        prop += ')'
+            except ValueError:
+                pass
+        elif prop.startswith('='):
+            # Expand '=' at the beginning of a rule as @mixin
+            prop = '@mixin' + prop[1:]
+        elif prop.startswith('@prototype '):
+            # Remove '@prototype '
+            # TODO what is @prototype??
+            prop = prop[11:]
+
+        # Basic properties
+        self.lineno = lineno
+        self.prop = prop
+        self.unparsed_contents = unparsed_contents
+
+        # Minor parsing
+        if prop.startswith('@'):
+            if prop.lower().startswith('@else if '):
+                self.directive = '@else if'
+                self.argument = prop[9:]
+            else:
+                directive, _, self.argument = prop.partition(' ')
+                self.directive = directive.lower()
+        else:
+            self.directive = None
+            self.argument = None
+
+
+    ### What kind of thing is this?
+
+    @property
+    def is_atrule(self):
+        return self.prop.startswith('@')
+
+    @property
+    def is_nested_property(self):
+        return self.prop.endswith(':') and not self.is_atrule
