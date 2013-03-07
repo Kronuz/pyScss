@@ -71,7 +71,7 @@ from scss.cssdefs import (
 from scss.expression import CalculatorScanner, eval_expr, interpolate
 from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
-from scss.rule import UnparsedBlock, spawn_rule
+from scss.rule import UnparsedBlock, SassRule
 from scss.types import BooleanValue, ListValue, NumberValue, StringValue
 from scss.util import depar, dequote, normalize_var, split_params, to_str
 
@@ -287,7 +287,14 @@ class Scss(object):
             codestr = self.scss_files[fileid]
             codestr = self.load_string(codestr, fileid)
             self.scss_files[fileid] = codestr
-            rule = spawn_rule(fileid=fileid, codestr=codestr, context=self.scss_vars, options=self.scss_opts, index=self._scss_index)
+            rule = SassRule(
+                file_id=fileid,
+                index=self._scss_index,
+
+                unparsed_contents=codestr,
+                context=self.scss_vars,
+                options=self.scss_opts,
+            )
             children.append(rule)
 
         # this will manage rule: child objects inside of a node
@@ -584,7 +591,23 @@ class Scss(object):
                     for k, v in kwargs.items():
                         m_vars['$' + normalize_var(k)] = v
                     _options = rule.options.copy()
-                    _rule = spawn_rule(R, codestr=m_codestr, context=m_vars, options=_options, deps=set(), properties=[], lineno=block.lineno)
+                    _rule = SassRule(
+                        unparsed_contents=m_codestr,
+                        context=m_vars,
+                        options=_options,
+                        dependent_rules=set(),
+                        properties=[],
+                        lineno=block.lineno,
+
+                        # R
+                        file_id=R.file_id,
+                        position=R.position,
+                        selectors=R.selectors,
+                        path=R.path,
+                        index=R.index,
+                        media=R.media,
+                        extends_selectors=R.extends_selectors,
+                    )
                     self.manage_children(_rule, p_children, (scope or '') + '', R.media)
                     ret = _rule.options.pop('@return', '')
                     return ret
@@ -650,7 +673,12 @@ class Scss(object):
                 m_vars[p] = value
         _context = rule.context.copy()
         _context.update(m_vars)
-        _rule = spawn_rule(rule, codestr=m_codestr, context=_context, lineno=block.lineno)
+
+        _rule = rule.copy()
+        _rule.unparsed_contents = m_codestr
+        _rule.context = _context
+        _rule.lineno = block.lineno
+
         _rule.options['@content'] = block.unparsed_contents
         self.manage_children(_rule, p_children, scope, media)
 
@@ -739,7 +767,23 @@ class Scss(object):
                 unsupported = unsupported and "\nPossible matches (for unsupported file format SASS):\n\t%s" % "\n\t".join(unsupported) or ''
                 log.warn("File to import not found or unreadable: '%s' (%s)%s%s", filename, rule.index[rule.lineno], load_paths, unsupported)
             else:
-                _rule = spawn_rule(rule, codestr=i_codestr, path=full_filename, lineno=block.lineno)
+                _rule = SassRule(
+                    unparsed_contents=i_codestr,
+                    path=full_filename,
+                    lineno=block.lineno,
+
+                    # rule
+                    file_id=rule.file_id,
+                    position=rule.position,
+                    context=rule.context,
+                    options=rule.options,
+                    selectors=rule.selectors,
+                    media=rule.media,
+                    extends_selectors=rule.extends_selectors,
+                    dependent_rules=rule.dependent_rules,
+                    properties=rule.properties,
+                    index=rule.index,
+                )
                 self.manage_children(_rule, p_children, scope, media)
                 rule.options['@import ' + name] = True
 
@@ -1009,7 +1053,23 @@ class Scss(object):
                 else:
                     better_selectors.add(c_selector)
 
-        _rule = spawn_rule(rule, codestr=block.unparsed_contents, deps=set(), context=rule.context.copy(), options=rule.options.copy(), selectors=frozenset(better_selectors), properties=[], media=media, lineno=block.lineno, extends=c_parents)
+        _rule = SassRule(
+            unparsed_contents=block.unparsed_contents,
+            dependent_rules=set(),
+            context=rule.context.copy(),
+            options=rule.options.copy(),
+            selectors=frozenset(better_selectors),
+            properties=[],
+            media=media,
+            lineno=block.lineno,
+            extends_selectors=c_parents,
+
+            # rule
+            file_id=rule.file_id,
+            position=rule.position,
+            path=rule.path,
+            index=rule.index,
+        )
 
         p_children.appendleft(_rule)
 

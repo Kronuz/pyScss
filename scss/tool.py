@@ -8,8 +8,9 @@ import sys
 from collections import deque
 
 from scss import config
-from scss import Scss, log, spawn_rule, to_str, profiling
+from scss import Scss, log, to_str, profiling
 from scss import _prop_split_re
+from scss.rule import SassRule
 from scss.scss_meta import BUILD_INFO
 
 log.setLevel(logging.INFO)
@@ -117,7 +118,7 @@ def main():
         css = Scss()
         context = css.scss_vars
         options = css.scss_opts
-        rule = spawn_rule(context=context, options=options)
+        rule = SassRule(context=context, options=options)
         print "Welcome to %s interactive shell" % BUILD_INFO
         while True:
             try:
@@ -137,7 +138,7 @@ def main():
                 elif s.startswith('@'):
                     properties = []
                     children = deque()
-                    spawn_rule(fileid='<string>', context=context, options=options, properties=properties)
+                    SassRule(fileid='<string>', context=context, options=options, properties=properties)
                     code, name = (s.split(None, 1) + [''])[:2]
                     if code == '@option':
                         css._settle_options(rule, [''], set(), children, None, None, s, None, code, name)
