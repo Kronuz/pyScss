@@ -143,7 +143,7 @@ def main():
                         css._settle_options(rule, [''], set(), children, None, None, s, None, code, name)
                         continue
                     elif code == '@import':
-                        css._do_import(rule, [''], set(), children, None, None, s, None, code, name)
+                        css._do_import(rule, [''], set(), children, None, None, s, None, None, code, name)
                         continue
                     elif code == '@include':
                         final_cont = ''
