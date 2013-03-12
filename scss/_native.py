@@ -1,12 +1,10 @@
 """Pure-Python scanner and parser, used if _speedups is not available."""
 
+from scss.cssdefs import SEPARATOR, _nl_re, _nl_num_nl_re
 import re
 
 # TODO copied from __init__
-SEPARATOR = '\x00'
-_nl_re = re.compile(r'[ \t\r\f\v]*\n[ \t\r\f\v]*', re.MULTILINE)
 _nl_num_re = re.compile(r'\n.+' + SEPARATOR, re.MULTILINE)
-_nl_num_nl_re = re.compile(r'\n.+' + SEPARATOR + r'[ \t\r\f\v]*\n', re.MULTILINE)
 _blocks_re = re.compile(r'[{},;()\'"\n]')
 
 def _strip_selprop(selprop, lineno):

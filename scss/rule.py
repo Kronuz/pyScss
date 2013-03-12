@@ -4,11 +4,13 @@ class SassRule(object):
     metadata, like `@extend` rules and `@media` nesting.
     """
 
-    def __init__(self, file_id=None, position=None, unparsed_contents=None, dependent_rules=None,
+    def __init__(self, source_file, position=None, unparsed_contents=None, dependent_rules=None,
             context=None, options=None, selectors=frozenset(), properties=None,
-            path='./', index=None, lineno=0, media=None, extends_selectors=frozenset()):
+            path='./', lineno=0, media=None, extends_selectors=frozenset(),
+            ancestors=None):
 
-        self.file_id = file_id
+        self.source_file = source_file
+
         self.position = position
         self.unparsed_contents = unparsed_contents
         self.context = context
@@ -29,14 +31,16 @@ class SassRule(object):
         else:
             self.properties = properties
 
-        if index is None:
-            self.index = {0: '<unknown>'}
-        else:
-            self.index = index
+    @property
+    def file_and_line(self):
+        """Returns the filename and line number where this rule originally
+        appears, in the form "foo.scss:3".  Used for error messages.
+        """
+        return "%s:%d" % (self.source_file.filename, self.lineno)
 
     def copy(self):
         return type(self)(
-            file_id=self.file_id,
+            source_file=self.source_file,
             position=self.position,
             unparsed_contents=self.unparsed_contents,
             #deps=set(self.deps),
@@ -47,8 +51,6 @@ class SassRule(object):
             #properties=list(self.properties),
             properties=self.properties,
             path=self.path,
-            #index=dict(self.index),
-            index=self.index,
             lineno=self.lineno,
             media=self.media,
             extends_selectors=self.extends_selectors,

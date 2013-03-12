@@ -104,10 +104,6 @@ _reverse_safe_strings = dict((v, k) for k, v in _safe_strings.items())
 _safe_strings_re = re.compile('|'.join(map(re.escape, _safe_strings)))
 _reverse_safe_strings_re = re.compile('|'.join(map(re.escape, _reverse_safe_strings)))
 
-_default_scss_files = {}  # Files to be compiled ({file: content, ...})
-
-_default_scss_index = {0: '<unknown>:0'}
-
 _default_scss_vars = {
     '$BUILD-INFO': BUILD_INFO,
     '$PROJECT': PROJECT,
@@ -196,6 +192,67 @@ def print_timing(level=0):
 ################################################################################
 
 
+class SourceFile(object):
+    def __init__(self, filename, contents):
+        self.filename = filename
+        self.contents = self.prepare_source(contents)
+
+    @classmethod
+    def from_filename(cls, fn, filename=None):
+        if filename is None:
+            _, filename = os.path.split(fn)
+
+        with open(fn) as f:
+            contents = f.read()
+
+        return cls(filename, contents)
+
+    @classmethod
+    def from_string(cls, string, filename=None):
+        if filename is None:
+            filename = "<string %r...>" % string[:50]
+
+        return cls(filename, string)
+
+    def prepare_source(self, codestr):
+        codestr += '\n'
+
+        # Decorate lines with their line numbers and a delimiting NUL
+        scope = dict(line=1)
+        def line_decorator(m):
+            scope['line'] += 1
+            return '\n' + str(scope['line']) + SEPARATOR
+        codestr = "1" + SEPARATOR + _nl_re.sub(line_decorator, codestr)
+
+        # remove empty lines
+        codestr = _nl_num_nl_re.sub('\n', codestr)
+
+        # protects codestr: "..." strings
+        codestr = _strings_re.sub(lambda m: _reverse_safe_strings_re.sub(lambda n: _reverse_safe_strings[n.group(0)], m.group(0)), codestr)
+
+        # removes multiple line comments
+        codestr = _ml_comment_re.sub('', codestr)
+
+        # removes inline comments, but not :// (protocol)
+        codestr = _sl_comment_re.sub('', codestr)
+
+        codestr = _safe_strings_re.sub(lambda m: _safe_strings[m.group(0)], codestr)
+
+        # expand the space in rules
+        codestr = _expand_rules_space_re.sub(' {', codestr)
+
+        # collapse the space in properties blocks
+        codestr = _collapse_properties_space_re.sub(r'\1{', codestr)
+
+        # to do math operations, we need to get the color's hex values (for color names):
+        def _pp(m):
+            v = m.group(0)
+            return _colors.get(v, v)
+        codestr = _colors_re.sub(_pp, codestr)
+
+        return codestr
+
+
 class Scss(object):
     def __init__(self, scss_vars=None, scss_opts=None, scss_files=None, super_selector=None, library=ALL_BUILTINS_LIBRARY, search_paths=None):
         if super_selector:
@@ -219,9 +276,6 @@ class Scss(object):
     def get_scss_vars(self):
         scss_vars = self.scss_vars or {}
         return dict((k, v) for k, v in scss_vars.items() if k and not (not k.startswith('$') or k.startswith('$') and k[1].isupper()))
-
-    def clean(self):
-        self.rules = []
 
     def reset(self, input_scss=None):
         if hasattr(CalculatorScanner, 'cleanup'):
@@ -253,45 +307,46 @@ class Scss(object):
 
             self.search_paths.extend(self.scss_opts.get('load_paths', []))
 
-        self.scss_files = {}
-        self._scss_files_order = []
-        for f, c in _default_scss_files.iteritems():
-            if f not in self.scss_files:
-                self._scss_files_order.append(f)
-            self.scss_files[f] = c
+        self.source_files = []
+        self.source_file_index = {}
         if self._scss_files is not None:
-            for f, c in self._scss_files.iteritems():
-                if f not in self.scss_files:
-                    self._scss_files_order.append(f)
-                self.scss_files[f] = c
+            for name, contents in self._scss_files.iteritems():
+                if name in self.source_file_index:
+                    raise KeyError("Duplicate filename %r" % name)
+                source_file = SourceFile(name, contents)
+                self.source_files.append(source_file)
+                self.source_file_index[name] = source_file
 
-        self._scss_index = _default_scss_index.copy()
-
-        self.clean()
+        self.rules = []
 
     #@profile
     #@print_timing(2)
     def Compilation(self, scss_string=None, scss_file=None, super_selector=None, filename=None):
         if super_selector:
             self.super_selector = super_selector + ' '
-        if scss_string is not None:
-            self._scss_files = {filename or '<string %r>' % (scss_string.strip()[:50] + '...'): scss_string}
-        elif scss_file is not None:
-            self._scss_files = {filename or scss_file: open(scss_file).read()}
-
         self.reset()
+
+        source_file = None
+        if scss_string is not None:
+            source_file = SourceFile.from_string(scss_string, filename)
+        elif scss_file is not None:
+            source_file = SourceFile.from_filename(scss_file, filename)
+
+        if source_file is not None:
+            # Clear the existing list of files
+            self.source_files = []
+            self.source_file_index = dict()
+
+            self.source_files.append(source_file)
+            self.source_file_index[source_file.filename] = source_file
 
         # Compile
         children = deque()
-        for fileid in self._scss_files_order:
-            codestr = self.scss_files[fileid]
-            codestr = self.load_string(codestr, fileid)
-            self.scss_files[fileid] = codestr
+        for source_file in self.source_files:
             rule = SassRule(
-                file_id=fileid,
-                index=self._scss_index,
+                source_file=source_file,
 
-                unparsed_contents=codestr,
+                unparsed_contents=source_file.contents,
                 context=self.scss_vars,
                 options=self.scss_opts,
             )
@@ -306,14 +361,14 @@ class Scss(object):
         # this will manage the order of the rules
         self.manage_order()
 
-        rules_by_file_id, css_files = self.parse_properties()
+        rules_by_file, css_files = self.parse_properties()
 
         all_rules = 0
         all_selectors = 0
         exceeded = ''
         final_cont = ''
-        for fileid in css_files:
-            rules = rules_by_file_id[fileid]
+        for source_file in css_files:
+            rules = rules_by_file[source_file]
             fcont, total_rules, total_selectors = self.create_css(rules)
             all_rules += total_rules
             all_selectors += total_selectors
@@ -332,55 +387,6 @@ class Scss(object):
         return final_cont
 
     compile = Compilation
-
-    def load_string(self, codestr, filename=None):
-        if filename is not None:
-            codestr += '\n'
-
-            idx = {
-                'next_id': len(self._scss_index),
-                'line': 1,
-            }
-
-            def _cnt(m):
-                idx['line'] += 1
-                lineno = '%s:%d' % (filename, idx['line'])
-                next_id = idx['next_id']
-                self._scss_index[next_id] = lineno
-                idx['next_id'] += 1
-                return '\n' + str(next_id) + SEPARATOR
-            lineno = '%s:%d' % (filename, idx['line'])
-            next_id = idx['next_id']
-            self._scss_index[next_id] = lineno
-            codestr = str(next_id) + SEPARATOR + _nl_re.sub(_cnt, codestr)
-
-        # remove empty lines
-        codestr = _nl_num_nl_re.sub('\n', codestr)
-
-        # protects codestr: "..." strings
-        codestr = _strings_re.sub(lambda m: _reverse_safe_strings_re.sub(lambda n: _reverse_safe_strings[n.group(0)], m.group(0)), codestr)
-
-        # removes multiple line comments
-        codestr = _ml_comment_re.sub('', codestr)
-
-        # removes inline comments, but not :// (protocol)
-        codestr = _sl_comment_re.sub('', codestr)
-
-        codestr = _safe_strings_re.sub(lambda m: _safe_strings[m.group(0)], codestr)
-
-        # expand the space in rules
-        codestr = _expand_rules_space_re.sub(' {', codestr)
-
-        # collapse the space in properties blocks
-        codestr = _collapse_properties_space_re.sub(r'\1{', codestr)
-
-        # to do math operations, we need to get the color's hex values (for color names):
-        def _pp(m):
-            v = m.group(0)
-            return _colors.get(v, v)
-        codestr = _colors_re.sub(_pp, codestr)
-
-        return codestr
 
     def longest_common_prefix(self, seq1, seq2):
         start = 0
@@ -592,19 +598,17 @@ class Scss(object):
                         m_vars['$' + normalize_var(k)] = v
                     _options = rule.options.copy()
                     _rule = SassRule(
+                        source_file=R.source_file,
+
                         unparsed_contents=m_codestr,
                         context=m_vars,
                         options=_options,
-                        dependent_rules=set(),
-                        properties=[],
                         lineno=block.lineno,
 
                         # R
-                        file_id=R.file_id,
                         position=R.position,
                         selectors=R.selectors,
                         path=R.path,
-                        index=R.index,
                         media=R.media,
                         extends_selectors=R.extends_selectors,
                     )
@@ -654,7 +658,7 @@ class Scss(object):
             if mixin and all(map(lambda o: isinstance(o, int), new_params.keys())):
                 new_params = {0: ', '.join(new_params.values())}
         if not mixin:
-            log.error("Required mixin not found: %s:%d (%s)", funct, num_args, rule.index[rule.lineno], extra={'stack': True})
+            log.error("Required mixin not found: %s:%d (%s)", funct, num_args, rule.file_and_line, extra={'stack': True})
             return
 
         m_params = mixin[0]
@@ -688,7 +692,7 @@ class Scss(object):
         Implements @content
         """
         if '@content' not in rule.options:
-            log.error("Content string not found for @content (%s)", rule.index[rule.lineno])
+            log.error("Content string not found for @content (%s)", rule.file_and_line)
         rule.unparsed_contents = rule.options.pop('@content', '')
         self.manage_children(rule, p_children, scope, media)
 
@@ -718,7 +722,7 @@ class Scss(object):
             dirname = os.path.dirname(name)
 
             try:
-                i_codestr = self.scss_files[name]
+                i_codestr = self.source_file_index[name]
             except KeyError:
                 i_codestr = None
 
@@ -759,21 +763,23 @@ class Scss(object):
                         break
                 if i_codestr is None:
                     i_codestr = self._do_magic_import(rule, p_children, scope, media, block)
-                i_codestr = self.scss_files[name] = i_codestr and self.load_string(i_codestr, full_filename)
-                if name not in self.scss_files:
-                    self._scss_files_order.append(name)
+                if i_codestr is not None:
+                    source_file = SourceFile(full_filename, i_codestr)
+                    self.source_files.append(source_file)
+                    self.source_file_index[name] = source_file
             if i_codestr is None:
                 load_paths = load_paths and "\nLoad paths:\n\t%s" % "\n\t".join(load_paths) or ''
                 unsupported = unsupported and "\nPossible matches (for unsupported file format SASS):\n\t%s" % "\n\t".join(unsupported) or ''
-                log.warn("File to import not found or unreadable: '%s' (%s)%s%s", filename, rule.index[rule.lineno], load_paths, unsupported)
+                log.warn("File to import not found or unreadable: '%s' (%s)%s%s", filename, rule.file_and_line, load_paths, unsupported)
             else:
                 _rule = SassRule(
-                    unparsed_contents=i_codestr,
+                    source_file=source_file,
+
+                    unparsed_contents=source_file.contents,
                     path=full_filename,
                     lineno=block.lineno,
 
                     # rule
-                    file_id=rule.file_id,
                     position=rule.position,
                     context=rule.context,
                     options=rule.options,
@@ -782,7 +788,6 @@ class Scss(object):
                     extends_selectors=rule.extends_selectors,
                     dependent_rules=rule.dependent_rules,
                     properties=rule.properties,
-                    index=rule.index,
                 )
                 self.manage_children(_rule, p_children, scope, media)
                 rule.options['@import ' + name] = True
@@ -872,7 +877,7 @@ class Scss(object):
         """
         if block.directive != '@if':
             if '@if' not in rule.options:
-                log.error("@else with no @if (%s)", rule.index[rule.lineno])
+                log.error("@else with no @if (%s)", rule.file_and_line)
             val = not rule.options.get('@if', True)
         else:
             val = True
@@ -890,7 +895,7 @@ class Scss(object):
         Implements @else
         """
         if '@if' not in rule.options:
-            log.error("@else with no @if (%s)", rule.index[rule.lineno])
+            log.error("@else with no @if (%s)", rule.file_and_line)
         val = rule.options.pop('@if', True)
         if not val:
             rule.unparsed_contents = block.unparsed_contents
@@ -1054,21 +1059,19 @@ class Scss(object):
                     better_selectors.add(c_selector)
 
         _rule = SassRule(
+            source_file=rule.source_file,
+
             unparsed_contents=block.unparsed_contents,
-            dependent_rules=set(),
             context=rule.context.copy(),
             options=rule.options.copy(),
             selectors=frozenset(better_selectors),
-            properties=[],
             media=media,
             lineno=block.lineno,
             extends_selectors=c_parents,
 
             # rule
-            file_id=rule.file_id,
             position=rule.position,
             path=rule.path,
-            index=rule.index,
         )
 
         p_children.appendleft(_rule)
@@ -1224,20 +1227,20 @@ class Scss(object):
     def parse_properties(self):
         css_files = []
         seen_files = set()
-        rules_by_file_id = {}
-        old_fileid = None
+        rules_by_file= {}
 
         for rule in self.rules:
-            if rule.position is not None and rule.properties:
-                fileid = rule.file_id
-                rules_by_file_id.setdefault(fileid, []).append(rule)
-                if old_fileid != fileid:
-                    old_fileid = fileid
-                    if fileid not in seen_files:
-                        seen_files.add(fileid)
-                        css_files.append(fileid)
+            if rule.position is None or not rule.properties:
+                continue
 
-        return rules_by_file_id, css_files
+            source_file = rule.source_file
+            rules_by_file.setdefault(source_file, []).append(rule)
+
+            if source_file not in seen_files:
+                seen_files.add(source_file)
+                css_files.append(source_file)
+
+        return rules_by_file, css_files
 
     @print_timing(3)
     def create_css(self, rules):
@@ -1312,9 +1315,8 @@ class Scss(object):
                         total_rules += 1
                         total_selectors += len(_selectors)
                         if debug_info:
-                            _lineno = rule.lineno
-                            line = rule.index[_lineno]
-                            filename, lineno = line.rsplit(':', 1)
+                            filename = rule.source_file.filename
+                            lineno = str(rule.lineno)
                             real_filename, real_lineno = filename, lineno
                             # Walk up to a non-library file:
                             # while _lineno >= 0:
@@ -1357,7 +1359,7 @@ class Scss(object):
             if selectors:
                 _tb += tb
             if rule.options.get('verbosity', 0) > 1:
-                result += _tb + '/* file: ' + rule.file_id + ' */' + nl
+                result += _tb + '/* file: ' + rule.source_file.filename + ' */' + nl
                 if rule.context:
                     result += _tb + '/* vars:' + nl
                     for k, v in rule.context.items():
