@@ -193,9 +193,10 @@ def print_timing(level=0):
 
 
 class SourceFile(object):
-    def __init__(self, filename, contents):
+    def __init__(self, filename, contents, parent_dir='.'):
         self.filename = filename
         self.contents = self.prepare_source(contents)
+        self.parent_dir = parent_dir
 
     @classmethod
     def from_filename(cls, fn, filename=None):
@@ -608,7 +609,6 @@ class Scss(object):
                         # R
                         position=R.position,
                         selectors=R.selectors,
-                        path=R.path,
                         media=R.media,
                         extends_selectors=R.extends_selectors,
                     )
@@ -727,7 +727,7 @@ class Scss(object):
                 i_codestr = None
 
                 for path in self.search_paths:
-                    for basepath in ['.', os.path.dirname(rule.path)]:
+                    for basepath in ['.', rule.source_file.parent_dir]:
                         i_codestr = None
                         full_path = os.path.realpath(os.path.join(path, basepath, dirname))
                         if full_path in load_paths:
@@ -764,7 +764,7 @@ class Scss(object):
                 if i_codestr is None:
                     i_codestr = self._do_magic_import(rule, p_children, scope, media, block)
                 if i_codestr is not None:
-                    source_file = SourceFile(full_filename, i_codestr)
+                    source_file = SourceFile(full_filename, i_codestr, parent_dir=os.path.dirname(full_filename))
                     self.source_files.append(source_file)
                     self.source_file_index[name] = source_file
             if i_codestr is None:
@@ -776,7 +776,6 @@ class Scss(object):
                     source_file=source_file,
 
                     unparsed_contents=source_file.contents,
-                    path=full_filename,
                     lineno=block.lineno,
 
                     # rule
@@ -1071,7 +1070,6 @@ class Scss(object):
 
             # rule
             position=rule.position,
-            path=rule.path,
         )
 
         p_children.appendleft(_rule)

@@ -6,18 +6,17 @@ class SassRule(object):
 
     def __init__(self, source_file, position=None, unparsed_contents=None, dependent_rules=None,
             context=None, options=None, selectors=frozenset(), properties=None,
-            path='./', lineno=0, media=None, extends_selectors=frozenset(),
+            lineno=0, media=None, extends_selectors=frozenset(),
             ancestors=None):
 
         self.source_file = source_file
+        self.lineno = lineno
 
         self.position = position
         self.unparsed_contents = unparsed_contents
         self.context = context
         self.options = options
         self.selectors = selectors
-        self.path = path
-        self.lineno = lineno
         self.media = media
         self.extends_selectors = extends_selectors
 
@@ -41,6 +40,7 @@ class SassRule(object):
     def copy(self):
         return type(self)(
             source_file=self.source_file,
+            lineno=self.lineno,
             position=self.position,
             unparsed_contents=self.unparsed_contents,
             #deps=set(self.deps),
@@ -50,8 +50,6 @@ class SassRule(object):
             selectors=self.selectors,
             #properties=list(self.properties),
             properties=self.properties,
-            path=self.path,
-            lineno=self.lineno,
             media=self.media,
             extends_selectors=self.extends_selectors,
         )
