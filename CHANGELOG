@@ -1,6 +1,18 @@
 Changelog
 =========
 
+2.0.0 ???
+    + Heavy refactoring, an expanded test suite, and more extensibility.
+
+    + Bug fixes:
+
+    + Features:
+        + Support for writing custom Sass functions in Python.
+
+    + Backwards-incompatible changes:
+        + Configuration via monkeypatching the ``scss`` module no longer works.  Use the new constructor arguments instead.
+
+
 1.1.5 ???
     + Improved memory usage for large sets of files to be used as sprites.
     + Warns about IE 4095 maximum number of selectors.
