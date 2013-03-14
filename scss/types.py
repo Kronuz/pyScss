@@ -353,7 +353,7 @@ class NumberValue(Value):
         if not self.unit:
             val *= _conv_factor.get(type, 1.0)
         ret = NumberValue(val)
-        if type == 'deg':
+        if type == 'deg' and ret.value > 360:
             ret.value = ret.value % 360.0
         ret.units = {type: _units_weights.get(type, 1), '_': type}
         return ret
