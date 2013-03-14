@@ -1,23 +1,24 @@
+from scss.cssdefs import _has_placeholder_re
+
 class SassRule(object):
     """At its heart, a CSS rule: combination of a selector and zero or more
     properties.  But this is Sass, so it also tracks some Sass-flavored
     metadata, like `@extend` rules and `@media` nesting.
     """
 
-    def __init__(self, source_file, position=None, unparsed_contents=None, dependent_rules=None,
-            context=None, options=None, selectors=frozenset(), properties=None,
-            lineno=0, media=None, extends_selectors=frozenset(),
-            ancestors=None):
+    position = None
+
+    def __init__(self, source_file, unparsed_contents=None, dependent_rules=None,
+            context=None, options=None, properties=None,
+            lineno=0, extends_selectors=frozenset(),
+            ancestry=None):
 
         self.source_file = source_file
         self.lineno = lineno
 
-        self.position = position
         self.unparsed_contents = unparsed_contents
         self.context = context
         self.options = options
-        self.selectors = selectors
-        self.media = media
         self.extends_selectors = extends_selectors
 
         if dependent_rules is None:
@@ -30,6 +31,33 @@ class SassRule(object):
         else:
             self.properties = properties
 
+        if ancestry is None:
+            self.ancestry = []
+        else:
+            self.ancestry = ancestry
+
+    @property
+    def selectors(self):
+        # TEMPORARY
+        if self.ancestry and self.ancestry[-1].is_selector:
+            return frozenset(self.ancestry[-1].selectors)
+        else:
+            return frozenset()
+
+    @selectors.setter
+    def selectors(self, value):
+        for header in reversed(self.ancestry):
+            if header.is_selector:
+                header.selectors |= value
+                return
+            else:
+                # TODO media
+                break
+
+        self.ancestry.append(BlockSelectorHeader(value))
+
+
+
     @property
     def file_and_line(self):
         """Returns the filename and line number where this rule originally
@@ -41,21 +69,20 @@ class SassRule(object):
         return type(self)(
             source_file=self.source_file,
             lineno=self.lineno,
-            position=self.position,
             unparsed_contents=self.unparsed_contents,
             #deps=set(self.deps),
             dependent_rules=self.dependent_rules,
             context=self.context,
             options=self.options,
-            selectors=self.selectors,
             #properties=list(self.properties),
             properties=self.properties,
-            media=self.media,
             extends_selectors=self.extends_selectors,
+            #ancestry=list(self.ancestry),
+            ancestry=self.ancestry,
         )
 
 
-class RuleHeader(object):
+class BlockHeader(object):
     """..."""
     # TODO doc me depending on how UnparsedBlock is handled...
 
@@ -63,8 +90,8 @@ class RuleHeader(object):
     is_scope = False
     is_selector = False
 
-    def __init__(self, prop):
-
+    @classmethod
+    def parse(cls, prop):
         # Simple pre-processing
         if prop.startswith('+'):
             # Expand '+' at the beginning of a rule as @include
@@ -85,27 +112,55 @@ class RuleHeader(object):
             # TODO what is @prototype??
             prop = prop[11:]
 
-        self.prop = prop
-
         # Minor parsing
         if prop.startswith('@'):
-            self.is_atrule = True
-
             if prop.lower().startswith('@else if '):
-                self.directive = '@else if'
-                self.argument = prop[9:]
+                directive = '@else if'
+                argument = prop[9:]
             else:
-                directive, _, self.argument = prop.partition(' ')
-                self.directive = directive.lower()
+                directive, _, argument = prop.partition(' ')
+                directive = directive.lower()
+
+            return BlockAtRuleHeader(directive, argument)
         else:
-            self.directive = None
-            self.argument = None
-
             if prop.endswith(':'):
-                self.is_scope = True
+                return BlockScopeHeader(prop)
             else:
-                self.is_selector = True
+                return BlockSelectorHeader(prop)
 
+class BlockAtRuleHeader(BlockHeader):
+    is_atrule = True
+
+    def __init__(self, directive, argument):
+        self.directive = directive
+        self.argument = argument
+
+    def __repr__(self):
+        return "<%s %r %r>" % (self.__class__.__name__, self.directive, self.argument)
+
+    def render(self):
+        return "%s %s" % (self.directive, self.argument)
+
+class BlockSelectorHeader(BlockHeader):
+    is_selector = True
+
+    def __init__(self, selectors):
+        self.selectors = selectors
+
+    def __repr__(self):
+        return "<%s %r>" % (self.__class__.__name__, self.selectors)
+
+    def render(self, sep=', ', super_selector=''):
+        return sep.join(sorted(
+            super_selector + s
+            for s in self.selectors
+            if not _has_placeholder_re.search(s)))
+
+class BlockScopeHeader(BlockHeader):
+    is_scope = True
+
+    def __init__(self, scope):
+        self.scope = scope
 
 
 class UnparsedBlock(object):
@@ -131,7 +186,7 @@ class UnparsedBlock(object):
     def __init__(self, calculator, parent_rule, lineno, prop, unparsed_contents):
         self.calculator = calculator
         self.parent_rule = parent_rule
-        self.header = RuleHeader(prop)
+        self.header = BlockHeader.parse(prop)
 
         # Basic properties
         self.lineno = lineno

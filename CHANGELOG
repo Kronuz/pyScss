@@ -5,6 +5,7 @@ Changelog
     + Heavy refactoring, an expanded test suite, and more extensibility.
 
     + Bug fixes:
+        + Unrecognized @-rule blocks such as ``@keyframes`` are now preserved.
 
     + Features:
         + Support for writing custom Sass functions in Python.

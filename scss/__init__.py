@@ -446,22 +446,18 @@ class Scss(object):
 
     @print_timing(3)
     def parse_children(self, children):
-        pos = 0
         while children:
             rule = children.popleft()
 
             # manage children or expand children:
             new_children = deque()
-            self.manage_children(rule, new_children, None, rule.media)
+            self.manage_children(rule, new_children, None)
             children.extendleft(new_children)
 
-            # prepare maps:
-            rule.position = pos
             self.rules.append(rule)
-            pos += 1
 
     @print_timing(4)
-    def manage_children(self, rule, p_children, scope, media):
+    def manage_children(self, rule, p_children, scope):
         if '@return' in rule.options:
             return
 
@@ -494,11 +490,11 @@ class Scss(object):
                     config.DEBUG = setting
                     log.info("Debug mode is %s", 'On' if config.DEBUG else 'Off')
                 elif code == '@option':
-                    self._settle_options(rule, p_children, scope, media, block)
+                    self._settle_options(rule, p_children, scope, block)
                 elif code == '@content':
-                    self._do_content(rule, p_children, scope, media, block)
+                    self._do_content(rule, p_children, scope, block)
                 elif code == '@import':
-                    self._do_import(rule, p_children, scope, media, block)
+                    self._do_import(rule, p_children, scope, block)
                 elif code == '@extend':
                     selectors = self.calculator.apply_vars(block.argument, rule.context, rule.options, rule)
                     rule.extends_selectors.update(p.strip() for p in selectors.replace(',', '&').split('&'))
@@ -507,48 +503,41 @@ class Scss(object):
                     ret = self.calculator.calculate(block.argument, rule.context, rule)
                     rule.options['@return'] = ret
                 elif code == '@include':
-                    self._do_include(rule, p_children, scope, media, block)
+                    self._do_include(rule, p_children, scope, block)
                 elif block.unparsed_contents is None:
                     rule.properties.append((block.prop, None))
                 elif code in ('@mixin', '@function'):
-                    self._do_functions(rule, p_children, scope, media, block)
+                    self._do_functions(rule, p_children, scope, block)
                 elif code in ('@if', '@else if'):
-                    self._do_if(rule, p_children, scope, media, block)
+                    self._do_if(rule, p_children, scope, block)
                 elif code == '@else':
-                    self._do_else(rule, p_children, scope, media, block)
+                    self._do_else(rule, p_children, scope, block)
                 elif code == '@for':
-                    self._do_for(rule, p_children, scope, media, block)
+                    self._do_for(rule, p_children, scope, block)
                 elif code == '@each':
-                    self._do_each(rule, p_children, scope, media, block)
+                    self._do_each(rule, p_children, scope, block)
                 # elif code == '@while':
-                #     self._do_while(rule, p_children, scope, media, block)
+                #     self._do_while(rule, p_children, scope, block)
                 elif code in ('@variables', '@vars'):
-                    self._get_variables(rule, p_children, scope, media, block)
-                elif code == '@media':
-                    # https://developer.mozilla.org/en-US/docs/CSS/@media
-                    _media = (media or []) + [block.argument]
-                    # Use '&' as a dummy selector to mean reusing the parent's
-                    # selectors
-                    fake_block = UnparsedBlock(self.calculator, rule, block.lineno, "&", block.unparsed_contents)
-                    self._nest_rules(rule, p_children, scope, _media, fake_block)
+                    self._get_variables(rule, p_children, scope, block)
                 elif scope is None:  # needs to have no scope to crawl down the nested rules
-                    self._nest_rules(rule, p_children, scope, media, block)
+                    self._nest_rules(rule, p_children, scope, block)
             ####################################################################
             # Properties
             elif block.unparsed_contents is None:
-                self._get_properties(rule, p_children, scope, media, block)
+                self._get_properties(rule, p_children, scope, block)
             # Nested properties
             elif block.is_nested_property:
                 rule.unparsed_contents = block.unparsed_contents
                 subscope = (scope or '') + block.prop[:-1] + '-'
-                self.manage_children(rule, p_children, subscope, media)
+                self.manage_children(rule, p_children, subscope)
             ####################################################################
             # Nested rules
             elif scope is None:  # needs to have no scope to crawl down the nested rules
-                self._nest_rules(rule, p_children, scope, media, block)
+                self._nest_rules(rule, p_children, scope, block)
 
     @print_timing(10)
-    def _settle_options(self, rule, p_children, scope, media, block):
+    def _settle_options(self, rule, p_children, scope, block):
         for option in block.argument.split(','):
             option, value = (option.split(':', 1) + [''])[:2]
             option = option.strip().lower()
@@ -561,7 +550,7 @@ class Scss(object):
                 rule.options[option] = value
 
     @print_timing(10)
-    def _do_functions(self, rule, p_children, scope, media, block):
+    def _do_functions(self, rule, p_children, scope, block):
         """
         Implements @mixin and @function
         """
@@ -607,12 +596,10 @@ class Scss(object):
                         lineno=block.lineno,
 
                         # R
-                        position=R.position,
-                        selectors=R.selectors,
-                        media=R.media,
+                        ancestry=R.ancestry,
                         extends_selectors=R.extends_selectors,
                     )
-                    self.manage_children(_rule, p_children, (scope or '') + '', R.media)
+                    self.manage_children(_rule, p_children, (scope or '') + '')
                     ret = _rule.options.pop('@return', '')
                     return ret
                 return __call
@@ -629,7 +616,7 @@ class Scss(object):
             rule.options[block.directive + ' ' + funct + ':0'] = mixin
 
     @print_timing(10)
-    def _do_include(self, rule, p_children, scope, media, block):
+    def _do_include(self, rule, p_children, scope, block):
         """
         Implements @include, for @mixins
         """
@@ -684,20 +671,20 @@ class Scss(object):
         _rule.lineno = block.lineno
 
         _rule.options['@content'] = block.unparsed_contents
-        self.manage_children(_rule, p_children, scope, media)
+        self.manage_children(_rule, p_children, scope)
 
     @print_timing(10)
-    def _do_content(self, rule, p_children, scope, media, block):
+    def _do_content(self, rule, p_children, scope, block):
         """
         Implements @content
         """
         if '@content' not in rule.options:
             log.error("Content string not found for @content (%s)", rule.file_and_line)
         rule.unparsed_contents = rule.options.pop('@content', '')
-        self.manage_children(rule, p_children, scope, media)
+        self.manage_children(rule, p_children, scope)
 
     @print_timing(10)
-    def _do_import(self, rule, p_children, scope, media, block):
+    def _do_import(self, rule, p_children, scope, block):
         """
         Implements @import
         Load and import mixins and functions and rules
@@ -762,7 +749,7 @@ class Scss(object):
                     if i_codestr is not None:
                         break
                 if i_codestr is None:
-                    i_codestr = self._do_magic_import(rule, p_children, scope, media, block)
+                    i_codestr = self._do_magic_import(rule, p_children, scope, block)
                 if i_codestr is not None:
                     source_file = SourceFile(full_filename, i_codestr, parent_dir=os.path.dirname(full_filename))
                     self.source_files.append(source_file)
@@ -779,20 +766,18 @@ class Scss(object):
                     lineno=block.lineno,
 
                     # rule
-                    position=rule.position,
                     context=rule.context,
                     options=rule.options,
-                    selectors=rule.selectors,
-                    media=rule.media,
+                    ancestry=rule.ancestry,
                     extends_selectors=rule.extends_selectors,
                     dependent_rules=rule.dependent_rules,
                     properties=rule.properties,
                 )
-                self.manage_children(_rule, p_children, scope, media)
+                self.manage_children(_rule, p_children, scope)
                 rule.options['@import ' + name] = True
 
     @print_timing(10)
-    def _do_magic_import(self, rule, p_children, scope, media, block):
+    def _do_magic_import(self, rule, p_children, scope, block):
         """
         Implements @import for sprite-maps
         Imports magic sprite map directories
@@ -870,7 +855,7 @@ class Scss(object):
         return ret
 
     @print_timing(10)
-    def _do_if(self, rule, p_children, scope, media, block):
+    def _do_if(self, rule, p_children, scope, block):
         """
         Implements @if and @else if
         """
@@ -885,11 +870,11 @@ class Scss(object):
             val = bool(False if not val or isinstance(val, basestring) and (val in ('0', 'false', 'undefined') or _variable_re.match(val)) else val)
             if val:
                 rule.unparsed_contents = block.unparsed_contents
-                self.manage_children(rule, p_children, scope, media)
+                self.manage_children(rule, p_children, scope)
             rule.options['@if'] = val
 
     @print_timing(10)
-    def _do_else(self, rule, p_children, scope, media, block):
+    def _do_else(self, rule, p_children, scope, block):
         """
         Implements @else
         """
@@ -898,10 +883,10 @@ class Scss(object):
         val = rule.options.pop('@if', True)
         if not val:
             rule.unparsed_contents = block.unparsed_contents
-            self.manage_children(rule, p_children, scope, media)
+            self.manage_children(rule, p_children, scope)
 
     @print_timing(10)
-    def _do_for(self, rule, p_children, scope, media, block):
+    def _do_for(self, rule, p_children, scope, block):
         """
         Implements @for
         """
@@ -928,10 +913,10 @@ class Scss(object):
         for i in rev(range(frm, through + 1)):
             rule.unparsed_contents = block.unparsed_contents
             rule.context[var] = str(i)
-            self.manage_children(rule, p_children, scope, media)
+            self.manage_children(rule, p_children, scope)
 
     @print_timing(10)
-    def _do_each(self, rule, p_children, scope, media, block):
+    def _do_each(self, rule, p_children, scope, block):
         """
         Implements @each
         """
@@ -950,10 +935,10 @@ class Scss(object):
             rule.context[var] = v
             if not isinstance(n, int):
                 rule.context[n] = v
-            self.manage_children(rule, p_children, scope, media)
+            self.manage_children(rule, p_children, scope)
 
     # @print_timing(10)
-    # def _do_while(self, rule, p_children, scope, media, block):
+    # def _do_while(self, rule, p_children, scope, block):
     #     THIS DOES NOT WORK AS MODIFICATION OF INNER VARIABLES ARE NOT KNOWN AT THIS POINT!!
     #     """
     #     Implements @while
@@ -967,21 +952,21 @@ class Scss(object):
     #         if not val:
     #             break
     #         rule.unparsed_contents = block.unparsed_contents
-    #         self.manage_children(rule, p_children, scope, media)
+    #         self.manage_children(rule, p_children, scope)
     #     rule.options['@if'] = first_val
 
     @print_timing(10)
-    def _get_variables(self, rule, p_children, scope, media, block):
+    def _get_variables(self, rule, p_children, scope, block):
         """
         Implements @variables and @vars
         """
         _rule = rule.copy()
         _rule.unparsed_contents = block.unparsed_contents
         _rule.properties = rule.context
-        self.manage_children(_rule, p_children, scope, media)
+        self.manage_children(_rule, p_children, scope)
 
     @print_timing(10)
-    def _get_properties(self, rule, p_children, scope, media, block):
+    def _get_properties(self, rule, p_children, scope, block):
         """
         Implements properties and variables extraction and assignment
         """
@@ -1029,10 +1014,46 @@ class Scss(object):
             rule.properties.append((_prop, to_str(value) if value is not None else None))
 
     @print_timing(10)
-    def _nest_rules(self, rule, p_children, scope, media, block):
+    def _nest_rules(self, rule, p_children, scope, block):
         """
         Implements Nested CSS rules
         """
+        if block.is_atrule:
+            new_ancestry = list(rule.ancestry)
+            if block.directive == '@media' and rule.ancestry:
+                for i, header in reversed(list(enumerate(new_ancestry))):
+                    if header.is_selector:
+                        continue
+                    elif header.directive == '@media':
+                        from scss.rule import BlockAtRuleHeader
+                        new_ancestry[i] = BlockAtRuleHeader(
+                            '@media',
+                            "%s and %s" % (header.argument, block.argument))
+                        break
+                    else:
+                        new_ancestry.insert(i, block.header)
+                else:
+                    new_ancestry.insert(0, block.header)
+            else:
+                new_ancestry.append(block.header)
+
+            new_rule = SassRule(
+                source_file=rule.source_file,
+
+                unparsed_contents=block.unparsed_contents,
+                context=rule.context.copy(),
+                options=rule.options.copy(),
+                lineno=block.lineno,
+                #extends_selectors=c_parents,
+
+                ancestry=new_ancestry,
+            )
+
+            p_children.appendleft(new_rule)
+
+            return
+
+
         raw_selectors = self.calculator.apply_vars(block.prop, rule.context, rule.options, rule, True)
         c_selectors, c_parents = self.parse_selectors(raw_selectors)
 
@@ -1057,19 +1078,23 @@ class Scss(object):
                 else:
                     better_selectors.add(c_selector)
 
+        # Merge ancestry
+        from scss.rule import BlockSelectorHeader
+        selector_header = BlockSelectorHeader(better_selectors)
+        if rule.ancestry and rule.ancestry[-1].is_selector:
+            new_ancestry = rule.ancestry[:-1] + [selector_header]
+        else:
+            new_ancestry = rule.ancestry + [selector_header]
+
         _rule = SassRule(
             source_file=rule.source_file,
 
             unparsed_contents=block.unparsed_contents,
             context=rule.context.copy(),
             options=rule.options.copy(),
-            selectors=frozenset(better_selectors),
-            media=media,
             lineno=block.lineno,
+            ancestry=new_ancestry,
             extends_selectors=c_parents,
-
-            # rule
-            position=rule.position,
         )
 
         p_children.appendleft(_rule)
@@ -1135,7 +1160,7 @@ class Scss(object):
                 deps = set()
                 # save child dependencies:
                 for c_rule in c_rules or []:
-                    c_rule.selectors = c_selectors  # re-set the SELECTORS for the rules
+                    assert c_rule.selectors == c_selectors
                     deps.add(c_rule.position)
 
                 for p_rule in p_rules:
@@ -1150,8 +1175,12 @@ class Scss(object):
         For each part, create the inheritance parts from the @extends
         """
         # First group rules by a tuple of (selectors, @extends)
+        pos = 0
         grouped_rules = defaultdict(list)
         for rule in self.rules:
+            pos += 1
+            rule.position = pos
+
             key = rule.selectors, frozenset(rule.extends_selectors)
             grouped_rules[key].append(rule)
 
@@ -1219,7 +1248,7 @@ class Scss(object):
             rule.dependent_rules.add(rule.position + 1)
             # This moves the rules just above the topmost dependency during the sorted() below:
             rule.position = min(rule.dependent_rules)
-        self.rules = sorted(self.rules, key=lambda o: o.position)
+        self.rules.sort(key=lambda o: o.position)
 
     @print_timing(3)
     def parse_properties(self):
@@ -1265,6 +1294,8 @@ class Scss(object):
         old_media = None
         old_property = None
 
+        old_ancestry = []
+
         wrap = textwrap.TextWrapper(break_long_words=False, break_on_hyphens=False)
         wrap.wordsep_re = re.compile(r'(?<=,)(\s*)')
         wrap = wrap.wrap
@@ -1277,108 +1308,54 @@ class Scss(object):
             if rule.position is None or not rule.properties:
                 continue
 
-            selectors = rule.selectors
-            media = rule.media
-            _tb = tb if old_media else ''
-            if old_media != media or media is not None:
-                if open_selectors:
-                    if not skip_selectors:
-                        if not sc and result[-1] == ';':
-                            result = result[:-1]
-                        result += _tb + '}' + nl
-                    open_selectors = False
-                    skip_selectors = False
-                if open_media and (old_media != media or media is None):
-                    if not sc and result[-1] == ';':
-                        result = result[:-1]
-                    result += '}' + nl
-                    open_media = False
-                if media and not open_media:
-                    result += '@media ' + (' and ').join(set(media)) + sp + '{' + nl
-                    open_media = True
-                old_media = media
-                old_selectors = None  # force entrance to add a new selector
-            _tb = tb if media else ''
-            if old_selectors != selectors or selectors is not None:
-                if open_selectors:
-                    if not skip_selectors:
-                        if not sc and result[-1] == ';':
-                            result = result[:-1]
-                        result += _tb + '}' + nl
-                    open_selectors = False
-                    skip_selectors = False
-                if selectors:
-                    _selectors = [s for s in sorted(selectors) if '%' not in s]
-                    if _selectors:
-                        total_rules += 1
-                        total_selectors += len(_selectors)
-                        if debug_info:
-                            filename = rule.source_file.filename
-                            lineno = str(rule.lineno)
-                            real_filename, real_lineno = filename, lineno
-                            # Walk up to a non-library file:
-                            # while _lineno >= 0:
-                            #     path, name = os.path.split(line)
-                            #     if not name.startswith('_'):
-                            #         filename, lineno = line.rsplit(':', 1)
-                            #         break
-                            #     line = rule.index[_lineno]
-                            #     _lineno -= 1
-                            sass_debug_info = ''
-                            if filename.startswith('<string '):
-                                filename = '<unknown>'
-                            if real_filename.startswith('<string '):
-                                real_filename = '<unknown>'
-                            if real_filename != filename or real_lineno != lineno:
-                                if debug_info == 'comments':
-                                    sass_debug_info += '/* file: %s, line: %s */' % (real_filename, real_lineno) + nl
-                                else:
-                                    _filename = real_filename
-                                    _lineno = real_lineno
-                                    _filename = _escape_chars_re.sub(r'\\\1', _filename)
-                                    sass_debug_info += "@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}" % (_filename, _lineno) + nl
-                            if debug_info == 'comments':
-                                sass_debug_info += '/* file: %s, line: %s */' % (filename, lineno) + nl
-                            else:
-                                _filename = filename
-                                _lineno = lineno
-                                _filename = _escape_chars_re.sub(r'\\\1', _filename)
-                                sass_debug_info += "@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}" % (_filename, _lineno) + nl
-                            result += sass_debug_info
-                        selector = (',' + sp).join('%s%s' % (self.super_selector, s) for s in _selectors) + sp + '{'
-                        if nl:
-                            selector = nl.join(wrap(selector))
-                        result += _tb + selector + nl
+            ancestry = rule.ancestry
+
+            first_mismatch = 0
+            for i, (old_header, new_header) in enumerate(zip(old_ancestry, ancestry)):
+                if old_header != new_header:
+                    first_mismatch = i
+                    break
+
+            # Close blocks and outdent as necessary
+            for i in range(len(old_ancestry), first_mismatch, -1):
+                result += tb * (i - 1) + '}' + nl
+
+            # Open new blocks as necessary
+            for i in range(first_mismatch, len(ancestry)):
+                if debug_info:
+                    filename = rule.source_file.filename
+                    lineno = str(rule.lineno)
+                    if filename.startswith('<string '):
+                        filename = '<unknown>'
+                    if debug_info == 'comments':
+                        result += '/* file: %s, line: %s */' % (filename, lineno) + nl
                     else:
-                        skip_selectors = True
-                    open_selectors = True
-                old_selectors = selectors
-                scope = set()
-            if selectors:
-                _tb += tb
-            if rule.options.get('verbosity', 0) > 1:
-                result += _tb + '/* file: ' + rule.source_file.filename + ' */' + nl
-                if rule.context:
-                    result += _tb + '/* vars:' + nl
-                    for k, v in rule.context.items():
-                        result += _tb + _tb + k + ' = ' + v + ';' + nl
-                    result += _tb + '*/' + nl
+                        filename = _escape_chars_re.sub(r'\\\1', filename)
+                        result += "@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}" % (filename, lineno) + nl
+
+                if ancestry[i].is_selector:
+                    header = ancestry[i].render(sep=',' + sp, super_selector=self.super_selector)
+                    last_selector_header = header
+                    if nl:
+                        header = nl.join(wrap(header))
+                else:
+                    header = ancestry[i].render()
+                result += tb * i + header + sp + '{' + nl
+
+                total_rules += 1
+                if ancestry[i].is_selector:
+                    total_selectors += 1
+
+            old_ancestry = ancestry
+
             if not skip_selectors:
-                result += self._print_properties(rule.properties, scope, [old_property], sc, sp, _tb, nl, wrap)
+                result += self._print_properties(rule.properties, scope, [old_property], sc, sp, tb * len(ancestry), nl, wrap)
 
-        if open_media:
-            _tb = tb
-        else:
-            _tb = ''
-        if open_selectors and not skip_selectors:
-            if not sc and result[-1] == ';':
-                result = result[:-1]
-            result += _tb + '}' + nl
+        if not sc and result[-1] == ';':
+            result = result[:-1]
 
-        if open_media:
-            if not sc and result[-1] == ';':
-                result = result[:-1]
-            result += '}' + nl
+        for i in reversed(range(len(old_ancestry))):
+            result += tb * i + '}' + nl
 
         return (result, total_rules, total_selectors)
 
