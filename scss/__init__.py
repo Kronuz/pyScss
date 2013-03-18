@@ -1782,11 +1782,11 @@ class Scss(object):
         old_media = None
         old_property = None
 
-        try:
+        TextWrapper.wordsep_re = re.compile(r'(?<=,)(\s*)')
+        if hasattr(TextWrapper, 'wordsep_simple_re'):
             wrap = textwrap.TextWrapper(break_long_words=False, break_on_hyphens=False)
-        except TypeError:
+        else:
             wrap = textwrap.TextWrapper(break_long_words=False)
-        wrap.wordsep_re = re.compile(r'(?<=,)(\s*)')
         wrap = wrap.wrap
 
         total_rules = 0
