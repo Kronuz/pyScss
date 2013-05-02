@@ -616,8 +616,8 @@ class Scss(object):
         Implements @include, for @mixins
         """
         funct, params, _ = block.argument.partition('(')
-        funct = normalize_var(funct.strip())
         funct = self.calculator.do_glob_math(funct, rule.context, rule.options, rule, True)
+        funct = normalize_var(funct.strip())
         params = split_params(depar(params + _))
         new_params = {}
         num_args = 0

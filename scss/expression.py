@@ -32,8 +32,7 @@ def _inv(sign, value):
 
 
 def interpolate(var, rule, library):
-    var = normalize_var(var)
-    value = rule.context.get(var, var)
+    value = rule.context.get(normalize_var(var), var)
     if var != value and isinstance(value, basestring):
         _vi = eval_expr(value, rule, library, True)
         if _vi is not None:
