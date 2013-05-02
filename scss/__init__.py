@@ -1274,19 +1274,14 @@ class Scss(object):
         else:
             sc, sp, tb, nl = True, ' ', '  ', '\n'
 
-        scope = set()
-        return self._create_css(rules, scope, sc, sp, tb, nl, not compress and self.scss_opts.get('debug_info', False))
+        return self._create_css(rules, sc, sp, tb, nl, not compress and self.scss_opts.get('debug_info', False))
 
-    def _create_css(self, rules, scope=None, sc=True, sp=' ', tb='  ', nl='\n', debug_info=False):
-        if scope is None:
-            scope = set()
-
+    def _create_css(self, rules, sc=True, sp=' ', tb='  ', nl='\n', debug_info=False):
         open_selectors = False
         skip_selectors = False
         old_selectors = None
         open_media = False
         old_media = None
-        old_property = None
 
         old_ancestry = []
 
@@ -1343,7 +1338,7 @@ class Scss(object):
             old_ancestry = ancestry
 
             if not skip_selectors:
-                result += self._print_properties(rule.properties, scope, [old_property], sc, sp, tb * len(ancestry), nl, wrap)
+                result += self._print_properties(rule.properties, sc, sp, tb * len(ancestry), nl, wrap)
 
         if not sc and result[-1] == ';':
             result = result[:-1]
@@ -1353,17 +1348,14 @@ class Scss(object):
 
         return (result, total_rules, total_selectors)
 
-    def _print_properties(self, properties, scope=None, old_property=None, sc=True, sp=' ', _tb='', nl='\n', wrap=None):
+    def _print_properties(self, properties, sc=True, sp=' ', _tb='', nl='\n', wrap=None):
         if wrap is None:
             wrap = textwrap.TextWrapper(break_long_words=False)
             wrap.wordsep_re = re.compile(r'(?<=,)(\s*)')
             wrap = wrap.wrap
-        if old_property is None:
-            old_property = [None]
-        if scope is None:
-            scope = set()
 
         result = ''
+        old_property = None
         for name, value in properties:
             if value is not None:
                 if nl:
@@ -1371,10 +1363,8 @@ class Scss(object):
                 prop = name + ':' + sp + value
             else:
                 prop = name
-            if old_property[0] != prop:
-                old_property[0] = prop
-                scope.add(name)
-                old_property[0] = prop
+            if old_property != prop:
+                old_property = prop
                 result += _tb + prop + ';' + nl
         return result
 
