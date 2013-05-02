@@ -193,10 +193,11 @@ def print_timing(level=0):
 
 
 class SourceFile(object):
-    def __init__(self, filename, contents, parent_dir='.'):
+    def __init__(self, filename, contents, parent_dir='.', is_string=False):
         self.filename = filename
         self.contents = self.prepare_source(contents)
         self.parent_dir = parent_dir
+        self.is_string = is_string
 
     @classmethod
     def from_filename(cls, fn, filename=None):
@@ -213,7 +214,7 @@ class SourceFile(object):
         if filename is None:
             filename = "<string %r...>" % string[:50]
 
-        return cls(filename, string)
+        return cls(filename, string, is_string=True)
 
     def prepare_source(self, codestr):
         codestr += '\n'
