@@ -904,6 +904,7 @@ class Scss(object):
             rev = lambda x: x
         var = var.strip()
         var = self.calculator.do_glob_math(var, rule.context, rule.options, rule, True)
+        var = normalize_var(var)
 
         for i in rev(range(frm, through + 1)):
             rule.unparsed_contents = block.unparsed_contents
@@ -923,6 +924,7 @@ class Scss(object):
         name = ListValue(name)
         var = var.strip()
         var = self.calculator.do_glob_math(var, rule.context, rule.options, rule, True)
+        var = normalize_var(var)
 
         for n, v in name.items():
             v = to_str(v)
