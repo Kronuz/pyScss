@@ -45,9 +45,7 @@ DEBUG = False
 
 
 SEPARATOR = '\x00'
-_nl_re = re.compile(r'\s*\n\s*', re.MULTILINE)
 _nl_num_re = re.compile(r'\n.+' + SEPARATOR, re.MULTILINE)
-_nl_num_nl_re = re.compile(r'\n.+' + SEPARATOR + r'\s*(?=\n)', re.MULTILINE)
 _blocks_re = re.compile(r'[{},;()\'"\n]')
 
 
@@ -56,16 +54,9 @@ def load_string(codestr):
     Add line numbers to the string using SEPARATOR as the separation between
     the line number and the line.
     """
-    idx = {'line': 1}
+    # Decorate lines with their line numbers and a delimiting NUL and remove empty lines
+    codestr = '\n'.join(str(i + 1) + SEPARATOR + s for i, l in enumerate(codestr.splitlines()) for s in (l.strip(),) if s)
 
-    # Add line numbers:
-    def _cnt(m):
-        idx['line'] += 1
-        return '\n' + str(idx['line']) + SEPARATOR
-    codestr = str(idx['line']) + SEPARATOR + _nl_re.sub(_cnt, codestr + '\n')
-
-    # remove empty lines
-    codestr = _nl_num_nl_re.sub('', codestr)
     return codestr
 
 

@@ -8,7 +8,7 @@ import sys
 from collections import deque
 
 from scss import config
-from scss import Scss, log, to_str, profiling
+from scss import Scss, SourceFile, log, to_str, profiling
 from scss import _prop_split_re
 from scss.rule import SassRule
 from scss.scss_meta import BUILD_INFO
@@ -118,7 +118,8 @@ def main():
         css = Scss()
         context = css.scss_vars
         options = css.scss_opts
-        rule = SassRule(context=context, options=options)
+        source_file = SourceFile.from_string('', '<shell>')
+        rule = SassRule(source_file, context=context, options=options)
         print "Welcome to %s interactive shell" % BUILD_INFO
         while True:
             try:
@@ -132,13 +133,13 @@ def main():
             if s in ('exit', 'quit'):
                 break
             for s in s.split(';'):
-                s = css.load_string(s.strip())
+                s = source_file.prepare_source(s.strip(), line_numbers=False)
                 if not s:
                     continue
                 elif s.startswith('@'):
                     properties = []
                     children = deque()
-                    SassRule(fileid='<string>', context=context, options=options, properties=properties)
+                    SassRule(source_file, context=context, options=options, properties=properties)
                     code, name = (s.split(None, 1) + [''])[:2]
                     if code == '@option':
                         css._settle_options(rule, [''], set(), children, None, None, s, None, code, name)
@@ -215,11 +216,11 @@ def main():
                         continue
                 elif s.startswith('$') and (':' in s or '=' in s):
                     prop, value = [a.strip() for a in _prop_split_re.split(s, 1)]
-                    prop = css.do_glob_math(prop, context, options, rule, True)
-                    value = css.calculate(value, context, options, rule)
+                    prop = css.calculator.do_glob_math(prop, context, options, rule, True)
+                    value = css.calculator.calculate(value, context, rule)
                     context[prop] = value
                     continue
-                s = to_str(css.calculate(s, context, options, rule))
+                s = to_str(css.calculator.calculate(s, context, rule))
                 s = css.post_process(s)
                 print s
         print "Bye!"

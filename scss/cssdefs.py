@@ -237,8 +237,6 @@ _css_functions_re = re.compile(r'^(%s)$' % (
 # Bits and pieces of grammar, as regexen
 
 SEPARATOR = '\x00'
-_nl_re = re.compile(r'[ \t\r\f\v]*\n[ \t\r\f\v]*', re.MULTILINE)
-_nl_num_nl_re = re.compile(r'\n.+' + SEPARATOR + r'[ \t\r\f\v]*\n', re.MULTILINE)
 
 _short_color_re = re.compile(r'(?<!\w)#([a-f0-9])\1([a-f0-9])\2([a-f0-9])\3\b', re.IGNORECASE)
 _long_color_re = re.compile(r'(?<!\w)#([a-f0-9]){2}([a-f0-9]){2}([a-f0-9]){2}\b', re.IGNORECASE)
@@ -263,8 +261,8 @@ _expr_glob_re = re.compile(r'''
 
 # XXX these still need to be fixed; the //-in-functions thing is a chumpy hack
 _ml_comment_re = re.compile(r'\/\*(.*?)\*\/', re.DOTALL)
-_sl_comment_re = re.compile(r'(?<![(])(?<!\w{2}:)\/\/.*')
-_zero_units_re = re.compile(r'\b(?<![.])0(' + '|'.join(map(re.escape, _zero_units)) + r')(?!\w)', re.IGNORECASE)
+_sl_comment_re = re.compile(r'(?<!\burl[(])(?<!\w{2}:)\/\/.*')
+_zero_units_re = re.compile(r'\b0(' + '|'.join(map(re.escape, _zero_units)) + r')(?!\w)', re.IGNORECASE)
 _zero_re = re.compile(r'\b0\.(?=\d)')
 
 _escape_chars_re = re.compile(r'([^-a-zA-Z0-9_])')

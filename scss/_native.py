@@ -1,11 +1,12 @@
 """Pure-Python scanner and parser, used if _speedups is not available."""
 
-from scss.cssdefs import SEPARATOR, _nl_re, _nl_num_nl_re
+from scss.cssdefs import SEPARATOR
 import re
 
 # TODO copied from __init__
 _nl_num_re = re.compile(r'\n.+' + SEPARATOR, re.MULTILINE)
 _blocks_re = re.compile(r'[{},;()\'"\n]')
+
 
 def _strip_selprop(selprop, lineno):
     # Get the line number of the selector or property and strip all other
@@ -23,10 +24,12 @@ def _strip_selprop(selprop, lineno):
     selprop = selprop.strip()
     return selprop, lineno
 
+
 def _strip(selprop):
     # Strip all line numbers, ignoring them in the way
     selprop, _ = _strip_selprop(selprop, None)
     return selprop
+
 
 def locate_blocks(codestr):
     """
@@ -128,6 +131,7 @@ def locate_blocks(codestr):
         if _property:
             yield lineno, _property, None
 
+
 ################################################################################
 # Parser
 
@@ -136,6 +140,7 @@ class NoMoreTokens(Exception):
     Another exception object, for when we run out of tokens
     """
     pass
+
 
 class Scanner(object):
     def __init__(self, patterns, ignore, input=None):

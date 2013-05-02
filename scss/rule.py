@@ -1,5 +1,6 @@
 from scss.cssdefs import _has_placeholder_re
 
+
 class SassRule(object):
     """At its heart, a CSS rule: combination of a selector and zero or more
     properties.  But this is Sass, so it also tracks some Sass-flavored
@@ -55,8 +56,6 @@ class SassRule(object):
                 break
 
         self.ancestry.append(BlockSelectorHeader(value))
-
-
 
     @property
     def file_and_line(self):
@@ -128,6 +127,7 @@ class BlockHeader(object):
             else:
                 return BlockSelectorHeader(prop)
 
+
 class BlockAtRuleHeader(BlockHeader):
     is_atrule = True
 
@@ -144,6 +144,7 @@ class BlockAtRuleHeader(BlockHeader):
         else:
             return self.directive
 
+
 class BlockSelectorHeader(BlockHeader):
     is_selector = True
 
@@ -158,6 +159,7 @@ class BlockSelectorHeader(BlockHeader):
             super_selector + s
             for s in self.selectors
             if not _has_placeholder_re.search(s)))
+
 
 class BlockScopeHeader(BlockHeader):
     is_scope = True
@@ -195,8 +197,6 @@ class UnparsedBlock(object):
         self.lineno = lineno
         self.prop = prop
         self.unparsed_contents = unparsed_contents
-
-
 
     @property
     def directive(self):

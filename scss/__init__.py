@@ -57,8 +57,7 @@ import time
 from scss import config
 from scss.cssdefs import (
     SEPARATOR,
-    _colors, _zero_units,
-    _nl_re, _nl_num_nl_re,
+    _colors,
     _short_color_re, _reverse_colors, _reverse_colors_re, _colors_re,
     _expr_glob_re,
     _ml_comment_re, _sl_comment_re,
@@ -162,6 +161,10 @@ def print_timing(level=0):
 # Profiler decorator
 # import pstats
 # import cProfile
+# try:
+#     from cStringIO import StringIO
+# except:
+#     from StringIO import StringIO
 # def profile(fn):
 #     def wrapper(*args, **kwargs):
 #         profiler = cProfile.Profile()
@@ -216,18 +219,9 @@ class SourceFile(object):
 
         return cls(filename, string, is_string=True)
 
-    def prepare_source(self, codestr):
-        codestr += '\n'
-
-        # Decorate lines with their line numbers and a delimiting NUL
-        scope = dict(line=1)
-        def line_decorator(m):
-            scope['line'] += 1
-            return '\n' + str(scope['line']) + SEPARATOR
-        codestr = "1" + SEPARATOR + _nl_re.sub(line_decorator, codestr)
-
-        # remove empty lines
-        codestr = _nl_num_nl_re.sub('\n', codestr)
+    def prepare_source(self, codestr, line_numbers=True):
+        # Decorate lines with their line numbers and a delimiting NUL and remove empty lines
+        codestr = '\n'.join(str(i + 1) + SEPARATOR + s if line_numbers else s for i, l in enumerate(codestr.splitlines()) for s in (l.strip(),) if s)
 
         # protects codestr: "..." strings
         codestr = _strings_re.sub(lambda m: _reverse_safe_strings_re.sub(lambda n: _reverse_safe_strings[n.group(0)], m.group(0)), codestr)
@@ -378,10 +372,10 @@ class Scss(object):
                 exceeded = " (IE exceeded!)"
                 log.error("Maximum number of supported selectors in Internet Explorer (4095) exceeded!")
             if self.scss_opts.get('debug_info', False):
-                if fileid.startswith('<string '):
+                if source_file.is_string:
                     final_cont += "/* %s, add to %s%s selectors generated */\n" % (total_selectors, all_selectors, exceeded)
                 else:
-                    final_cont += "/* %s, add to %s%s selectors generated from '%s' */\n" % (total_selectors, all_selectors, exceeded, fileid)
+                    final_cont += "/* %s, add to %s%s selectors generated from '%s' */\n" % (total_selectors, all_selectors, exceeded, source_file.filename)
             final_cont += fcont
 
         final_cont = self.post_process(final_cont)
@@ -946,7 +940,7 @@ class Scss(object):
     #     """
     #     first_val = None
     #     while True:
-    #         val = self.calculator.calculate(name, rule.context, rule)
+    #         val = self.calculator.calculate(block.argument, rule.context, rule)
     #         val = bool(False if not val or isinstance(val, basestring) and (val in ('0', 'false', 'undefined') or _variable_re.match(val)) else val)
     #         if first_val is None:
     #             first_val = val
@@ -1048,10 +1042,8 @@ class Scss(object):
 
             return
 
-
         raw_selectors = self.calculator.apply_vars(block.prop, rule.context, rule.options, rule, True)
         c_selectors, c_parents = self.parse_selectors(raw_selectors)
-
 
         p_selectors = rule.selectors
         if not p_selectors:
@@ -1063,7 +1055,7 @@ class Scss(object):
         better_selectors = set()
         for c_selector in c_selectors:
             for p_selector in p_selectors:
-                if c_selector == "self":
+                if c_selector == 'self':
                     # xCSS extension: "self" means to hoist to the parent
                     better_selectors.add(p_selector)
                 elif '&' in c_selector:  # Parent References
@@ -1249,7 +1241,7 @@ class Scss(object):
     def parse_properties(self):
         css_files = []
         seen_files = set()
-        rules_by_file= {}
+        rules_by_file = {}
 
         for rule in self.rules:
             if rule.position is None or not rule.properties:
@@ -1278,11 +1270,7 @@ class Scss(object):
         return self._create_css(rules, sc, sp, tb, nl, not compress and self.scss_opts.get('debug_info', False))
 
     def _create_css(self, rules, sc=True, sp=' ', tb='  ', nl='\n', debug_info=False):
-        open_selectors = False
         skip_selectors = False
-        old_selectors = None
-        open_media = False
-        old_media = None
 
         old_ancestry = []
 
@@ -1325,7 +1313,6 @@ class Scss(object):
 
                 if ancestry[i].is_selector:
                     header = ancestry[i].render(sep=',' + sp, super_selector=self.super_selector)
-                    last_selector_header = header
                     if nl:
                         header = nl.join(wrap(header))
                 else:

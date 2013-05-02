@@ -18,6 +18,8 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
+expr_cache = {}
+
 
 def _inv(sign, value):
     if isinstance(value, NumberValue):
@@ -71,7 +73,6 @@ def call(name, args, R, library, is_function=True):
     return node
 
 
-expr_cache = {}
 def eval_expr(expr, rule, library, raw=False):
     # print >>sys.stderr, '>>',expr,'<<'
     results = None
