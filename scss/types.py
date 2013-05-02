@@ -472,6 +472,8 @@ class ListValue(Value):
 
     def first(self):
         for v in self.values():
+            if isinstance(v, basestring) and _undefined_re.match(v):
+                continue
             if bool(v):
                 return v
         return v
