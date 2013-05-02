@@ -210,8 +210,8 @@ class UnparsedBlock(object):
 
     @property
     def is_atrule(self):
-        return self.prop.startswith('@')
+        return self.header.is_atrule
 
     @property
     def is_nested_property(self):
-        return self.prop.endswith(':') and not self.is_atrule
+        return self.header.is_scope
