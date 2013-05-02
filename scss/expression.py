@@ -59,7 +59,7 @@ def call(name, args, R, library, is_function=True):
         sp = args and args.value.get('_') or ''
         if is_function:
             if not _css_functions_re.match(_name):
-                log.error("Required function not found: %s (%s)", _fn_a, R.index[R.lineno], extra={'stack': True})
+                log.error("Required function not found: %s (%s)", _fn_a, R.file_and_line, extra={'stack': True})
             _args = (sp + ' ').join(to_str(v) for n, v in s if isinstance(n, int))
             _kwargs = (sp + ' ').join('%s: %s' % (n, to_str(v)) for n, v in s if not isinstance(n, int) and n != '_')
             if _args and _kwargs:
@@ -105,7 +105,7 @@ def eval_expr(expr, rule, library, raw=False):
                 if config.DEBUG:
                     raise
             except Exception, e:
-                log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule.index[rule.lineno])
+                log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule.file_and_line)
                 if config.DEBUG:
                     raise
 
