@@ -11,12 +11,19 @@ from __future__ import absolute_import
 
 import glob
 import os.path
-
+import logging
 import pytest
 
 from scss import Scss
 
+
+console = logging.StreamHandler()
+logger = logging.getLogger('scss')
+logger.setLevel(logging.ERROR)
+logger.addHandler(console)
+
 HERE = os.path.join(os.path.split(__file__)[0], 'files')
+
 
 @pytest.mark.parametrize(
     ('scss_fn', 'css_fn'), [
