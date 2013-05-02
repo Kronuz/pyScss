@@ -33,29 +33,272 @@ register = EXTRA_LIBRARY.register
 
 # ------------------------------------------------------------------------------
 # Image stuff
+def _image_noise(pixdata, size, density=None, intensity=None, color=None, opacity=None, monochrome=None, background=None):
+    if not density:
+        density = [0.8]
+    elif not isinstance(density, (tuple, list)):
+        density = [density]
+
+    if not intensity:
+        intensity = [0.5]
+    elif not isinstance(intensity, (tuple, list)):
+        intensity = [intensity]
+
+    if not color:
+        color = [(0, 0, 0, 0)]
+    elif not isinstance(color, (tuple, list)) or not isinstance(color[0], (tuple, list)):
+        color = [color]
+
+    if not opacity:
+        opacity = [0.2]
+    elif not isinstance(opacity, (tuple, list)):
+        opacity = [opacity]
+
+    if not monochrome:
+        monochrome = [False]
+    elif not isinstance(monochrome, (tuple, list)):
+        monochrome = [monochrome]
+
+    pixels = {}
+
+    if background:
+        for y in xrange(size):
+            for x in xrange(size):
+                ca = float(background[3])
+                pixels[(x, y)] = (background[0] * ca, background[1] * ca, background[2] * ca, ca)
+
+    loops = max(map(len, (density, intensity, color, opacity, monochrome)))
+    for l in range(loops):
+        _density = density[l % len(density)]
+        _intensity = intensity[l % len(intensity)]
+        _color = color[l % len(color)]
+        _opacity = opacity[l % len(opacity)]
+        _monochrome = monochrome[l % len(monochrome)]
+        _intensity = 1 - _intensity
+        if _intensity < 0.5:
+            cx = 255 * _intensity
+            cm = cx
+        else:
+            cx = 255 * (1 - _intensity)
+            cm = 255 * _intensity
+        xa = int(cm - cx)
+        xb = int(cm + cx)
+        if xa > 0:
+            xa &= 255
+        else:
+            xa = 0
+        if xb > 0:
+            xb &= 255
+        else:
+            xb = 0
+        r, g, b, a = _color
+        for i in xrange(int(round(_density * size ** 2))):
+            x = random.randint(1, size)
+            y = random.randint(1, size)
+            cc = random.randint(xa, xb)
+            cr = (cc) * (1 - a) + a * r
+            cg = (cc if _monochrome else random.randint(xa, xb)) * (1 - a) + a * g
+            cb = (cc if _monochrome else random.randint(xa, xb)) * (1 - a) + a * b
+            ca = random.random() * _opacity
+            ica = 1 - ca
+            pos = (x - 1, y - 1)
+            dst = pixels.get(pos, (0, 0, 0, 0))
+            src = (cr * ca, cg * ca, cb * ca, ca)
+            pixels[pos] = (src[0] + dst[0] * ica, src[1] + dst[1] * ica, src[2] + dst[2] * ica, src[3] + dst[3] * ica)
+
+    for pos, col in pixels.items():
+        ca = col[3]
+        if ca:
+            pixdata[pos] = tuple(int(round(c)) for c in (col[0] / ca, col[1] / ca, col[2] / ca, ca * 255))
+
+
+def _image_brushed(pixdata, size, density=None, intensity=None, color=None, opacity=None, monochrome=None, direction=None, spread=None, background=None):
+    if not density:
+        density = [0.8]
+    elif not isinstance(density, (tuple, list)):
+        density = [density]
+
+    if not intensity:
+        intensity = [0.5]
+    elif not isinstance(intensity, (tuple, list)):
+        intensity = [intensity]
+
+    if not color:
+        color = [(0, 0, 0, 0)]
+    elif not isinstance(color, (tuple, list)) or not isinstance(color[0], (tuple, list)):
+        color = [color]
+
+    if not opacity:
+        opacity = [0.2]
+    elif not isinstance(opacity, (tuple, list)):
+        opacity = [opacity]
+
+    if not monochrome:
+        monochrome = [False]
+    elif not isinstance(monochrome, (tuple, list)):
+        monochrome = [monochrome]
+
+    if not direction:
+        direction = [0]
+    elif not isinstance(direction, (tuple, list)):
+        direction = [direction]
+
+    if not spread:
+        spread = [0]
+    elif not isinstance(spread, (tuple, list)):
+        spread = [spread]
+
+    def ppgen(d):
+        if d is None:
+            return
+        d = d % 4
+        if d == 0:
+            pp = lambda x, y, o: ((x - o) % size, y)
+        elif d == 1:
+            pp = lambda x, y, o: ((x - o) % size, (y + x - o) % size)
+        elif d == 2:
+            pp = lambda x, y, o: (y, (x - o) % size)
+        else:
+            pp = lambda x, y, o: ((x - o) % size, (y - x - o) % size)
+        return pp
+
+    pixels = {}
+
+    if background:
+        for y in xrange(size):
+            for x in xrange(size):
+                ca = float(background[3])
+                pixels[(x, y)] = (background[0] * ca, background[1] * ca, background[2] * ca, ca)
+
+    loops = max(map(len, (density, intensity, color, opacity, monochrome, direction, spread)))
+    for l in range(loops):
+        _density = density[l % len(density)]
+        _intensity = intensity[l % len(intensity)]
+        _color = color[l % len(color)]
+        _opacity = opacity[l % len(opacity)]
+        _monochrome = monochrome[l % len(monochrome)]
+        _direction = direction[l % len(direction)]
+        _spread = spread[l % len(spread)]
+        _intensity = 1 - _intensity
+        if _intensity < 0.5:
+            cx = 255 * _intensity
+            cm = cx
+        else:
+            cx = 255 * (1 - _intensity)
+            cm = 255 * _intensity
+        xa = int(cm - cx)
+        xb = int(cm + cx)
+        if xa > 0:
+            xa &= 255
+        else:
+            xa = 0
+        if xb > 0:
+            xb &= 255
+        else:
+            xb = 0
+        r, g, b, a = _color
+        pp = ppgen(_direction)
+        if pp:
+            for y in xrange(size):
+                if _spread and (y + (l % 2)) % _spread:
+                    continue
+                o = random.randint(1, size)
+                cc = random.randint(xa, xb)
+                cr = (cc) * (1 - a) + a * r
+                cg = (cc if _monochrome else random.randint(xa, xb)) * (1 - a) + a * g
+                cb = (cc if _monochrome else random.randint(xa, xb)) * (1 - a) + a * b
+                da = random.randint(0, 255) * _opacity
+                ip = round((size / 2.0 * _density) / int(1 / _density))
+                iq = round((size / 2.0 * (1 - _density)) / int(1 / _density))
+                if ip:
+                    i = da / ip
+                    aa = 0
+                else:
+                    i = 0
+                    aa = da
+                d = 0
+                p = ip
+                for x in xrange(size):
+                    if d == 0:
+                        if p > 0:
+                            p -= 1
+                            aa += i
+                        else:
+                            d = 1
+                            q = iq
+                    elif d == 1:
+                        if q > 0:
+                            q -= 1
+                        else:
+                            d = 2
+                            p = ip
+                    elif d == 2:
+                        if p > 0:
+                            p -= 1
+                            aa -= i
+                        else:
+                            d = 3
+                            q = iq
+                    elif d == 3:
+                        if q > 0:
+                            q -= 1
+                        else:
+                            d = 0
+                            p = ip
+                    if aa > 0:
+                        ca = aa / 255.0
+                    else:
+                        ca = 0.0
+                    ica = 1 - ca
+                    pos = pp(x, y, o)
+                    dst = pixels.get(pos, (0, 0, 0, 0))
+                    src = (cr * ca, cg * ca, cb * ca, ca)
+                    pixels[pos] = (src[0] + dst[0] * ica, src[1] + dst[1] * ica, src[2] + dst[2] * ica, src[3] + dst[3] * ica)
+
+    for pos, col in pixels.items():
+        ca = col[3]
+        if ca:
+            pixdata[pos] = tuple(int(round(c)) for c in (col[0] / ca, col[1] / ca, col[2] / ca, ca * 255))
 
 @register('background-noise', 0)
 @register('background-noise', 1)
 @register('background-noise', 2)
 @register('background-noise', 3)
 @register('background-noise', 4)
-def background_noise(intensity=None, opacity=None, size=None, monochrome=False, inline=False):
+@register('background-noise', 5)
+@register('background-noise', 6)
+@register('background-noise', 7)
+def background_noise(density=None, opacity=None, size=None, monochrome=False, intensity=None, color=None, background=None, inline=False):
     if not Image:
         raise Exception("Images manipulation require PIL")
 
-    intensity = intensity and NumberValue(intensity).value
-    if not intensity or intensity < 0 or intensity > 1:
-        intensity = 0.5
+    if isinstance(density, ListValue):
+        density = [NumberValue(v).value for n, v in density.items()]
+    else:
+        density = [NumberValue(density).value]
 
-    opacity = opacity and NumberValue(opacity).value
-    if not opacity or opacity < 0 or opacity > 1:
-        opacity = 0.08
+    if isinstance(intensity, ListValue):
+        intensity = [NumberValue(v).value for n, v in intensity.items()]
+    else:
+        intensity = [NumberValue(intensity).value]
 
-    size = size and int(NumberValue(size).value)
-    if not size or size < 1 or size > 512:
+    if isinstance(color, ListValue):
+        color = [ColorValue(v).value for n, v in color.items() if v]
+    else:
+        color = [ColorValue(color).value] if color else []
+
+    if isinstance(opacity, ListValue):
+        opacity = [NumberValue(v).value for n, v in opacity.items()]
+    else:
+        opacity = [NumberValue(opacity).value]
+
+    size = int(NumberValue(size).value) if size else 0
+    if size < 1 or size > 512:
         size = 200
 
     monochrome = bool(monochrome)
+
+    background = ColorValue(background).value if background else None
 
     new_image = Image.new(
         mode='RGBA',
@@ -63,19 +306,97 @@ def background_noise(intensity=None, opacity=None, size=None, monochrome=False, 
     )
 
     pixdata = new_image.load()
-    for i in range(0, int(round(intensity * size ** 2))):
-        x = random.randint(1, size)
-        y = random.randint(1, size)
-        r = random.randint(0, 255)
-        a = int(round(random.randint(0, 255) * opacity))
-        color = (r, r, r, a) if monochrome else (r, random.randint(0, 255), random.randint(0, 255), a)
-        pixdata[x - 1, y - 1] = color
+    _image_noise(pixdata, size, density, intensity, color, opacity, monochrome)
 
     if not inline:
-        key = (intensity, opacity, size, monochrome)
-        asset_file = 'noise_%s%sx%s+%s+%s' % ('mono_' if monochrome else '', size, size, to_str(intensity).replace('.', '_'), to_str(opacity).replace('.', '_'))
-        asset_file = asset_file + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
-        asset_file = asset_file + '.png'
+        key = (size, density, intensity, color, opacity, monochrome)
+        asset_file = 'noise-%s%sx%s' % ('mono-' if monochrome else '', size, size)
+        # asset_file += '-[%s][%s]' % ('-'.join(to_str(s).replace('.', '_') for s in density or []), '-'.join(to_str(s).replace('.', '_') for s in opacity or []))
+        asset_file += '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
+        asset_file += '.png'
+        asset_path = os.path.join(config.ASSETS_ROOT, asset_file)
+        try:
+            new_image.save(asset_path)
+        except IOError:
+            log.exception("Error while saving image")
+            inline = True  # Retry inline version
+        url = '%s%s' % (config.ASSETS_URL, asset_file)
+    if inline:
+        output = StringIO()
+        new_image.save(output, format='PNG')
+        contents = output.getvalue()
+        output.close()
+        url = 'data:image/png;base64,' + base64.b64encode(contents)
+
+    inline = 'url("%s")' % escape(url)
+    return StringValue(inline)
+
+@register('background-brushed', 0)
+@register('background-brushed', 1)
+@register('background-brushed', 2)
+@register('background-brushed', 3)
+@register('background-brushed', 4)
+@register('background-brushed', 5)
+@register('background-brushed', 6)
+@register('background-brushed', 7)
+@register('background-brushed', 8)
+@register('background-brushed', 9)
+def background_brushed(density=None, intensity=None, color=None, opacity=None, size=None, monochrome=False, direction=None, spread=None, background=None, inline=False):
+    if not Image:
+        raise Exception("Images manipulation require PIL")
+
+    if isinstance(density, ListValue):
+        density = [NumberValue(v).value for n, v in density.items()]
+    else:
+        density = [NumberValue(density).value]
+
+    if isinstance(intensity, ListValue):
+        intensity = [NumberValue(v).value for n, v in intensity.items()]
+    else:
+        intensity = [NumberValue(intensity).value]
+
+    if isinstance(color, ListValue):
+        color = [ColorValue(v).value for n, v in color.items() if v]
+    else:
+        color = [ColorValue(color).value] if color else []
+
+    if isinstance(opacity, ListValue):
+        opacity = [NumberValue(v).value for n, v in opacity.items()]
+    else:
+        opacity = [NumberValue(opacity).value]
+
+    size = int(NumberValue(size).value) if size else -1
+    if size < 0 or size > 512:
+        size = 200
+
+    monochrome = bool(monochrome)
+
+    if isinstance(direction, ListValue):
+        direction = [NumberValue(v).value for n, v in direction.items()]
+    else:
+        direction = [NumberValue(direction).value]
+
+    if isinstance(spread, ListValue):
+        spread = [NumberValue(v).value for n, v in spread.items()]
+    else:
+        spread = [NumberValue(spread).value]
+
+    background = ColorValue(background).value if background else None
+
+    new_image = Image.new(
+        mode='RGBA',
+        size=(size, size)
+    )
+
+    pixdata = new_image.load()
+    _image_brushed(pixdata, size, density, intensity, color, opacity, monochrome, direction, spread, background)
+
+    if not inline:
+        key = (size, density, intensity, color, opacity, monochrome, direction, spread, background)
+        asset_file = 'brushed-%s%sx%s' % ('mono-' if monochrome else '', size, size)
+        # asset_file += '-[%s][%s][%s]' % ('-'.join(to_str(s).replace('.', '_') for s in density or []), '-'.join(to_str(s).replace('.', '_') for s in opacity or []), '-'.join(to_str(s).replace('.', '_') for s in direction or []))
+        asset_file += '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
+        asset_file += '.png'
         asset_path = os.path.join(config.ASSETS_ROOT, asset_file)
         try:
             new_image.save(asset_path)
