@@ -139,7 +139,10 @@ class BlockAtRuleHeader(BlockHeader):
         return "<%s %r %r>" % (self.__class__.__name__, self.directive, self.argument)
 
     def render(self):
-        return "%s %s" % (self.directive, self.argument)
+        if self.argument:
+            return "%s %s" % (self.directive, self.argument)
+        else:
+            return self.directive
 
 class BlockSelectorHeader(BlockHeader):
     is_selector = True

@@ -980,34 +980,28 @@ class Scss(object):
         if not prop:
             return
 
-        if value:
+        # Parse the value and determine whether it's a default assignment
+        is_default = False
+        if value is not None:
             value = value.strip()
+            if prop.startswith('$'):
+                value, subs = re.subn(r'(?i)\s+!default\Z', '', value)
+                if subs:
+                    is_default = True
+
             value = self.calculator.calculate(value, rule.context, rule)
+
         _prop = (scope or '') + prop
         if is_var or prop.startswith('$') and value is not None:
             _prop = normalize_var(_prop)
             in_context = rule.context.get(_prop)
             is_defined = not (in_context is None or isinstance(in_context, basestring) and _undefined_re.match(in_context))
-            if isinstance(value, basestring):
-                if '!default' in value:
-                    if is_defined:
-                        value = None
-                    if value is not None:
-                        value = value.replace('!default', '').replace('  ', ' ').strip()
-                if value is not None and prop.startswith('$') and prop[1].isupper():
-                    if is_defined:
-                        log.warn("Constant %r redefined", prop)
-            elif isinstance(value, ListValue):
-                value = ListValue(value)
-                for k, v in value.value.items():
-                    if v == '!default':
-                        if is_defined:
-                            value = None
-                        if value is not None:
-                            del value.value[k]
-                            value = value.first() if len(value) == 1 else value
-                        break
-            if value is not None:
+            if (is_defined and is_default) or value is None:
+                pass
+            else:
+                if is_defined and prop.startswith('$') and prop[1].isupper():
+                    log.warn("Constant %r redefined", prop)
+
                 rule.context[_prop] = value
         else:
             _prop = self.calculator.apply_vars(_prop, rule.context, rule.options, rule, True)
@@ -1377,10 +1371,6 @@ class Scss(object):
                 prop = name + ':' + sp + value
             else:
                 prop = name
-            if '!default' in prop:
-                prop = prop.replace('!default', '').replace('  ', ' ').strip()
-                if name in scope:
-                    continue
             if old_property[0] != prop:
                 old_property[0] = prop
                 scope.add(name)
