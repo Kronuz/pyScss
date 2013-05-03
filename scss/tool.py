@@ -28,7 +28,7 @@ def main():
                       help="Run an interactive Scss shell")
     parser.add_option("-w", "--watch", metavar="DIR",
                       help="Watch the files in DIR, and recompile when they change")
-    parser.add_option("-r", "--recursive", action="store_true",
+    parser.add_option("-r", "--recursive", action="store_true", default=False,
                       help="Also watch directories inside of the watch directory")
     parser.add_option("-o", "--output", metavar="PATH",
                       help="Write output to PATH (a directory if using watch, a file otherwise)")
