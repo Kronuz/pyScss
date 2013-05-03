@@ -18,6 +18,8 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
+expr_cache = {}
+
 
 def _inv(sign, value):
     if isinstance(value, NumberValue):
@@ -30,8 +32,7 @@ def _inv(sign, value):
 
 
 def interpolate(var, rule, library):
-    var = normalize_var(var)
-    value = rule.context.get(var, var)
+    value = rule.context.get(normalize_var(var), var)
     if var != value and isinstance(value, basestring):
         _vi = eval_expr(value, rule, library, True)
         if _vi is not None:
@@ -71,7 +72,6 @@ def call(name, args, R, library, is_function=True):
     return node
 
 
-expr_cache = {}
 def eval_expr(expr, rule, library, raw=False):
     # print >>sys.stderr, '>>',expr,'<<'
     results = None
