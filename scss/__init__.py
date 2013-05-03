@@ -363,6 +363,7 @@ class Scss(object):
         all_selectors = 0
         exceeded = ''
         final_cont = ''
+        files = len(css_files)
         for source_file in css_files:
             rules = rules_by_file[source_file]
             fcont, total_rules, total_selectors = self.create_css(rules)
@@ -371,11 +372,22 @@ class Scss(object):
             if not exceeded and all_selectors > 4095:
                 exceeded = " (IE exceeded!)"
                 log.error("Maximum number of supported selectors in Internet Explorer (4095) exceeded!")
-            if self.scss_opts.get('debug_info', False):
+            if files > 1 and self.scss_opts.get('debug_info', False):
                 if source_file.is_string:
-                    final_cont += "/* %s, add to %s%s selectors generated */\n" % (total_selectors, all_selectors, exceeded)
+                    final_cont += "/* %s %s generated add up to a total of %s %s accumulated%s */\n" % (
+                        total_selectors,
+                        'selector' if total_selectors == 1 else 'selectors',
+                        all_selectors,
+                        'selector' if all_selectors == 1 else 'selectors',
+                        exceeded)
                 else:
-                    final_cont += "/* %s, add to %s%s selectors generated from '%s' */\n" % (total_selectors, all_selectors, exceeded, source_file.filename)
+                    final_cont += "/* %s %s generated from '%s' add up to a total of %s %s accumulated%s */\n" % (
+                        total_selectors,
+                        'selector' if total_selectors == 1 else 'selectors',
+                        source_file.filename,
+                        all_selectors,
+                        'selector' if all_selectors == 1 else 'selectors',
+                        exceeded)
             final_cont += fcont
 
         final_cont = self.post_process(final_cont)
@@ -1303,15 +1315,14 @@ class Scss(object):
             # Open new blocks as necessary
             for i in range(first_mismatch, len(ancestry)):
                 if debug_info:
-                    filename = rule.source_file.filename
-                    lineno = str(rule.lineno)
-                    if filename.startswith('<string '):
-                        filename = '<unknown>'
-                    if debug_info == 'comments':
-                        result += '/* file: %s, line: %s */' % (filename, lineno) + nl
-                    else:
-                        filename = _escape_chars_re.sub(r'\\\1', filename)
-                        result += "@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}" % (filename, lineno) + nl
+                    if not rule.source_file.is_string:
+                        filename = rule.source_file.filename
+                        lineno = str(rule.lineno)
+                        if debug_info == 'comments':
+                            result += '/* file: %s, line: %s */' % (filename, lineno) + nl
+                        else:
+                            filename = _escape_chars_re.sub(r'\\\1', filename)
+                            result += "@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}" % (filename, lineno) + nl
 
                 if ancestry[i].is_selector:
                     header = ancestry[i].render(sep=',' + sp, super_selector=self.super_selector)

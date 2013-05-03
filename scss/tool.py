@@ -98,7 +98,7 @@ def main():
     # Execution modes
     if options.test:
         import doctest
-        doctest.testfile('tests.rst')
+        doctest.testfile('tests/tests.rst')
     elif options.version:
         print BUILD_INFO
     elif options.interactive:
