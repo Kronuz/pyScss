@@ -68,7 +68,6 @@ def __color_stops(percentages, *args):
     else:
         max_stops = max(s and (s if s.unit != '%' else None) or None for s in stops)
     stops = [s and (s.value / max_stops if s.unit != '%' else s.value) for s in stops]
-    stops[0] = 0
 
     init = 0
     start = None
