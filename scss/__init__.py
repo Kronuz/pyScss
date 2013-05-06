@@ -873,7 +873,15 @@ class Scss(object):
             val = True
         if val:
             val = self.calculator.calculate(block.argument, rule, rule.context, rule.options)
-            val = bool(False if not val or isinstance(val, basestring) and (val in ('0', 'false', 'undefined') or _variable_re.match(val)) else val)
+            if isinstance(val, basestring):
+                if val != 'false' and not _undefined_re.match(val):
+                    val = True
+                else:
+                    val = False
+            elif isinstance(val, (BooleanValue, bool)):
+                val = bool(val)
+            else:
+                val = True
             if val:
                 rule.unparsed_contents = block.unparsed_contents
                 self.manage_children(rule, p_children, scope)
