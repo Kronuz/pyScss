@@ -407,6 +407,19 @@ CORE_LIBRARY.add(Value._wrap(math.floor), 'floor', 1)
 
 # ------------------------------------------------------------------------------
 # List functions
+def __parse_separator(separator):
+    if separator is None:
+        return None
+    separator = StringValue(separator).value
+    if separator == 'comma':
+        return ','
+    elif separator == 'space':
+        return ' '
+    elif separator == 'auto':
+        return None
+    else:
+        raise ValueError('Separator must be auto, comma, or space')
+
 
 # TODO get the compass bit outta here
 @register('-compass-list-size')
@@ -453,10 +466,9 @@ def join(lst1, lst2, separator=None):
     lst2 = ListValue(lst2).value
     lst_len = len(ret.value)
     ret.value.update((k + lst_len if isinstance(k, int) else k, v) for k, v in lst2.items())
+    separator = __parse_separator(separator)
     if separator is not None:
-        separator = StringValue(separator).value
-        if separator:
-            ret.value['_'] = separator
+        ret.value['_'] = separator
     return ret
 
 
@@ -479,7 +491,7 @@ def max_(*lst):
 @register('append', 2)
 @register('append', 3)
 def append(lst, val, separator=None):
-    separator = separator and StringValue(separator).value
+    separator = __parse_separator(separator)
     ret = ListValue(lst, separator)
     val = ListValue(val)
     for v in val:
