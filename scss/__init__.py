@@ -403,7 +403,7 @@ FUNCTIONS_2D = 'matrix translate translateX translateY scale '\
                'scale scaleX scaleY rotate skew skewX skewY'
 # http://www.w3.org/TR/css3-3d-transforms/
 FUNCTIONS_3D = 'matrix3d translate3d translateZ scale3d scaleZ rotate3d '\
-               'rotateX rotateY rotateZ perspective'
+               'rotateX rotateY rotateZ skew perspective'
 # http://www.w3.org/TR/css3-transitions/
 FUNCTIONS_TRANSITIONS = 'cubic-bezier'
 # http://www.w3.org/TR/css3-animations/
@@ -413,7 +413,7 @@ FUNCTIONS_OTHERS = 'from to mask'
 VENDORS = '-[^-]+-.+'
 
 _css_functions_re = re.compile(r'^(%s)$' % (
-    '|'.join(' '.join([
+    '|'.join(set(' '.join([
         FUNCTIONS_CSS2,
         FUNCTIONS_UNITS,
         FUNCTIONS_COLORS,
@@ -426,7 +426,7 @@ _css_functions_re = re.compile(r'^(%s)$' % (
         FUNCTIONS_FILTER,
         FUNCTIONS_OTHERS,
         VENDORS,
-    ]).split())))
+    ]).split()))))
 
 FILEID = 0
 POSITION = 1
