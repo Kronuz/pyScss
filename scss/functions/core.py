@@ -499,6 +499,14 @@ def append(lst, val, separator=None):
     return ret
 
 
+@register('index', 2)
+def index(lst, val):
+    for i in xrange(len(lst)):
+        if lst.value[i] == val:
+            return NumberValue(i + 1)
+    return BooleanValue(False)
+
+
 # ------------------------------------------------------------------------------
 # Meta functions
 
