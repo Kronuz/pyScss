@@ -353,6 +353,19 @@ issue tracker at http://github.com/Kronuz/pyScss/issues
 Changelog
 =========
 
+2.0.0 ???
+    + Heavy refactoring, an expanded test suite, and more extensibility.
+    > Bug fixes:
+        - Unrecognized @-rule blocks such as ``@keyframes`` are now preserved.
+    > Features:
+        + Support for writing custom Sass functions in Python.
+    > Backwards-incompatible changes:
+        * Configuration via monkeypatching the ``scss`` module no longer works. Use the new constructor arguments instead.
+
+
+1.1.6 ???
+	+ Compatibility with Python 2.5 restored.
+
 1.1.5 Feb 15, 2013
 	+ ``debug_info`` now properly produces rules that can be used by FireSass and Google Chrome SASS Source Maps.
 	+ Improved memory usage for large sets of files to be used as sprites.
