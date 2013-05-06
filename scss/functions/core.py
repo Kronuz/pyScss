@@ -325,10 +325,11 @@ def invert(color):
     The red, green, and blue values are inverted, while the opacity is left alone.
     """
     col = ColorValue(color)
-    c = col.value
+    c = list(col.value)
     c[0] = 255.0 - c[0]
     c[1] = 255.0 - c[1]
     c[2] = 255.0 - c[2]
+    col.value = tuple(c)
     return col
 
 
