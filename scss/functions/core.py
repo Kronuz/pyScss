@@ -493,9 +493,7 @@ def max_(*lst):
 def append(lst, val, separator=None):
     separator = __parse_separator(separator)
     ret = ListValue(lst, separator)
-    val = ListValue(val)
-    for v in val:
-        ret.value[len(ret)] = v
+    ret.value[len(ret)] = val
     return ret
 
 
