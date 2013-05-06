@@ -3690,14 +3690,32 @@ def _compact(*args):
             args = args.value
         if isinstance(args, dict):
             for i, item in args.items():
-                if False if isinstance(item, basestring) and _undefined_re.match(item) else bool(item):
+                if isinstance(item, (basestring, StringValue)):
+                    if item != 'false' and not _undefined_re.match(item):
+                        ret[i] = item
+                elif isinstance(item, (bool, BooleanValue)):
+                    if bool(item):
+                        ret[i] = item
+                else:
                     ret[i] = item
-        elif False if isinstance(args, basestring) and _undefined_re.match(args) else bool(args):
+        elif isinstance(args, (basestring, StringValue)):
+            if args != 'false' and not _undefined_re.match(args):
+                ret[0] = args
+        elif isinstance(args, (bool, BooleanValue)):
+            if bool(args):
+                ret[0] = args
+        else:
             ret[0] = args
     else:
         ret['_'] = ','
         for i, item in enumerate(args):
-            if False if isinstance(item, basestring) and _undefined_re.match(item) else bool(item):
+            if isinstance(item, (basestring, StringValue)):
+                if item != 'false' and not _undefined_re.match(item):
+                    ret[i] = item
+            elif isinstance(item, (bool, BooleanValue)):
+                if bool(item):
+                    ret[i] = item
+            else:
                 ret[i] = item
     if isinstance(args, ListValue):
         args = args.value
