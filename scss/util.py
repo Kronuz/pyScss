@@ -1,4 +1,16 @@
 import re
+import sys
+import time
+
+import pstats
+import cProfile
+try:
+    from cStringIO import StringIO
+except:
+    from StringIO import StringIO
+
+from scss import config
+
 
 def split_params(params):
     params = params.split(',') or []
@@ -72,3 +84,56 @@ def normalize_var(var):
     dashes.
     """
     return var.replace('_', '-')
+
+
+################################################################################
+# Function timing decorator
+profiling = {}
+
+
+def print_timing(level=0):
+    def _print_timing(func):
+        if config.VERBOSITY:
+            def wrapper(*args, **kwargs):
+                if config.VERBOSITY >= level:
+                    t1 = time.time()
+                    res = func(*args, **kwargs)
+                    t2 = time.time()
+                    profiling.setdefault(func.func_name, 0)
+                    profiling[func.func_name] += (t2 - t1)
+                    return res
+                else:
+                    return func(*args, **kwargs)
+            return wrapper
+        else:
+            return func
+    return _print_timing
+
+
+################################################################################
+# Profiler decorator
+def profile(fn):
+    def wrapper(*args, **kwargs):
+        profiler = cProfile.Profile()
+        stream = StringIO()
+        profiler.enable()
+        try:
+            res = fn(*args, **kwargs)
+        finally:
+            profiler.disable()
+            stats = pstats.Stats(profiler, stream=stream)
+            stats.sort_stats('time')
+            print >>stream, ""
+            print >>stream, "=" * 100
+            print >>stream, "Stats:"
+            stats.print_stats()
+            print >>stream, "=" * 100
+            print >>stream, "Callers:"
+            stats.print_callers()
+            print >>stream, "=" * 100
+            print >>stream, "Callees:"
+            stats.print_callees()
+            print >>sys.stderr, stream.getvalue()
+            stream.close()
+        return res
+    return wrapper
