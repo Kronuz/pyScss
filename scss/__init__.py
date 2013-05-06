@@ -1288,8 +1288,11 @@ class Scss(object):
 
         old_ancestry = []
 
-        wrap = textwrap.TextWrapper(break_long_words=False, break_on_hyphens=False)
-        wrap.wordsep_re = re.compile(r'(?<=,)(\s*)')
+        textwrap.TextWrapper.wordsep_re = re.compile(r'(?<=,)(\s*)')
+        if hasattr(textwrap.TextWrapper, 'wordsep_simple_re'):
+            wrap = textwrap.TextWrapper(break_long_words=False, break_on_hyphens=False)
+        else:
+            wrap = textwrap.TextWrapper(break_long_words=False)
         wrap = wrap.wrap
 
         total_rules = 0
@@ -1351,8 +1354,11 @@ class Scss(object):
 
     def _print_properties(self, properties, sc=True, sp=' ', _tb='', nl='\n', wrap=None):
         if wrap is None:
-            wrap = textwrap.TextWrapper(break_long_words=False)
-            wrap.wordsep_re = re.compile(r'(?<=,)(\s*)')
+            textwrap.TextWrapper.wordsep_re = re.compile(r'(?<=,)(\s*)')
+            if hasattr(textwrap.TextWrapper, 'wordsep_simple_re'):
+                wrap = textwrap.TextWrapper(break_long_words=False, break_on_hyphens=False)
+            else:
+                wrap = textwrap.TextWrapper(break_long_words=False)
             wrap = wrap.wrap
 
         result = ''
