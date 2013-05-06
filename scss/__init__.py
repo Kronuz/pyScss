@@ -473,16 +473,15 @@ class Scss(object):
 
             if block.is_atrule:
                 code = block.directive
-                name = block.argument
                 code = code.lower()
                 if code == '@warn':
-                    value = self.calculator.calculate(block.argument, rule.context, rule)
+                    value = self.calculator.calculate(block.argument, rule, rule.context, rule.options)
                     log.warn(dequote(to_str(value)))
                 elif code == '@print':
-                    value = self.calculator.calculate(block.argument, rule.context, rule)
+                    value = self.calculator.calculate(block.argument, rule, rule.context, rule.options)
                     print >>sys.stderr, dequote(to_str(value))
                 elif code == '@raw':
-                    value = self.calculator.calculate(block.argument, rule.context, rule)
+                    value = self.calculator.calculate(block.argument, rule, rule.context, rule.options)
                     print >>sys.stderr, repr(value)
                 elif code == '@dump_context':
                     log.info(repr(rule.context))
@@ -503,11 +502,11 @@ class Scss(object):
                 elif code == '@import':
                     self._do_import(rule, p_children, scope, block)
                 elif code == '@extend':
-                    selectors = self.calculator.apply_vars(block.argument, rule.context, rule.options, rule)
+                    selectors = self.calculator.apply_vars(block.argument, rule, rule.context, rule.options)
                     rule.extends_selectors.update(p.strip() for p in selectors.replace(',', '&').split('&'))
                     rule.extends_selectors.discard('')
                 elif code == '@return':
-                    ret = self.calculator.calculate(block.argument, rule.context, rule)
+                    ret = self.calculator.calculate(block.argument, rule, rule.context, rule.options)
                     rule.options['@return'] = ret
                 elif code == '@include':
                     self._do_include(rule, p_children, scope, block)
@@ -576,12 +575,12 @@ class Scss(object):
             if param:
                 new_params.append(param)
                 if default:
-                    default = self.calculator.apply_vars(default, rule.context, None, rule)
+                    default = self.calculator.apply_vars(default, rule, rule.context, None)
                     defaults[param] = default
         context = rule.context.copy()
         for p in new_params:
             context.pop(p, None)
-        mixin = [list(new_params), defaults, self.calculator.apply_vars(block.unparsed_contents, context, None, rule)]
+        mixin = [list(new_params), defaults, self.calculator.apply_vars(block.unparsed_contents, rule, context, None)]
         if block.directive == '@function':
             def _call(mixin):
                 def __call(R, *args, **kwargs):
@@ -628,7 +627,7 @@ class Scss(object):
         Implements @include, for @mixins
         """
         funct, params, _ = block.argument.partition('(')
-        funct = self.calculator.do_glob_math(funct, rule.context, rule.options, rule, True)
+        funct = self.calculator.do_glob_math(funct, rule, rule.context, rule.options, True)
         funct = normalize_var(funct.strip())
         params = split_params(depar(params + _))
         new_params = {}
@@ -663,11 +662,11 @@ class Scss(object):
                 m_param = m_params[varname]
             except (IndexError, KeyError, TypeError):
                 m_param = varname
-            value = self.calculator.calculate(value, rule.context, rule)
+            value = self.calculator.calculate(value, rule, rule.context, rule.options)
             m_vars[m_param] = value
         for p in m_params:
             if p not in new_params and isinstance(m_vars[p], basestring):
-                value = self.calculator.calculate(m_vars[p], m_vars, rule)
+                value = self.calculator.calculate(m_vars[p], rule, m_vars, rule.options)
                 m_vars[p] = value
         _context = rule.context.copy()
         _context.update(m_vars)
@@ -873,7 +872,7 @@ class Scss(object):
         else:
             val = True
         if val:
-            val = self.calculator.calculate(block.argument, rule.context, rule)
+            val = self.calculator.calculate(block.argument, rule, rule.context, rule.options)
             val = bool(False if not val or isinstance(val, basestring) and (val in ('0', 'false', 'undefined') or _variable_re.match(val)) else val)
             if val:
                 rule.unparsed_contents = block.unparsed_contents
@@ -901,8 +900,8 @@ class Scss(object):
         frm, _, through = name.partition(' through ')
         if not through:
             frm, _, through = frm.partition(' to ')
-        frm = self.calculator.calculate(frm, rule.context, rule)
-        through = self.calculator.calculate(through, rule.context, rule)
+        frm = self.calculator.calculate(frm, rule, rule.context, rule.options)
+        through = self.calculator.calculate(through, rule, rule.context, rule.options)
         try:
             frm = int(float(frm))
             through = int(float(through))
@@ -915,7 +914,7 @@ class Scss(object):
         else:
             rev = lambda x: x
         var = var.strip()
-        var = self.calculator.do_glob_math(var, rule.context, rule.options, rule, True)
+        var = self.calculator.do_glob_math(var, rule, rule.context, rule.options, True)
         var = normalize_var(var)
 
         for i in rev(range(frm, through + 1)):
@@ -929,13 +928,13 @@ class Scss(object):
         Implements @each
         """
         var, _, name = block.argument.partition(' in ')
-        name = self.calculator.calculate(name, rule.context, rule)
+        name = self.calculator.calculate(name, rule, rule.context, rule.options)
         if not name:
             return
 
         name = ListValue(name)
         var = var.strip()
-        var = self.calculator.do_glob_math(var, rule.context, rule.options, rule, True)
+        var = self.calculator.do_glob_math(var, rule, rule.context, rule.options, True)
         var = normalize_var(var)
 
         for n, v in name.items():
@@ -954,7 +953,7 @@ class Scss(object):
     #     """
     #     first_val = None
     #     while True:
-    #         val = self.calculator.calculate(block.argument, rule.context, rule)
+    #         val = self.calculator.calculate(block.argument, rule, rule.context, rule.options)
     #         val = bool(False if not val or isinstance(val, basestring) and (val in ('0', 'false', 'undefined') or _variable_re.match(val)) else val)
     #         if first_val is None:
     #             first_val = val
@@ -985,7 +984,7 @@ class Scss(object):
         except IndexError:
             is_var = False
         prop = prop.strip()
-        prop = self.calculator.do_glob_math(prop, rule.context, rule.options, rule, True)
+        prop = self.calculator.do_glob_math(prop, rule, rule.context, rule.options, True)
         if not prop:
             return
 
@@ -998,7 +997,7 @@ class Scss(object):
                 if subs:
                     is_default = True
 
-            value = self.calculator.calculate(value, rule.context, rule)
+            value = self.calculator.calculate(value, rule, rule.context, rule.options)
 
         _prop = (scope or '') + prop
         if is_var or prop.startswith('$') and value is not None:
@@ -1013,7 +1012,7 @@ class Scss(object):
 
                 rule.context[_prop] = value
         else:
-            _prop = self.calculator.apply_vars(_prop, rule.context, rule.options, rule, True)
+            _prop = self.calculator.apply_vars(_prop, rule, rule.context, rule.options, True)
             rule.properties.append((_prop, to_str(value) if value is not None else None))
 
     @print_timing(10)
@@ -1056,7 +1055,7 @@ class Scss(object):
 
             return
 
-        raw_selectors = self.calculator.apply_vars(block.prop, rule.context, rule.options, rule, True)
+        raw_selectors = self.calculator.apply_vars(block.prop, rule, rule.context, rule.options, True)
         c_selectors, c_parents = self.parse_selectors(raw_selectors)
 
         p_selectors = rule.selectors
@@ -1397,14 +1396,14 @@ class Calculator(object):
         # TODO the library should really be part of the rule
         self.library = library
 
-    def _calculate_expr(self, context, options, rule, _dequote):
+    def _calculate_expr(self, rule, context, options, _dequote):
         def __calculate_expr(result):
             _group0 = result.group(1)
             _base_str = _group0
             better_expr_str = eval_expr(_base_str, rule, self.library)
 
             if better_expr_str is None:
-                better_expr_str = self.apply_vars(_base_str, context, options, rule)
+                better_expr_str = self.apply_vars(_base_str, rule, context, options)
             elif _dequote:
                 better_expr_str = dequote(str(better_expr_str))
             else:
@@ -1413,18 +1412,18 @@ class Calculator(object):
             return better_expr_str
         return __calculate_expr
 
-    def do_glob_math(self, cont, context, options, rule, _dequote=False):
+    def do_glob_math(self, cont, rule, context=None, options=None, _dequote=False):
         """Performs #{}-interpolation.  The result is always treated as a fixed
         syntactic unit and will not be re-evaluated.
         """
         cont = str(cont)
         if '#{' not in cont:
             return cont
-        cont = _expr_glob_re.sub(self._calculate_expr(context, options, rule, _dequote), cont)
+        cont = _expr_glob_re.sub(self._calculate_expr(rule, context, options, _dequote), cont)
         return cont
 
-    def apply_vars(self, cont, context, options=None, rule=None, _dequote=False):
-        if isinstance(cont, basestring) and '$' in cont:
+    def apply_vars(self, cont, rule, context=None, options=None, _dequote=False):
+        if context is not None and isinstance(cont, basestring) and '$' in cont:
             if cont in context:
                 # Optimization: the full cont is a variable in the context,
                 # flatten the interpolation and use it:
@@ -1460,10 +1459,10 @@ class Calculator(object):
                 cont = _interpolate_re.sub(_av, cont)
         if options is not None:
             # ...apply math:
-            cont = self.do_glob_math(cont, context, options, rule, _dequote)
+            cont = self.do_glob_math(cont, rule, context, options, _dequote)
         return cont
 
-    def calculate(self, _base_str, context, rule):
+    def calculate(self, _base_str, rule, context=None, options=None, _dequote=False):
         better_expr_str = _base_str
 
         if _skip_word_re.match(better_expr_str) and '- ' not in better_expr_str and ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
@@ -1471,12 +1470,13 @@ class Calculator(object):
 
         rule = rule.copy()
         rule.context = context
+        rule.options = options
 
-        better_expr_str = self.do_glob_math(better_expr_str, context, rule.options, rule)
+        better_expr_str = self.do_glob_math(better_expr_str, rule, context, options, _dequote)
 
         better_expr_str = eval_expr(better_expr_str, rule, self.library, True)
 
         if better_expr_str is None:
-            better_expr_str = self.apply_vars(_base_str, context, rule.options, rule)
+            better_expr_str = self.apply_vars(_base_str, rule, context, options, _dequote)
 
         return better_expr_str
