@@ -119,7 +119,7 @@ def grad_point(*p):
         vrt = NumberValue(0, '%')
     elif 'bottom' in pos:
         vrt = NumberValue(1, '%')
-    return ListValue(v for v in (hrz, vrt) if v is not None)
+    return ListValue([v for v in (hrz, vrt) if v is not None])
 
 
 def __grad_position(index, default, radial, color_stops):
