@@ -1782,8 +1782,8 @@ class Scss(object):
         old_media = None
         old_property = None
 
-        TextWrapper.wordsep_re = re.compile(r'(?<=,)(\s*)')
-        if hasattr(TextWrapper, 'wordsep_simple_re'):
+        textwrap.TextWrapper.wordsep_re = re.compile(r'(?<=,)(\s*)')
+        if hasattr(textwrap.TextWrapper, 'wordsep_simple_re'):
             wrap = textwrap.TextWrapper(break_long_words=False, break_on_hyphens=False)
         else:
             wrap = textwrap.TextWrapper(break_long_words=False)
@@ -1906,8 +1906,12 @@ class Scss(object):
 
     def _print_properties(self, properties, scope=None, old_property=None, sc=True, sp=' ', _tb='', nl='\n', wrap=None):
         if wrap is None:
-            wrap = textwrap.TextWrapper(break_long_words=False)
-            wrap.wordsep_re = re.compile(r'(?<=,)(\s*)')
+            textwrap.TextWrapper.wordsep_re = re.compile(r'(?<=,)(\s*)')
+            if hasattr(textwrap.TextWrapper, 'wordsep_simple_re'):
+                wrap = textwrap.TextWrapper(break_long_words=False, break_on_hyphens=False)
+            else:
+                wrap = textwrap.TextWrapper(break_long_words=False)
+            wrap = wrap.wrap
             wrap = wrap.wrap
         if old_property is None:
             old_property = [None]
