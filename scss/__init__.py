@@ -1409,12 +1409,12 @@ class Scss(object):
             val = True
         if val:
             val = self.calculate(name, rule[CONTEXT], rule[OPTIONS], rule)
-            if isinstance(val, basestring):
-                if val != 'false' and not _undefined_re.match(val):
+            if isinstance(val, (basestring, StringValue)):
+                if val != 'false' and not _undefined_re.match(unicode(val)):
                     val = True
                 else:
                     val = False
-            elif isinstance(val, (BooleanValue, bool)):
+            elif isinstance(val, (bool, BooleanValue)):
                 val = bool(val)
             else:
                 val = True
@@ -3691,7 +3691,7 @@ def _compact(*args):
         if isinstance(args, dict):
             for i, item in args.items():
                 if isinstance(item, (basestring, StringValue)):
-                    if item != 'false' and not _undefined_re.match(item):
+                    if item != 'false' and not _undefined_re.match(unicode(item)):
                         ret[i] = item
                 elif isinstance(item, (bool, BooleanValue)):
                     if bool(item):
@@ -3699,7 +3699,7 @@ def _compact(*args):
                 else:
                     ret[i] = item
         elif isinstance(args, (basestring, StringValue)):
-            if args != 'false' and not _undefined_re.match(args):
+            if args != 'false' and not _undefined_re.match(unicode(args)):
                 ret[0] = args
         elif isinstance(args, (bool, BooleanValue)):
             if bool(args):
@@ -3710,7 +3710,7 @@ def _compact(*args):
         ret['_'] = ','
         for i, item in enumerate(args):
             if isinstance(item, (basestring, StringValue)):
-                if item != 'false' and not _undefined_re.match(item):
+                if item != 'false' and not _undefined_re.match(unicode(item)):
                     ret[i] = item
             elif isinstance(item, (bool, BooleanValue)):
                 if bool(item):
