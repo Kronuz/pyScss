@@ -1782,8 +1782,11 @@ class Scss(object):
         old_media = None
         old_property = None
 
-        wrap = textwrap.TextWrapper(break_long_words=False, break_on_hyphens=False)
-        wrap.wordsep_re = re.compile(r'(?<=,)(\s*)')
+        TextWrapper.wordsep_re = re.compile(r'(?<=,)(\s*)')
+        if hasattr(TextWrapper, 'wordsep_simple_re'):
+            wrap = textwrap.TextWrapper(break_long_words=False, break_on_hyphens=False)
+        else:
+            wrap = textwrap.TextWrapper(break_long_words=False)
         wrap = wrap.wrap
 
         total_rules = 0
