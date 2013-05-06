@@ -3705,6 +3705,8 @@ def _reject(lst, *values):
         values = values[0]
         if isinstance(values, ListValue):
             values = values.value.values()
+        elif not isinstance(values, (list, tuple)):
+            values = list(values)
     for i, item in lst.items():
         if item not in values:
             ret[i] = item
