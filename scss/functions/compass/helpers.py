@@ -63,7 +63,7 @@ def compact(*args):
         if isinstance(args, dict):
             for i, item in args.items():
                 if isinstance(item, (basestring, StringValue)):
-                    if item != 'false' and not _undefined_re.match(item):
+                    if item != 'false' and not _undefined_re.match(unicode(item)):
                         ret[i] = item
                 elif isinstance(item, (bool, BooleanValue)):
                     if bool(item):
@@ -71,7 +71,7 @@ def compact(*args):
                 else:
                     ret[i] = item
         elif isinstance(args, (basestring, StringValue)):
-            if args != 'false' and not _undefined_re.match(args):
+            if args != 'false' and not _undefined_re.match(unicode(args)):
                 ret[0] = args
         elif isinstance(args, (bool, BooleanValue)):
             if bool(args):
@@ -82,7 +82,7 @@ def compact(*args):
         ret['_'] = ','
         for i, item in enumerate(args):
             if isinstance(item, (basestring, StringValue)):
-                if item != 'false' and not _undefined_re.match(item):
+                if item != 'false' and not _undefined_re.match(unicode(item)):
                     ret[i] = item
             elif isinstance(item, (bool, BooleanValue)):
                 if bool(item):

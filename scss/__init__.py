@@ -873,12 +873,12 @@ class Scss(object):
             val = True
         if val:
             val = self.calculator.calculate(block.argument, rule, rule.context, rule.options)
-            if isinstance(val, basestring):
-                if val != 'false' and not _undefined_re.match(val):
+            if isinstance(val, (basestring, StringValue)):
+                if val != 'false' and not _undefined_re.match(unicode(val)):
                     val = True
                 else:
                     val = False
-            elif isinstance(val, (BooleanValue, bool)):
+            elif isinstance(val, (bool, BooleanValue)):
                 val = bool(val)
             else:
                 val = True
