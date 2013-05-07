@@ -23,10 +23,10 @@ except ImportError:
     from StringIO import StringIO
 
 try:
-    from PIL import Image, ImageDraw
+    from PIL import Image
 except ImportError:
     try:
-        import Image, ImageDraw
+        import Image
     except:
         Image = None
 
@@ -35,7 +35,9 @@ log = logging.getLogger(__name__)
 COMPASS_IMAGES_LIBRARY = FunctionLibrary()
 register = COMPASS_IMAGES_LIBRARY.register
 
+
 # ------------------------------------------------------------------------------
+
 
 def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_color=None, inline=False, mime_type=None, spacing=None, collapse_x=None, collapse_y=None):
     """

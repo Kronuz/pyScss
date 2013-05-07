@@ -25,7 +25,6 @@ except ImportError:
         Image = None
 
 from scss import config
-from scss.cssdefs import _units_weights
 from scss.functions.compass import _image_size_cache
 from scss.functions.library import FunctionLibrary
 from scss.types import ColorValue, ListValue, NumberValue, QuotedStringValue, StringValue
@@ -35,6 +34,7 @@ log = logging.getLogger(__name__)
 
 COMPASS_SPRITES_LIBRARY = FunctionLibrary()
 register = COMPASS_SPRITES_LIBRARY.register
+
 
 # ------------------------------------------------------------------------------
 # Compass-like functionality for sprites and images

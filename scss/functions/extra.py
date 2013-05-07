@@ -10,8 +10,8 @@ import random
 
 from scss import config
 from scss.functions.library import FunctionLibrary
-from scss.types import ColorValue, NumberValue, StringValue
-from scss.util import escape, to_str
+from scss.types import ColorValue, NumberValue, StringValue, ListValue
+from scss.util import escape
 
 try:
     from cStringIO import StringIO
@@ -22,7 +22,8 @@ try:
     from PIL import Image, ImageDraw
 except ImportError:
     try:
-        import Image, ImageDraw
+        import Image
+        import ImageDraw
     except:
         Image = None
 
@@ -30,6 +31,7 @@ log = logging.getLogger(__name__)
 
 EXTRA_LIBRARY = FunctionLibrary()
 register = EXTRA_LIBRARY.register
+
 
 # ------------------------------------------------------------------------------
 # Image stuff
@@ -260,6 +262,7 @@ def _image_brushed(pixdata, size, density=None, intensity=None, color=None, opac
         if ca:
             pixdata[pos] = tuple(int(round(c)) for c in (col[0] / ca, col[1] / ca, col[2] / ca, ca * 255))
 
+
 @register('background-noise', 0)
 @register('background-noise', 1)
 @register('background-noise', 2)
@@ -330,6 +333,7 @@ def background_noise(density=None, opacity=None, size=None, monochrome=False, in
 
     inline = 'url("%s")' % escape(url)
     return StringValue(inline)
+
 
 @register('background-brushed', 0)
 @register('background-brushed', 1)
@@ -420,17 +424,17 @@ def background_brushed(density=None, intensity=None, color=None, opacity=None, s
 def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=None, baseline_color=None, background_color=None, inline=False):
     if not Image:
         raise Exception("Images manipulation require PIL")
-    if grid_color == None:
+    if grid_color is None:
         grid_color = (120, 170, 250, 15)
     else:
         c = ColorValue(grid_color).value
         grid_color = (c[0], c[1], c[2], int(c[3] * 255.0))
-    if baseline_color == None:
+    if baseline_color is None:
         baseline_color = (120, 170, 250, 30)
     else:
         c = ColorValue(baseline_color).value
         baseline_color = (c[0], c[1], c[2], int(c[3] * 255.0))
-    if background_color == None:
+    if background_color is None:
         background_color = (0, 0, 0, 0)
     else:
         c = ColorValue(background_color).value

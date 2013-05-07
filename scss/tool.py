@@ -8,7 +8,8 @@ import sys
 from collections import deque
 
 from scss import config
-from scss import Scss, SourceFile, log, to_str, profiling
+from scss.util import profiling
+from scss import Scss, SourceFile, log, to_str
 from scss import _prop_split_re
 from scss.rule import SassRule
 from scss.scss_meta import BUILD_INFO
