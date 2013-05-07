@@ -7,14 +7,17 @@ http://compass-style.org/reference/compass/utilities/sprites/
 from __future__ import absolute_import
 
 import base64
-import datetime
 import glob
 import hashlib
 import logging
 import os.path
-import pickle
 import tempfile
 import time
+
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 
 try:
     from PIL import Image
