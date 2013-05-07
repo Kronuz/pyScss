@@ -62,6 +62,8 @@ def main():
                       help="Assets root path (Sprite images will be created here)")
     paths_group.add_option("-a", "--assets-url", metavar="URL", dest="assets_url",
                       help="URL to reach the files in your assets_root")
+    paths_group.add_option("--cache-root", metavar="PATH", dest="cache_root",
+                      help="Cache root path (Cache files will be created here)")
     parser.add_option_group(paths_group)
 
     (options, args) = parser.parse_args()
@@ -74,6 +76,8 @@ def main():
         config.STATIC_ROOT = options.static_root
     if options.assets_root is not None:
         config.ASSETS_ROOT = options.assets_root
+    if options.cache_root is not None:
+        config.CACHE_ROOT = options.cache_root
     if options.load_paths is not None:
         # TODO: Convert global LOAD_PATHS to a list. Use it directly.
         # Doing the above will break backwards compatibility!

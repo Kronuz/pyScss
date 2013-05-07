@@ -96,7 +96,8 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
         key = (filetime, src_color, dst_color, spacing)
         key = file_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + file_ext
-        asset_path = os.path.join(config.ASSETS_ROOT, asset_file)
+        ASSETS_ROOT = config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets')
+        asset_path = os.path.join(ASSETS_ROOT, asset_file)
 
         if os.path.exists(asset_path):
             filepath = asset_file

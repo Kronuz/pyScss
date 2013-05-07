@@ -317,7 +317,7 @@ def background_noise(density=None, opacity=None, size=None, monochrome=False, in
         # asset_file += '-[%s][%s]' % ('-'.join(to_str(s).replace('.', '_') for s in density or []), '-'.join(to_str(s).replace('.', '_') for s in opacity or []))
         asset_file += '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file += '.png'
-        asset_path = os.path.join(config.ASSETS_ROOT, asset_file)
+        asset_path = os.path.join(config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets'), asset_file)
         try:
             new_image.save(asset_path)
         except IOError:
@@ -401,7 +401,7 @@ def background_brushed(density=None, intensity=None, color=None, opacity=None, s
         # asset_file += '-[%s][%s][%s]' % ('-'.join(to_str(s).replace('.', '_') for s in density or []), '-'.join(to_str(s).replace('.', '_') for s in opacity or []), '-'.join(to_str(s).replace('.', '_') for s in direction or []))
         asset_file += '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file += '.png'
-        asset_path = os.path.join(config.ASSETS_ROOT, asset_file)
+        asset_path = os.path.join(config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets'), asset_file)
         try:
             new_image.save(asset_path)
         except IOError:
@@ -468,7 +468,7 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
         key = (columns, grid_color, baseline_color, background_color)
         key = grid_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
-        asset_path = os.path.join(config.ASSETS_ROOT, asset_file)
+        asset_path = os.path.join(config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets'), asset_file)
         try:
             new_image.save(asset_path)
         except IOError:
