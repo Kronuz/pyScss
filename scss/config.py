@@ -16,3 +16,5 @@ STATIC_URL = '/static/'
 ASSETS_URL = '/static/assets/'
 VERBOSITY = 1
 DEBUG = 0
+
+SPRTE_MAP_DIRECTION = 'vertical'

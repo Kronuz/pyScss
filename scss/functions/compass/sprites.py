@@ -29,11 +29,15 @@ except ImportError:
 
 from scss import config
 from scss.functions.compass import _image_size_cache
+from scss.functions.compass.layouts import PackedSpritesLayout, HorizontalSpritesLayout, VerticalSpritesLayout, DiagonalSpritesLayout
 from scss.functions.library import FunctionLibrary
 from scss.types import ColorValue, ListValue, NumberValue, QuotedStringValue, StringValue
 from scss.util import escape
 
 log = logging.getLogger(__name__)
+
+MAX_SPRITE_MAPS = 4096
+KEEP_SPRITE_MAPS = int(MAX_SPRITE_MAPS * 0.8)
 
 COMPASS_SPRITES_LIBRARY = FunctionLibrary()
 register = COMPASS_SPRITES_LIBRARY.register
@@ -51,13 +55,15 @@ def sprite_map(g, **kwargs):
     Generates a sprite map from the files matching the glob pattern.
     Uses the keyword-style arguments passed in to control the placement.
     """
-    g = StringValue(g).value
-
     if not Image:
         raise Exception("Images manipulation require PIL")
 
+    now_time = time.time()
+
+    g = StringValue(g).value
+
     if g in sprite_maps:
-        sprite_maps[glob]['*'] = datetime.datetime.now()
+        sprite_maps[glob]['*'] = now_time
     elif '..' not in g:  # Protect against going to prohibited places...
         if callable(config.STATIC_ROOT):
             glob_path = g
@@ -76,15 +82,15 @@ def sprite_map(g, **kwargs):
         key = list(zip(*files)[0]) + [repr(kwargs), config.ASSETS_URL]
         key = map_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + '.png'
-        asset_path = os.path.join(config.ASSETS_ROOT, asset_file)
-
-        times = {}
-        max_time = 0
+        ASSETS_ROOT = config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets')
+        asset_path = os.path.join(ASSETS_ROOT, asset_file)
+        cache_path = os.path.join(config.CACHE_ROOT or ASSETS_ROOT, asset_file + '.cache')
 
         try:
-            max_time, asset, map, sizes = pickle.load(open(asset_path + '.cache'))
+            save_time, asset, map, sizes = pickle.load(open(cache_path))
             sprite_maps[asset] = map
         except:
+            save_time = 0
             map = None
 
         for file_, storage in files:
@@ -93,20 +99,37 @@ def sprite_map(g, **kwargs):
                 _time = time.mktime(d_obj.timetuple())
             else:
                 _time = os.path.getmtime(file_)
-            times[file_] = _time
-            if max_time < _time:
-                max_time = _time
+            if save_time < _time:
+                if _time > now_time:
+                    log.warning("File '%s' has a date in the future (cache ignored)" % file_)
                 map = None  # Invalidate cached sprite map
                 break
 
         if map is None:
-            direction = kwargs.get('direction', 'vertical')
+            direction = kwargs.get('direction', config.SPRTE_MAP_DIRECTION)
             repeat = StringValue(kwargs.get('repeat', 'no-repeat'))
+            collapse_x = collapse_y = int(NumberValue(kwargs.get('collapse', 0)).value)
+            if 'collapse_x' in kwargs:
+                collapse_x = int(NumberValue(kwargs['collapse_x']).value)
+            if 'collapse_y' in kwargs:
+                collapse_y = int(NumberValue(kwargs['collapse_y']).value)
+
             position = NumberValue(kwargs.get('position', 0))
-            collapse_x = NumberValue(kwargs.get('collapse_x', 0))
-            collapse_y = NumberValue(kwargs.get('collapse_y', 0))
-            if position and position > -1 and position < 1:
-                position.units = {'%': _units_weights.get('%', 1), '_': '%'}
+            if position.units.get('_') != '%' and position.value > 1:
+                position = position.value / 100.0
+            else:
+                position = position.value
+            if position < 0:
+                position = 0.0
+            elif position > 1:
+                position = 1.0
+
+            spacing = kwargs.get('spacing', 0)
+            if isinstance(spacing, ListValue):
+                spacing = [int(NumberValue(v).value) for n, v in spacing.items()]
+            else:
+                spacing = [int(NumberValue(spacing).value)]
+            spacing = (spacing * 4)[:4]
 
             dst_colors = kwargs.get('dst_color')
             if isinstance(dst_colors, ListValue):
@@ -124,46 +147,22 @@ def sprite_map(g, **kwargs):
             dst_colors = (dst_colors * len_colors)[:len_colors]
             src_colors = (src_colors * len_colors)[:len_colors]
 
-            spacing = kwargs.get('spacing', 0)
-            if isinstance(spacing, ListValue):
-                spacing = [int(NumberValue(v).value) for n, v in spacing.items()]
-            else:
-                spacing = [int(NumberValue(spacing).value)]
-            spacing = (spacing * 4)[:4]
-
-            def images():
-                for file_, storage in files:
+            def images(f=lambda x: x):
+                for file_, storage in f(files):
                     if storage is not None:
                         _file = storage.open(file_)
                     else:
                         _file = file_
                     _image = Image.open(_file)
-                    try:
-                        _time = times[file_]
-                    except KeyError:
-                        if storage is not None:
-                            d_obj = storage.modified_time(file_)
-                            _time = time.mktime(d_obj.timetuple())
-                        else:
-                            _time = os.path.getmtime(file_)
-                    times[file_] = _time
-                    yield _time, _image
+                    yield _image
 
             names = tuple(os.path.splitext(os.path.basename(file_))[0] for file_, storage in files)
-            positions = []
+
             spacings = []
-            tot_spacings = []
 
             for name in names:
                 name = name.replace('-', '_')
-                _position = kwargs.get(name + '_position')
-                if _position is None:
-                    _position = position
-                else:
-                    _position = NumberValue(_position)
-                    if _position and _position > -1 and _position < 1:
-                        _position.units = {'%': _units_weights.get('%', 1), '_': '%'}
-                positions.append(_position)
+
                 _spacing = kwargs.get(name + '_spacing')
                 if _spacing is None:
                     _spacing = spacing
@@ -174,163 +173,93 @@ def sprite_map(g, **kwargs):
                         _spacing = [int(NumberValue(_spacing).value)]
                     _spacing = (_spacing * 4)[:4]
                 spacings.append(_spacing)
-                if _position and _position.unit != '%':
-                    if direction == 'vertical':
-                        if _position > 0:
-                            tot_spacings.append((_spacing[0], _spacing[1], _spacing[2], _spacing[3] + _position))
-                    elif direction == 'horizontal':
-                        if _position > 0:
-                            tot_spacings.append((_spacing[0] + _position, _spacing[1], _spacing[2], _spacing[3]))
-                    elif direction == 'diagonal':
-                        if _position > 0:
-                            tot_spacings.append((_spacing[0] + _position, _spacing[1], _spacing[2], _spacing[3] + _position))
-                else:
-                    tot_spacings.append(_spacing)
 
-            sizes = tuple((collapse_x or i.size[0], collapse_y or i.size[1]) for t, i in images())
+            sizes = tuple((collapse_x or i.size[0], collapse_y or i.size[1]) for i in images())
 
-            _spacings = zip(*tot_spacings)
-            if direction == 'vertical':
-                width = max(zip(*sizes)[0]) + max(_spacings[1]) + max(_spacings[3])
-                height = sum(zip(*sizes)[1]) + sum(_spacings[0]) + sum(_spacings[2])
-            elif direction == 'horizontal':
-                width = sum(zip(*sizes)[0]) + sum(_spacings[1]) + sum(_spacings[3])
-                height = max(zip(*sizes)[1]) + max(_spacings[0]) + max(_spacings[2])
+            if direction == 'horizontal':
+                layout = HorizontalSpritesLayout(sizes, spacings, position=position)
+            elif direction == 'vertical':
+                layout = VerticalSpritesLayout(sizes, spacings, position=position)
             elif direction == 'diagonal':
-                width = sum(zip(*sizes)[0]) + sum(_spacings[1]) + sum(_spacings[3])
-                height = sum(zip(*sizes)[1]) + sum(_spacings[0]) + sum(_spacings[2])
+                layout = DiagonalSpritesLayout(sizes, spacings)
+            elif direction == 'smart':
+                layout = PackedSpritesLayout(sizes, spacings)
             else:
-                raise NotImplementedError("Direction not implemented!")
+                raise Exception("Invalid direction %s" % direction)
+            layout_positions = list(layout)
 
             new_image = Image.new(
                 mode='RGBA',
-                size=(width, height),
+                size=(layout.width, layout.height),
                 color=(0, 0, 0, 0)
             )
 
             offsets_x = []
             offsets_y = []
-            offset_x = 0
-            offset_y = 0
-            for i, (im_time, image) in enumerate(images()):
-                if max_time < im_time:
-                    max_time = im_time
-                spacing = spacings[i]
-                position = positions[i]
+            for i, image in enumerate(images()):
+                x, y, width, height, cssx, cssy, cssw, cssh = layout_positions[i]
                 iwidth, iheight = image.size
-                width, height = sizes[i]
-                if direction == 'vertical':
-                    if position and position.unit == '%':
-                        x = width * position.value - (spacing[3] + height + spacing[1])
-                    elif position.value < 0:
-                        x = width + position.value - (spacing[3] + height + spacing[1])
-                    else:
-                        x = position.value
-                    offset_y += spacing[0]
-                    for i, dst_color in enumerate(dst_colors):
-                        src_color = src_colors[i]
-                        pixdata = image.load()
-                        for _y in xrange(image.size[1]):
-                            for _x in xrange(image.size[0]):
-                                pixel = pixdata[_x, _y]
-                                if pixel[:3] == src_color:
-                                    pixdata[_x, _y] = tuple([int(c) for c in dst_color] + [pixel[3] if len(pixel) == 4 else 255])
-                    if iwidth != width or iheight != height:
-                        cy = 0
-                        while cy < iheight:
-                            cx = 0
-                            while cx < iwidth:
-                                cropped_image = image.crop((cx, cy, cx + width, cy + height))
-                                new_image.paste(cropped_image, (int(x + spacing[3]), offset_y), cropped_image)
-                                cx += width
-                            cy += height
-                    else:
-                        new_image.paste(image, (int(x + spacing[3]), offset_y))
-                    offsets_x.append(x)
-                    offsets_y.append(offset_y - spacing[0])
-                    offset_y += height + spacing[2]
-                elif direction == 'horizontal':
-                    if position and position.unit == '%':
-                        y = height * position.value - (spacing[0] + height + spacing[2])
-                    elif position.value < 0:
-                        y = height + position.value - (spacing[0] + height + spacing[2])
-                    else:
-                        y = position.value
-                    offset_x += spacing[3]
-                    for i, dst_color in enumerate(dst_colors):
-                        src_color = src_colors[i]
-                        pixdata = image.load()
-                        for _y in xrange(image.size[1]):
-                            for _x in xrange(image.size[0]):
-                                pixel = pixdata[_x, _y]
-                                if pixel[:3] == src_color:
-                                    pixdata[_x, _y] = tuple([int(c) for c in dst_color] + [pixel[3] if len(pixel) == 4 else 255])
-                    if iwidth != width or iheight != height:
-                        cy = 0
-                        while cy < iheight:
-                            cx = 0
-                            while cx < iwidth:
-                                cropped_image = image.crop((cx, cy, cx + width, cy + height))
-                                new_image.paste(cropped_image, (offset_x, int(y + spacing[0])), cropped_image)
-                                cx += width
-                            cy += height
-                    else:
-                        new_image.paste(image, (offset_x, int(y + spacing[0])))
-                    offsets_x.append(offset_x - spacing[3])
-                    offsets_y.append(y)
-                    offset_x += width + spacing[1]
-                elif direction == 'diagonal':
-                    offset_x += spacing[3]
-                    offset_y += spacing[0]
-                    for i, dst_color in enumerate(dst_colors):
-                        src_color = src_colors[i]
-                        pixdata = image.load()
-                        for _y in xrange(image.size[1]):
-                            for _x in xrange(image.size[0]):
-                                pixel = pixdata[_x, _y]
-                                if pixel[:3] == src_color:
-                                    pixdata[_x, _y] = tuple([int(c) for c in dst_color] + [pixel[3] if len(pixel) == 4 else 255])
-                    if iwidth != width or iheight != height:
-                        cy = 0
-                        while cy < iheight:
-                            cx = 0
-                            while cx < iwidth:
-                                cropped_image = image.crop((cx, cy, cx + width, cy + height))
-                                new_image.paste(cropped_image, (offset_x, offset_y), cropped_image)
-                                cx += width
-                            cy += height
-                    else:
-                        new_image.paste(image, (offset_x, offset_y))
-                    offsets_x.append(offset_x - spacing[3])
-                    offsets_y.append(offset_y - spacing[0])
-                    offset_x += width + spacing[1]
-                    offset_y += height + spacing[2]
+
+                if iwidth != width or iheight != height:
+                    cy = 0
+                    while cy < iheight:
+                        cx = 0
+                        while cx < iwidth:
+                            cropped_image = image.crop((cx, cy, cx + width, cy + height))
+                            new_image.paste(cropped_image, (x, y), cropped_image)
+                            cx += width
+                        cy += height
+                else:
+                    new_image.paste(image, (x, y))
+                offsets_x.append(cssx)
+                offsets_y.append(cssy)
+
+            if dst_colors:
+                useless = True
+                pixdata = new_image.load()
+                for _y in xrange(iheight):
+                    for _x in xrange(iwidth):
+                        pixel = pixdata[_x, _y]
+                        rgb = pixel[:3]
+                        a = pixel[3]
+                        for i, dst_color in enumerate(dst_colors):
+                            if rgb == src_colors[i]:
+                                if a:
+                                    new_color = tuple([int(c) for c in dst_color] + [a])
+                                    if pixel != new_color:
+                                        pixdata[_x, _y] = new_color
+                                        useless = False
+                                break
+                if useless:
+                    log.warning("Useless use of dst_color in sprite map for files at '%s' (never used)" % glob_path)
+
             try:
                 new_image.save(asset_path)
             except IOError:
                 log.exception("Error while saving image")
-            filetime = int(time.mktime(datetime.datetime.now().timetuple()))
 
+            filetime = int(now_time)
             url = '%s%s?_=%s' % (config.ASSETS_URL, asset_file, filetime)
             asset = 'url("%s") %s' % (escape(url), repeat)
-            # Use the sorted list to remove older elements (keep only 500 objects):
-            if len(sprite_maps) > 1000:
-                for a in sorted(sprite_maps, key=lambda a: sprite_maps[a]['*'], reverse=True)[500:]:
-                    del sprite_maps[a]
+
             # Add the new object:
             map = dict(zip(names, zip(sizes, rfiles, offsets_x, offsets_y)))
-            map['*'] = datetime.datetime.now()
+            map['*'] = now_time
             map['*f*'] = asset_file
             map['*k*'] = key
             map['*n*'] = map_name
             map['*t*'] = filetime
 
-            tmp_dir = config.ASSETS_ROOT
-            cache_tmp = tempfile.NamedTemporaryFile(delete=False, dir=tmp_dir)
-            pickle.dump((max_time, asset, map, zip(files, sizes)), cache_tmp)
+            cache_tmp = tempfile.NamedTemporaryFile(delete=False, dir=ASSETS_ROOT)
+            pickle.dump((now_time, asset, map, zip(files, sizes)), cache_tmp)
             cache_tmp.close()
-            os.rename(cache_tmp.name, asset_path + '.cache')
+            os.rename(cache_tmp.name, cache_path)
 
+            # Use the sorted list to remove older elements (keep only 500 objects):
+            if len(sprite_maps) > MAX_SPRITE_MAPS:
+                for a in sorted(sprite_maps, key=lambda a: sprite_maps[a]['*'], reverse=True)[KEEP_SPRITE_MAPS:]:
+                    del sprite_maps[a]
+                log.warning("Exceeded maximum number of sprite maps (%s)" % MAX_SPRITE_MAPS)
             sprite_maps[asset] = map
         for file_, size in sizes:
             _image_size_cache[file_] = size
