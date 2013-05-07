@@ -217,8 +217,8 @@ def sprite_map(g, **kwargs):
             if dst_colors:
                 useless = True
                 pixdata = new_image.load()
-                for _y in xrange(iheight):
-                    for _x in xrange(iwidth):
+                for _y in xrange(layout.height):
+                    for _x in xrange(layout.width):
                         pixel = pixdata[_x, _y]
                         rgb = pixel[:3]
                         a = pixel[3]
