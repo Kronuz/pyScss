@@ -99,6 +99,11 @@ class SpritesLayout(object):
 
 class PackedSpritesLayout(SpritesLayout):
     @staticmethod
+    def MAXSIDE(a, b):
+        """maxside: Sort pack by maximum sides"""
+        return cmp(max(b[0], b[1]), max(a[0], a[1])) or cmp(min(b[0], b[1]), min(a[0], a[1])) or cmp(b[1], a[1]) or cmp(b[0], a[0])
+
+    @staticmethod
     def WIDTH(a, b):
         """width: Sort pack by width"""
         return cmp(b[0], a[0]) or cmp(b[1], a[1])
@@ -113,18 +118,13 @@ class PackedSpritesLayout(SpritesLayout):
         """area: Sort pack by area"""
         return cmp(b[0] * b[1], a[0] * a[1]) or cmp(b[1], a[1]) or cmp(b[0], a[0])
 
-    @staticmethod
-    def MAXSIDE(a, b):
-        """maxside: Sort pack by maximum sides"""
-        return cmp(max(b[0], b[1]), max(a[0], a[1])) or cmp(min(b[0], b[1]), min(a[0], a[1])) or cmp(b[1], a[1]) or cmp(b[0], a[0])
-
     def __init__(self, blocks, margin=None, padding=None, pmargin=None, ppadding=None, methods=None):
         super(PackedSpritesLayout, self).__init__(blocks, margin, padding, pmargin, ppadding)
 
         ratio = 0
 
         if methods is None:
-            methods = (self.WIDTH, self.HEIGHT, self.AREA, self.MAXSIDE)
+            methods = (self.MAXSIDE, self.WIDTH, self.HEIGHT, self.AREA)
 
         for method in methods:
             sorted_blocks = sorted(
@@ -159,12 +159,14 @@ class PackedSpritesLayout(SpritesLayout):
                 area += node.area
 
             this_ratio = area / float(root.w * root.h)
+            # print method.__doc__, "%g%%" % (this_ratio * 100)
             if ratio < this_ratio:
-                ratio = this_ratio
                 self.root = root
                 self.nodes = nodes
                 self.method = method
-
+                ratio = this_ratio
+                if ratio > 0.96:
+                    break
         # print self.method.__doc__, "%g%%" % (ratio * 100)
 
     def __iter__(self):
