@@ -79,17 +79,13 @@ class SpritesLayout(object):
         elif not isinstance(ppadding[0], (tuple, list)):
             ppadding = [ppadding] * self.num_blocks
 
-        try:
-            self.blocks = tuple((
-                b[0] + padding[i][3] + padding[i][1] + margin[i][3] + margin[i][1] + int(round(b[0] * (ppadding[i][3] + ppadding[i][1] + pmargin[i][3] + pmargin[i][1]))),
-                b[1] + padding[i][0] + padding[i][2] + margin[i][0] + margin[i][2] + int(round(b[1] * (ppadding[i][0] + ppadding[i][2] + pmargin[i][0] + pmargin[i][2]))),
-                b[0],
-                b[1],
-                i
-            ) for i, b in enumerate(blocks))
-        except:
-            print len(margin), self.num_blocks
-            raise
+        self.blocks = tuple((
+            b[0] + padding[i][3] + padding[i][1] + margin[i][3] + margin[i][1] + int(round(b[0] * (ppadding[i][3] + ppadding[i][1] + pmargin[i][3] + pmargin[i][1]))),
+            b[1] + padding[i][0] + padding[i][2] + margin[i][0] + margin[i][2] + int(round(b[1] * (ppadding[i][0] + ppadding[i][2] + pmargin[i][0] + pmargin[i][2]))),
+            b[0],
+            b[1],
+            i
+        ) for i, b in enumerate(blocks))
 
         self.margin = margin
         self.padding = padding
