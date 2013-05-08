@@ -223,6 +223,7 @@ def sprite_map(g, **kwargs):
 
             names = tuple(os.path.splitext(os.path.basename(file_))[0] for file_, storage in files)
 
+            has_dst_colors = False
             all_dst_colors = []
             all_src_colors = []
             all_positions = []
@@ -260,7 +261,10 @@ def sprite_map(g, **kwargs):
                 _dst_colors = kwargs.get(name + '_dst_color')
                 if _dst_colors is None:
                     _dst_colors = dst_colors
+                    if dst_colors:
+                        has_dst_colors = True
                 else:
+                    has_dst_colors = True
                     if isinstance(_dst_colors, ListValue):
                         _dst_colors = [list(ColorValue(v).value[:3]) for n, v in _dst_colors.items() if v]
                     else:
@@ -299,19 +303,20 @@ def sprite_map(g, **kwargs):
                 color=(0, 0, 0, 0)
             )
 
-            useless = True
+            useless_dst_color = has_dst_colors
+
             offsets_x = []
             offsets_y = []
             for i, image in enumerate(images()):
                 x, y, width, height, cssx, cssy, cssw, cssh = layout_positions[i]
                 iwidth, iheight = image.size
 
-                if all_dst_colors:
+                if has_dst_colors:
                     pixdata = image.load()
                     for _y in xrange(iheight):
                         for _x in xrange(iwidth):
                             pixel = pixdata[_x, _y]
-                            a = pixel[3]
+                            a = pixel[3] if len(pixel) == 4 else 255
                             if a:
                                 rgb = pixel[:3]
                                 for j, dst_color in enumerate(all_dst_colors[i]):
@@ -319,7 +324,7 @@ def sprite_map(g, **kwargs):
                                         new_color = tuple([int(c) for c in dst_color] + [a])
                                         if pixel != new_color:
                                             pixdata[_x, _y] = new_color
-                                            useless = False
+                                            useless_dst_color = False
                                         break
 
                 if iwidth != width or iheight != height:
@@ -335,8 +340,8 @@ def sprite_map(g, **kwargs):
                 offsets_x.append(cssx)
                 offsets_y.append(cssy)
 
-                if useless:
-                    log.warning("Useless use of $dst-color in sprite map for files at '%s' (never used)" % glob_path)
+            if useless_dst_color:
+                log.warning("Useless use of $dst-color in sprite map for files at '%s' (never used for)" % glob_path)
 
             try:
                 new_image.save(asset_path)
