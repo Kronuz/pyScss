@@ -49,6 +49,47 @@ register = COMPASS_SPRITES_LIBRARY.register
 sprite_maps = {}
 
 
+def alpha_composite(im1, im2, offset=None, box=None, opacity=1):
+    im1size = im1.size
+    im2size = im2.size
+    if offset is None:
+        offset = (0, 0)
+    if box is None:
+        box = (0, 0) + im2size
+    o1x, o1y = offset
+    o2x, o2y, o2w, o2h = box
+    width = o2w - o2x
+    height = o2h - o2y
+    im1_data = im1.load()
+    im2_data = im2.load()
+    for y in xrange(height):
+        for x in xrange(width):
+            pos1 = o1x + x, o1y + y
+            if pos1[0] >= im1size[0] or pos1[1] >= im1size[1]:
+                continue
+            pos2 = o2x + x, o2y + y
+            if pos2[0] >= im2size[0] or pos2[1] >= im2size[1]:
+                continue
+            dr, dg, db, da = im1_data[pos1]
+            sr, sg, sb, sa = im2_data[pos2]
+            da /= 255.0
+            sa /= 255.0
+            sa *= opacity
+            ida = da * (1 - sa)
+            oa = (sa + ida)
+            if oa:
+                pixel = (
+                    int(round((sr * sa + dr * ida)) / oa),
+                    int(round((sg * sa + dg * ida)) / oa),
+                    int(round((sb * sa + db * ida)) / oa),
+                    int(round(255 * oa))
+                )
+            else:
+                pixel = (0, 0, 0, 0)
+            im1_data[pos1] = pixel
+    return im1
+
+
 @register('sprite-map', 1)
 def sprite_map(g, **kwargs):
     """
@@ -256,34 +297,17 @@ def sprite_map(g, **kwargs):
                 color=(0, 0, 0, 0)
             )
 
-            pasted = []
+            useless = True
             offsets_x = []
             offsets_y = []
             for i, image in enumerate(images()):
                 x, y, width, height, cssx, cssy, cssw, cssh = layout_positions[i]
                 iwidth, iheight = image.size
 
-                if iwidth != width or iheight != height:
-                    cy = 0
-                    while cy < iheight:
-                        cx = 0
-                        while cx < iwidth:
-                            cropped_image = image.crop((cx, cy, cx + width, cy + height))
-                            new_image.paste(cropped_image, (x, y), cropped_image)
-                            cx += width
-                        cy += height
-                else:
-                    new_image.paste(image, (x, y))
-                offsets_x.append(cssx)
-                offsets_y.append(cssy)
-                pasted.append((x, y, width, height))
-
-            if all_dst_colors:
-                useless = True
-                pixdata = new_image.load()
-                for i, (x, y, width, height) in enumerate(pasted):
-                    for _y in xrange(y, y + height):
-                        for _x in xrange(x, x + width):
+                if all_dst_colors:
+                    pixdata = image.load()
+                    for _y in xrange(iheight):
+                        for _x in xrange(iwidth):
                             pixel = pixdata[_x, _y]
                             a = pixel[3]
                             if a:
@@ -295,6 +319,20 @@ def sprite_map(g, **kwargs):
                                             pixdata[_x, _y] = new_color
                                             useless = False
                                         break
+
+                if iwidth != width or iheight != height:
+                    cy = 0
+                    while cy < iheight:
+                        cx = 0
+                        while cx < iwidth:
+                            new_image = alpha_composite(new_image, image, (x, y), (cx, cy, cx + width, cy + height))
+                            cx += width
+                        cy += height
+                else:
+                    new_image.paste(image, (x, y))
+                offsets_x.append(cssx)
+                offsets_y.append(cssy)
+
                 if useless:
                     log.warning("Useless use of $dst-color in sprite map for files at '%s' (never used)" % glob_path)
 
