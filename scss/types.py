@@ -482,6 +482,18 @@ class ListValue(Value):
                 return v
         return v
 
+    def args(self):
+        return zip(*sorted((k, v) for k, v in self.value.items() if k != '_' and isinstance(k, int)))[1]
+
+    def kwargs(self):
+        return dict((k, v) for k, v in self.value.items() if k != '_' and not isinstance(k, int))
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self.args()[key]
+        else:
+            return self.kwargs()[key]
+
 
 class ColorValue(Value):
     HEX2RGBA = {
