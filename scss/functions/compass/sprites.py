@@ -145,26 +145,28 @@ def sprite_map(g, **kwargs):
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
         cache_path = os.path.join(config.CACHE_ROOT or ASSETS_ROOT, asset_file + '.cache')
 
-        try:
-            save_time, asset, map, sizes = pickle.load(open(cache_path))
-            sprite_maps[asset] = map
-        except:
-            save_time = 0
-            map = None
+        sprite_map = None
+        if os.path.exists(asset_path):
+            try:
+                save_time, asset, sprite_map, sizes = pickle.load(open(cache_path))
+                sprite_maps[asset] = sprite_map
+            except:
+                pass
 
-        for file_, storage in files:
-            if storage is not None:
-                d_obj = storage.modified_time(file_)
-                _time = time.mktime(d_obj.timetuple())
-            else:
-                _time = os.path.getmtime(file_)
-            if save_time < _time:
-                if _time > now_time:
-                    log.warning("File '%s' has a date in the future (cache ignored)" % file_)
-                map = None  # Invalidate cached sprite map
-                break
+            if sprite_map:
+                for file_, storage in files:
+                    if storage is not None:
+                        d_obj = storage.modified_time(file_)
+                        _time = time.mktime(d_obj.timetuple())
+                    else:
+                        _time = os.path.getmtime(file_)
+                    if save_time < _time:
+                        if _time > now_time:
+                            log.warning("File '%s' has a date in the future (cache ignored)" % file_)
+                        sprite_map = None  # Invalidate cached sprite map
+                        break
 
-        if map is None:
+        if sprite_map is None:
             direction = kwargs.get('direction', config.SPRTE_MAP_DIRECTION)
             repeat = StringValue(kwargs.get('repeat', 'no-repeat'))
             collapse = kwargs.get('collapse') or 0
@@ -346,15 +348,15 @@ def sprite_map(g, **kwargs):
             asset = 'url("%s") %s' % (escape(url), repeat)
 
             # Add the new object:
-            map = dict(zip(names, zip(sizes, rfiles, offsets_x, offsets_y)))
-            map['*'] = now_time
-            map['*f*'] = asset_file
-            map['*k*'] = key
-            map['*n*'] = map_name
-            map['*t*'] = filetime
+            sprite_map = dict(zip(names, zip(sizes, rfiles, offsets_x, offsets_y)))
+            sprite_map['*'] = now_time
+            sprite_map['*f*'] = asset_file
+            sprite_map['*k*'] = key
+            sprite_map['*n*'] = map_name
+            sprite_map['*t*'] = filetime
 
             cache_tmp = tempfile.NamedTemporaryFile(delete=False, dir=ASSETS_ROOT)
-            pickle.dump((now_time, asset, map, zip(files, sizes)), cache_tmp)
+            pickle.dump((now_time, asset, sprite_map, zip(files, sizes)), cache_tmp)
             cache_tmp.close()
             os.rename(cache_tmp.name, cache_path)
 
@@ -363,7 +365,7 @@ def sprite_map(g, **kwargs):
                 for a in sorted(sprite_maps, key=lambda a: sprite_maps[a]['*'], reverse=True)[KEEP_SPRITE_MAPS:]:
                     del sprite_maps[a]
                 log.warning("Exceeded maximum number of sprite maps (%s)" % MAX_SPRITE_MAPS)
-            sprite_maps[asset] = map
+            sprite_maps[asset] = sprite_map
         for file_, size in sizes:
             _image_size_cache[file_] = size
     ret = StringValue(asset)
