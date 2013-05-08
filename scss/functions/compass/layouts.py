@@ -48,7 +48,7 @@ class LayoutNode(object):
 
 
 class SpritesLayout(object):
-    def __init__(self, blocks, margin=None, padding=None, pmargin=None, ppadding=None):
+    def __init__(self, blocks, padding=None, margin=None, ppadding=None, pmargin=None):
         self.num_blocks = len(blocks)
 
         if margin is None:
@@ -114,8 +114,8 @@ class PackedSpritesLayout(SpritesLayout):
         """area: Sort pack by area"""
         return cmp(b[0] * b[1], a[0] * a[1]) or cmp(b[1], a[1]) or cmp(b[0], a[0])
 
-    def __init__(self, blocks, margin=None, padding=None, pmargin=None, ppadding=None, methods=None):
-        super(PackedSpritesLayout, self).__init__(blocks, margin, padding, pmargin, ppadding)
+    def __init__(self, blocks, padding=None, margin=None, ppadding=None, pmargin=None, methods=None):
+        super(PackedSpritesLayout, self).__init__(blocks, padding, margin, ppadding, pmargin)
 
         ratio = 0
 
@@ -264,8 +264,8 @@ class PackedSpritesLayout(SpritesLayout):
 
 
 class HorizontalSpritesLayout(SpritesLayout):
-    def __init__(self, blocks, margin=None, padding=None, pmargin=None, ppadding=None, position=None):
-        super(HorizontalSpritesLayout, self).__init__(blocks, margin, padding, pmargin, ppadding)
+    def __init__(self, blocks, padding=None, margin=None, ppadding=None, pmargin=None, position=None):
+        super(HorizontalSpritesLayout, self).__init__(blocks, padding, margin, ppadding, pmargin)
 
         self.width = sum(zip(*self.blocks)[0])
         self.height = max(zip(*self.blocks)[1])
@@ -294,8 +294,8 @@ class HorizontalSpritesLayout(SpritesLayout):
 
 
 class VerticalSpritesLayout(SpritesLayout):
-    def __init__(self, blocks, margin=None, padding=None, pmargin=None, ppadding=None, position=None):
-        super(VerticalSpritesLayout, self).__init__(blocks, margin, padding, pmargin, ppadding)
+    def __init__(self, blocks, padding=None, margin=None, ppadding=None, pmargin=None, position=None):
+        super(VerticalSpritesLayout, self).__init__(blocks, padding, margin, ppadding, pmargin)
 
         self.width = max(zip(*self.blocks)[0])
         self.height = sum(zip(*self.blocks)[1])
@@ -324,8 +324,8 @@ class VerticalSpritesLayout(SpritesLayout):
 
 
 class DiagonalSpritesLayout(SpritesLayout):
-    def __init__(self, blocks, margin=None, padding=None, pmargin=None, ppadding=None):
-        super(DiagonalSpritesLayout, self).__init__(blocks, margin, padding, pmargin, ppadding)
+    def __init__(self, blocks, padding=None, margin=None, ppadding=None, pmargin=None):
+        super(DiagonalSpritesLayout, self).__init__(blocks, padding, margin, ppadding, pmargin)
         self.width = sum(zip(*self.blocks)[0])
         self.height = sum(zip(*self.blocks)[1])
 

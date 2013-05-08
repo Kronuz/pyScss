@@ -101,8 +101,8 @@ def sprite_map(g, **kwargs):
     $position - For `horizontal` and `vertical` directions, the position of the sprite. (defaults to `0`)
     $<sprite>-position - Position of a given sprite.
 
-    $margin, $spacing - Adds margins to sprites (top, right, bottom, left). (defaults to `0, 0, 0, 0`)
-    $<sprite>-margin, $<sprite>-spacing - Margin for a given sprite.
+    $padding, $spacing - Adds paddings to sprites (top, right, bottom, left). (defaults to `0, 0, 0, 0`)
+    $<sprite>-padding, $<sprite>-spacing - Padding for a given sprite.
 
     $dst-color - Together with `$src-color`, forms a map of source colors to be converted to destiny colors (same index of `$src-color` changed to `$dst-color`).
     $<sprite>-dst-color - Destiny colors for a given sprite. (defaults to `$dst-color`)
@@ -191,12 +191,12 @@ def sprite_map(g, **kwargs):
             elif position > 1:
                 position = 1.0
 
-            margin = kwargs.get('margin', kwargs.get('spacing', 0))
-            if isinstance(margin, ListValue):
-                margin = [int(NumberValue(v).value) for n, v in margin.items()]
+            padding = kwargs.get('padding', kwargs.get('spacing', 0))
+            if isinstance(padding, ListValue):
+                padding = [int(NumberValue(v).value) for n, v in padding.items()]
             else:
-                margin = [int(NumberValue(margin).value)]
-            margin = (margin * 4)[:4]
+                padding = [int(NumberValue(padding).value)]
+            padding = (padding * 4)[:4]
 
             dst_colors = kwargs.get('dst_color')
             if isinstance(dst_colors, ListValue):
@@ -227,7 +227,7 @@ def sprite_map(g, **kwargs):
             all_dst_colors = []
             all_src_colors = []
             all_positions = []
-            all_margins = []
+            all_paddings = []
 
             for name in names:
                 name = name.replace('-', '_')
@@ -247,16 +247,16 @@ def sprite_map(g, **kwargs):
                         _position = 1.0
                 all_positions.append(_position)
 
-                _margin = kwargs.get(name + '_margin', kwargs.get(name + '_spacing'))
-                if _margin is None:
-                    _margin = margin
+                _padding = kwargs.get(name + '_padding', kwargs.get(name + '_spacing'))
+                if _padding is None:
+                    _padding = padding
                 else:
-                    if isinstance(_margin, ListValue):
-                        _margin = [int(NumberValue(v).value) for n, v in _margin.items()]
+                    if isinstance(_padding, ListValue):
+                        _padding = [int(NumberValue(v).value) for n, v in _padding.items()]
                     else:
-                        _margin = [int(NumberValue(_margin).value)]
-                    _margin = (_margin * 4)[:4]
-                all_margins.append(_margin)
+                        _padding = [int(NumberValue(_padding).value)]
+                    _padding = (_padding * 4)[:4]
+                all_paddings.append(_padding)
 
                 _dst_colors = kwargs.get(name + '_dst_color')
                 if _dst_colors is None:
@@ -286,13 +286,13 @@ def sprite_map(g, **kwargs):
             sizes = tuple((collapse_x or i.size[0], collapse_y or i.size[1]) for i in images())
 
             if direction == 'horizontal':
-                layout = HorizontalSpritesLayout(sizes, all_margins, position=all_positions)
+                layout = HorizontalSpritesLayout(sizes, all_paddings, position=all_positions)
             elif direction == 'vertical':
-                layout = VerticalSpritesLayout(sizes, all_margins, position=all_positions)
+                layout = VerticalSpritesLayout(sizes, all_paddings, position=all_positions)
             elif direction == 'diagonal':
-                layout = DiagonalSpritesLayout(sizes, all_margins)
+                layout = DiagonalSpritesLayout(sizes, all_paddings)
             elif direction == 'smart':
-                layout = PackedSpritesLayout(sizes, all_margins)
+                layout = PackedSpritesLayout(sizes, all_paddings)
             else:
                 raise Exception("Invalid direction %s" % direction)
             layout_positions = list(layout)
