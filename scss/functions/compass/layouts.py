@@ -266,9 +266,15 @@ class PackedSpritesLayout(SpritesLayout):
 class HorizontalSpritesLayout(SpritesLayout):
     def __init__(self, blocks, margin=None, padding=None, pmargin=None, ppadding=None, position=None):
         super(HorizontalSpritesLayout, self).__init__(blocks, margin, padding, pmargin, ppadding)
+
         self.width = sum(zip(*self.blocks)[0])
         self.height = max(zip(*self.blocks)[1])
-        self.position = position if position is not None else 0.0
+
+        if position is None:
+            position = [0.0] * self.num_blocks
+        elif not isinstance(position, (tuple, list)):
+            position = [position] * self.num_blocks
+        self.position = position
 
     def __iter__(self):
         cx = 0
@@ -276,10 +282,11 @@ class HorizontalSpritesLayout(SpritesLayout):
             w, h, width, height, i = block
             margin, padding = self.margin[i], self.padding[i]
             pmargin, ppadding = self.pmargin[i], self.ppadding[i]
+            position = self.position[i]
             cssw = width + padding[3] + padding[1] + int(round(width * (ppadding[3] + ppadding[1])))  # image width plus padding
             cssh = height + padding[0] + padding[2] + int(round(height * (ppadding[0] + ppadding[2])))  # image height plus padding
             cssx = cx + margin[3] + int(round(width * pmargin[3]))  # anchored at x
-            cssy = int(round((self.height - cssh) * self.position))  # centered vertically
+            cssy = int(round((self.height - cssh) * position))  # centered vertically
             x = cssx + padding[3] + int(round(width * ppadding[3]))  # image drawn offset to account for padding
             y = cssy + padding[0] + int(round(height * ppadding[0]))  # image drawn offset to account for padding
             yield x, y, width, height, cssx, cssy, cssw, cssh
@@ -289,9 +296,15 @@ class HorizontalSpritesLayout(SpritesLayout):
 class VerticalSpritesLayout(SpritesLayout):
     def __init__(self, blocks, margin=None, padding=None, pmargin=None, ppadding=None, position=None):
         super(VerticalSpritesLayout, self).__init__(blocks, margin, padding, pmargin, ppadding)
+
         self.width = max(zip(*self.blocks)[0])
         self.height = sum(zip(*self.blocks)[1])
-        self.position = position if position is not None else 0.0
+
+        if position is None:
+            position = [0.0] * self.num_blocks
+        elif not isinstance(position, (tuple, list)):
+            position = [position] * self.num_blocks
+        self.position = position
 
     def __iter__(self):
         cy = 0
@@ -299,9 +312,10 @@ class VerticalSpritesLayout(SpritesLayout):
             w, h, width, height, i = block
             margin, padding = self.margin[i], self.padding[i]
             pmargin, ppadding = self.pmargin[i], self.ppadding[i]
+            position = self.position[i]
             cssw = width + padding[3] + padding[1] + int(round(width * (ppadding[3] + ppadding[1])))  # image width plus padding
             cssh = height + padding[0] + padding[2] + int(round(height * (ppadding[0] + ppadding[2])))  # image height plus padding
-            cssx = int(round((self.width - cssw) * self.position))  # centered horizontally
+            cssx = int(round((self.width - cssw) * position))  # centered horizontally
             cssy = cy + margin[0] + int(round(height * pmargin[0]))  # anchored at y
             x = cssx + padding[3] + int(round(width * ppadding[3]))  # image drawn offset to account for padding
             y = cssy + padding[0] + int(round(height * ppadding[0]))  # image drawn offset to account for padding
