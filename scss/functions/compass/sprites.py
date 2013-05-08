@@ -54,6 +54,24 @@ def sprite_map(g, **kwargs):
     """
     Generates a sprite map from the files matching the glob pattern.
     Uses the keyword-style arguments passed in to control the placement.
+
+    $direction - Sprite map layout. Can be `vertical` (default), `horizontal`, `diagonal` or `smart`.
+
+    $position - For `horizontal` and `vertical` directions, the position of the sprite. (defaults to `0`)
+    $<sprite>-position - Position of a given sprite.
+
+    $margin, $spacing - Adds margins to sprites (top, right, bottom, left). (defaults to `0, 0, 0, 0`)
+    $<sprite>-margin, $<sprite>-spacing - Margin for a given sprite.
+
+    $dst-color - Together with `$src-color`, forms a map of source colors to be converted to destiny colors (same index of `$src-color` changed to `$dst-color`).
+    $<sprite>-dst-color - Destiny colors for a given sprite. (defaults to `$dst-color`)
+
+    $src-color - Selects source colors to be converted to the corresponding destiny colors. (defaults to `black`)
+    $<sprite>-dst-color - Source colors for a given sprite. (defaults to `$src-color`)
+
+    $collapse - Collapses every image in the sprite map to a fixed size (`x` and `y`).
+    $collapse-x  - Collapses a size for `x`.
+    $collapse-y  - Collapses a size for `y`.
     """
     if not Image:
         raise Exception("Images manipulation require PIL")
@@ -108,13 +126,19 @@ def sprite_map(g, **kwargs):
         if map is None:
             direction = kwargs.get('direction', config.SPRTE_MAP_DIRECTION)
             repeat = StringValue(kwargs.get('repeat', 'no-repeat'))
-            collapse_x = collapse_y = int(NumberValue(kwargs.get('collapse', 0)).value)
+            collapse = kwargs.get('collapse') or 0
+            if isinstance(collapse, ListValue):
+                collapse_x = int(NumberValue(collapse[0]).value)
+                collapse_y = int(NumberValue(collapse[-1]).value)
+            else:
+                collapse_x = collapse_y = int(NumberValue(collapse).value)
             if 'collapse_x' in kwargs:
                 collapse_x = int(NumberValue(kwargs['collapse_x']).value)
             if 'collapse_y' in kwargs:
                 collapse_y = int(NumberValue(kwargs['collapse_y']).value)
 
-            position = NumberValue(kwargs.get('position', 0))
+            position = kwargs.get('position', 0)
+            position = NumberValue(position)
             if position.units.get('_') != '%' and position.value > 1:
                 position = position.value / 100.0
             else:
@@ -124,25 +148,23 @@ def sprite_map(g, **kwargs):
             elif position > 1:
                 position = 1.0
 
-            spacing = kwargs.get('spacing', 0)
-            if isinstance(spacing, ListValue):
-                spacing = [int(NumberValue(v).value) for n, v in spacing.items()]
+            margin = kwargs.get('margin', kwargs.get('spacing', 0))
+            if isinstance(margin, ListValue):
+                margin = [int(NumberValue(v).value) for n, v in margin.items()]
             else:
-                spacing = [int(NumberValue(spacing).value)]
-            spacing = (spacing * 4)[:4]
+                margin = [int(NumberValue(margin).value)]
+            margin = (margin * 4)[:4]
 
             dst_colors = kwargs.get('dst_color')
             if isinstance(dst_colors, ListValue):
                 dst_colors = [list(ColorValue(v).value[:3]) for n, v in dst_colors.items() if v]
             else:
                 dst_colors = [list(ColorValue(dst_colors).value[:3])] if dst_colors else []
-
             src_colors = kwargs.get('src_color')
             if isinstance(src_colors, ListValue):
                 src_colors = [tuple(ColorValue(v).value[:3]) if v else (0, 0, 0) for n, v in src_colors.items()]
             else:
                 src_colors = [tuple(ColorValue(src_colors).value[:3]) if src_colors else (0, 0, 0)]
-
             len_colors = max(len(dst_colors), len(src_colors))
             dst_colors = (dst_colors * len_colors)[:len_colors]
             src_colors = (src_colors * len_colors)[:len_colors]
@@ -158,32 +180,72 @@ def sprite_map(g, **kwargs):
 
             names = tuple(os.path.splitext(os.path.basename(file_))[0] for file_, storage in files)
 
-            spacings = []
+            all_dst_colors = []
+            all_src_colors = []
+            all_positions = []
+            all_margins = []
 
             for name in names:
                 name = name.replace('-', '_')
 
-                _spacing = kwargs.get(name + '_spacing')
-                if _spacing is None:
-                    _spacing = spacing
+                _position = kwargs.get(name + '_position')
+                if _position is None:
+                    _position = position
                 else:
-                    if isinstance(_spacing, ListValue):
-                        _spacing = [int(NumberValue(v).value) for n, v in _spacing.items()]
+                    _position = NumberValue(_position)
+                    if _position.units.get('_') != '%' and _position.value > 1:
+                        _position = _position.value / 100.0
                     else:
-                        _spacing = [int(NumberValue(_spacing).value)]
-                    _spacing = (_spacing * 4)[:4]
-                spacings.append(_spacing)
+                        _position = _position.value
+                    if _position < 0:
+                        _position = 0.0
+                    elif _position > 1:
+                        _position = 1.0
+                all_positions.append(_position)
+
+                _margin = kwargs.get(name + '_margin', kwargs.get(name + '_spacing'))
+                if _margin is None:
+                    _margin = margin
+                else:
+                    if isinstance(_margin, ListValue):
+                        _margin = [int(NumberValue(v).value) for n, v in _margin.items()]
+                    else:
+                        _margin = [int(NumberValue(_margin).value)]
+                    _margin = (_margin * 4)[:4]
+                all_margins.append(_margin)
+
+                _dst_colors = kwargs.get(name + '_dst_color')
+                if _dst_colors is None:
+                    _dst_colors = dst_colors
+                else:
+                    if isinstance(_dst_colors, ListValue):
+                        _dst_colors = [list(ColorValue(v).value[:3]) for n, v in _dst_colors.items() if v]
+                    else:
+                        _dst_colors = [list(ColorValue(_dst_colors).value[:3])] if _dst_colors else []
+                _src_colors = kwargs.get(name + '_src_color')
+                if _src_colors is None:
+                    _src_colors = src_colors
+                else:
+                    if isinstance(_src_colors, ListValue):
+                        _src_colors = [tuple(ColorValue(v).value[:3]) if v else (0, 0, 0) for n, v in _src_colors.items()]
+                    else:
+                        _src_colors = [tuple(ColorValue(_src_colors).value[:3]) if _src_colors else (0, 0, 0)]
+                _len_colors = max(len(_dst_colors), len(_src_colors))
+                _dst_colors = (_dst_colors * _len_colors)[:_len_colors]
+                _src_colors = (_src_colors * _len_colors)[:_len_colors]
+                all_dst_colors.append(_dst_colors)
+                all_src_colors.append(_src_colors)
 
             sizes = tuple((collapse_x or i.size[0], collapse_y or i.size[1]) for i in images())
 
             if direction == 'horizontal':
-                layout = HorizontalSpritesLayout(sizes, spacings, position=position)
+                layout = HorizontalSpritesLayout(sizes, all_margins, position=all_positions)
             elif direction == 'vertical':
-                layout = VerticalSpritesLayout(sizes, spacings, position=position)
+                layout = VerticalSpritesLayout(sizes, all_margins, position=all_positions)
             elif direction == 'diagonal':
-                layout = DiagonalSpritesLayout(sizes, spacings)
+                layout = DiagonalSpritesLayout(sizes, all_margins)
             elif direction == 'smart':
-                layout = PackedSpritesLayout(sizes, spacings)
+                layout = PackedSpritesLayout(sizes, all_margins)
             else:
                 raise Exception("Invalid direction %s" % direction)
             layout_positions = list(layout)
@@ -194,6 +256,7 @@ def sprite_map(g, **kwargs):
                 color=(0, 0, 0, 0)
             )
 
+            pasted = []
             offsets_x = []
             offsets_y = []
             for i, image in enumerate(images()):
@@ -213,25 +276,27 @@ def sprite_map(g, **kwargs):
                     new_image.paste(image, (x, y))
                 offsets_x.append(cssx)
                 offsets_y.append(cssy)
+                pasted.append((x, y, width, height))
 
-            if dst_colors:
+            if all_dst_colors:
                 useless = True
                 pixdata = new_image.load()
-                for _y in xrange(layout.height):
-                    for _x in xrange(layout.width):
-                        pixel = pixdata[_x, _y]
-                        rgb = pixel[:3]
-                        a = pixel[3]
-                        for i, dst_color in enumerate(dst_colors):
-                            if rgb == src_colors[i]:
-                                if a:
-                                    new_color = tuple([int(c) for c in dst_color] + [a])
-                                    if pixel != new_color:
-                                        pixdata[_x, _y] = new_color
-                                        useless = False
-                                break
+                for i, (x, y, width, height) in enumerate(pasted):
+                    for _y in xrange(y, y + height):
+                        for _x in xrange(x, x + width):
+                            pixel = pixdata[_x, _y]
+                            a = pixel[3]
+                            if a:
+                                rgb = pixel[:3]
+                                for j, dst_color in enumerate(all_dst_colors[i]):
+                                    if rgb == all_src_colors[i][j]:
+                                        new_color = tuple([int(c) for c in dst_color] + [a])
+                                        if pixel != new_color:
+                                            pixdata[_x, _y] = new_color
+                                            useless = False
+                                        break
                 if useless:
-                    log.warning("Useless use of dst_color in sprite map for files at '%s' (never used)" % glob_path)
+                    log.warning("Useless use of $dst-color in sprite map for files at '%s' (never used)" % glob_path)
 
             try:
                 new_image.save(asset_path)
