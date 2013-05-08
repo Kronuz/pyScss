@@ -235,7 +235,7 @@ class NumberValue(Value):
         elif isinstance(tokens, (int, float)):
             self.value = float(tokens)
         else:
-            raise ValueError("Can't convert to CSS number: %r" % tokens)
+            raise ValueError("Can't convert to CSS number: %s" % repr(tokens))
         if type is not None:
             self.units = {type: _units_weights.get(type, 1), '_': type}
 
