@@ -277,7 +277,6 @@ _strings_re = re.compile(r'([\'"]).*?\1')
 
 _has_placeholder_re = re.compile(r'(?<!\w)([a-z]\w*)?%')
 _prop_split_re = re.compile(r'[:=]')
-_skip_word_re = re.compile(r'-?[_\w\s#.,:%]*$|[-_\w#.,:%]*$', re.MULTILINE)
 _has_code_re = re.compile('''
     (?:^|(?<=[{;}]))            # the character just before it should be a '{', a ';' or a '}'
     \s*                         # ...followed by any number of spaces

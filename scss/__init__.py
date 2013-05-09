@@ -64,7 +64,7 @@ from scss.cssdefs import (
     _escape_chars_re, _interpolate_re,
     _spaces_re, _expand_rules_space_re, _collapse_properties_space_re,
     _undefined_re,
-    _strings_re, _prop_split_re, _skip_word_re,
+    _strings_re, _prop_split_re,
 )
 from scss.expression import CalculatorScanner, eval_expr, interpolate
 from scss.functions import ALL_BUILTINS_LIBRARY
@@ -1518,9 +1518,6 @@ class Calculator(object):
 
     def calculate(self, _base_str, rule, context=None, options=None, _dequote=False):
         better_expr_str = _base_str
-
-        if _skip_word_re.match(better_expr_str) and '- ' not in better_expr_str and ' and ' not in better_expr_str and ' or ' not in better_expr_str and 'not ' not in better_expr_str:
-            return better_expr_str
 
         rule = rule.copy()
         rule.context = context
