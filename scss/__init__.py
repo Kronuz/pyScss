@@ -1310,7 +1310,7 @@ class Scss(object):
         rules_by_file = {}
 
         for rule in self.rules:
-            if rule.position is None or not rule.properties:
+            if rule.position is None:
                 continue
 
             source_file = rule.source_file
@@ -1352,7 +1352,8 @@ class Scss(object):
 
         result = ''
         for rule in rules:
-            if rule.position is None or not rule.properties:
+            # TODO this is wrong; what about, say, @imports
+            if rule.is_empty:
                 continue
 
             ancestry = rule.ancestry

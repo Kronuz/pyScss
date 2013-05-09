@@ -64,6 +64,29 @@ class SassRule(object):
         """
         return "%s:%d" % (self.source_file.filename, self.lineno)
 
+    @property
+    def is_empty(self):
+        """Returns whether this rule is considered "empty" -- i.e., has no
+        contents that should end up in the final CSS.
+        """
+        if self.position is None:
+            # Not sure how this should ever happen; hysterical raisins
+            return True
+
+        if self.properties:
+            # Rules containing CSS properties are never empty
+            return False
+
+        if self.ancestry:
+            header = self.ancestry[-1]
+            if header.is_atrule and header.directive != '@media':
+                # At-rules should always be preserved, UNLESS they are @media
+                # blocks, which are known to be noise if they don't have any
+                # contents of their own
+                return False
+
+        return True
+
     def copy(self):
         return type(self)(
             source_file=self.source_file,
