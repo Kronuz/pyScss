@@ -51,7 +51,7 @@ def to_str(num):
         sp = num.get('_', '')
         return (sp + ' ').join(to_str(v) for n, v in s if n != '_')
     elif isinstance(num, float):
-        num = ('%0.03f' % round(num, 3)).rstrip('0').rstrip('.')
+        num = ('%0.05f' % round(num, 5)).rstrip('0').rstrip('.')
         return num
     elif isinstance(num, bool):
         return 'true' if num else 'false'
