@@ -22,16 +22,10 @@ logger = logging.getLogger('scss')
 logger.setLevel(logging.ERROR)
 logger.addHandler(console)
 
-HERE = os.path.join(os.path.split(__file__)[0], 'files')
 
+def test_pair_programmatic(scss_file_pair):
+    scss_fn, css_fn = scss_file_pair
 
-@pytest.mark.parametrize(
-    ('scss_fn', 'css_fn'), [
-        (scss_fn, os.path.splitext(scss_fn)[0] + '.css')
-        for scss_fn in glob.glob(os.path.join(HERE, '*/*.scss'))
-    ]
-)
-def test_pair(scss_fn, css_fn):
     with open(scss_fn) as fh:
         source = fh.read()
     with open(css_fn) as fh:
