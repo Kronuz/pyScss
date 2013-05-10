@@ -581,9 +581,13 @@ class Scss(object):
             elif block.unparsed_contents is None:
                 self._get_properties(rule, p_children, scope, block)
             # Nested properties
-            elif block.is_nested_property:
+            elif block.is_scope:
+                if block.header.unscoped_value:
+                    # Possibly deal with default unscoped value
+                    self._get_properties(rule, p_children, scope, block)
+
                 rule.unparsed_contents = block.unparsed_contents
-                subscope = (scope or '') + block.prop[:-1] + '-'
+                subscope = (scope or '') + block.header.scope + '-'
                 self.manage_children(rule, p_children, subscope)
             ####################################################################
             # Nested rules

@@ -145,8 +145,13 @@ class BlockHeader(object):
 
             return BlockAtRuleHeader(directive, argument)
         else:
-            if prop.endswith(':'):
-                return BlockScopeHeader(prop)
+            if prop.endswith(u':') or u': ' in prop:
+                # Syntax is "<scope>: [prop]" -- if the optional prop exists,
+                # it becomes the first rule with no suffix
+                scope, unscoped_value = prop.split(u':', 1)
+                scope = scope.rstrip()
+                unscoped_value = unscoped_value.lstrip()
+                return BlockScopeHeader(scope, unscoped_value)
             else:
                 return BlockSelectorHeader(prop)
 
@@ -187,8 +192,13 @@ class BlockSelectorHeader(BlockHeader):
 class BlockScopeHeader(BlockHeader):
     is_scope = True
 
-    def __init__(self, scope):
+    def __init__(self, scope, unscoped_value):
         self.scope = scope
+
+        if unscoped_value:
+            self.unscoped_value = unscoped_value
+        else:
+            self.unscoped_value = None
 
 
 class UnparsedBlock(object):
@@ -236,5 +246,5 @@ class UnparsedBlock(object):
         return self.header.is_atrule
 
     @property
-    def is_nested_property(self):
+    def is_scope(self):
         return self.header.is_scope
