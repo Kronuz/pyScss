@@ -140,32 +140,136 @@ _default_search_paths = ['.']
 
 
 class SourceFile(object):
-    def __init__(self, filename, contents, parent_dir='.', is_string=False):
+    def __init__(self, filename, contents, parent_dir='.', is_string=False, is_sass=None, line_numbers=True, line_strip=True):
         self.filename = filename
+        self.sass = filename.endswith('.sass') if is_sass is None else is_sass
+        self.line_numbers = line_numbers
+        self.line_strip = line_strip
         self.contents = self.prepare_source(contents)
         self.parent_dir = parent_dir
         self.is_string = is_string
 
     @classmethod
-    def from_filename(cls, fn, filename=None):
+    def from_filename(cls, fn, filename=None, is_sass=None, line_numbers=True):
         if filename is None:
             _, filename = os.path.split(fn)
 
         with open(fn) as f:
             contents = f.read()
 
-        return cls(filename, contents)
+        return cls(filename, contents, is_sass=is_sass, line_numbers=line_numbers)
 
     @classmethod
-    def from_string(cls, string, filename=None):
+    def from_string(cls, string, filename=None, is_sass=None, line_numbers=True):
         if filename is None:
             filename = "<string %r...>" % string[:50]
 
-        return cls(filename, string, is_string=True)
+        return cls(filename, string, is_string=True, is_sass=is_sass, line_numbers=line_numbers)
 
-    def prepare_source(self, codestr, line_numbers=True):
+    def parse_scss_line(self, line_no, line, state):
+        ret = ''
+
+        if line is None:
+            line = ''
+
+        line = state['line_buffer'] + line.rstrip()  # remove EOL character
+
+        if line and line[-1] == '\\':
+            state['line_buffer'] = line[:-1]
+            return ''
+        else:
+            state['line_buffer'] = ''
+
+        output = state['prev_line']
+        if self.line_strip:
+            output = output.strip()
+        output_line_no = state['prev_line_no']
+
+        state['prev_line'] = line
+        state['prev_line_no'] = line_no
+
+        if output:
+            if self.line_numbers:
+                output = str(output_line_no + 1) + SEPARATOR + output
+            output += '\n'
+            ret += output
+
+        return ret
+
+    def parse_sass_line(self, line_no, line, state):
+        ret = ''
+
+        if line is None:
+            line = ''
+
+        line = state['line_buffer'] + line.rstrip()  # remove EOL character
+
+        if line and line[-1] == '\\':
+            state['line_buffer'] = line[:-1]
+            return ret
+        else:
+            state['line_buffer'] = ''
+
+        indent = len(line) - len(line.lstrip())
+
+        # make sure we support multi-space indent as long as indent is consistent
+        if indent and not state['indent_marker']:
+            state['indent_marker'] = indent
+
+        if state['indent_marker']:
+            indent /= state['indent_marker']
+
+        if indent == state['prev_indent']:
+            # same indentation as previous line
+            if state['prev_line']:
+                state['prev_line'] += ';'
+        elif indent > state['prev_indent']:
+            # new indentation is greater than previous, we just entered a new block
+            state['prev_line'] += ' {'
+            state['nested_blocks'] += 1
+        else:
+            # indentation is reset, we exited a block
+            block_diff = state['prev_indent'] - indent
+            if state['prev_line']:
+                state['prev_line'] += ';'
+            state['prev_line'] += ' }' * block_diff
+            state['nested_blocks'] -= block_diff
+
+        output = state['prev_line']
+        if self.line_strip:
+            output = output.strip()
+        output_line_no = state['prev_line_no']
+
+        state['prev_indent'] = indent
+        state['prev_line'] = line
+        state['prev_line_no'] = line_no
+
+        if output:
+            if self.line_numbers:
+                output = str(output_line_no + 1) + SEPARATOR + output
+            output += '\n'
+            ret += output
+        return ret
+
+    def prepare_source(self, codestr, sass=False):
         # Decorate lines with their line numbers and a delimiting NUL and remove empty lines
-        codestr = '\n'.join(str(i + 1) + SEPARATOR + s if line_numbers else s for i, l in enumerate(codestr.splitlines()) for s in (l.strip(),) if s)
+        state = {
+            'line_buffer': '',
+            'prev_line': '',
+            'prev_line_no': 0,
+            'prev_indent': 0,
+            'nested_blocks': 0,
+            'indent_marker': 0,
+        }
+        if self.sass:
+            parse_line = self.parse_sass_line
+        else:
+            parse_line = self.parse_scss_line
+        _codestr = codestr
+        codestr = ''
+        for line_no, line in enumerate(_codestr.splitlines()):
+            codestr += parse_line(line_no, line, state)
+        codestr += parse_line(None, None, state)  # parse the last line stored in prev_line buffer
 
         # protects codestr: "..." strings
         codestr = _strings_re.sub(lambda m: _reverse_safe_strings_re.sub(lambda n: _reverse_safe_strings[n.group(0)], m.group(0)), codestr)
@@ -261,16 +365,16 @@ class Scss(object):
 
     #@profile
     #@print_timing(2)
-    def Compilation(self, scss_string=None, scss_file=None, super_selector=None, filename=None):
+    def Compilation(self, scss_string=None, scss_file=None, super_selector=None, filename=None, is_sass=None, line_numbers=True):
         if super_selector:
             self.super_selector = super_selector + ' '
         self.reset()
 
         source_file = None
         if scss_string is not None:
-            source_file = SourceFile.from_string(scss_string, filename)
+            source_file = SourceFile.from_string(scss_string, filename, is_sass, line_numbers)
         elif scss_file is not None:
-            source_file = SourceFile.from_filename(scss_file, filename)
+            source_file = SourceFile.from_filename(scss_file, filename, is_sass, line_numbers)
 
         if source_file is not None:
             # Clear the existing list of files

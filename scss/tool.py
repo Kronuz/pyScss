@@ -66,6 +66,10 @@ def main():
                       help="Cache root path (Cache files will be created here)")
     parser.add_option_group(paths_group)
 
+    parser.add_option("--sass", action="store_false",
+                      dest="is_sass", default=None,
+                      help="Sass mode")
+
     (options, args) = parser.parse_args()
 
     # General runtime configuration
@@ -120,11 +124,13 @@ def main():
         except ImportError:
             pass
 
+        is_sass = options.is_sass
+
         css = Scss()
         context = css.scss_vars
         options = css.scss_opts
-        source_file = SourceFile.from_string('', '<shell>')
-        rule = SassRule(source_file, context=context, options=options)
+        source_file = SourceFile.from_string('', '<shell>', line_numbers=False)
+        rule = SassRule(source_file, context=context, options=options, is_sass=is_sass)
         print "Welcome to %s interactive shell" % BUILD_INFO
         while True:
             try:
@@ -138,7 +144,7 @@ def main():
             if s in ('exit', 'quit'):
                 break
             for s in s.split(';'):
-                s = source_file.prepare_source(s.strip(), line_numbers=False)
+                s = source_file.prepare_source(s.strip())
                 if not s:
                     continue
                 elif s.startswith('@'):
@@ -252,7 +258,7 @@ def main():
                 self.suffix = options.suffix
 
             def is_valid(self, path):
-                return os.path.isfile(path) and path.endswith(".scss") and not os.path.basename(path).startswith("_")
+                return os.path.isfile(path) and (path.endswith('.scss') or path.endswith('.sass')) and not os.path.basename(path).startswith('_')
 
             def process(self, path):
                 if os.path.isdir(path):
@@ -265,11 +271,11 @@ def main():
 
             def compile(self, src_path):
                 fname = os.path.basename(src_path)
-                if fname.endswith(".scss"):
+                if fname.endswith('.scss') or fname.endswith('.sass'):
                     fname = fname[:-5]
                     if self.suffix:
-                        fname += "." + self.suffix
-                    fname += ".css"
+                        fname += '.' + self.suffix
+                    fname += '.css'
                 else:
                     # you didn't give me a file of the correct type!
                     return False
@@ -280,9 +286,8 @@ def main():
                     dest_path = os.path.join(os.path.dirname(src_path), fname)
 
                 print "Compiling %s => %s" % (src_path, dest_path)
-                src_file = open(src_path)
                 dest_file = open(dest_path, 'w')
-                dest_file.write(self.css.compile(src_file.read()))
+                dest_file.write(self.css.compile(scss_file=src_path))
 
             def on_moved(self, event):
                 super(ScssEventHandler, self).on_moved(event)
@@ -296,7 +301,7 @@ def main():
                 super(ScssEventHandler, self).on_modified(event)
                 self.process(event.src_path)
 
-        event_handler = ScssEventHandler(patterns="*.scss")
+        event_handler = ScssEventHandler(patterns=['*.scss', '*.sass'])
         observer = Observer()
         observer.schedule(event_handler, path=options.watch, recursive=options.recursive)
         observer.start()
@@ -319,10 +324,9 @@ def main():
         })
         if args:
             for path in args:
-                finput = open(path, 'rt')
-                output.write(css.compile(finput.read()))
+                output.write(css.compile(scss_file=path, is_sass=options.is_sass))
         else:
-            output.write(css.compile(sys.stdin.read()))
+            output.write(css.compile(sys.stdin.read(), is_sass=options.is_sass))
 
         for f, t in profiling.items():
             print >>sys.stderr, "%s took %03fs" % (f, t)

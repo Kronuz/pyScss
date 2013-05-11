@@ -105,7 +105,7 @@ class BlockHeader(object):
                 pass
         elif prop.startswith('='):
             # Expand '=' at the beginning of a rule as @mixin
-            prop = '@mixin' + prop[1:]
+            prop = '@mixin ' + prop[1:]
         elif prop.startswith('@prototype '):
             # Remove '@prototype '
             # TODO what is @prototype??
