@@ -1185,6 +1185,24 @@ TESTS FOR REPORTED ISSUES
     }
 
 
+### Issue #110 test
+
+    >>> print css.compile('''
+    ... @option compress:no, reverse_colors:yes;
+    ... $global: blue;
+    ... @mixin box {
+    ...   $global: red;
+    ...   color: $global;
+    ... }
+    ... p {
+    ...   @include box();
+    ... }
+    ... ''') #doctest: +NORMALIZE_WHITESPACE
+    p {
+      color: red;
+    }
+
+
 ADVANCED STUFF, NOT (YET) SUPPORTED (FROM SASS)
 -----------------------------------------------
 

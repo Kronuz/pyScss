@@ -510,7 +510,7 @@ class Scss(object):
         funct, params, _ = block.argument.partition('(')
         funct = normalize_var(funct.strip())
         params = split_params(depar(params + _))
-        defaults = {}
+        defaults = rule.context.copy()
         new_params = []
         for param in params:
             param, _, default = param.partition(':')
@@ -521,28 +521,25 @@ class Scss(object):
                 if default:
                     default = self.calculator.apply_vars(default, rule, rule.context, None)
                     defaults[param] = default
-        context = rule.context.copy()
-        for p in new_params:
-            context.pop(p, None)
-        mixin = [list(new_params), defaults, self.calculator.apply_vars(block.unparsed_contents, rule, context, None)]
+        mixin = [list(new_params), defaults, block.unparsed_contents]
         if block.directive == '@function':
             def _call(mixin):
                 def __call(R, *args, **kwargs):
                     m_params = mixin[0]
-                    m_vars = rule.context.copy()
+                    m_vars = {}
+                    # m_vars.update(R.context)
                     m_vars.update(mixin[1])
                     m_codestr = mixin[2]
                     for i, a in enumerate(args):
                         m_vars[m_params[i]] = a
                     for k, v in kwargs.items():
                         m_vars['$' + normalize_var(k)] = v
-                    _options = rule.options.copy()
                     _rule = SassRule(
                         source_file=R.source_file,
 
                         unparsed_contents=m_codestr,
                         context=m_vars,
-                        options=_options,
+                        options=rule.options.copy(),
                         lineno=block.lineno,
 
                         # R
@@ -599,7 +596,9 @@ class Scss(object):
             return
 
         m_params = mixin[0]
-        m_vars = mixin[1].copy()
+        m_vars = {}
+        m_vars.update(rule.context)
+        m_vars.update(mixin[1])
         m_codestr = mixin[2]
         for varname, value in new_params.items():
             try:
@@ -612,12 +611,10 @@ class Scss(object):
             if p not in new_params and isinstance(m_vars[p], basestring):
                 value = self.calculator.calculate(m_vars[p], rule, m_vars, rule.options)
                 m_vars[p] = value
-        _context = rule.context.copy()
-        _context.update(m_vars)
 
         _rule = rule.copy()
         _rule.unparsed_contents = m_codestr
-        _rule.context = _context
+        _rule.context = m_vars
         _rule.lineno = block.lineno
 
         _rule.options['@content'] = block.unparsed_contents
