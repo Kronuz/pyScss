@@ -497,7 +497,7 @@ class Scss(object):
                     value = 1
                 elif value.lower() in ('0', 'false', 'f', 'no', 'n', 'off', 'undefined'):
                     value = 0
-                rule.options[option] = value
+                rule.options[option.replace('-', '_')] = value
 
     @print_timing(10)
     def _do_functions(self, rule, p_children, scope, block):
