@@ -1314,7 +1314,7 @@ class Scss(object):
         rules_by_file = {}
 
         for rule in self.rules:
-            if rule.position is None:
+            if rule.position is None or not rule.properties:
                 continue
 
             source_file = rule.source_file
