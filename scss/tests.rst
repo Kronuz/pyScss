@@ -301,6 +301,23 @@ http://xcss.antpaw.org/docs/syntax/math
     >>> print css.compile('''
     ... @option compress:no, short_colors:yes, reverse_colors:yes;
     ... .selector {
+    ...     padding: [4em / 2em];
+    ...     margin: [4em / 2em]em;
+    ...     width: [8px / 2px];
+    ...     height: [500px / 2];
+    ... }
+    ... ''') #doctest: +NORMALIZE_WHITESPACE
+    .selector {
+        padding: 2;
+        margin: 2em;
+        width: 4;
+        height: 250px;
+    }
+    
+
+    >>> print css.compile('''
+    ... @option compress:no, short_colors:yes, reverse_colors:yes;
+    ... .selector {
     ...     padding: [5em - 3em + 5px]px;
     ...     margin: [20 - 10] [30% - 10];
     ... }
