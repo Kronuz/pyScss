@@ -310,6 +310,21 @@ http://xcss.antpaw.org/docs/syntax/math
         margin: 10 20%;
     }
 
+    >>> print css.compile('''
+    ... @option compress:no, short_colors:yes, reverse_colors:yes;
+    ... .selector {
+    ...     padding: [4em / 2em];
+    ...     margin: [4em / 2em]em;
+    ...     width: [8px / 2px];
+    ...     height: [500px / 2];
+    ... }
+    ... ''') #doctest: +NORMALIZE_WHITESPACE
+    .selector {
+        padding: 2;
+        margin: 2em;
+        width: 4;
+        height: 250px;
+    }
 
 SASS NESTING COMPATIBILITY
 --------------------------
