@@ -91,7 +91,7 @@ class CalculatorScanner(Scanner):
 class Calculator(Parser):
     def goal(self, R):
         expr_lst = self.expr_lst(R)
-        v = expr_lst.first() if len(expr_lst) == 1 else expr_lst
+        v = expr_lst
         END = self._scan('END')
         return v
 
@@ -101,7 +101,7 @@ class Calculator(Parser):
         while self._peek(self.expr_rsts) == 'OR':
             OR = self._scan('OR')
             and_test = self.and_test(R)
-            v = and_test if isinstance(v, basestring) and _undefined_re.match(v) else (v or and_test)
+            v = AnyOp(v, and_test)
         return v
 
     def and_test(self, R):
@@ -110,28 +110,18 @@ class Calculator(Parser):
         while self._peek(self.and_test_rsts) == 'AND':
             AND = self._scan('AND')
             not_test = self.not_test(R)
-            v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) else (v and not_test)
+            v = AllOp(v, not_test)
         return v
 
     def not_test(self, R):
         _token_ = self._peek(self.not_test_rsts)
-        if _token_ not in self.not_test_chks:
+        if _token_ != 'NOT':
             comparison = self.comparison(R)
             return comparison
-        else:  # in self.not_test_chks
-            while 1:
-                _token_ = self._peek(self.not_test_chks)
-                if _token_ == 'NOT':
-                    NOT = self._scan('NOT')
-                    not_test = self.not_test(R)
-                    v = 'undefined' if isinstance(not_test, basestring) and _undefined_re.match(not_test) else (not not_test)
-                else:  # == 'INV'
-                    INV = self._scan('INV')
-                    not_test = self.not_test(R)
-                    v = 'undefined' if isinstance(not_test, basestring) and _undefined_re.match(not_test) else _inv('!', not_test)
-                if self._peek(self.not_test_rsts_) not in self.not_test_chks:
-                    break
-            return v
+        else:  # == 'NOT'
+            NOT = self._scan('NOT')
+            not_test = self.not_test(R)
+            return NotOp(not_test)
 
     def comparison(self, R):
         a_expr = self.a_expr(R)
@@ -141,27 +131,27 @@ class Calculator(Parser):
             if _token_ == 'LT':
                 LT = self._scan('LT')
                 a_expr = self.a_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v < a_expr)
+                v = BinaryOp(operator.lt, v, a_expr)
             elif _token_ == 'GT':
                 GT = self._scan('GT')
                 a_expr = self.a_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v > a_expr)
+                v = BinaryOp(operator.gt, v, a_expr)
             elif _token_ == 'LE':
                 LE = self._scan('LE')
                 a_expr = self.a_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v <= a_expr)
+                v = BinaryOp(operator.le, v, a_expr)
             elif _token_ == 'GE':
                 GE = self._scan('GE')
                 a_expr = self.a_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v >= a_expr)
+                v = BinaryOp(operator.ge, v, a_expr)
             elif _token_ == 'EQ':
                 EQ = self._scan('EQ')
                 a_expr = self.a_expr(R)
-                v = (None if isinstance(v, basestring) and _undefined_re.match(v) else v) == (None if isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else a_expr)
+                v = BinaryOp(operator.eq, v, a_expr)
             else:  # == 'NE'
                 NE = self._scan('NE')
                 a_expr = self.a_expr(R)
-                v = (None if isinstance(v, basestring) and _undefined_re.match(v) else v) != (None if isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else a_expr)
+                v = BinaryOp(operator.ne, v, a_expr)
         return v
 
     def a_expr(self, R):
@@ -172,11 +162,11 @@ class Calculator(Parser):
             if _token_ == 'ADD':
                 ADD = self._scan('ADD')
                 m_expr = self.m_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(m_expr, basestring) and _undefined_re.match(m_expr) else (v + m_expr)
+                v = BinaryOp(operator.add, v, m_expr)
             else:  # == 'SUB'
                 SUB = self._scan('SUB')
                 m_expr = self.m_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(m_expr, basestring) and _undefined_re.match(m_expr) else (v - m_expr)
+                v = BinaryOp(operator.sub, v, m_expr)
         return v
 
     def m_expr(self, R):
@@ -187,11 +177,11 @@ class Calculator(Parser):
             if _token_ == 'MUL':
                 MUL = self._scan('MUL')
                 u_expr = self.u_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else (v * u_expr)
+                v = BinaryOp(operator.mul, v, u_expr)
             else:  # == 'DIV'
                 DIV = self._scan('DIV')
                 u_expr = self.u_expr(R)
-                v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else (v / u_expr)
+                v = BinaryOp(operator.div, v, u_expr)
         return v
 
     def u_expr(self, R):
@@ -199,18 +189,14 @@ class Calculator(Parser):
         if _token_ == 'SIGN':
             SIGN = self._scan('SIGN')
             u_expr = self.u_expr(R)
-            return 'undefined' if isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else _inv('-', u_expr)
+            return UnaryOp(operator.neg, u_expr)
         elif _token_ == 'ADD':
             ADD = self._scan('ADD')
             u_expr = self.u_expr(R)
-            return 'undefined' if isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else u_expr
+            return UnaryOp(operator.pos, u_expr)
         else:  # in self.u_expr_chks
             atom = self.atom(R)
-            v = atom
-            if self._peek(self.u_expr_rsts_) == 'UNITS':
-                UNITS = self._scan('UNITS')
-                v = call(UNITS, ListValue(ParserValue({0: v, 1: UNITS})), R, self._library, False)
-            return v
+            return atom
 
     def atom(self, R):
         _token_ = self._peek(self.u_expr_chks)
@@ -218,89 +204,96 @@ class Calculator(Parser):
             LPAR = self._scan('LPAR')
             expr_lst = self.expr_lst(R)
             RPAR = self._scan('RPAR')
-            return expr_lst.first() if len(expr_lst) == 1 else expr_lst
+            return expr_lst
         elif _token_ == 'ID':
             ID = self._scan('ID')
-            return ID
+            return Literal(StringValue(ID))
         elif _token_ == 'FNCT':
             FNCT = self._scan('FNCT')
-            v = None
+            v = ArgspecLiteral([])
             LPAR = self._scan('LPAR')
             if self._peek(self.atom_rsts) != 'RPAR':
-                expr_lst = self.expr_lst(R)
-                v = expr_lst
+                argspec = self.argspec(R)
+                v = argspec
             RPAR = self._scan('RPAR')
-            return call(FNCT, v, R, self._library)
+            return CallOp(FNCT, v)
         elif _token_ == 'NUM':
             NUM = self._scan('NUM')
-            return NumberValue(ParserValue(NUM))
+            if self._peek(self.atom_rsts_) == 'UNITS':
+                UNITS = self._scan('UNITS')
+                return Literal(NumberValue(float(NUM), type=UNITS))
+            return Literal(NumberValue(float(NUM)))
         elif _token_ == 'STR':
             STR = self._scan('STR')
-            return StringValue(ParserValue(STR))
+            return Literal(StringValue(ParserValue(STR)))
         elif _token_ == 'QSTR':
             QSTR = self._scan('QSTR')
-            return QuotedStringValue(ParserValue(QSTR))
+            return Literal(QuotedStringValue(ParserValue(QSTR)))
         elif _token_ == 'BOOL':
             BOOL = self._scan('BOOL')
-            return BooleanValue(ParserValue(BOOL))
+            return Literal(BooleanValue(ParserValue(BOOL)))
         elif _token_ == 'COLOR':
             COLOR = self._scan('COLOR')
-            return ColorValue(ParserValue(COLOR))
+            return Literal(ColorValue(ParserValue(COLOR)))
         else:  # == 'VAR'
             VAR = self._scan('VAR')
-            return interpolate(VAR, R, self._library)
+            return Variable(VAR)
 
-    def expr_lst(self, R):
-        n = None
-        if self._peek(self.expr_lst_rsts) == 'VAR':
+    def argspec(self, R):
+        argspec_item = self.argspec_item(R)
+        v = [argspec_item]
+        while self._peek(self.argspec_rsts) == 'COMMA':
+            COMMA = self._scan('COMMA')
+            argspec_item = self.argspec_item(R)
+            v.append(argspec_item)
+        return ArgspecLiteral(v)
+
+    def argspec_item(self, R):
+        var = None
+        if self._peek(self.argspec_item_rsts) == 'VAR':
             VAR = self._scan('VAR')
-            if self._peek(self.expr_lst_rsts_) == '":"':
+            if self._peek(self.argspec_item_rsts_) == '":"':
                 self._scan('":"')
-                n = VAR
+                var = VAR
             else: self._rewind()
         expr_slst = self.expr_slst(R)
-        v = {n or 0: expr_slst}
-        while self._peek(self.expr_lst_rsts__) == 'COMMA':
-            n = None
+        return (var, expr_slst)
+
+    def expr_lst(self, R):
+        expr_slst = self.expr_slst(R)
+        v = [expr_slst]
+        while self._peek(self.expr_lst_rsts) == 'COMMA':
             COMMA = self._scan('COMMA')
-            v['_'] = COMMA
-            if self._peek(self.expr_lst_rsts) == 'VAR':
-                VAR = self._scan('VAR')
-                if self._peek(self.expr_lst_rsts_) == '":"':
-                    self._scan('":"')
-                    n = VAR
-                else: self._rewind()
             expr_slst = self.expr_slst(R)
-            v[n or len(v)] = expr_slst
-        return ListValue(ParserValue(v))
+            v.append(expr_slst)
+        return ListLiteral(v) if len(v) > 1 else v[0]
 
     def expr_slst(self, R):
         expr = self.expr(R)
-        v = {0: expr}
-        while self._peek(self.expr_slst_rsts) not in self.expr_lst_rsts__:
+        v = [expr]
+        while self._peek(self.expr_slst_rsts) not in self.expr_lst_rsts:
             expr = self.expr(R)
-            v[len(v)] = expr
-        return ListValue(ParserValue(v)) if len(v) > 1 else v[0]
+            v.append(expr)
+        return ListLiteral(v, comma=False) if len(v) > 1 else v[0]
 
-    not_test_rsts_ = set(['AND', 'LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
     m_expr_chks = set(['MUL', 'DIV'])
-    comparison_rsts = set(['LPAR', 'QSTR', 'RPAR', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'ADD', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'INV', 'GE', 'BOOL', 'NOT', 'OR'])
-    atom_rsts = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'NOT', 'ADD', 'NUM', 'BOOL', 'FNCT', 'STR', 'VAR', 'RPAR', 'ID'])
-    not_test_chks = set(['NOT', 'INV'])
+    comparison_rsts = set(['LPAR', 'QSTR', 'RPAR', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'ADD', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'GE', 'BOOL', 'NOT', 'OR'])
     u_expr_chks = set(['LPAR', 'COLOR', 'QSTR', 'NUM', 'BOOL', 'FNCT', 'STR', 'VAR', 'ID'])
-    m_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
-    expr_lst_rsts_ = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'BOOL', '":"', 'STR', 'NOT', 'ID', 'FNCT'])
-    expr_lst_rsts = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'NOT', 'ADD', 'NUM', 'BOOL', 'FNCT', 'STR', 'VAR', 'ID'])
-    and_test_rsts = set(['AND', 'LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
-    u_expr_rsts_ = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'VAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
+    m_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'BOOL', 'NOT', 'OR'])
+    argspec_item_rsts_ = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'BOOL', '":"', 'STR', 'NOT', 'ID', 'FNCT'])
+    expr_lst_rsts = set(['END', 'COMMA', 'RPAR'])
+    and_test_rsts = set(['AND', 'LPAR', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
+    atom_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'NOT', 'ADD', 'NUM', 'BOOL', 'FNCT', 'STR', 'VAR', 'RPAR', 'ID'])
     u_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'ADD', 'NUM', 'BOOL', 'FNCT', 'STR', 'VAR', 'ID'])
-    expr_rsts = set(['LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'BOOL', 'ID', 'RPAR', 'OR'])
-    not_test_rsts = set(['LPAR', 'QSTR', 'COLOR', 'INV', 'SIGN', 'VAR', 'ADD', 'NUM', 'BOOL', 'FNCT', 'STR', 'NOT', 'ID'])
+    expr_rsts = set(['LPAR', 'END', 'COLOR', 'QSTR', 'RPAR', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'BOOL', 'ID', 'SIGN', 'OR'])
+    argspec_item_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'NOT', 'ADD', 'NUM', 'BOOL', 'FNCT', 'STR', 'VAR', 'ID'])
+    argspec_rsts = set(['COMMA', 'RPAR'])
+    not_test_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'BOOL', 'FNCT', 'STR', 'NOT', 'ID'])
+    atom_rsts_ = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'VAR', 'MUL', 'DIV', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'ADD', 'BOOL', 'NOT', 'OR'])
     comparison_chks = set(['GT', 'GE', 'NE', 'LT', 'LE', 'EQ'])
-    expr_slst_rsts = set(['LPAR', 'QSTR', 'END', 'COLOR', 'INV', 'RPAR', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'BOOL', 'SIGN', 'ID'])
     a_expr_chks = set(['ADD', 'SUB'])
-    a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'INV', 'ADD', 'BOOL', 'NOT', 'OR'])
-    expr_lst_rsts__ = set(['END', 'COMMA', 'RPAR'])
+    a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'BOOL', 'NOT', 'OR'])
+    expr_slst_rsts = set(['LPAR', 'END', 'COLOR', 'QSTR', 'RPAR', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'BOOL', 'SIGN', 'ID'])
 
 
     expr_lst_rsts_ = None

@@ -71,7 +71,7 @@ def hsla(h, s, l, a, type='hsla'):
               ]
            ]
     col += [type]
-    c = [c * 255.0 for c in colorsys.hls_to_rgb(col[0], 0.999999 if col[2] == 1 else col[2], 0.999999 if col[1] == 1 else col[1])] + [col[3], type]
+    c = [c * 255.0 for c in colorsys.hls_to_rgb(col[0], 0.99999999 if col[2] == 1 else col[2], 0.99999999 if col[1] == 1 else col[1])] + [col[3], type]
     col = ColorValue(c)
     return col
 
@@ -276,7 +276,7 @@ def __hsl_op(op, color, h, s, l):
     r = 360.0, 1.0, 1.0
     c = [0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(3)]
     # Convert back to RGB:
-    c = colorsys.hls_to_rgb(c[0] / 360.0, 0.999999 if c[2] == 1 else c[2], 0.999999 if c[1] == 1 else c[1])
+    c = colorsys.hls_to_rgb(c[0] / 360.0, 0.99999999 if c[2] == 1 else c[2], 0.99999999 if c[1] == 1 else c[1])
     color.value = (c[0] * 255.0, c[1] * 255.0, c[2] * 255.0, color.value[3])
     return color
 

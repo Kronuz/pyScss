@@ -191,47 +191,63 @@ del t, m, k, f
 
 
 # ------------------------------------------------------------------------------
-# Built-in CSS function regex
+# Built-in CSS function reference
 
 # Known function names
-FUNCTIONS_CSS2 = 'attr counter counters url rgb rect'
-## CSS3
-FUNCTIONS_UNITS = 'calc min max cycle'  # http://www.w3.org/TR/css3-values/
-FUNCTIONS_COLORS = 'rgba hsl hsla'  # http://www.w3.org/TR/css3-color/
-FUNCTIONS_FONTS = 'local format'  # http://www.w3.org/TR/css3-fonts/
-# http://www.w3.org/TR/css3-images
-FUNCTIONS_IMAGES = 'image element linear-gradient radial-gradient '\
-                   'repeating-linear-gradient repeating-radial-gradient'
-# http://www.w3.org/TR/css3-2d-transforms/
-FUNCTIONS_2D = 'matrix translate translateX translateY scale '\
-               'scale scaleX scaleY rotate skew skewX skewY'
-# http://www.w3.org/TR/css3-3d-transforms/
-FUNCTIONS_3D = 'matrix3d translate3d translateZ scale3d scaleZ rotate3d '\
-               'rotateX rotateY rotateZ skew perspective'
-# http://www.w3.org/TR/css3-transitions/
-FUNCTIONS_TRANSITIONS = 'cubic-bezier'
-# http://www.w3.org/TR/css3-animations/
-FUNCTIONS_ANIMATIONS = ''  # has 'from' and 'to' block selectors, but no new function
-FUNCTIONS_FILTER = 'grayscale blur sepia saturate opacity brightness contrast hue-rotate invert'
-FUNCTIONS_OTHERS = 'from to color-stop mask'
-VENDORS = '-[^-]+-.+'
+BUILTIN_FUNCTIONS = frozenset([
+    # CSS2
+    'attr', 'counter', 'counters', 'url', 'rgb', 'rect',
 
-_css_functions_re = re.compile(r'^(%s)$' % (
-    '|'.join(set(' '.join([
-        FUNCTIONS_CSS2,
-        FUNCTIONS_UNITS,
-        FUNCTIONS_COLORS,
-        FUNCTIONS_FONTS,
-        FUNCTIONS_IMAGES,
-        FUNCTIONS_2D,
-        FUNCTIONS_3D,
-        FUNCTIONS_TRANSITIONS,
-        FUNCTIONS_ANIMATIONS,
-        FUNCTIONS_FILTER,
-        FUNCTIONS_OTHERS,
-        VENDORS,
-    ]).split()))))
+    # CSS3 values: http://www.w3.org/TR/css3-values/
+    'calc', 'min', 'max', 'cycle',
 
+    # CSS3 colors: http://www.w3.org/TR/css3-color/
+    'rgba', 'hsl', 'hsla',
+
+    # CSS3 fonts: http://www.w3.org/TR/css3-fonts/
+    'local', 'format',
+
+    # CSS3 images: http://www.w3.org/TR/css3-images/
+    'image', 'element',
+    'linear-gradient', 'radial-gradient',
+    'repeating-linear-gradient', 'repeating-radial-gradient',
+
+    # CSS3 transforms: http://www.w3.org/TR/css3-transforms/
+    'perspective',
+    'matrix', 'matrix3d',
+    'rotate', 'rotateX', 'rotateY', 'rotateZ', 'rotate3d',
+    'translate', 'translateX', 'translateY', 'translateZ', 'translate3d',
+    'scale', 'scaleX', 'scaleY', 'scaleZ', 'scale3d',
+    'skew', 'skewX', 'skewY',
+
+    # CSS3 transitions: http://www.w3.org/TR/css3-transitions/
+    'cubic-bezier', 'steps',
+
+    # CSS filter effects:
+    # https://dvcs.w3.org/hg/FXTF/raw-file/tip/filters/index.html
+    'grayscale', 'sepia', 'saturate', 'hue-rotate', 'invert', 'opacity',
+    'brightness', 'contrast', 'blur', 'drop-shadow', 'custom',
+
+    # Others
+    'color-stop',           # Older version of CSS3 gradients
+    'mask',                 # ???
+])
+
+
+def is_builtin_css_function(name):
+    """Returns whether the given `name` looks like the name of a builtin CSS
+    function.
+
+    Unrecognized functions not in this list produce warnings.
+    """
+    if name in BUILTIN_FUNCTIONS:
+        return True
+
+    # Vendor-specific functions (-foo-bar) are always okay
+    if name[0] == '-' and '-' in name[1:]:
+        return True
+
+    return False
 
 # ------------------------------------------------------------------------------
 # Bits and pieces of grammar, as regexen

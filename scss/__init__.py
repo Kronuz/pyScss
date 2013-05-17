@@ -627,8 +627,7 @@ class Scss(object):
             if param:
                 new_params.append(param)
                 if default:
-                    default = self.calculator.apply_vars(default, rule, rule.context, None)
-                    defaults[param] = default
+                    defaults[param] = self.calculator.calculate(default, rule, rule.context, None)
         mixin = [list(new_params), defaults, block.unparsed_contents]
         if block.directive == '@function':
             def _call(mixin):

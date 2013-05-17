@@ -68,97 +68,93 @@ parser Calculator:
     token VAR: "\$[-a-zA-Z0-9_]+"
     token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
     token ID: "[-a-zA-Z_][-a-zA-Z0-9_]*"
-    rule goal<<R>>:         expr_lst<<R>>                   {{ v = expr_lst.first() if len(expr_lst) == 1 else expr_lst }}
+    rule goal<<R>>:         expr_lst<<R>>                   {{ v = expr_lst }}
                               END                           {{ return v }}
     rule expr<<R>>:         and_test<<R>>                   {{ v = and_test }}
                               (
-                                  OR and_test<<R>>          {{ v = and_test if isinstance(v, basestring) and _undefined_re.match(v) else (v or and_test) }}
+                                  OR and_test<<R>>          {{ v = AnyOp(v, and_test) }}
                               )*                            {{ return v }}
     rule and_test<<R>>:     not_test<<R>>                   {{ v = not_test }}
                               (
-                                  AND not_test<<R>>         {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) else (v and not_test) }}
+                                  AND not_test<<R>>         {{ v = AllOp(v, not_test) }}
                               )*                            {{ return v }}
     rule not_test<<R>>:     comparison<<R>>                 {{ return comparison }}
                               |
-                              (
-                                  NOT not_test<<R>>         {{ v = 'undefined' if isinstance(not_test, basestring) and _undefined_re.match(not_test) else (not not_test) }}
-                                  |
-                                  INV not_test<<R>>         {{ v = 'undefined' if isinstance(not_test, basestring) and _undefined_re.match(not_test) else _inv('!', not_test) }}
-                              )+                            {{ return v }}
+                              NOT not_test<<R>>             {{ return NotOp(not_test) }}
     rule comparison<<R>>:   a_expr<<R>>                     {{ v = a_expr }}
                               (
-                                  LT a_expr<<R>>            {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v < a_expr) }}
+                                  LT a_expr<<R>>            {{ v = BinaryOp(operator.lt, v, a_expr) }}
                                   |
-                                  GT a_expr<<R>>            {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v > a_expr) }}
+                                  GT a_expr<<R>>            {{ v = BinaryOp(operator.gt, v, a_expr) }}
                                   |
-                                  LE a_expr<<R>>            {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v <= a_expr) }}
+                                  LE a_expr<<R>>            {{ v = BinaryOp(operator.le, v, a_expr) }}
                                   |
-                                  GE a_expr<<R>>            {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else (v >= a_expr) }}
+                                  GE a_expr<<R>>            {{ v = BinaryOp(operator.ge, v, a_expr) }}
                                   |
-                                  EQ a_expr<<R>>            {{ v = (None if isinstance(v, basestring) and _undefined_re.match(v) else v) == (None if isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else a_expr) }}
+                                  EQ a_expr<<R>>            {{ v = BinaryOp(operator.eq, v, a_expr) }}
                                   |
-                                  NE a_expr<<R>>            {{ v = (None if isinstance(v, basestring) and _undefined_re.match(v) else v) != (None if isinstance(a_expr, basestring) and _undefined_re.match(a_expr) else a_expr) }}
+                                  NE a_expr<<R>>            {{ v = BinaryOp(operator.ne, v, a_expr) }}
                               )*                            {{ return v }}
     rule a_expr<<R>>:       m_expr<<R>>                     {{ v = m_expr }}
                               (
-                                  ADD m_expr<<R>>           {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(m_expr, basestring) and _undefined_re.match(m_expr) else (v + m_expr) }}
+                                  ADD m_expr<<R>>           {{ v = BinaryOp(operator.add, v, m_expr) }}
                                   |
-                                  SUB m_expr<<R>>           {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(m_expr, basestring) and _undefined_re.match(m_expr) else (v - m_expr) }}
+                                  SUB m_expr<<R>>           {{ v = BinaryOp(operator.sub, v, m_expr) }}
                               )*                            {{ return v }}
     rule m_expr<<R>>:       u_expr<<R>>                     {{ v = u_expr }}
                               (
-                                  MUL u_expr<<R>>           {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else (v * u_expr) }}
+                                  MUL u_expr<<R>>           {{ v = BinaryOp(operator.mul, v, u_expr) }}
                                   |
-                                  DIV u_expr<<R>>           {{ v = 'undefined' if isinstance(v, basestring) and _undefined_re.match(v) or isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else (v / u_expr) }}
+                                  DIV u_expr<<R>>           {{ v = BinaryOp(operator.div, v, u_expr) }}
                               )*                            {{ return v }}
-    rule u_expr<<R>>:       SIGN u_expr<<R>>                {{ return 'undefined' if isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else _inv('-', u_expr) }}
+    rule u_expr<<R>>:       SIGN u_expr<<R>>                {{ return UnaryOp(operator.neg, u_expr) }}
                               |
-                              ADD u_expr<<R>>               {{ return 'undefined' if isinstance(u_expr, basestring) and _undefined_re.match(u_expr) else u_expr }}
+                              ADD u_expr<<R>>               {{ return UnaryOp(operator.pos, u_expr) }}
                               |
-                              atom<<R>>                     {{ v = atom }}
-                              [
-                                  UNITS                     {{ v = call(UNITS, ListValue(ParserValue({0: v, 1: UNITS})), R, self._library, False) }}
-                              ]                             {{ return v }}
-    rule atom<<R>>:         LPAR expr_lst<<R>> RPAR         {{ return expr_lst.first() if len(expr_lst) == 1 else expr_lst }}
+                              atom<<R>>                     {{ return atom }}
+    rule atom<<R>>:         LPAR expr_lst<<R>> RPAR         {{ return expr_lst }}
                               |
-                              ID                            {{ return ID }}
+                              ID                            {{ return Literal(StringValue(ID)) }}
                               |
-                              FNCT                          {{ v = None }}
+                              FNCT                          {{ v = ArgspecLiteral([]) }}
                               LPAR [
-                                  expr_lst<<R>>             {{ v = expr_lst }}
-                              ] RPAR                        {{ return call(FNCT, v, R, self._library) }}
+                                  argspec<<R>>              {{ v = argspec }}
+                              ] RPAR                        {{ return CallOp(FNCT, v) }}
                               |
-                              NUM                           {{ return NumberValue(ParserValue(NUM)) }}
+                              NUM [
+                                  UNITS                     {{ return Literal(NumberValue(float(NUM), type=UNITS)) }}
+                              ]                             {{ return Literal(NumberValue(float(NUM))) }}
                               |
-                              STR                           {{ return StringValue(ParserValue(STR)) }}
+                              STR                           {{ return Literal(StringValue(ParserValue(STR))) }}
                               |
-                              QSTR                          {{ return QuotedStringValue(ParserValue(QSTR)) }}
+                              QSTR                          {{ return Literal(QuotedStringValue(ParserValue(QSTR))) }}
                               |
-                              BOOL                          {{ return BooleanValue(ParserValue(BOOL)) }}
+                              BOOL                          {{ return Literal(BooleanValue(ParserValue(BOOL))) }}
                               |
-                              COLOR                         {{ return ColorValue(ParserValue(COLOR)) }}
+                              COLOR                         {{ return Literal(ColorValue(ParserValue(COLOR))) }}
                               |
-                              VAR                           {{ return interpolate(VAR, R, self._library) }}
-    rule expr_lst<<R>>:                                     {{ n = None }}
-                              [
-                                  VAR [
-                                      ":"                   {{ n = VAR }}
-                                  ]                         {{ else: self._rewind() }}
-                              ]
-                              expr_slst<<R>>                {{ v = {n or 0: expr_slst} }}
-                              (                             {{ n = None }}
-                                  COMMA                     {{ v['_'] = COMMA }}
-                                  [
-                                      VAR [
-                                          ":"               {{ n = VAR }}
-                                      ]                     {{ else: self._rewind() }}
-                                  ]
-                                  expr_slst<<R>>            {{ v[n or len(v)] = expr_slst }}
-                              )*                            {{ return ListValue(ParserValue(v)) }}
-    rule expr_slst<<R>>:    expr<<R>>                       {{ v = {0: expr} }}
+                              VAR                           {{ return Variable(VAR) }}
+    rule argspec<<R>>:      argspec_item<<R>>               {{ v = [argspec_item] }}
                               (
-                                  expr<<R>>                 {{ v[len(v)] = expr }}
-                              )*                            {{ return ListValue(ParserValue(v)) if len(v) > 1 else v[0] }}
+                                  COMMA
+                                  argspec_item<<R>>         {{ v.append(argspec_item) }}
+                              )*                            {{ return ArgspecLiteral(v) }}
+    rule argspec_item<<R>>:                                 {{ var = None }}
+                              [
+                                VAR
+                                [ ":"                       {{ var = VAR }}
+                                ]                           {{ else: self._rewind() }}
+                              ]
+                              expr_slst<<R>>                {{ return (var, expr_slst) }}
+    rule expr_lst<<R>>:     expr_slst<<R>>                  {{ v = [expr_slst] }}
+                              (
+                                  COMMA
+                                  expr_slst<<R>>            {{ v.append(expr_slst) }}
+                              )*                            {{ return ListLiteral(v) if len(v) > 1 else v[0] }}
+    rule expr_slst<<R>>:    expr<<R>>                       {{ v = [expr] }}
+                              (
+                                  expr<<R>>                 {{ v.append(expr) }}
+                              )*                            {{ return ListLiteral(v, comma=False) if len(v) > 1 else v[0] }}
 %%
     expr_lst_rsts_ = None
 

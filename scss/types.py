@@ -233,7 +233,9 @@ class NumberValue(Value):
             except ValueError:
                 raise ValueError("Value is not a Number! (%s)" % tokens)
         elif isinstance(tokens, (int, float)):
-            self.value = float(tokens)
+            # TODO i don't like this; should store the original and only divide
+            # when converting.  requires fixing __str__ though
+            self.value = float(tokens) * _conv_factor.get(type, 1.0)
         else:
             raise ValueError("Can't convert to CSS number: %s" % repr(tokens))
         if type is not None:
@@ -250,6 +252,12 @@ class NumberValue(Value):
 
     def __float__(self):
         return float(self.value)
+
+    def __neg__(self):
+        return self * -1
+
+    def __pos__(self):
+        return self
 
     def __str__(self):
         unit = self.unit
@@ -583,6 +591,10 @@ class ColorValue(Value):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.types))
 
     def __str__(self):
+        # TODO bit of a hack?
+        if self.tokens is not None and isinstance(self.tokens, ParserValue):
+            return self.tokens.value
+
         type = self.type
         c = self.value
         if type == 'hsl' or type == 'hsla' and c[3] == 1:
@@ -592,14 +604,18 @@ class ColorValue(Value):
             h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
             return 'hsla(%s, %s%%, %s%%, %s)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0), to_str(c[3]))
         r, g, b = to_str(c[0]), to_str(c[1]), to_str(c[2])
-        _, _, r = r.partition('.')
-        _, _, g = g.partition('.')
-        _, _, b = b.partition('.')
+        are_integral = True
+        for n in c[:3]:
+            # replicating old logic; perhaps needs rethinking
+            n2 = round(n * 100, 1)
+            if n2 != int(n2):
+                are_integral = False
+                break
         if c[3] == 1:
-            if len(r) > 2 or len(g) > 2 or len(b) > 2:
+            if not are_integral:
                 return 'rgb(%s%%, %s%%, %s%%)' % (to_str(c[0] * 100.0 / 255.0), to_str(c[1] * 100.0 / 255.0), to_str(c[2] * 100.0 / 255.0))
             return '#%02x%02x%02x' % (round(c[0]), round(c[1]), round(c[2]))
-        if len(r) > 2 or len(g) > 2 or len(b) > 2:
+        if not are_integral:
             return 'rgba(%s%%, %s%%, %s%%, %s)' % (to_str(c[0] * 100.0 / 255.0), to_str(c[1] * 100.0 / 255.0), to_str(c[2] * 100.0 / 255.0), to_str(c[3]))
         return 'rgba(%d, %d, %d, %s)' % (round(c[0]), round(c[1]), round(c[2]), to_str(c[3]))
 
