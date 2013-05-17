@@ -1,39 +1,5 @@
 # python yapps2.py grammar.g grammar.py
 
-
-_units = ['em', 'ex', 'px', 'cm', 'mm', 'in', 'pt', 'pc', 'deg', 'rad'
-          'grad', 'ms', 's', 'hz', 'khz', '%']
-_inv = lambda s: s
-ParserValue = lambda s: s
-NumberValue = lambda s: float(s)
-StringValue = lambda s: s
-QuotedStringValue = lambda s: s
-BooleanValue = lambda s: bool(s)
-ColorValue = lambda s: s
-class ListValue():
-    def __init__(self, v):
-        if isinstance(v, self.__class__):
-            self.v = v
-        else:
-            self.v = {0: v}
-    def first(self):
-        return self.v[0]
-    def __len__(self):
-        return len(self.v)
-
-
-def _reorder_list(lst):
-    return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
-
-
-def interpolate(v, R, library):
-    return v
-
-
-def call(fn, args, R, library, function=True):
-    print 'call: ', fn, args
-    return args
-
 ################################################################################
 #'(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'
 ## Grammar compiled using Yapps:
@@ -89,120 +55,120 @@ class CalculatorScanner(Scanner):
 
 
 class Calculator(Parser):
-    def goal(self, R):
-        expr_lst = self.expr_lst(R)
+    def goal(self):
+        expr_lst = self.expr_lst()
         v = expr_lst
         END = self._scan('END')
         return v
 
-    def expr(self, R):
-        and_test = self.and_test(R)
+    def expr(self):
+        and_test = self.and_test()
         v = and_test
         while self._peek(self.expr_rsts) == 'OR':
             OR = self._scan('OR')
-            and_test = self.and_test(R)
+            and_test = self.and_test()
             v = AnyOp(v, and_test)
         return v
 
-    def and_test(self, R):
-        not_test = self.not_test(R)
+    def and_test(self):
+        not_test = self.not_test()
         v = not_test
         while self._peek(self.and_test_rsts) == 'AND':
             AND = self._scan('AND')
-            not_test = self.not_test(R)
+            not_test = self.not_test()
             v = AllOp(v, not_test)
         return v
 
-    def not_test(self, R):
+    def not_test(self):
         _token_ = self._peek(self.not_test_rsts)
         if _token_ != 'NOT':
-            comparison = self.comparison(R)
+            comparison = self.comparison()
             return comparison
         else:  # == 'NOT'
             NOT = self._scan('NOT')
-            not_test = self.not_test(R)
+            not_test = self.not_test()
             return NotOp(not_test)
 
-    def comparison(self, R):
-        a_expr = self.a_expr(R)
+    def comparison(self):
+        a_expr = self.a_expr()
         v = a_expr
         while self._peek(self.comparison_rsts) in self.comparison_chks:
             _token_ = self._peek(self.comparison_chks)
             if _token_ == 'LT':
                 LT = self._scan('LT')
-                a_expr = self.a_expr(R)
+                a_expr = self.a_expr()
                 v = BinaryOp(operator.lt, v, a_expr)
             elif _token_ == 'GT':
                 GT = self._scan('GT')
-                a_expr = self.a_expr(R)
+                a_expr = self.a_expr()
                 v = BinaryOp(operator.gt, v, a_expr)
             elif _token_ == 'LE':
                 LE = self._scan('LE')
-                a_expr = self.a_expr(R)
+                a_expr = self.a_expr()
                 v = BinaryOp(operator.le, v, a_expr)
             elif _token_ == 'GE':
                 GE = self._scan('GE')
-                a_expr = self.a_expr(R)
+                a_expr = self.a_expr()
                 v = BinaryOp(operator.ge, v, a_expr)
             elif _token_ == 'EQ':
                 EQ = self._scan('EQ')
-                a_expr = self.a_expr(R)
+                a_expr = self.a_expr()
                 v = BinaryOp(operator.eq, v, a_expr)
             else:  # == 'NE'
                 NE = self._scan('NE')
-                a_expr = self.a_expr(R)
+                a_expr = self.a_expr()
                 v = BinaryOp(operator.ne, v, a_expr)
         return v
 
-    def a_expr(self, R):
-        m_expr = self.m_expr(R)
+    def a_expr(self):
+        m_expr = self.m_expr()
         v = m_expr
         while self._peek(self.a_expr_rsts) in self.a_expr_chks:
             _token_ = self._peek(self.a_expr_chks)
             if _token_ == 'ADD':
                 ADD = self._scan('ADD')
-                m_expr = self.m_expr(R)
+                m_expr = self.m_expr()
                 v = BinaryOp(operator.add, v, m_expr)
             else:  # == 'SUB'
                 SUB = self._scan('SUB')
-                m_expr = self.m_expr(R)
+                m_expr = self.m_expr()
                 v = BinaryOp(operator.sub, v, m_expr)
         return v
 
-    def m_expr(self, R):
-        u_expr = self.u_expr(R)
+    def m_expr(self):
+        u_expr = self.u_expr()
         v = u_expr
         while self._peek(self.m_expr_rsts) in self.m_expr_chks:
             _token_ = self._peek(self.m_expr_chks)
             if _token_ == 'MUL':
                 MUL = self._scan('MUL')
-                u_expr = self.u_expr(R)
+                u_expr = self.u_expr()
                 v = BinaryOp(operator.mul, v, u_expr)
             else:  # == 'DIV'
                 DIV = self._scan('DIV')
-                u_expr = self.u_expr(R)
+                u_expr = self.u_expr()
                 v = BinaryOp(operator.div, v, u_expr)
         return v
 
-    def u_expr(self, R):
+    def u_expr(self):
         _token_ = self._peek(self.u_expr_rsts)
         if _token_ == 'SIGN':
             SIGN = self._scan('SIGN')
-            u_expr = self.u_expr(R)
+            u_expr = self.u_expr()
             return UnaryOp(operator.neg, u_expr)
         elif _token_ == 'ADD':
             ADD = self._scan('ADD')
-            u_expr = self.u_expr(R)
+            u_expr = self.u_expr()
             return UnaryOp(operator.pos, u_expr)
         else:  # in self.u_expr_chks
-            atom = self.atom(R)
+            atom = self.atom()
             return atom
 
-    def atom(self, R):
+    def atom(self):
         _token_ = self._peek(self.u_expr_chks)
         if _token_ == 'LPAR':
             LPAR = self._scan('LPAR')
-            expr_lst = self.expr_lst(R)
+            expr_lst = self.expr_lst()
             RPAR = self._scan('RPAR')
             return expr_lst
         elif _token_ == 'ID':
@@ -213,7 +179,7 @@ class Calculator(Parser):
             v = ArgspecLiteral([])
             LPAR = self._scan('LPAR')
             if self._peek(self.atom_rsts) != 'RPAR':
-                argspec = self.argspec(R)
+                argspec = self.argspec()
                 v = argspec
             RPAR = self._scan('RPAR')
             return CallOp(FNCT, v)
@@ -239,16 +205,16 @@ class Calculator(Parser):
             VAR = self._scan('VAR')
             return Variable(VAR)
 
-    def argspec(self, R):
-        argspec_item = self.argspec_item(R)
+    def argspec(self):
+        argspec_item = self.argspec_item()
         v = [argspec_item]
         while self._peek(self.argspec_rsts) == 'COMMA':
             COMMA = self._scan('COMMA')
-            argspec_item = self.argspec_item(R)
+            argspec_item = self.argspec_item()
             v.append(argspec_item)
         return ArgspecLiteral(v)
 
-    def argspec_item(self, R):
+    def argspec_item(self):
         var = None
         if self._peek(self.argspec_item_rsts) == 'VAR':
             VAR = self._scan('VAR')
@@ -256,23 +222,23 @@ class Calculator(Parser):
                 self._scan('":"')
                 var = VAR
             else: self._rewind()
-        expr_slst = self.expr_slst(R)
+        expr_slst = self.expr_slst()
         return (var, expr_slst)
 
-    def expr_lst(self, R):
-        expr_slst = self.expr_slst(R)
+    def expr_lst(self):
+        expr_slst = self.expr_slst()
         v = [expr_slst]
         while self._peek(self.expr_lst_rsts) == 'COMMA':
             COMMA = self._scan('COMMA')
-            expr_slst = self.expr_slst(R)
+            expr_slst = self.expr_slst()
             v.append(expr_slst)
         return ListLiteral(v) if len(v) > 1 else v[0]
 
-    def expr_slst(self, R):
-        expr = self.expr(R)
+    def expr_slst(self):
+        expr = self.expr()
         v = [expr]
         while self._peek(self.expr_slst_rsts) not in self.expr_lst_rsts:
-            expr = self.expr(R)
+            expr = self.expr()
             v.append(expr)
         return ListLiteral(v, comma=False) if len(v) > 1 else v[0]
 
@@ -298,29 +264,5 @@ class Calculator(Parser):
 
     expr_lst_rsts_ = None
 
-    def __init__(self, scanner, library):
-        self._library = library
-        super(Calculator, self).__init__(scanner)
-
-
 ### Grammar ends.
 ################################################################################
-
-P = Calculator(CalculatorScanner())
-
-
-def parse(rule, text, *args):
-    P.reset(text)
-    return wrap_error_reporter(P, rule, *args)
-
-
-if __name__ == '__main__':
-    while True:
-        try:
-            s = raw_input('>>> ')
-        except EOFError:
-            break
-        if not s.strip():
-            break
-        print parse('goal', s, None)
-    print 'Bye.'
