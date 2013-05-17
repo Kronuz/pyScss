@@ -20,17 +20,7 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
-expr_cache = {}
-
-
-def _inv(sign, value):
-    if isinstance(value, NumberValue):
-        return value * -1
-    elif isinstance(value, BooleanValue):
-        return not value
-    val = StringValue(value)
-    val.value = sign + val.value
-    return val
+ast_cache = {}
 
 
 def interpolate(var, rule, library):
@@ -63,15 +53,16 @@ def eval_expr(expr, rule, library, raw=False):
         if not isinstance(expr, basestring):
             results = expr
 
+    ast = None
     if results is None:
-        if expr in expr_cache:
-            results = expr_cache[expr]
+        if expr in ast_cache:
+            ast = ast_cache[expr]
+            results = ast.evaluate(rule, library)
         else:
             try:
                 P = Calculator(CalculatorScanner())
                 P.reset(expr)
-                results = P.goal()
-                results = results.evaluate(rule, library)
+                ast = P.goal()
             except SyntaxError:
                 if config.DEBUG:
                     raise
@@ -79,12 +70,10 @@ def eval_expr(expr, rule, library, raw=False):
                 log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule.file_and_line)
                 if config.DEBUG:
                     raise
+            else:
+                ast_cache[expr] = ast
 
-            # TODO this is a clumsy hack for nondeterministic functions;
-            # something better (and per-compiler rather than global) would be
-            # nice
-            if '$' not in expr and '(' not in expr:
-                expr_cache[expr] = results
+                results = ast.evaluate(rule, library)
 
     if not raw and results is not None:
         results = to_str(results)
@@ -211,8 +200,18 @@ class Variable(Expression):
         self.name = name
 
     def evaluate(self, rule, library):
-        print repr(rule.context[self.name])
-        return rule.context[self.name]
+        var = normalize_var(self.name)
+        if var in rule.context:
+            # TODO this should be a real value, not a flattened basestring
+            value = rule.context[var]
+            if isinstance(value, basestring):
+                evald = eval_expr(value, rule, library, True)
+                if evald is not None:
+                    return evald
+            return value
+        else:
+            # TODO well, no.
+            return var
 
 class ListLiteral(Expression):
     def __init__(self, items, comma=True):
@@ -230,61 +229,6 @@ class ArgspecLiteral(Expression):
 
 
 
-
-
-class CachedScanner(Scanner):
-    """
-    Same as Scanner, but keeps cached tokens for any given input
-    """
-    _cache_ = {}
-    _goals_ = ['END']
-
-    @classmethod
-    def cleanup(cls):
-        cls._cache_ = {}
-
-    def __init__(self, patterns, ignore, input=None):
-        try:
-            self._tokens = self._cache_[input]
-        except KeyError:
-            self._tokens = None
-            self.__tokens = {}
-            self.__input = input
-            super(CachedScanner, self).__init__(patterns, ignore, input)
-
-    def reset(self, input):
-        try:
-            self._tokens = self._cache_[input]
-        except KeyError:
-            self._tokens = None
-            self.__tokens = {}
-            self.__input = input
-            super(CachedScanner, self).reset(input)
-
-    def __repr__(self):
-        if self._tokens is None:
-            return super(CachedScanner, self).__repr__()
-        output = ''
-        for t in self._tokens[-10:]:
-            output = "%s\n  (@%s)  %s  =  %s" % (output, t[0], t[2], repr(t[3]))
-        return output
-
-    def token(self, i, restrict=None):
-        if self._tokens is None:
-            token = super(CachedScanner, self).token(i, restrict)
-            self.__tokens[i] = token
-            if token[2] in self._goals_:  # goal tokens
-                self._cache_[self.__input] = self._tokens = self.__tokens
-            return token
-        else:
-            token = self._tokens.get(i)
-            if token is None:
-                raise NoMoreTokens
-            return token
-
-    def rewind(self, i):
-        if self._tokens is None:
-            super(CachedScanner, self).rewind(i)
 
 
 class Parser(object):
@@ -322,7 +266,7 @@ class Parser(object):
 ################################################################################
 #'(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'
 ## Grammar compiled using Yapps:
-class CalculatorScanner(CachedScanner):
+class CalculatorScanner(Scanner):
     patterns = None
     _patterns = [
         ('":"', ':'),

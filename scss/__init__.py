@@ -66,7 +66,7 @@ from scss.cssdefs import (
     _undefined_re,
     _strings_re, _prop_split_re,
 )
-from scss.expression import CalculatorScanner, eval_expr, interpolate
+from scss.expression import eval_expr, interpolate
 from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
 from scss.rule import UnparsedBlock, SassRule
@@ -322,9 +322,6 @@ class Scss(object):
         return dict((k, v) for k, v in scss_vars.items() if k and not (not k.startswith('$') or k.startswith('$') and k[1].isupper()))
 
     def reset(self, input_scss=None):
-        if hasattr(CalculatorScanner, 'cleanup'):
-            CalculatorScanner.cleanup()
-
         # Initialize
         self.scss_vars = _default_scss_vars.copy()
         if self._scss_vars is not None:
