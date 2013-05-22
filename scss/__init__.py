@@ -65,7 +65,7 @@ from scss.cssdefs import (
     _undefined_re,
     _strings_re, _prop_split_re,
 )
-from scss.expression import Calculator, interpolate
+from scss.expression import Calculator
 from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
 from scss.rule import UnparsedBlock, SassRule
@@ -849,10 +849,10 @@ class Scss(object):
         def setdefault(var, val):
             _var = '$' + map_name + '-' + var
             if _var in rule.context:
-                kwargs[var] = interpolate(rule.context[_var], rule, self._library)
+                kwargs[var] = self.calculator.interpolate(rule.context[_var], rule, self._library)
             else:
                 rule.context[_var] = val
-                kwargs[var] = interpolate(val, rule, self._library)
+                kwargs[var] = self.calculator.interpolate(val, rule, self._library)
             return rule.context[_var]
 
         setdefault('sprite-base-class', StringValue('.' + map_name + '-sprite'))

@@ -34,7 +34,7 @@ class Calculator(object):
         def __calculate_expr(result):
             _group0 = result.group(1)
             _base_str = _group0
-            better_expr_str = eval_expr(_base_str, rule, self.library)
+            better_expr_str = self.eval_expr(_base_str, rule, self.library)
 
             if better_expr_str is None:
                 better_expr_str = self.apply_vars(_base_str, rule, context, options)
@@ -106,7 +106,7 @@ class Calculator(object):
 
         better_expr_str = self.do_glob_math(better_expr_str, rule, context, options)
 
-        better_expr_str = eval_expr(better_expr_str, rule, self.library, True)
+        better_expr_str = self.eval_expr(better_expr_str, rule, self.library, True)
 
         if better_expr_str is None:
             better_expr_str = self.apply_vars(_base_str, rule, context, options)
@@ -114,63 +114,63 @@ class Calculator(object):
         return better_expr_str
 
 
-def interpolate(var, rule, library):
-    value = rule.context.get(normalize_var(var), var)
-    if var != value and isinstance(value, basestring):
-        _vi = eval_expr(value, rule, library, True)
-        if _vi is not None:
-            value = _vi
-    return value
+    # TODO only used by magic-import...?
+    def interpolate(self, var, rule, library):
+        value = rule.context.get(normalize_var(var), var)
+        if var != value and isinstance(value, basestring):
+            _vi = self.eval_expr(value, rule, library, True)
+            if _vi is not None:
+                value = _vi
+        return value
 
 
-def eval_expr(expr, rule, library, raw=False):
-    # print >>sys.stderr, '>>',expr,'<<'
-    results = None
+    def eval_expr(self, expr, rule, library, raw=False):
+        results = None
 
-    if not isinstance(expr, basestring):
-        results = expr
-
-    if results is None:
-        if _variable_re.match(expr):
-            expr = normalize_var(expr)
-        if expr in rule.context:
-            chkd = {}
-            while expr in rule.context and expr not in chkd:
-                chkd[expr] = 1
-                _expr = rule.context[expr]
-                if _expr == expr:
-                    break
-                expr = _expr
         if not isinstance(expr, basestring):
             results = expr
 
-    ast = None
-    if results is None:
-        if expr in ast_cache:
-            ast = ast_cache[expr]
-            results = ast.evaluate(rule, library)
-        else:
-            try:
-                P = CalculatorParser(CalculatorScanner())
-                P.reset(expr)
-                ast = P.goal()
-            except SyntaxError:
-                if config.DEBUG:
-                    raise
-            except Exception, e:
-                log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule.file_and_line)
-                if config.DEBUG:
-                    raise
+        if results is None:
+            if _variable_re.match(expr):
+                expr = normalize_var(expr)
+            if expr in rule.context:
+                chkd = {}
+                while expr in rule.context and expr not in chkd:
+                    chkd[expr] = 1
+                    _expr = rule.context[expr]
+                    if _expr == expr:
+                        break
+                    expr = _expr
+            if not isinstance(expr, basestring):
+                results = expr
+
+        ast = None
+        if results is None:
+            if expr in ast_cache:
+                ast = ast_cache[expr]
+                results = ast.evaluate(rule, self)
             else:
-                ast_cache[expr] = ast
+                try:
+                    P = CalculatorParser(CalculatorScanner())
+                    P.reset(expr)
+                    ast = P.goal()
+                except SyntaxError:
+                    if config.DEBUG:
+                        raise
+                except Exception, e:
+                    log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule.file_and_line)
+                    if config.DEBUG:
+                        raise
+                else:
+                    ast_cache[expr] = ast
 
-                results = ast.evaluate(rule, library)
+                    results = ast.evaluate(rule, self)
 
-    if not raw and results is not None:
-        results = to_str(results)
+        if not raw and results is not None:
+            results = to_str(results)
 
-    # print >>sys.stderr, repr(expr),'==',results,'=='
-    return results
+        # print >>sys.stderr, repr(expr),'==',results,'=='
+        return results
 
 
 # ------------------------------------------------------------------------------
@@ -180,7 +180,7 @@ class Expression(object):
     def __repr__(self):
         return repr(self.__dict__)
 
-    def evaluate(self, rule, library):
+    def evaluate(self, rule, calculator):
         raise NotImplementedError
 
 class UnaryOp(Expression):
@@ -188,8 +188,8 @@ class UnaryOp(Expression):
         self.op = op
         self.operand = operand
 
-    def evaluate(self, rule, library):
-        return self.op(self.operand.evaluate(rule, library))
+    def evaluate(self, rule, calculator):
+        return self.op(self.operand.evaluate(rule, calculator))
 
 class BinaryOp(Expression):
     def __init__(self, op, left, right):
@@ -197,40 +197,40 @@ class BinaryOp(Expression):
         self.left = left
         self.right = right
 
-    def evaluate(self, rule, library):
-        left = self.left.evaluate(rule, library)
-        right = self.right.evaluate(rule, library)
+    def evaluate(self, rule, calculator):
+        left = self.left.evaluate(rule, calculator)
+        right = self.right.evaluate(rule, calculator)
         return self.op(left, right)
 
 class AnyOp(Expression):
     def __init__(self, *operands):
         self.operands = operands
 
-    def evaluate(self, rule, library):
-        operands = [operand.evaluate(rule, library) for operand in self.operands]
+    def evaluate(self, rule, calculator):
+        operands = [operand.evaluate(rule, calculator) for operand in self.operands]
         return any(operands)
 
 class AllOp(Expression):
     def __init__(self, *operands):
         self.operands = operands
 
-    def evaluate(self, rule, library):
-        operands = [operand.evaluate(rule, library) for operand in self.operands]
+    def evaluate(self, rule, calculator):
+        operands = [operand.evaluate(rule, calculator) for operand in self.operands]
         return all(operands)
 
 class NotOp(Expression):
     def __init__(self, operand):
         self.operand = operand
 
-    def evaluate(self, rule, library):
-        return not(self.operand.evaluate(rule, library))
+    def evaluate(self, rule, calculator):
+        return not(self.operand.evaluate(rule, calculator))
 
 class CallOp(Expression):
     def __init__(self, func_name, argspec):
         self.func_name = func_name
         self.argspec = argspec
 
-    def evaluate(self, rule, library):
+    def evaluate(self, rule, calculator):
         # TODO bake this into the context and options "dicts", plus library
         name = normalize_var(self.func_name)
 
@@ -241,7 +241,7 @@ class CallOp(Expression):
         kwargs = {}
         evald_argpairs = []
         for var, expr in self.argspec.argpairs:
-            value = expr.evaluate(rule, library)
+            value = expr.evaluate(rule, calculator)
             evald_argpairs.append((var, value))
 
             if var is None:
@@ -262,7 +262,7 @@ class CallOp(Expression):
         try:
             # If that fails, check for Python implementations
             if func is None:
-                func = library.lookup(name, num_args)
+                func = calculator.library.lookup(name, num_args)
         except KeyError:
             if not is_builtin_css_function(name):
                 # TODO log.warn, log.error, warning, exception?
@@ -284,20 +284,20 @@ class Literal(Expression):
     def __init__(self, value):
         self.value = value
 
-    def evaluate(self, rule, library):
+    def evaluate(self, rule, calculator):
         return self.value
 
 class Variable(Expression):
     def __init__(self, name):
         self.name = name
 
-    def evaluate(self, rule, library):
+    def evaluate(self, rule, calculator):
         var = normalize_var(self.name)
         if var in rule.context:
             # TODO this should be a real value, not a flattened basestring
             value = rule.context[var]
             if isinstance(value, basestring):
-                evald = eval_expr(value, rule, library, True)
+                evald = calculator.eval_expr(value, rule, calculator.library, True)
                 if evald is not None:
                     return evald
             return value
@@ -310,8 +310,8 @@ class ListLiteral(Expression):
         self.items = items
         self.comma = comma
 
-    def evaluate(self, rule, library):
-        items = [item.evaluate(rule, library) for item in self.items]
+    def evaluate(self, rule, calculator):
+        items = [item.evaluate(rule, calculator) for item in self.items]
         return ListValue(items, separator="," if self.comma else "")
 
 class ArgspecLiteral(Expression):
@@ -616,4 +616,4 @@ class CalculatorParser(Parser):
 ### Grammar ends.
 ################################################################################
 
-__all__ = ('interpolate', 'eval_expr', 'Calculator')
+__all__ = ('Calculator',)
