@@ -4460,15 +4460,15 @@ class NumberValue(Value):
                 first.value /= 100.0
             elif second_unit == '%' and first_unit != '%':
                 second = NumberValue(first) * second.value
-        elif op == operator.__div__:
-            if first_unit and first_unit == second_unit:
-                first.units = {}
-                second.units = {}
-
+        
         val = op(first.value, second.value)
 
-        ret = NumberValue(None).merge(first)
-        ret = ret.merge(second)
+        if op == operator.__div__ and first_unit and first_unit == second_unit:
+            ret = NumberValue(None)
+        else:
+            ret = NumberValue(None).merge(first)
+            ret = ret.merge(second)
+            
         ret.value = val
         return ret
 
