@@ -1,4 +1,51 @@
+from scss.compat import ChainMap
 from scss.cssdefs import _has_placeholder_re
+
+
+def normalize_var(name):
+    if isinstance(name, basestring):
+        return name.replace('_', '-')
+    else:
+        return name
+
+class SassVariableMap(ChainMap):
+    """ChainMap extension that implements Sass's interchangeable underscores
+    and dashes.
+    """
+    # TODO __init__
+    # TODO fromkeys
+
+    def __setitem__(self, key, value):
+        super(SassVariableMap, self).__setitem__(normalize_var(key), value)
+
+    def __getitem__(self, key):
+        return super(SassVariableMap, self).__getitem__(normalize_var(key))
+
+    def __delitem__(self, key):
+        super(SassVariableMap, self).__delitem__(normalize_var(key))
+
+    def __contains__(self, key):
+        return super(SassVariableMap, self).__contains__(normalize_var(key))
+
+    def get(self, key, default=None):
+        return super(SassVariableMap, self).get(normalize_var(key), default)
+
+    def pop(self, key, *args):
+        return super(SassVariableMap, self).pop(normalize_var(key), *args)
+
+# TODO TODO need the .replace() in here too, but using tuple keys doesn't work
+class SassFunctionMap(ChainMap):
+    """ChainMap extension for functions that supports arity overloading."""
+
+    def __getitem__(self, key):
+        name, arity = key
+        if arity is not None:
+            try:
+                return super(SassFunctionMap, self).__getitem__(key)
+            except KeyError:
+                pass
+
+        return super(SassFunctionMap, self).__getitem__((name, None))
 
 
 class SassRule(object):
@@ -11,6 +58,7 @@ class SassRule(object):
 
     def __init__(self, source_file, unparsed_contents=None, dependent_rules=None,
             context=None, options=None, properties=None,
+                 mixins=None, functions=None,
             lineno=0, extends_selectors=frozenset(),
             ancestry=None):
 
@@ -18,9 +66,23 @@ class SassRule(object):
         self.lineno = lineno
 
         self.unparsed_contents = unparsed_contents
-        self.context = context
         self.options = options
         self.extends_selectors = extends_selectors
+
+        if context is None:
+            self.context = SassVariableMap()
+        else:
+            self.context = SassVariableMap(context)
+
+        if mixins is None:
+            self.mixins = SassFunctionMap()
+        else:
+            self.mixins = mixins
+
+        if functions is None:
+            self.functions = SassFunctionMap()
+        else:
+            self.functions = functions
 
         if dependent_rules is None:
             self.dependent_rules = set()
@@ -101,6 +163,9 @@ class SassRule(object):
             extends_selectors=self.extends_selectors,
             #ancestry=list(self.ancestry),
             ancestry=self.ancestry,
+
+            mixins=self.mixins.new_child(),
+            functions=self.functions.new_child(),
         )
 
 

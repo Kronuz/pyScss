@@ -110,13 +110,13 @@ _default_scss_vars = {
     '$LICENSE': LICENSE,
 
     # unsafe chars will be hidden as vars
-    '$__doubleslash': '//',
-    '$__bigcopen': '/*',
-    '$__bigcclose': '*/',
-    '$__doubledot': ':',
-    '$__semicolon': ';',
-    '$__curlybracketopen': '{',
-    '$__curlybracketclosed': '}',
+    '$--doubleslash': '//',
+    '$--bigcopen': '/*',
+    '$--bigcclose': '*/',
+    '$--doubledot': ':',
+    '$--semicolon': ';',
+    '$--curlybracketopen': '{',
+    '$--curlybracketclosed': '}',
 
     # shortcuts (it's "a hidden feature" for now)
     'bg:': 'background:',
@@ -648,6 +648,10 @@ class Scss(object):
                         # R
                         ancestry=R.ancestry,
                         extends_selectors=R.extends_selectors,
+
+                        # TODO
+                        mixins=R.mixins.new_child(),
+                        functions=R.functions.new_child(),
                     )
                     self.manage_children(_rule, p_children, (scope or '') + '')
                     ret = _rule.options.pop('@return', '')
@@ -656,14 +660,20 @@ class Scss(object):
             _mixin = _call(mixin)
             _mixin.mixin = mixin
             mixin = _mixin
-        # Insert as many @mixin options as the default parameters:
+
+        if block.directive == '@mixin':
+            context = rule.mixins
+        elif block.directive == '@function':
+            context = rule.functions
+
+        # Register the mixin for every possible arity it takes
         while len(new_params):
-            rule.options['%s %s:%d' % (block.directive, funct, len(new_params))] = mixin
+            context[funct, len(new_params)] = mixin
             param = new_params.pop()
             if param not in defaults:
                 break
         if not new_params:
-            rule.options[block.directive + ' ' + funct + ':0'] = mixin
+            context[funct, 0] = mixin
 
     @print_timing(10)
     def _do_include(self, rule, p_children, scope, block):
@@ -688,15 +698,18 @@ class Scss(object):
                     num_args += 1
             if param:
                 new_params[varname] = param
-        mixin = rule.options.get('@mixin %s:%s' % (funct, num_args))
-        if not mixin:
-            # Fallback to single parmeter:
-            mixin = rule.options.get('@mixin %s:1' % (funct,))
-            if mixin and all(map(lambda o: isinstance(o, int), new_params.keys())):
-                new_params = {0: ', '.join(new_params.values())}
-        if not mixin:
-            log.error("Required mixin not found: %s:%d (%s)", funct, num_args, rule.file_and_line, extra={'stack': True})
-            return
+        try:
+            mixin = rule.mixins[funct, num_args]
+        except KeyError:
+            try:
+                # Fallback to single parameter
+                # TODO don't do this
+                mixin = rule.mixins[funct, 1]
+                if all(map(lambda o: isinstance(o, int), new_params.keys())):
+                    new_params = {0: ', '.join(new_params.values())}
+            except KeyError:
+                log.error("Required mixin not found: %s:%d (%s)", funct, num_args, rule.file_and_line, extra={'stack': True})
+                return
 
         m_params = mixin[0]
         m_vars = {}
@@ -822,6 +835,10 @@ class Scss(object):
                     extends_selectors=rule.extends_selectors,
                     dependent_rules=rule.dependent_rules,
                     properties=rule.properties,
+
+                    # TODO
+                    mixins=rule.mixins.new_child(),
+                    functions=rule.functions.new_child(),
                 )
                 self.manage_children(_rule, p_children, scope)
                 rule.options['@import ' + name] = True
@@ -1101,6 +1118,10 @@ class Scss(object):
                 #extends_selectors=c_parents,
 
                 ancestry=new_ancestry,
+
+                # TODO
+                mixins=rule.mixins.new_child(),
+                functions=rule.functions.new_child(),
             )
 
             p_children.appendleft(new_rule)
@@ -1147,6 +1168,10 @@ class Scss(object):
             lineno=block.lineno,
             ancestry=new_ancestry,
             extends_selectors=c_parents,
+
+            # TODO
+            mixins=rule.mixins.new_child(),
+            functions=rule.functions.new_child(),
         )
 
         p_children.appendleft(_rule)

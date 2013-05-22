@@ -251,13 +251,14 @@ class CallOp(Expression):
 
         num_args = len(self.argspec.argpairs)
 
-        # First look for a custom in-sass function
-        option_name = "@function %s:%d" % (name, num_args)
-        func = rule.options.get(option_name)
-        # @functions take a rule as first arg.  TODO: Python functions possibly
-        # should too
-        if func is not None:
+        # TODO merge this with the library
+        try:
+            func = rule.functions[name, num_args]
+            # @functions take a rule as first arg.  TODO: Python functions possibly
+            # should too
             func = partial(func, rule)
+        except KeyError:
+            func = None
 
         try:
             # If that fails, check for Python implementations
