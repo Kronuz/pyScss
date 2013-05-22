@@ -6,9 +6,9 @@ import operator
 import re
 
 import scss.config as config
-from scss.cssdefs import is_builtin_css_function, _undefined_re, _units, _variable_re
+from scss.cssdefs import is_builtin_css_function, _expr_glob_re, _interpolate_re, _units, _variable_re
 from scss.types import BooleanValue, ColorValue, ListValue, NumberValue, ParserValue, QuotedStringValue, StringValue
-from scss.util import normalize_var, to_str
+from scss.util import dequote, normalize_var, to_str
 
 ################################################################################
 # Load C acceleration modules
@@ -21,6 +21,97 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 ast_cache = {}
+
+
+class Calculator(object):
+    """Expression evaluator."""
+
+    def __init__(self, library):
+        # TODO the library should really be part of the rule
+        self.library = library
+
+    def _calculate_expr(self, rule, context, options):
+        def __calculate_expr(result):
+            _group0 = result.group(1)
+            _base_str = _group0
+            better_expr_str = eval_expr(_base_str, rule, self.library)
+
+            if better_expr_str is None:
+                better_expr_str = self.apply_vars(_base_str, rule, context, options)
+            else:
+                better_expr_str = dequote(str(better_expr_str))
+
+            return better_expr_str
+        return __calculate_expr
+
+    def do_glob_math(self, cont, rule, context=None, options=None):
+        """Performs #{}-interpolation.  The result is always treated as a fixed
+        syntactic unit and will not be re-evaluated.
+        """
+        # TODO this should really accept and/or parse an *expression* and
+        # return a type  :|
+        cont = str(cont)
+        if '#{' not in cont:
+            return cont
+        cont = _expr_glob_re.sub(self._calculate_expr(rule, context, options), cont)
+        return cont
+
+    def apply_vars(self, cont, rule, context=None, options=None):
+        if context is not None and isinstance(cont, basestring) and '$' in cont:
+            if cont in context:
+                # Optimization: the full cont is a variable in the context,
+                # flatten the interpolation and use it:
+                while isinstance(cont, basestring) and cont in context:
+                    _cont = context[cont]
+                    if _cont == cont:
+                        break
+                    cont = _cont
+            else:
+                # Flatten the context (no variables mapping to variables)
+                flat_context = {}
+                for k, v in context.items():
+                    while isinstance(v, basestring) and v in context:
+                        _v = context[v]
+                        if _v == v:
+                            break
+                        v = _v
+                    flat_context[k] = v
+
+                # Interpolate variables:
+                def _av(m):
+                    v = flat_context.get(normalize_var(m.group(2)))
+                    if v:
+                        v = to_str(v)
+                        # TODO this used to test for _dequote
+                        if m.group(1):
+                            v = dequote(v)
+                    elif v is not None:
+                        v = to_str(v)
+                    else:
+                        v = m.group(0)
+                    return v
+
+                cont = _interpolate_re.sub(_av, cont)
+        if options is not None:
+            # ...apply math:
+            cont = self.do_glob_math(cont, rule, context, options)
+        return cont
+
+    def calculate(self, _base_str, rule, context=None, options=None):
+        better_expr_str = _base_str
+
+        rule = rule.copy()
+        rule.context = context
+        rule.options = options
+
+        better_expr_str = self.do_glob_math(better_expr_str, rule, context, options)
+
+        better_expr_str = eval_expr(better_expr_str, rule, self.library, True)
+
+        if better_expr_str is None:
+            better_expr_str = self.apply_vars(_base_str, rule, context, options)
+
+        return better_expr_str
 
 
 def interpolate(var, rule, library):
@@ -60,7 +151,7 @@ def eval_expr(expr, rule, library, raw=False):
             results = ast.evaluate(rule, library)
         else:
             try:
-                P = Calculator(CalculatorScanner())
+                P = CalculatorParser(CalculatorScanner())
                 P.reset(expr)
                 ast = P.goal()
             except SyntaxError:
@@ -82,6 +173,7 @@ def eval_expr(expr, rule, library, raw=False):
     return results
 
 
+# ------------------------------------------------------------------------------
 # Expression classes -- the AST resulting from a parse
 
 class Expression(object):
@@ -311,7 +403,7 @@ class CalculatorScanner(Scanner):
         super(CalculatorScanner, self).__init__(None, ['[ \r\t\n]+'], input)
 
 
-class Calculator(Parser):
+class CalculatorParser(Parser):
     def goal(self):
         expr_lst = self.expr_lst()
         v = expr_lst
@@ -524,4 +616,4 @@ class Calculator(Parser):
 ### Grammar ends.
 ################################################################################
 
-__all__ = ('interpolate', 'call', 'eval_expr', 'Calculator')
+__all__ = ('interpolate', 'eval_expr', 'Calculator')

@@ -54,7 +54,7 @@ class CalculatorScanner(Scanner):
         super(CalculatorScanner, self).__init__(None, ['[ \r\t\n]+'], input)
 
 
-class Calculator(Parser):
+class CalculatorParser(Parser):
     def goal(self):
         expr_lst = self.expr_lst()
         v = expr_lst

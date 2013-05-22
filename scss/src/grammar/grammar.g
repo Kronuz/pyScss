@@ -4,7 +4,7 @@
 #'(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'
 ## Grammar compiled using Yapps:
 %%
-parser Calculator:
+parser CalculatorParser:
     ignore: "[ \r\t\n]+"
     token COMMA: ","
     token LPAR: "\\(|\\["

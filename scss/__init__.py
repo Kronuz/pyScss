@@ -58,15 +58,14 @@ from scss.cssdefs import (
     SEPARATOR,
     _colors,
     _short_color_re, _reverse_colors, _reverse_colors_re, _colors_re,
-    _expr_glob_re,
     _ml_comment_re, _sl_comment_re,
     _zero_units_re, _zero_re,
-    _escape_chars_re, _interpolate_re,
+    _escape_chars_re,
     _spaces_re, _expand_rules_space_re, _collapse_properties_space_re,
     _undefined_re,
     _strings_re, _prop_split_re,
 )
-from scss.expression import eval_expr, interpolate
+from scss.expression import Calculator, interpolate
 from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
 from scss.rule import UnparsedBlock, SassRule
@@ -1443,89 +1442,3 @@ class Scss(object):
             # remove zeros before decimal point (i.e. 0.3 -> .3)
             cont = _zero_re.sub('.', cont)
         return cont
-
-
-class Calculator(object):
-    def __init__(self, library):
-        # TODO the library should really be part of the rule
-        self.library = library
-
-    def _calculate_expr(self, rule, context, options):
-        def __calculate_expr(result):
-            _group0 = result.group(1)
-            _base_str = _group0
-            better_expr_str = eval_expr(_base_str, rule, self.library)
-
-            if better_expr_str is None:
-                better_expr_str = self.apply_vars(_base_str, rule, context, options)
-            else:
-                better_expr_str = dequote(str(better_expr_str))
-
-            return better_expr_str
-        return __calculate_expr
-
-    def do_glob_math(self, cont, rule, context=None, options=None):
-        """Performs #{}-interpolation.  The result is always treated as a fixed
-        syntactic unit and will not be re-evaluated.
-        """
-        cont = str(cont)
-        if '#{' not in cont:
-            return cont
-        cont = _expr_glob_re.sub(self._calculate_expr(rule, context, options), cont)
-        return cont
-
-    def apply_vars(self, cont, rule, context=None, options=None):
-        if context is not None and isinstance(cont, basestring) and '$' in cont:
-            if cont in context:
-                # Optimization: the full cont is a variable in the context,
-                # flatten the interpolation and use it:
-                while isinstance(cont, basestring) and cont in context:
-                    _cont = context[cont]
-                    if _cont == cont:
-                        break
-                    cont = _cont
-            else:
-                # Flatten the context (no variables mapping to variables)
-                flat_context = {}
-                for k, v in context.items():
-                    while isinstance(v, basestring) and v in context:
-                        _v = context[v]
-                        if _v == v:
-                            break
-                        v = _v
-                    flat_context[k] = v
-
-                # Interpolate variables:
-                def _av(m):
-                    v = flat_context.get(normalize_var(m.group(2)))
-                    if v:
-                        v = to_str(v)
-                        if m.group(1):
-                            v = dequote(v)
-                    elif v is not None:
-                        v = to_str(v)
-                    else:
-                        v = m.group(0)
-                    return v
-
-                cont = _interpolate_re.sub(_av, cont)
-        if options is not None:
-            # ...apply math:
-            cont = self.do_glob_math(cont, rule, context, options)
-        return cont
-
-    def calculate(self, _base_str, rule, context=None, options=None):
-        better_expr_str = _base_str
-
-        rule = rule.copy()
-        rule.context = context
-        rule.options = options
-
-        better_expr_str = self.do_glob_math(better_expr_str, rule, context, options)
-
-        better_expr_str = eval_expr(better_expr_str, rule, self.library, True)
-
-        if better_expr_str is None:
-            better_expr_str = self.apply_vars(_base_str, rule, context, options)
-
-        return better_expr_str
