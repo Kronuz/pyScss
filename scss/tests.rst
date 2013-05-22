@@ -300,11 +300,15 @@ http://xcss.antpaw.org/docs/syntax/math
 
     >>> print css.compile('''
     ... @option compress:no, short_colors:yes, reverse_colors:yes;
+    ... @variables {
+    ...     $gap = 4em;
+    ... }
     ... .selector {
-    ...     padding: [4em / 2em];
+    ...     padding: [$gap / 2em];
     ...     margin: [4em / 2em]em;
     ...     width: [8px / 2px];
     ...     height: [500px / 2];
+    ...     line-height: $gap;
     ... }
     ... ''') #doctest: +NORMALIZE_WHITESPACE
     .selector {
@@ -312,6 +316,7 @@ http://xcss.antpaw.org/docs/syntax/math
         margin: 2em;
         width: 4;
         height: 250px;
+        line-height: 4em;
     }
     
 
