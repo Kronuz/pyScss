@@ -173,7 +173,7 @@ class CalculatorParser(Parser):
             return expr_lst
         elif _token_ == 'ID':
             ID = self._scan('ID')
-            return Literal(StringValue(ID))
+            return Literal(parse_bareword(ID))
         elif _token_ == 'FNCT':
             FNCT = self._scan('FNCT')
             v = ArgspecLiteral([])

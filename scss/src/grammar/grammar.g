@@ -80,7 +80,7 @@ parser CalculatorParser:
                               atom                          {{ return atom }}
     rule atom:              LPAR expr_lst RPAR              {{ return expr_lst }}
                               |
-                              ID                            {{ return Literal(StringValue(ID)) }}
+                              ID                            {{ return Literal(parse_bareword(ID)) }}
                               |
                               FNCT                          {{ v = ArgspecLiteral([]) }}
                               LPAR [

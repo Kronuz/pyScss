@@ -56,8 +56,7 @@ import textwrap
 from scss import config
 from scss.cssdefs import (
     SEPARATOR,
-    _colors,
-    _short_color_re, _reverse_colors, _reverse_colors_re, _colors_re,
+    _short_color_re, _reverse_colors, _reverse_colors_re,
     _ml_comment_re, _sl_comment_re,
     _zero_units_re, _zero_re,
     _escape_chars_re,
@@ -286,12 +285,6 @@ class SourceFile(object):
 
         # collapse the space in properties blocks
         codestr = _collapse_properties_space_re.sub(r'\1{', codestr)
-
-        # to do math operations, we need to get the color's hex values (for color names):
-        def _pp(m):
-            v = m.group(0)
-            return _colors.get(v, v)
-        codestr = _colors_re.sub(_pp, codestr)
 
         return codestr
 

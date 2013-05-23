@@ -6,7 +6,7 @@ import operator
 import re
 
 import scss.config as config
-from scss.cssdefs import is_builtin_css_function, _expr_glob_re, _interpolate_re, _units, _variable_re
+from scss.cssdefs import is_builtin_css_function, _colors, _expr_glob_re, _interpolate_re, _units, _variable_re
 from scss.types import BooleanValue, ColorValue, ListValue, NumberValue, ParserValue, QuotedStringValue, StringValue
 from scss.util import dequote, normalize_var, to_str
 
@@ -320,6 +320,16 @@ class ArgspecLiteral(Expression):
         self.argpairs = argpairs
 
 
+def parse_bareword(word):
+    if word in _colors:
+        # TODO tidy this up once constructors are more reliable
+        ret = ColorValue(ParserValue(_colors[word]))
+        ret.tokens = ParserValue(word)
+        return ret
+    #elif word in ('null', 'undefined'):
+    #    return NullValue()
+    else:
+        return StringValue(ParserValue(word))
 
 
 
@@ -523,7 +533,7 @@ class CalculatorParser(Parser):
             return expr_lst
         elif _token_ == 'ID':
             ID = self._scan('ID')
-            return Literal(StringValue(ID))
+            return Literal(parse_bareword(ID))
         elif _token_ == 'FNCT':
             FNCT = self._scan('FNCT')
             v = ArgspecLiteral([])
