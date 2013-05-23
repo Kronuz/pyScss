@@ -54,8 +54,6 @@ class SassRule(object):
     metadata, like `@extend` rules and `@media` nesting.
     """
 
-    position = None
-
     def __init__(self, source_file, unparsed_contents=None, dependent_rules=None,
             context=None, options=None, properties=None,
                  mixins=None, functions=None,
@@ -133,10 +131,6 @@ class SassRule(object):
         """Returns whether this rule is considered "empty" -- i.e., has no
         contents that should end up in the final CSS.
         """
-        if self.position is None:
-            # Not sure how this should ever happen; hysterical raisins
-            return True
-
         if self.properties:
             # Rules containing CSS properties are never empty
             return False
@@ -156,9 +150,10 @@ class SassRule(object):
             source_file=self.source_file,
             lineno=self.lineno,
             unparsed_contents=self.unparsed_contents,
+
             #deps=set(self.deps),
-            dependent_rules=self.dependent_rules,
-            context=self.context,
+            #dependent_rules=self.dependent_rules,
+            context=self.context.new_child(),
             options=self.options,
             #properties=list(self.properties),
             properties=self.properties,

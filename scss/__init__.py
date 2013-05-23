@@ -614,7 +614,7 @@ class Scss(object):
         funct, params, _ = block.argument.partition('(')
         funct = normalize_var(funct.strip())
         params = split_params(depar(params + _))
-        defaults = rule.context.copy()
+        defaults = rule.context.new_child()
         new_params = []
         for param in params:
             param, _, default = param.partition(':')
@@ -823,19 +823,16 @@ class Scss(object):
             else:
                 _rule = SassRule(
                     source_file=source_file,
-
-                    unparsed_contents=source_file.contents,
                     lineno=block.lineno,
+                    unparsed_contents=source_file.contents,
 
                     # rule
+                    #dependent_rules
                     context=rule.context,
                     options=rule.options,
-                    ancestry=rule.ancestry,
-                    extends_selectors=rule.extends_selectors,
-                    dependent_rules=rule.dependent_rules,
                     properties=rule.properties,
-
-                    # TODO
+                    extends_selectors=rule.extends_selectors,
+                    ancestry=rule.ancestry,
                     mixins=rule.mixins,
                     functions=rule.functions,
                 )
@@ -1039,6 +1036,7 @@ class Scss(object):
         Implements @variables and @vars
         """
         _rule = rule.copy()
+        _rule.context = rule.context
         _rule.unparsed_contents = block.unparsed_contents
         _rule.properties = rule.context
         self.manage_children(_rule, p_children, scope)
@@ -1111,13 +1109,14 @@ class Scss(object):
 
             new_rule = SassRule(
                 source_file=rule.source_file,
-
+                lineno=block.lineno,
                 unparsed_contents=block.unparsed_contents,
+
+                #dependent_rules
                 context=rule.context.new_child(),
                 options=rule.options.copy(),
-                lineno=block.lineno,
-                #extends_selectors=c_parents,
-
+                #properties
+                #extends_selectors
                 ancestry=new_ancestry,
 
                 # TODO
@@ -1162,13 +1161,15 @@ class Scss(object):
 
         _rule = SassRule(
             source_file=rule.source_file,
-
+            lineno=block.lineno,
             unparsed_contents=block.unparsed_contents,
+
+            #dependent_rules
             context=rule.context.new_child(),
             options=rule.options.copy(),
-            lineno=block.lineno,
-            ancestry=new_ancestry,
+            #properties
             extends_selectors=c_parents,
+            ancestry=new_ancestry,
 
             # TODO
             mixins=rule.mixins.new_child(),
@@ -1321,8 +1322,7 @@ class Scss(object):
     def manage_order(self):
         # order rules according with their dependencies
         for rule in self.rules:
-            if rule.position is None:
-                continue
+            assert rule.position is not None
 
             rule.dependent_rules.add(rule.position + 1)
             # This moves the rules just above the topmost dependency during the sorted() below:
@@ -1336,7 +1336,8 @@ class Scss(object):
         rules_by_file = {}
 
         for rule in self.rules:
-            if rule.position is None or not rule.properties:
+            assert rule.position is not None
+            if not rule.properties:
                 continue
 
             source_file = rule.source_file
