@@ -94,6 +94,8 @@ class SassRule(object):
         else:
             self.properties = properties
 
+        self.retval = None
+
         if ancestry is None:
             self.ancestry = []
         else:
@@ -151,8 +153,6 @@ class SassRule(object):
             lineno=self.lineno,
             unparsed_contents=self.unparsed_contents,
 
-            #deps=set(self.deps),
-            #dependent_rules=self.dependent_rules,
             context=self.context.new_child(),
             options=self.options,
             #properties=list(self.properties),

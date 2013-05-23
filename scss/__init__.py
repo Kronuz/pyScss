@@ -509,8 +509,8 @@ class Scss(object):
 
     @print_timing(4)
     def manage_children(self, rule, p_children, scope):
-        if '@return' in rule.options:
-            return
+        # A rule that has already returned should not end up here
+        assert rule.retval is None
 
         for c_lineno, c_property, c_codestr in locate_blocks(rule.unparsed_contents):
             block = UnparsedBlock(self.calculator, rule, c_lineno, c_property, c_codestr)
@@ -551,7 +551,8 @@ class Scss(object):
                     rule.extends_selectors.discard('')
                 elif code == '@return':
                     ret = self.calculator.calculate(block.argument, rule, rule.context, rule.options)
-                    rule.options['@return'] = ret
+                    rule.retval = ret
+                    return
                 elif code == '@include':
                     self._do_include(rule, p_children, scope, block)
                 elif block.unparsed_contents is None:
@@ -654,7 +655,9 @@ class Scss(object):
                         functions=R.functions.new_child(),
                     )
                     self.manage_children(_rule, p_children, (scope or '') + '')
-                    ret = _rule.options.pop('@return', '')
+                    ret = _rule.retval
+                    if ret is None:
+                        ret = 'undefined'
                     return ret
                 return __call
             _mixin = _call(mixin)
