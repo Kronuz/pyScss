@@ -71,8 +71,10 @@ class SassRule(object):
 
         if context is None:
             self.context = SassVariableMap()
-        else:
+        elif isinstance(context, dict):
             self.context = SassVariableMap(context)
+        else:
+            self.context = context
 
         if mixins is None:
             self.mixins = SassFunctionMap()

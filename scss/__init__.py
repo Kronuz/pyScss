@@ -712,8 +712,7 @@ class Scss(object):
                 return
 
         m_params = mixin[0]
-        m_vars = {}
-        m_vars.update(rule.context)
+        m_vars = rule.context.new_child()
         m_vars.update(mixin[1])
         m_codestr = mixin[2]
         for varname, value in new_params.items():
@@ -837,8 +836,8 @@ class Scss(object):
                     properties=rule.properties,
 
                     # TODO
-                    mixins=rule.mixins.new_child(),
-                    functions=rule.functions.new_child(),
+                    mixins=rule.mixins,
+                    functions=rule.functions,
                 )
                 self.manage_children(_rule, p_children, scope)
                 rule.options['@import ' + name] = True
@@ -1008,11 +1007,13 @@ class Scss(object):
 
         for n, v in name.items():
             v = to_str(v)
-            rule.unparsed_contents = block.unparsed_contents
-            rule.context[var] = v
+            inner_rule = rule.copy()
+            inner_rule.context = inner_rule.context.new_child()
+            inner_rule.unparsed_contents = block.unparsed_contents
+            inner_rule.context[var] = v
             if not isinstance(n, int):
-                rule.context[n] = v
-            self.manage_children(rule, p_children, scope)
+                inner_rule.context[n] = v
+            self.manage_children(inner_rule, p_children, scope)
 
     # @print_timing(10)
     # def _do_while(self, rule, p_children, scope, block):
@@ -1112,7 +1113,7 @@ class Scss(object):
                 source_file=rule.source_file,
 
                 unparsed_contents=block.unparsed_contents,
-                context=rule.context.copy(),
+                context=rule.context.new_child(),
                 options=rule.options.copy(),
                 lineno=block.lineno,
                 #extends_selectors=c_parents,
@@ -1163,7 +1164,7 @@ class Scss(object):
             source_file=rule.source_file,
 
             unparsed_contents=block.unparsed_contents,
-            context=rule.context.copy(),
+            context=rule.context.new_child(),
             options=rule.options.copy(),
             lineno=block.lineno,
             ancestry=new_ancestry,
@@ -1302,7 +1303,8 @@ class Scss(object):
                     continue
 
                 # from the parent, inherit the context and the options:
-                new_context = {}
+                from scss.rule import SassVariableMap
+                new_context = SassVariableMap()
                 new_options = {}
                 for parent in parents:
                     new_context.update(parent.context)
