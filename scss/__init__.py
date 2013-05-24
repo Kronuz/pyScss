@@ -301,8 +301,6 @@ class Scss(object):
         self._library = library
         self._search_paths = search_paths
 
-        self.calculator = Calculator(self._library)
-
         self.reset()
 
     def get_scss_constants(self):
@@ -374,13 +372,16 @@ class Scss(object):
             self.source_file_index[source_file.filename] = source_file
 
         # Compile
+        from scss.rule import Namespace
+        namespace = Namespace(variables=self.scss_vars, functions=self._library)
+
         children = deque()
         for source_file in self.source_files:
             rule = SassRule(
                 source_file=source_file,
 
                 unparsed_contents=source_file.contents,
-                context=self.scss_vars,
+                namespace=namespace,
                 options=self.scss_opts,
             )
             children.append(rule)
@@ -505,20 +506,22 @@ class Scss(object):
         # A rule that has already returned should not end up here
         assert rule.retval is None
 
+        calculator = Calculator(rule.namespace)
+
         for c_lineno, c_property, c_codestr in locate_blocks(rule.unparsed_contents):
-            block = UnparsedBlock(self.calculator, rule, c_lineno, c_property, c_codestr)
+            block = UnparsedBlock(rule, c_lineno, c_property, c_codestr)
 
             if block.is_atrule:
                 code = block.directive
                 code = code.lower()
                 if code == '@warn':
-                    value = self.calculator.calculate(block.argument, rule, rule.context, rule.options)
+                    value = calculator.calculate(block.argument)
                     log.warn(dequote(to_str(value)))
                 elif code == '@print':
-                    value = self.calculator.calculate(block.argument, rule, rule.context, rule.options)
+                    value = calculator.calculate(block.argument)
                     print >>sys.stderr, dequote(to_str(value))
                 elif code == '@raw':
-                    value = self.calculator.calculate(block.argument, rule, rule.context, rule.options)
+                    value = calculator.calculate(block.argument)
                     print >>sys.stderr, repr(value)
                 elif code == '@dump_context':
                     log.info(repr(rule.context))
@@ -539,11 +542,11 @@ class Scss(object):
                 elif code == '@import':
                     self._do_import(rule, p_children, scope, block)
                 elif code == '@extend':
-                    selectors = self.calculator.apply_vars(block.argument, rule, rule.context, rule.options)
+                    selectors = calculator.apply_vars(block.argument)
                     rule.extends_selectors.update(p.strip() for p in selectors.replace(',', '&').split('&'))
                     rule.extends_selectors.discard('')
                 elif code == '@return':
-                    ret = self.calculator.calculate(block.argument, rule, rule.context, rule.options)
+                    ret = calculator.calculate(block.argument)
                     rule.retval = ret
                     return
                 elif code == '@include':
@@ -608,7 +611,7 @@ class Scss(object):
         funct, params, _ = block.argument.partition('(')
         funct = normalize_var(funct.strip())
         params = split_params(depar(params + _))
-        defaults = rule.context.new_child()
+        defaults = {}
         new_params = []
         for param in params:
             param, _, default = param.partition(':')
@@ -617,37 +620,42 @@ class Scss(object):
             if param:
                 new_params.append(param)
                 if default:
-                    defaults[param] = self.calculator.calculate(default, rule, rule.context, None)
+                    calculator = Calculator(rule.namespace)
+                    defaults[param] = calculator.parse_expression(default)
         mixin = [list(new_params), defaults, block.unparsed_contents]
         if block.directive == '@function':
             def _call(mixin):
-                def __call(R, *args, **kwargs):
+                def __call(namespace, *args, **kwargs):
                     m_params = mixin[0]
-                    m_vars = {}
-                    # m_vars.update(R.context)
-                    m_vars.update(mixin[1])
+                    m_vars = namespace.derive()
                     m_codestr = mixin[2]
+                    calculator = Calculator(m_vars)
+                    for key, value in mixin[1].items():
+                        m_vars.set_variable(key, value.evaluate(calculator))
                     for i, a in enumerate(args):
-                        m_vars[m_params[i]] = a
+                        m_vars.set_variable(m_params[i], a)
                     for k, v in kwargs.items():
-                        m_vars['$' + normalize_var(k)] = v
-                    _rule = SassRule(
-                        source_file=R.source_file,
+                        m_vars.set_variable('$' + k, v)
 
+                    _rule = SassRule(
+                        # TODO correct?  relevant?  seems the function should
+                        # consider itself as existing where it was defined, not
+                        # called?
+                        source_file=rule.source_file,
+
+                        # TODO
                         unparsed_contents=m_codestr,
-                        context=m_vars,
+                        #context=m_vars,
                         options=rule.options.copy(),
                         lineno=block.lineno,
 
                         # R
-                        ancestry=R.ancestry,
-                        extends_selectors=R.extends_selectors,
+                        #ancestry=R.ancestry,
+                        #extends_selectors=R.extends_selectors,
 
-                        # TODO
-                        mixins=R.mixins.new_child(),
-                        functions=R.functions.new_child(),
+                        namespace=m_vars,
                     )
-                    self.manage_children(_rule, p_children, (scope or '') + '')
+                    self.manage_children(_rule, p_children, scope)
                     ret = _rule.retval
                     if ret is None:
                         ret = 'undefined'
@@ -658,18 +666,18 @@ class Scss(object):
             mixin = _mixin
 
         if block.directive == '@mixin':
-            context = rule.mixins
+            add = rule.namespace.set_mixin
         elif block.directive == '@function':
-            context = rule.functions
+            add = rule.namespace.set_function
 
         # Register the mixin for every possible arity it takes
         while len(new_params):
-            context[funct, len(new_params)] = mixin
+            add(funct, len(new_params), mixin)
             param = new_params.pop()
             if param not in defaults:
                 break
         if not new_params:
-            context[funct, 0] = mixin
+            add(funct, 0, mixin)
 
     @print_timing(10)
     def _do_include(self, rule, p_children, scope, block):
@@ -677,7 +685,8 @@ class Scss(object):
         Implements @include, for @mixins
         """
         funct, params, _ = block.argument.partition('(')
-        funct = self.calculator.do_glob_math(funct, rule, rule.context, rule.options)
+        calculator = Calculator(rule.namespace)
+        funct = calculator.do_glob_math(funct)
         funct = normalize_var(funct.strip())
         params = split_params(depar(params + _))
         new_params = {}
@@ -695,12 +704,12 @@ class Scss(object):
             if param:
                 new_params[varname] = param
         try:
-            mixin = rule.mixins[funct, num_args]
+            mixin = rule.namespace.mixin(funct, num_args)
         except KeyError:
             try:
                 # Fallback to single parameter
                 # TODO don't do this
-                mixin = rule.mixins[funct, 1]
+                mixin = rule.namespace.mixin(funct, 1)
                 if all(map(lambda o: isinstance(o, int), new_params.keys())):
                     new_params = {0: ', '.join(new_params.values())}
             except KeyError:
@@ -708,24 +717,25 @@ class Scss(object):
                 return
 
         m_params = mixin[0]
-        m_vars = rule.context.new_child()
-        m_vars.update(mixin[1])
+        m_vars = rule.namespace.derive()
+        for key, value in mixin[1].items():
+            m_vars.set_variable(key, value.evaluate(calculator))
         m_codestr = mixin[2]
         for varname, value in new_params.items():
             try:
                 m_param = m_params[varname]
             except (IndexError, KeyError, TypeError):
                 m_param = varname
-            value = self.calculator.calculate(value, rule, rule.context, rule.options)
-            m_vars[m_param] = value
+            value = calculator.calculate(value)
+            m_vars.set_variable(m_param, value)
         for p in m_params:
-            if p not in new_params and isinstance(m_vars[p], basestring):
-                value = self.calculator.calculate(m_vars[p], rule, m_vars, rule.options)
-                m_vars[p] = value
+            if p not in new_params and isinstance(m_vars.variable(p), basestring):
+                value = calculator.calculate(m_vars.variable(p))
+                m_vars.set_variable(p, value)
 
         _rule = rule.copy()
         _rule.unparsed_contents = m_codestr
-        _rule.context = m_vars
+        _rule.namespace = m_vars
         _rule.lineno = block.lineno
 
         _rule.options['@content'] = block.unparsed_contents
@@ -824,13 +834,11 @@ class Scss(object):
 
                     # rule
                     #dependent_rules
-                    context=rule.context,
                     options=rule.options,
                     properties=rule.properties,
                     extends_selectors=rule.extends_selectors,
                     ancestry=rule.ancestry,
-                    mixins=rule.mixins,
-                    functions=rule.functions,
+                    namespace=rule.namespace,
                 )
                 self.manage_children(_rule, p_children, scope)
                 rule.options['@import ' + name] = True
@@ -855,13 +863,15 @@ class Scss(object):
         map_name = os.path.normpath(os.path.dirname(block.argument)).replace('\\', '_').replace('/', '_')
         kwargs = {}
 
+        calculator = Calculator(rule.namespace)
+
         def setdefault(var, val):
             _var = '$' + map_name + '-' + var
             if _var in rule.context:
-                kwargs[var] = self.calculator.interpolate(rule.context[_var], rule, self._library)
+                kwargs[var] = calculator.interpolate(rule.context[_var], rule, self._library)
             else:
                 rule.context[_var] = val
-                kwargs[var] = self.calculator.interpolate(val, rule, self._library)
+                kwargs[var] = calculator.interpolate(val, rule, self._library)
             return rule.context[_var]
 
         setdefault('sprite-base-class', StringValue('.' + map_name + '-sprite'))
@@ -925,7 +935,8 @@ class Scss(object):
         else:
             val = True
         if val:
-            val = self.calculator.calculate(block.argument, rule, rule.context, rule.options)
+            calculator = Calculator(rule.namespace)
+            val = calculator.calculate(block.argument)
             if isinstance(val, (basestring, StringValue)):
                 if val != 'false' and not _undefined_re.match(unicode(val)):
                     val = True
@@ -961,8 +972,9 @@ class Scss(object):
         frm, _, through = name.partition(' through ')
         if not through:
             frm, _, through = frm.partition(' to ')
-        frm = self.calculator.calculate(frm, rule, rule.context, rule.options)
-        through = self.calculator.calculate(through, rule, rule.context, rule.options)
+        calculator = Calculator(rule.namespace)
+        frm = calculator.calculate(frm)
+        through = calculator.calculate(through)
         try:
             frm = int(float(frm))
             through = int(float(through))
@@ -975,12 +987,12 @@ class Scss(object):
         else:
             rev = lambda x: x
         var = var.strip()
-        var = self.calculator.do_glob_math(var, rule, rule.context, rule.options)
+        var = calculator.do_glob_math(var)
         var = normalize_var(var)
 
         for i in rev(range(frm, through + 1)):
             rule.unparsed_contents = block.unparsed_contents
-            rule.context[var] = str(i)
+            rule.namespace.set_variable(var, str(i))
             self.manage_children(rule, p_children, scope)
 
     @print_timing(10)
@@ -989,23 +1001,24 @@ class Scss(object):
         Implements @each
         """
         var, _, name = block.argument.partition(' in ')
-        name = self.calculator.calculate(name, rule, rule.context, rule.options)
+        calculator = Calculator(rule.namespace)
+        name = calculator.calculate(name)
         if not name:
             return
 
         name = ListValue(name)
         var = var.strip()
-        var = self.calculator.do_glob_math(var, rule, rule.context, rule.options)
+        var = calculator.do_glob_math(var)
         var = normalize_var(var)
 
         for n, v in name.items():
             v = to_str(v)
             inner_rule = rule.copy()
-            inner_rule.context = inner_rule.context.new_child()
+            inner_rule.namespace = inner_rule.namespace.derive()
             inner_rule.unparsed_contents = block.unparsed_contents
-            inner_rule.context[var] = v
+            inner_rule.namespace.set_variable(var, v)
             if not isinstance(n, int):
-                inner_rule.context[n] = v
+                inner_rule.namespace.set_variable(n, v)
             self.manage_children(inner_rule, p_children, scope)
 
     # @print_timing(10)
@@ -1032,10 +1045,12 @@ class Scss(object):
         Implements @variables and @vars
         """
         _rule = rule.copy()
-        _rule.context = rule.context
         _rule.unparsed_contents = block.unparsed_contents
-        _rule.properties = rule.context
+        _rule.namespace = rule.namespace
+        _rule.properties = {}
         self.manage_children(_rule, p_children, scope)
+        for name, value in _rule.properties.items():
+            rule.namespace.set_variable(name, value)
 
     @print_timing(10)
     def _get_properties(self, rule, p_children, scope, block):
@@ -1047,8 +1062,9 @@ class Scss(object):
             is_var = (block.prop[len(prop)] == '=')
         except IndexError:
             is_var = False
+        calculator = Calculator(rule.namespace)
         prop = prop.strip()
-        prop = self.calculator.do_glob_math(prop, rule, rule.context, rule.options)
+        prop = calculator.do_glob_math(prop)
         if not prop:
             return
 
@@ -1061,22 +1077,26 @@ class Scss(object):
                 if subs:
                     is_default = True
 
-            value = self.calculator.calculate(value, rule, rule.context, rule.options)
+            value = calculator.calculate(value)
 
         _prop = (scope or '') + prop
         if is_var or prop.startswith('$') and value is not None:
             _prop = normalize_var(_prop)
-            in_context = rule.context.get(_prop)
-            is_defined = not (in_context is None or isinstance(in_context, basestring) and _undefined_re.match(in_context))
-            if (is_defined and is_default) or value is None:
+            try:
+                existing_value = rule.namespace.variable(_prop)
+            except KeyError:
+                existing_value = None
+
+            is_defined = existing_value is not None and not existing_value.is_null
+            if is_default and is_defined:
                 pass
             else:
                 if is_defined and prop.startswith('$') and prop[1].isupper():
                     log.warn("Constant %r redefined", prop)
 
-                rule.context[_prop] = value
+                rule.namespace.set_variable(_prop, value)
         else:
-            _prop = self.calculator.apply_vars(_prop, rule, rule.context, rule.options)
+            _prop = calculator.apply_vars(_prop)
             rule.properties.append((_prop, to_str(value) if value is not None else None))
 
     @print_timing(10)
@@ -1109,22 +1129,20 @@ class Scss(object):
                 unparsed_contents=block.unparsed_contents,
 
                 #dependent_rules
-                context=rule.context.new_child(),
                 options=rule.options.copy(),
                 #properties
                 #extends_selectors
                 ancestry=new_ancestry,
 
-                # TODO
-                mixins=rule.mixins.new_child(),
-                functions=rule.functions.new_child(),
+                namespace=rule.namespace.derive(),
             )
 
             p_children.appendleft(new_rule)
 
             return
 
-        raw_selectors = self.calculator.apply_vars(block.prop, rule, rule.context, rule.options)
+        calculator = Calculator(rule.namespace)
+        raw_selectors = calculator.apply_vars(block.prop)
         c_selectors, c_parents = self.parse_selectors(raw_selectors)
 
         p_selectors = rule.selectors
@@ -1161,15 +1179,12 @@ class Scss(object):
             unparsed_contents=block.unparsed_contents,
 
             #dependent_rules
-            context=rule.context.new_child(),
             options=rule.options.copy(),
             #properties
             extends_selectors=c_parents,
             ancestry=new_ancestry,
 
-            # TODO
-            mixins=rule.mixins.new_child(),
-            functions=rule.functions.new_child(),
+            namespace=rule.namespace.derive(),
         )
 
         p_children.appendleft(_rule)
@@ -1300,16 +1315,14 @@ class Scss(object):
                     continue
 
                 # from the parent, inherit the context and the options:
-                from scss.rule import SassVariableMap
-                new_context = SassVariableMap()
+                from scss.rule import Namespace
+                parent_namespaces = [parent.namespace for parent in parents]
                 new_options = {}
                 for parent in parents:
-                    new_context.update(parent.context)
                     new_options.update(parent.options)
                 for rule in rules:
-                    _new_context = new_context.copy()
-                    _new_context.update(rule.context)
-                    rule.context = _new_context
+                    rule.namespace = Namespace.derive_from(
+                        rule.namespace, *parent_namespaces)
                     _new_options = new_options.copy()
                     _new_options.update(rule.options)
                     rule.options = _new_options

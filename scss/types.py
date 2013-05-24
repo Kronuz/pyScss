@@ -16,6 +16,10 @@ class ParserValue(object):
 
 
 class Value(object):
+    @property
+    def is_null(self):
+        return False
+
     @staticmethod
     def _merge_type(a, b):
         if a.__class__ == b.__class__:
@@ -135,6 +139,18 @@ class Value(object):
         else:
             self.value = obj
         return self
+
+
+class NullValue(Value):
+    def __init__(self):
+        pass
+
+    def __str__(self):
+        return 'null'
+
+    @property
+    def is_null(self):
+        return True
 
 
 class BooleanValue(Value):

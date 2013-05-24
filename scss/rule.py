@@ -8,44 +8,76 @@ def normalize_var(name):
     else:
         return name
 
-class SassVariableMap(ChainMap):
-    """ChainMap extension that implements Sass's interchangeable underscores
-    and dashes.
-    """
-    # TODO __init__
-    # TODO fromkeys
+class Namespace(object):
+    """..."""
 
-    def __setitem__(self, key, value):
-        super(SassVariableMap, self).__setitem__(normalize_var(key), value)
+    def __init__(self, variables=None, functions=None, mixins=None):
+        if variables is None:
+            self._variables = ChainMap()
+        else:
+            self._variables = ChainMap(variables)
 
-    def __getitem__(self, key):
-        return super(SassVariableMap, self).__getitem__(normalize_var(key))
+        if functions is None:
+            self._functions = ChainMap()
+        else:
+            self._functions = ChainMap(functions._functions)
 
-    def __delitem__(self, key):
-        super(SassVariableMap, self).__delitem__(normalize_var(key))
+        self._mixins = ChainMap()
 
-    def __contains__(self, key):
-        return super(SassVariableMap, self).__contains__(normalize_var(key))
+    @classmethod
+    def derive_from(cls, *others):
+        self = cls()
+        if len(others) == 1:
+            self._variables = others[0]._variables.new_child()
+            self._functions = others[0]._functions.new_child()
+            self._mixins = others[0]._mixins.new_child()
+        else:
+            self._variables = ChainMap(other._variables for other in others)
+            self._functions = ChainMap(other._functions for other in others)
+            self._mixins = ChainMap(other._mixins for other in others)
+        return self
 
-    def get(self, key, default=None):
-        return super(SassVariableMap, self).get(normalize_var(key), default)
+    def derive(self):
+        return type(self).derive_from(self)
 
-    def pop(self, key, *args):
-        return super(SassVariableMap, self).pop(normalize_var(key), *args)
 
-# TODO TODO need the .replace() in here too, but using tuple keys doesn't work
-class SassFunctionMap(ChainMap):
-    """ChainMap extension for functions that supports arity overloading."""
+    def variable(self, name):
+        name = normalize_var(name)
+        return self._variables[name]
 
-    def __getitem__(self, key):
-        name, arity = key
+    def set_variable(self, name, value):
+        name = normalize_var(name)
+        assert not (isinstance(value, basestring) and value.startswith('$'))
+        #assert isinstance(value, Value)
+        self._variables[name] = value
+
+    def _get_callable(self, chainmap, name, arity):
+        name = normalize_var(name)
         if arity is not None:
+            # With explicit arity, try the particular arity before falling back
+            # to the general case (None)
             try:
-                return super(SassFunctionMap, self).__getitem__(key)
+                return chainmap[name, arity]
             except KeyError:
                 pass
 
-        return super(SassFunctionMap, self).__getitem__((name, None))
+        return chainmap[name, None]
+
+    def _set_callable(self, chainmap, name, arity, cb):
+        name = normalize_var(name)
+        chainmap[name, arity] = cb
+
+    def mixin(self, name, arity):
+        return self._get_callable(self._mixins, name, arity)
+
+    def set_mixin(self, name, arity, cb):
+        self._set_callable(self._mixins, name, arity, cb)
+
+    def function(self, name, arity):
+        return self._get_callable(self._functions, name, arity)
+
+    def set_function(self, name, arity, cb):
+        self._set_callable(self._functions, name, arity, cb)
 
 
 class SassRule(object):
@@ -55,8 +87,8 @@ class SassRule(object):
     """
 
     def __init__(self, source_file, unparsed_contents=None, dependent_rules=None,
-            context=None, options=None, properties=None,
-                 mixins=None, functions=None,
+            options=None, properties=None,
+            namespace=None,
             lineno=0, extends_selectors=frozenset(),
             ancestry=None):
 
@@ -67,22 +99,11 @@ class SassRule(object):
         self.options = options
         self.extends_selectors = extends_selectors
 
-        if context is None:
-            self.context = SassVariableMap()
-        elif isinstance(context, dict):
-            self.context = SassVariableMap(context)
+        if namespace is None:
+            assert False
+            self.namespace = Namespace()
         else:
-            self.context = context
-
-        if mixins is None:
-            self.mixins = SassFunctionMap()
-        else:
-            self.mixins = mixins
-
-        if functions is None:
-            self.functions = SassFunctionMap()
-        else:
-            self.functions = functions
+            self.namespace = namespace
 
         if dependent_rules is None:
             self.dependent_rules = set()
@@ -153,7 +174,6 @@ class SassRule(object):
             lineno=self.lineno,
             unparsed_contents=self.unparsed_contents,
 
-            context=self.context.new_child(),
             options=self.options,
             #properties=list(self.properties),
             properties=self.properties,
@@ -161,8 +181,7 @@ class SassRule(object):
             #ancestry=list(self.ancestry),
             ancestry=self.ancestry,
 
-            mixins=self.mixins.new_child(),
-            functions=self.functions.new_child(),
+            namespace=self.namespace.derive(),
         )
 
 
@@ -283,8 +302,7 @@ class UnparsedBlock(object):
     block becomes an instance of this class.
     """
 
-    def __init__(self, calculator, parent_rule, lineno, prop, unparsed_contents):
-        self.calculator = calculator
+    def __init__(self, parent_rule, lineno, prop, unparsed_contents):
         self.parent_rule = parent_rule
         self.header = BlockHeader.parse(prop)
 

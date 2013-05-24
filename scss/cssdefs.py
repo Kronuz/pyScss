@@ -240,6 +240,8 @@ def is_builtin_css_function(name):
 
     Unrecognized functions not in this list produce warnings.
     """
+    name = name.replace('_', '-')
+
     if name in BUILTIN_FUNCTIONS:
         return True
 

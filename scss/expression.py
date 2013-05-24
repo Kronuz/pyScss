@@ -7,7 +7,7 @@ import re
 
 import scss.config as config
 from scss.cssdefs import is_builtin_css_function, _colors, _expr_glob_re, _interpolate_re, _units, _variable_re
-from scss.types import BooleanValue, ColorValue, ListValue, NumberValue, ParserValue, QuotedStringValue, StringValue
+from scss.types import BooleanValue, ColorValue, ListValue, NullValue, NumberValue, ParserValue, QuotedStringValue, StringValue
 from scss.util import dequote, normalize_var, to_str
 
 ################################################################################
@@ -26,25 +26,22 @@ ast_cache = {}
 class Calculator(object):
     """Expression evaluator."""
 
-    def __init__(self, library):
-        # TODO the library should really be part of the rule
-        self.library = library
+    def __init__(self, namespace):
+        self.namespace = namespace
 
-    def _calculate_expr(self, rule, context, options):
-        def __calculate_expr(result):
-            _group0 = result.group(1)
-            _base_str = _group0
-            better_expr_str = self.eval_expr(_base_str, rule, self.library)
+    def _calculate_expr(self, result):
+        _group0 = result.group(1)
+        _base_str = _group0
+        better_expr_str = self.eval_expr(_base_str)
 
-            if better_expr_str is None:
-                better_expr_str = self.apply_vars(_base_str, rule, context, options)
-            else:
-                better_expr_str = dequote(str(better_expr_str))
+        if better_expr_str is None:
+            better_expr_str = self.apply_vars(_base_str)
+        else:
+            better_expr_str = dequote(str(better_expr_str))
 
-            return better_expr_str
-        return __calculate_expr
+        return better_expr_str
 
-    def do_glob_math(self, cont, rule, context=None, options=None):
+    def do_glob_math(self, cont):
         """Performs #{}-interpolation.  The result is always treated as a fixed
         syntactic unit and will not be re-evaluated.
         """
@@ -53,33 +50,18 @@ class Calculator(object):
         cont = str(cont)
         if '#{' not in cont:
             return cont
-        cont = _expr_glob_re.sub(self._calculate_expr(rule, context, options), cont)
+        cont = _expr_glob_re.sub(self._calculate_expr, cont)
         return cont
 
-    def apply_vars(self, cont, rule, context=None, options=None):
-        if context is not None and isinstance(cont, basestring) and '$' in cont:
-            if cont in context:
+    def apply_vars(self, cont):
+        if isinstance(cont, basestring) and '$' in cont:
+            try:
                 # Optimization: the full cont is a variable in the context,
-                # flatten the interpolation and use it:
-                while isinstance(cont, basestring) and cont in context:
-                    _cont = context[cont]
-                    if _cont == cont:
-                        break
-                    cont = _cont
-            else:
-                # Flatten the context (no variables mapping to variables)
-                flat_context = {}
-                for k, v in context.items():
-                    while isinstance(v, basestring) and v in context:
-                        _v = context[v]
-                        if _v == v:
-                            break
-                        v = _v
-                    flat_context[k] = v
-
+                cont = self.namespace.variable(cont)
+            except KeyError:
                 # Interpolate variables:
                 def _av(m):
-                    v = flat_context.get(normalize_var(m.group(2)))
+                    v = self.namespace.variable(m.group(2))
                     if v:
                         v = to_str(v)
                         # TODO this used to test for _dequote
@@ -92,55 +74,46 @@ class Calculator(object):
                     return v
 
                 cont = _interpolate_re.sub(_av, cont)
-        if options is not None:
-            # ...apply math:
-            cont = self.do_glob_math(cont, rule, context, options)
+        # XXX what?: if options is not None:
+        # ...apply math:
+        cont = self.do_glob_math(cont)
         return cont
 
-    def calculate(self, _base_str, rule, context=None, options=None):
+    def calculate(self, _base_str):
         better_expr_str = _base_str
 
-        rule = rule.copy()
-        rule.context = context
-        rule.options = options
+        better_expr_str = self.do_glob_math(better_expr_str)
 
-        better_expr_str = self.do_glob_math(better_expr_str, rule, context, options)
-
-        better_expr_str = self.eval_expr(better_expr_str, rule, self.library, True)
+        better_expr_str = self.eval_expr(better_expr_str, raw=True)
 
         if better_expr_str is None:
-            better_expr_str = self.apply_vars(_base_str, rule, context, options)
+            better_expr_str = self.apply_vars(_base_str)
 
         return better_expr_str
 
 
     # TODO only used by magic-import...?
-    def interpolate(self, var, rule, library):
-        value = rule.context.get(normalize_var(var), var)
+    def interpolate(self, var):
+        value = self.namespace.variable(var)
         if var != value and isinstance(value, basestring):
-            _vi = self.eval_expr(value, rule, library, True)
+            _vi = self.eval_expr(value, raw=True)
             if _vi is not None:
                 value = _vi
         return value
 
 
-    def eval_expr(self, expr, rule, library, raw=False):
+    def eval_expr(self, expr, raw=False):
         results = None
 
         if not isinstance(expr, basestring):
             results = expr
 
         if results is None:
-            if _variable_re.match(expr):
-                expr = normalize_var(expr)
-            if expr in rule.context:
-                chkd = {}
-                while expr in rule.context and expr not in chkd:
-                    chkd[expr] = 1
-                    _expr = rule.context[expr]
-                    if _expr == expr:
-                        break
-                    expr = _expr
+            try:
+                results = self.namespace.variable(expr)
+            except KeyError:
+                pass
+
             if not isinstance(expr, basestring):
                 results = expr
 
@@ -148,7 +121,7 @@ class Calculator(object):
         if results is None:
             if expr in ast_cache:
                 ast = ast_cache[expr]
-                results = ast.evaluate(rule, self)
+                results = ast.evaluate(self)
             else:
                 try:
                     P = CalculatorParser(CalculatorScanner())
@@ -158,19 +131,31 @@ class Calculator(object):
                     if config.DEBUG:
                         raise
                 except Exception, e:
-                    log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule.file_and_line)
+                    # TODO hoist me up since the rule is gone
+                    #log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule.file_and_line)
                     if config.DEBUG:
                         raise
                 else:
                     ast_cache[expr] = ast
 
-                    results = ast.evaluate(rule, self)
+                    results = ast.evaluate(self)
 
         if not raw and results is not None:
             results = to_str(results)
 
         # print >>sys.stderr, repr(expr),'==',results,'=='
         return results
+
+    def parse_expression(self, expr):
+        if expr not in ast_cache:
+            parser = CalculatorParser(CalculatorScanner())
+            parser.reset(expr)
+            ast = parser.goal()
+
+            ast_cache[expr] = ast
+
+        return ast_cache[expr]
+
 
 
 # ------------------------------------------------------------------------------
@@ -180,7 +165,7 @@ class Expression(object):
     def __repr__(self):
         return repr(self.__dict__)
 
-    def evaluate(self, rule, calculator):
+    def evaluate(self, calculator):
         raise NotImplementedError
 
 class UnaryOp(Expression):
@@ -188,8 +173,8 @@ class UnaryOp(Expression):
         self.op = op
         self.operand = operand
 
-    def evaluate(self, rule, calculator):
-        return self.op(self.operand.evaluate(rule, calculator))
+    def evaluate(self, calculator):
+        return self.op(self.operand.evaluate(calculator))
 
 class BinaryOp(Expression):
     def __init__(self, op, left, right):
@@ -197,40 +182,40 @@ class BinaryOp(Expression):
         self.left = left
         self.right = right
 
-    def evaluate(self, rule, calculator):
-        left = self.left.evaluate(rule, calculator)
-        right = self.right.evaluate(rule, calculator)
+    def evaluate(self, calculator):
+        left = self.left.evaluate(calculator)
+        right = self.right.evaluate(calculator)
         return self.op(left, right)
 
 class AnyOp(Expression):
     def __init__(self, *operands):
         self.operands = operands
 
-    def evaluate(self, rule, calculator):
-        operands = [operand.evaluate(rule, calculator) for operand in self.operands]
+    def evaluate(self, calculator):
+        operands = [operand.evaluate(calculator) for operand in self.operands]
         return any(operands)
 
 class AllOp(Expression):
     def __init__(self, *operands):
         self.operands = operands
 
-    def evaluate(self, rule, calculator):
-        operands = [operand.evaluate(rule, calculator) for operand in self.operands]
+    def evaluate(self, calculator):
+        operands = [operand.evaluate(calculator) for operand in self.operands]
         return all(operands)
 
 class NotOp(Expression):
     def __init__(self, operand):
         self.operand = operand
 
-    def evaluate(self, rule, calculator):
-        return not(self.operand.evaluate(rule, calculator))
+    def evaluate(self, calculator):
+        return not(self.operand.evaluate(calculator))
 
 class CallOp(Expression):
     def __init__(self, func_name, argspec):
         self.func_name = func_name
         self.argspec = argspec
 
-    def evaluate(self, rule, calculator):
+    def evaluate(self, calculator):
         # TODO bake this into the context and options "dicts", plus library
         name = normalize_var(self.func_name)
 
@@ -241,7 +226,7 @@ class CallOp(Expression):
         kwargs = {}
         evald_argpairs = []
         for var, expr in self.argspec.argpairs:
-            value = expr.evaluate(rule, calculator)
+            value = expr.evaluate(calculator)
             evald_argpairs.append((var, value))
 
             if var is None:
@@ -253,19 +238,13 @@ class CallOp(Expression):
 
         # TODO merge this with the library
         try:
-            func = rule.functions[name, num_args]
-            # @functions take a rule as first arg.  TODO: Python functions possibly
+            func = calculator.namespace.function(self.func_name, num_args)
+            # @functions take a ns as first arg.  TODO: Python functions possibly
             # should too
-            func = partial(func, rule)
+            if func.__name__ == '__call':
+                func = partial(func, calculator.namespace)
         except KeyError:
-            func = None
-
-        try:
-            # If that fails, check for Python implementations
-            if func is None:
-                func = calculator.library.lookup(name, num_args)
-        except KeyError:
-            if not is_builtin_css_function(name):
+            if not is_builtin_css_function(self.func_name):
                 # TODO log.warn, log.error, warning, exception?
                 log.warn("no such function")
 
@@ -277,7 +256,7 @@ class CallOp(Expression):
                 else:
                     rendered_args.append("%s: %s" % (var, rendered_value))
 
-            return StringValue("%s(%s)" % (name, ", ".join(rendered_args)))
+            return StringValue("%s(%s)" % (self.func_name, ", ".join(rendered_args)))
         else:
             return func(*args, **kwargs)
 
@@ -285,34 +264,35 @@ class Literal(Expression):
     def __init__(self, value):
         self.value = value
 
-    def evaluate(self, rule, calculator):
+    def evaluate(self, calculator):
         return self.value
 
 class Variable(Expression):
     def __init__(self, name):
         self.name = name
 
-    def evaluate(self, rule, calculator):
-        var = normalize_var(self.name)
-        if var in rule.context:
-            # TODO this should be a real value, not a flattened basestring
-            value = rule.context[var]
+    def evaluate(self, calculator):
+        try:
+            value = calculator.namespace.variable(self.name)
+        except KeyError:
+            # TODO well, no.  should probably let this raise.
+            # TODO this should return an opaque anyway
+            raise
+            return self.name
+        else:
             if isinstance(value, basestring):
-                evald = calculator.eval_expr(value, rule, calculator.library, True)
+                evald = calculator.eval_expr(value, raw=True)
                 if evald is not None:
                     return evald
             return value
-        else:
-            # TODO well, no.
-            return var
 
 class ListLiteral(Expression):
     def __init__(self, items, comma=True):
         self.items = items
         self.comma = comma
 
-    def evaluate(self, rule, calculator):
-        items = [item.evaluate(rule, calculator) for item in self.items]
+    def evaluate(self, calculator):
+        items = [item.evaluate(calculator) for item in self.items]
         return ListValue(items, separator="," if self.comma else "")
 
 class ArgspecLiteral(Expression):
@@ -326,8 +306,12 @@ def parse_bareword(word):
         ret = ColorValue(ParserValue(_colors[word]))
         ret.tokens = ParserValue(word)
         return ret
-    #elif word in ('null', 'undefined'):
-    #    return NullValue()
+    elif word in ('null', 'undefined'):
+        return NullValue()
+    elif word == 'true':
+        return BooleanValue(True)
+    elif word == 'false':
+        return BooleanValue(False)
     else:
         return StringValue(ParserValue(word))
 
