@@ -1,11 +1,11 @@
 h2 {
-  background: #008000;
+  background: green;
 }
 @media screen {
   h2 {
-    background: #0000ff;
+    background: blue;
   }
 }
 h1 {
-  background: #ffff00;
+  background: yellow;
 }
