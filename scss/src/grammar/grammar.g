@@ -4,7 +4,7 @@
 #'(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'
 ## Grammar compiled using Yapps:
 %%
-parser CalculatorParser:
+parser SassExpression:
     ignore: "[ \r\t\n]+"
     token COMMA: ","
     token LPAR: "\\(|\\["
@@ -29,7 +29,6 @@ parser CalculatorParser:
     token QSTR: '"[^"]*"'
     token UNITS: "(?<!\s)(?:px|cm|mm|hz|%)(?![-\w])"
     token NUM: "(?:\d+(?:\.\d*)?|\.\d+)"
-    token BOOL: "(?<![-\w])(?:true|false)(?![-\w])"
     token COLOR: "#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])"
     token VAR: "\$[-a-zA-Z0-9_]+"
     token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
@@ -94,8 +93,6 @@ parser CalculatorParser:
                               STR                           {{ return Literal(StringValue(ParserValue(STR))) }}
                               |
                               QSTR                          {{ return Literal(QuotedStringValue(ParserValue(QSTR))) }}
-                              |
-                              BOOL                          {{ return Literal(BooleanValue(ParserValue(BOOL))) }}
                               |
                               COLOR                         {{ return Literal(ColorValue(ParserValue(COLOR))) }}
                               |

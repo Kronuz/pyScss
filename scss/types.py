@@ -154,20 +154,8 @@ class NullValue(Value):
 
 
 class BooleanValue(Value):
-    def __init__(self, tokens):
-        self.tokens = tokens
-        if tokens is None:
-            self.value = False
-        elif isinstance(tokens, ParserValue):
-            self.value = (tokens.value.lower() == 'true')
-        elif isinstance(tokens, BooleanValue):
-            self.value = tokens.value
-        elif isinstance(tokens, NumberValue):
-            self.value = bool(tokens.value)
-        elif isinstance(tokens, (float, int)):
-            self.value = bool(tokens)
-        else:
-            self.value = to_str(tokens).lower() in ('true', '1', 'on', 'yes', 't', 'y') or bool(tokens)
+    def __init__(self, value):
+        self.value = bool(value)
 
     def __hash__(self):
         return hash(self.value)
@@ -177,17 +165,7 @@ class BooleanValue(Value):
 
     @classmethod
     def _do_cmps(cls, first, second, op):
-        first = first.value if isinstance(first, Value) else first
-        second = second.value if isinstance(second, Value) else second
-        if first in ('true', '1', 'on', 'yes', 't', 'y'):
-            first = True
-        elif first in ('false', '0', 'off', 'no', 'f', 'n', 'undefined'):
-            first = False
-        if second in ('true', '1', 'on', 'yes', 't', 'y'):
-            second = True
-        elif second in ('false', '0', 'off', 'no', 'f', 'n', 'undefined'):
-            second = False
-        return op(first, second)
+        return op(bool(first), bool(second))
 
     @classmethod
     def _do_op(cls, first, second, op):
@@ -213,14 +191,7 @@ class BooleanValue(Value):
         first = BooleanValue(first)
         second = BooleanValue(second)
         val = op(first.value, second.value)
-        ret = BooleanValue(None).merge(first).merge(second)
-        ret.value = val
-        return ret
-
-    def merge(self, obj):
-        obj = BooleanValue(obj)
-        self.value = obj.value
-        return self
+        return BooleanValue(val)
 
 
 class NumberValue(Value):
