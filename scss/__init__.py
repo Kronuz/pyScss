@@ -68,7 +68,7 @@ from scss.expression import Calculator
 from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
 from scss.rule import UnparsedBlock, SassRule
-from scss.types import BooleanValue, ListValue, NumberValue, StringValue
+from scss.types import BooleanValue, ListValue, NullValue, NumberValue, StringValue
 from scss.util import depar, dequote, normalize_var, split_params, to_str, profile, print_timing
 
 log = logging.getLogger(__name__)
@@ -551,8 +551,6 @@ class Scss(object):
                     return
                 elif code == '@include':
                     self._do_include(rule, p_children, scope, block)
-                elif block.unparsed_contents is None:
-                    rule.properties.append((block.prop, None))
                 elif code in ('@mixin', '@function'):
                     self._do_functions(rule, p_children, scope, block)
                 elif code in ('@if', '@else if'):
@@ -567,6 +565,8 @@ class Scss(object):
                 #     self._do_while(rule, p_children, scope, block)
                 elif code in ('@variables', '@vars'):
                     self._get_variables(rule, p_children, scope, block)
+                elif block.unparsed_contents is None:
+                    rule.properties.append((block.prop, None))
                 elif scope is None:  # needs to have no scope to crawl down the nested rules
                     self._nest_rules(rule, p_children, scope, block)
             ####################################################################
@@ -606,7 +606,7 @@ class Scss(object):
         Implements @mixin and @function
         """
         if not block.argument:
-            return
+            raise SyntaxError("%s requires a function name (%s)" % (block.directive, rule.file_and_line))
 
         funct, params, _ = block.argument.partition('(')
         funct = normalize_var(funct.strip())
@@ -658,7 +658,7 @@ class Scss(object):
                     self.manage_children(_rule, p_children, scope)
                     ret = _rule.retval
                     if ret is None:
-                        ret = 'undefined'
+                        ret = NullValue()
                     return ret
                 return __call
             _mixin = _call(mixin)
@@ -708,7 +708,7 @@ class Scss(object):
         except KeyError:
             try:
                 # Fallback to single parameter
-                # TODO don't do this
+                # TODO don't do this, once ... works
                 mixin = rule.namespace.mixin(funct, 1)
                 if all(map(lambda o: isinstance(o, int), new_params.keys())):
                     new_params = {0: ', '.join(new_params.values())}
@@ -930,7 +930,7 @@ class Scss(object):
         """
         if block.directive != '@if':
             if '@if' not in rule.options:
-                log.error("@else with no @if (%s)", rule.file_and_line)
+                raise SyntaxError("@else with no @if (%s)" % (rule.file_and_line,))
             val = not rule.options.get('@if', True)
         else:
             val = True
@@ -1433,7 +1433,7 @@ class Scss(object):
             if not skip_selectors:
                 result += self._print_properties(rule.properties, sc, sp, tb * len(ancestry), nl, wrap)
 
-        if not sc and result[-1] == ';':
+        if not sc and result and result[-1] == ';':
             result = result[:-1]
 
         for i in reversed(range(len(old_ancestry))):
@@ -1451,7 +1451,6 @@ class Scss(object):
             wrap = wrap.wrap
 
         result = ''
-        old_property = None
         for name, value in properties:
             if value is not None:
                 if nl:
@@ -1459,9 +1458,8 @@ class Scss(object):
                 prop = name + ':' + sp + value
             else:
                 prop = name
-            if old_property != prop:
-                old_property = prop
-                result += _tb + prop + ';' + nl
+
+            result += _tb + prop + ';' + nl
         return result
 
     @print_timing(3)
