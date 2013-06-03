@@ -52,6 +52,7 @@ import os.path
 import re
 import sys
 import textwrap
+import traceback
 
 from scss import config
 from scss.cssdefs import (
@@ -315,7 +316,7 @@ class Scss(object):
             all_selectors += total_selectors
             if not exceeded and all_selectors > 4095:
                 exceeded = " (IE exceeded!)"
-                log.error("Maximum number of supported selectors in Internet Explorer (4095) exceeded!")
+                raise CompilationError('Maximum number of supported selectors in Internet Explorer (4095) exceeded!')
             if files > 1 and self.scss_opts.get('debug_info', False):
                 if source_file.is_string:
                     final_cont += "/* %s %s generated add up to a total of %s %s accumulated%s */\n" % (
@@ -338,7 +339,22 @@ class Scss(object):
 
         return final_cont
 
-    compile = Compilation
+    def compile(self, *args, **kwargs):
+        try:
+            return self.Compilation(*args, **kwargs)
+        except Exception as e:
+            browser_message = '/*\n' + traceback.format_exc() + '\n*/'
+            browser_message += """
+body:before {
+  content: "Scss compilation error: %s";
+  display: block;
+  white-space: Monaco, pre;
+  font-family: monospace;
+  text-align: center;
+  background: #ebadad;
+}
+""" % e.message
+            return browser_message
 
     def longest_common_prefix(self, seq1, seq2):
         start = 0
@@ -595,8 +611,7 @@ class Scss(object):
             if mixin and all(map(lambda o: isinstance(o, int), new_params.keys())):
                 new_params = {0: ', '.join(new_params.values())}
         if not mixin:
-            log.error("Required mixin not found: %s:%d (%s)", funct, num_args, rule.file_and_line, extra={'stack': True})
-            return
+            raise SyntaxError("Undefined mixin: '%s' (at %s)" % (funct, rule.file_and_line))
 
         m_params = mixin[0]
         m_vars = mixin[1].copy()
@@ -629,7 +644,7 @@ class Scss(object):
         Implements @content
         """
         if '@content' not in rule.options:
-            log.error("Content string not found for @content (%s)", rule.file_and_line)
+            raise SyntaxError("Content string not found for @content (%s)", rule.file_and_line)
         rule.unparsed_contents = rule.options.pop('@content', '')
         self.manage_children(rule, p_children, scope)
 
@@ -707,7 +722,7 @@ class Scss(object):
             if i_codestr is None:
                 load_paths = load_paths and "\nLoad paths:\n\t%s" % "\n\t".join(load_paths) or ''
                 unsupported = unsupported and "\nPossible matches (for unsupported file format SASS):\n\t%s" % "\n\t".join(unsupported) or ''
-                log.warn("File to import not found or unreadable: '%s' (%s)%s%s", filename, rule.file_and_line, load_paths, unsupported)
+                raise SyntaxError("File to import not found or unreadable: '%s' (%s)%s%s", filename, rule.file_and_line, load_paths, unsupported)
             else:
                 _rule = SassRule(
                     source_file=source_file,
@@ -811,7 +826,7 @@ class Scss(object):
         """
         if block.directive != '@if':
             if '@if' not in rule.options:
-                log.error("@else with no @if (%s)", rule.file_and_line)
+                raise SyntaxError("@else with no @if (%s)", rule.file_and_line)
             val = not rule.options.get('@if', True)
         else:
             val = True
@@ -837,7 +852,7 @@ class Scss(object):
         Implements @else
         """
         if '@if' not in rule.options:
-            log.error("@else with no @if (%s)", rule.file_and_line)
+            raise SyntaxError('@else with no @if (%s)', rule.file_and_line)
         val = rule.options.pop('@if', True)
         if not val:
             rule.unparsed_contents = block.unparsed_contents
@@ -960,7 +975,7 @@ class Scss(object):
                 pass
             else:
                 if is_defined and prop.startswith('$') and prop[1].isupper():
-                    log.warn("Constant %r redefined", prop)
+                    raise SyntaxError('Constant %r redefined', prop)
 
                 rule.context[_prop] = value
         else:
@@ -1173,7 +1188,7 @@ class Scss(object):
                 parents = self.link_with_parents(grouped_rules, parent, selectors, rules)
 
                 if parents is None:
-                    log.warn("Parent rule not found: %s", parent)
+                    raise SyntaxError('@extends parent rule not found: %s', parent)
                     continue
 
                 # from the parent, inherit the context and the options:
