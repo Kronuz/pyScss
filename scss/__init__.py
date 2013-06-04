@@ -316,7 +316,7 @@ class Scss(object):
             all_selectors += total_selectors
             if not exceeded and all_selectors > 4095:
                 exceeded = " (IE exceeded!)"
-                raise CompilationError('Maximum number of supported selectors in Internet Explorer (4095) exceeded!')
+                raise Exception('Maximum number of supported selectors in Internet Explorer (4095) exceeded!')
             if files > 1 and self.scss_opts.get('debug_info', False):
                 if source_file.is_string:
                     final_cont += "/* %s %s generated add up to a total of %s %s accumulated%s */\n" % (
