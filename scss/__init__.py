@@ -5057,6 +5057,10 @@ fnct = {
 for u in _units:
     fnct[u + ':2'] = _convert_to
 
+def register_function(name, argc, fn):
+    if (isinstance(argc, int) and argc < 0) or (not isinstance(argc, int) and argc != 'n'):
+        raise Exception('argc must be 0, a positive int or the letter n')
+    fnct['%s:%s' % (name, argc)] = fn
 
 def interpolate(var, rule):
     context = rule[CONTEXT]
