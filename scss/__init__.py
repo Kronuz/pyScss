@@ -5071,7 +5071,7 @@ def interpolate(var, rule):
 def call(name, args, R, is_function=True):
     C, O = R[CONTEXT], R[OPTIONS]
     # Function call:
-    _name = name.replace('_', '-')
+    _name = name
     s = args and args.value.items() or []
     _args = [v for n, v in s if isinstance(n, int)]
     _kwargs = dict((str(n[1:]).replace('-', '_'), v) for n, v in s if not isinstance(n, int) and n != '_')
