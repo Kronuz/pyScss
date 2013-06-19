@@ -1128,7 +1128,7 @@ class Scss(object):
             return
 
         funct, params, _ = name.partition('(')
-        funct = funct.strip()
+        funct = funct.strip().replace('_', '-')
         params = split_params(depar(params + _))
         defaults = {}
         new_params = []
