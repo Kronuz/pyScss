@@ -32,12 +32,12 @@ class Calculator(object):
     def _calculate_expr(self, result):
         _group0 = result.group(1)
         _base_str = _group0
-        better_expr_str = self.eval_expr(_base_str)
+        better_expr_str = self.evaluate_expression(_base_str)
 
         if better_expr_str is None:
             better_expr_str = self.apply_vars(_base_str)
         else:
-            better_expr_str = dequote(str(better_expr_str))
+            better_expr_str = dequote(str(to_str(better_expr_str)))
 
         return better_expr_str
 
@@ -84,7 +84,7 @@ class Calculator(object):
 
         better_expr_str = self.do_glob_math(better_expr_str)
 
-        better_expr_str = self.eval_expr(better_expr_str, raw=True)
+        better_expr_str = self.evaluate_expression(better_expr_str)
 
         if better_expr_str is None:
             better_expr_str = self.apply_vars(_base_str)
@@ -96,13 +96,13 @@ class Calculator(object):
     def interpolate(self, var):
         value = self.namespace.variable(var)
         if var != value and isinstance(value, basestring):
-            _vi = self.eval_expr(value, raw=True)
+            _vi = self.evaluate_expression(value)
             if _vi is not None:
                 value = _vi
         return value
 
 
-    def eval_expr(self, expr, raw=False):
+    def evaluate_expression(self, expr):
         results = None
 
         if not isinstance(expr, basestring):
@@ -139,9 +139,6 @@ class Calculator(object):
                     ast_cache[expr] = ast
 
                     results = ast.evaluate(self)
-
-        if not raw and results is not None:
-            results = to_str(results)
 
         # print >>sys.stderr, repr(expr),'==',results,'=='
         return results
@@ -281,7 +278,7 @@ class Variable(Expression):
             return self.name
         else:
             if isinstance(value, basestring):
-                evald = calculator.eval_expr(value, raw=True)
+                evald = calculator.evaluate_expression(value)
                 if evald is not None:
                     return evald
             return value

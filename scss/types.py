@@ -16,9 +16,7 @@ class ParserValue(object):
 
 
 class Value(object):
-    @property
-    def is_null(self):
-        return False
+    is_null = False
 
     @staticmethod
     def _merge_type(a, b):
@@ -142,15 +140,13 @@ class Value(object):
 
 
 class NullValue(Value):
+    is_null = True
+
     def __init__(self):
         pass
 
     def __str__(self):
         return 'null'
-
-    @property
-    def is_null(self):
-        return True
 
 
 class BooleanValue(Value):
@@ -571,6 +567,19 @@ class ColorValue(Value):
                     except:
                         raise ValueError("Value is not a Color! (%s)" % tokens)
 
+    @classmethod
+    def from_rgb(cls, red, green, blue, alpha=1.0):
+        self = cls.__new__(cls)  # TODO
+        self.tokens = None
+        # TODO really should store these things internally as 0-1
+        self.value = (red * 255.0, green * 255.0, blue * 255.0, alpha)
+        if alpha == 1.0:
+            self.types = {'rgb': 1}
+        else:
+            self.types = {'rgba': 1}
+
+        return self
+
     def __hash__(self):
         return hash((tuple(self.value), frozenset(self.types.items())))
 
@@ -613,7 +622,13 @@ class ColorValue(Value):
             second = ColorValue(second)
         except ValueError:
             return op(getattr(first, 'value', first), getattr(second, 'value', second))
-        return op(first.value, second.value)
+
+        # Round to the nearest 5 digits for comparisons; corresponds roughly to
+        # 16 bits per channel, the most that generally matters.  Otherwise
+        # float errors make equality fail for HSL colors.
+        first_rounded = tuple(round(n, 5) for n in first.value)
+        second_rounded = tuple(round(n, 5) for n in second.value)
+        return op(first_rounded, second_rounded)
 
     @classmethod
     def _do_op(cls, first, second, op):

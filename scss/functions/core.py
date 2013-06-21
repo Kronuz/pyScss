@@ -301,8 +301,8 @@ def desaturate(color, amount):
     return __hsl_op(operator.__sub__, color, 0, amount, 0)
 
 
-@register('greyscale', 2)
-@register('grayscale', 2)
+@register('greyscale', 1)
+@register('grayscale', 1)
 def grayscale(color):
     return __hsl_op(operator.__sub__, color, 0, 100.0, 0)
 
