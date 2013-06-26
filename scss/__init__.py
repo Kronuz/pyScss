@@ -1532,7 +1532,18 @@ class Scss(object):
 
         if value:
             value = value.strip()
-            value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
+            is_math_expr = True
+            if '/' in value:
+                # Check to see whether the slash represents a mathematic division or not
+                # See: http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html#division-and-slash
+                if ('$' in re.sub(r'#\{.*\$.*\}', '', value) or
+                    re.search(r'\(+.*\)+', value) or
+                    re.search(r'[\+\-\*]*', value)):
+                    is_math_expr = True
+                else:
+                    is_math_expr = False 
+            if is_math_expr:
+                value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
         _prop = (scope or '') + prop
         if is_var or prop.startswith('$') and value is not None:
             in_context = rule[CONTEXT].get(_prop)
