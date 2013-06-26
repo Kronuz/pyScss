@@ -18,37 +18,6 @@ class ParserValue(object):
 class Value(object):
     is_null = False
 
-    @staticmethod
-    def _merge_type(a, b):
-        if a.__class__ == b.__class__:
-            return a.__class__
-        if isinstance(a, QuotedStringValue) or isinstance(b, QuotedStringValue):
-            return QuotedStringValue
-        return StringValue
-
-    @staticmethod
-    def _wrap(fn):
-        """
-        Wrapper function to allow calling any function
-        using Value objects as parameters.
-        """
-        def _func(*args):
-            merged = None
-            _args = []
-            for arg in args:
-                if merged.__class__ != arg.__class__:
-                    if merged is None:
-                        merged = arg.__class__(None)
-                    else:
-                        merged = Value._merge_type(merged, arg)(None)
-                merged.merge(arg)
-                if isinstance(arg, Value):
-                    arg = arg.value
-                _args.append(arg)
-            merged.value = fn(*_args)
-            return merged
-        return _func
-
     @classmethod
     def _do_bitops(cls, first, second, op):
         first = StringValue(first)
@@ -334,6 +303,22 @@ class NumberValue(Value):
         ret = ret.merge(second)
         ret.value = val
         return ret
+
+    @classmethod
+    def wrap_python_function(cls, fn):
+        """Wraps an unary Python math function, translating the argument from
+        Sass to Python on the way in, and vice versa for the return value.
+
+        Used to wrap simple Python functions like `ceil`, `floor`, etc.
+        """
+        def wrapped(sass_arg):
+            # TODO enforce no units for trig?
+            python_arg = sass_arg.value
+            python_ret = fn(python_arg)
+            sass_ret = cls(python_ret, type=sass_arg.unit)
+            return sass_ret
+
+        return wrapped
 
     def merge(self, obj):
         obj = NumberValue(obj)

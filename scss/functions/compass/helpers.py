@@ -17,7 +17,7 @@ import time
 from scss import config
 from scss.cssdefs import _undefined_re
 from scss.functions.library import FunctionLibrary
-from scss.types import BooleanValue, ListValue, NumberValue, StringValue, Value
+from scss.types import BooleanValue, ListValue, NumberValue, StringValue
 from scss.util import escape, to_str
 
 log = logging.getLogger(__name__)
@@ -449,9 +449,9 @@ def opposite_position(p):
 def pi():
     return NumberValue(math.pi)
 
-COMPASS_HELPERS_LIBRARY.add(Value._wrap(math.sin), 'sin', 1)
-COMPASS_HELPERS_LIBRARY.add(Value._wrap(math.cos), 'cos', 1)
-COMPASS_HELPERS_LIBRARY.add(Value._wrap(math.tan), 'tan', 1)
+COMPASS_HELPERS_LIBRARY.add(NumberValue.wrap_python_function(math.sin), 'sin', 1)
+COMPASS_HELPERS_LIBRARY.add(NumberValue.wrap_python_function(math.cos), 'cos', 1)
+COMPASS_HELPERS_LIBRARY.add(NumberValue.wrap_python_function(math.tan), 'tan', 1)
 
 
 # ------------------------------------------------------------------------------

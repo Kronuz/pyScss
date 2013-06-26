@@ -11,7 +11,7 @@ import operator
 
 from scss.cssdefs import _conv_type, _units, _units_weights, _variable_re
 from scss.functions.library import FunctionLibrary
-from scss.types import BooleanValue, ColorValue, ListValue, NumberValue, QuotedStringValue, StringValue, Value
+from scss.types import BooleanValue, ColorValue, ListValue, NumberValue, QuotedStringValue, StringValue
 
 log = logging.getLogger(__name__)
 
@@ -400,10 +400,10 @@ def percentage(value):
     value.units = {'%': _units_weights.get('%', 1), '_': '%'}
     return value
 
-CORE_LIBRARY.add(Value._wrap(abs), 'abs', 1)
-CORE_LIBRARY.add(Value._wrap(round), 'round', 1)
-CORE_LIBRARY.add(Value._wrap(math.ceil), 'ceil', 1)
-CORE_LIBRARY.add(Value._wrap(math.floor), 'floor', 1)
+CORE_LIBRARY.add(NumberValue.wrap_python_function(abs), 'abs', 1)
+CORE_LIBRARY.add(NumberValue.wrap_python_function(round), 'round', 1)
+CORE_LIBRARY.add(NumberValue.wrap_python_function(math.ceil), 'ceil', 1)
+CORE_LIBRARY.add(NumberValue.wrap_python_function(math.floor), 'floor', 1)
 
 
 # ------------------------------------------------------------------------------
