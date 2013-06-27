@@ -1532,18 +1532,7 @@ class Scss(object):
 
         if value:
             value = value.strip()
-            is_math_expr = True
-            if '/' in value:
-                # Check to see whether the slash represents a mathematic division or not
-                # See: http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html#division-and-slash
-                if ('$' in re.sub(r'#\{.*\$.*\}', '', value) or
-                    re.search(r'\(+.*\)+', value) or
-                    re.search(r'[\+\-\*]*', value)):
-                    is_math_expr = True
-                else:
-                    is_math_expr = False 
-            if is_math_expr:
-                value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
+            value = self.calculate(value, rule[CONTEXT], rule[OPTIONS], rule)
         _prop = (scope or '') + prop
         if is_var or prop.startswith('$') and value is not None:
             in_context = rule[CONTEXT].get(_prop)
@@ -1964,11 +1953,23 @@ class Scss(object):
 
         rule = list(rule)
         rule[CONTEXT] = context
-        rule[OPTIONS] = options
-
+        rule[OPTIONS] = options 
+        
+        is_math_expr = True
+        if '/' in better_expr_str:
+            # Check to see whether the slash represents a mathematic division or not
+            # See: http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html#division-and-slash
+            if ('$' in re.sub(r'#\{.*\$.*\}', '', better_expr_str) or
+                re.search(r'\(+.*\)+', better_expr_str) or
+                re.search(r'[\+\-\*]+', better_expr_str)):
+                is_math_expr = True
+            else:
+                is_math_expr = False
+        
         better_expr_str = self.do_glob_math(better_expr_str, context, options, rule)
-
-        better_expr_str = eval_expr(better_expr_str, rule, True)
+        
+        if is_math_expr:
+            better_expr_str = eval_expr(better_expr_str, rule, True)
 
         if better_expr_str is None:
             better_expr_str = self.apply_vars(_base_str, context, options, rule)
