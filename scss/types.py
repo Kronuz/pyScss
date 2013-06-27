@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import colorsys
 import operator
 
-from scss.cssdefs import _conv_factor, _conv_type, _undefined_re, _units_weights
+from scss.cssdefs import _conv_factor, _conv_type, _units_weights
 from scss.util import dequote, escape, to_float, to_str
 
 
@@ -138,8 +138,6 @@ class NumberValue(Value):
                 type = None
         elif isinstance(tokens, (StringValue, basestring)):
             tokens = getattr(tokens, 'value', tokens)
-            if _undefined_re.match(tokens):
-                raise ValueError("Value is not a Number! (%s)" % tokens)
             try:
                 if tokens and tokens[-1] == '%':
                     self.value = to_float(tokens[:-1]) / 100.0
@@ -408,8 +406,6 @@ class ListValue(Value):
 
     def first(self):
         for v in self.values():
-            if isinstance(v, basestring) and _undefined_re.match(v):
-                continue
             if bool(v):
                 return v
         return v
@@ -467,8 +463,6 @@ class ColorValue(Value):
                 tokens = tokens.value
             tokens = to_str(tokens)
             tokens.replace(' ', '').lower()
-            if _undefined_re.match(tokens):
-                raise ValueError("Value is not a Color! (%s)" % tokens)
             try:
                 self.value = self.HEX2RGBA[len(tokens)](tokens)
             except:
