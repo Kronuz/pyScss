@@ -17,7 +17,7 @@ import time
 from scss import config
 from scss.cssdefs import _undefined_re
 from scss.functions.library import FunctionLibrary
-from scss.types import BooleanValue, ListValue, NumberValue, StringValue
+from scss.types import BooleanValue, ListValue, NumberValue, QuotedStringValue, StringValue
 from scss.util import escape, to_str
 
 log = logging.getLogger(__name__)
@@ -47,55 +47,33 @@ def add_cache_buster(url, mtime):
 def blank(*objs):
     """Returns true when the object is false, an empty string, or an empty list"""
     for o in objs:
-        if bool(o):
+        if isinstance(o, BooleanValue):
+            is_blank = not o
+        elif isinstance(o, QuotedStringValue):
+            is_blank = not len(o.value.strip())
+        elif isinstance(o, ListValue):
+            is_blank = all(blank(el) for el in o)
+        else:
+            is_blank = False
+
+        if not is_blank:
             return BooleanValue(False)
+
     return BooleanValue(True)
 
 
 @register('compact')
 def compact(*args):
     """Returns a new list after removing any non-true values"""
-    ret = {}
-    if len(args) == 1:
+    sep = ','
+    if len(args) == 1 and isinstance(args[0], ListValue):
+        sep = args[0].value.get('_', '')
         args = args[0]
-        if isinstance(args, ListValue):
-            args = args.value
-        if isinstance(args, dict):
-            for i, item in args.items():
-                if isinstance(item, (basestring, StringValue)):
-                    if item != 'false' and not _undefined_re.match(unicode(item)):
-                        ret[i] = item
-                elif isinstance(item, (bool, BooleanValue)):
-                    if bool(item):
-                        ret[i] = item
-                else:
-                    ret[i] = item
-        elif isinstance(args, (basestring, StringValue)):
-            if args != 'false' and not _undefined_re.match(unicode(args)):
-                ret[0] = args
-        elif isinstance(args, (bool, BooleanValue)):
-            if bool(args):
-                ret[0] = args
-        else:
-            ret[0] = args
-    else:
-        ret['_'] = ','
-        for i, item in enumerate(args):
-            if isinstance(item, (basestring, StringValue)):
-                if item != 'false' and not _undefined_re.match(unicode(item)):
-                    ret[i] = item
-            elif isinstance(item, (bool, BooleanValue)):
-                if bool(item):
-                    ret[i] = item
-            else:
-                ret[i] = item
-    if isinstance(args, ListValue):
-        args = args.value
-    if isinstance(args, dict):
-        separator = args.get('_', None)
-        if separator is not None:
-            ret['_'] = separator
-    return ListValue(ret)
+
+    return ListValue(
+        [arg for arg in args if arg],
+        separator=sep,
+    )
 
 
 @register('reject')

@@ -40,7 +40,8 @@ class Value(object):
         return self._do_cmps(self, other, operator.__ge__)
 
     def __nonzero__(self):
-        return bool(self.value)
+        # Sass values are all true, except for booleans and nulls
+        return True
 
     def __add__(self, other):
         return self._do_op(self, other, operator.__add__)
@@ -83,6 +84,9 @@ class NullValue(Value):
     def __str__(self):
         return 'null'
 
+    def __nonzero__(self):
+        return False
+
 
 class BooleanValue(Value):
     def __init__(self, value):
@@ -93,6 +97,9 @@ class BooleanValue(Value):
 
     def __str__(self):
         return 'true' if self.value else 'false'
+
+    def __nonzero__(self):
+        return self.value
 
     @classmethod
     def _do_cmps(cls, first, second, op):
