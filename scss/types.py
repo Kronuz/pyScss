@@ -66,9 +66,6 @@ class Value(object):
     def __rmul__(self, other):
         return self._do_op(other, self, operator.__mul__)
 
-    def convert_to(self, type):
-        return self.value.convert_to(type)
-
     def merge(self, obj):
         if isinstance(obj, Value):
             self.value = obj.value
@@ -298,16 +295,6 @@ class NumberValue(Value):
         if _units_weights.get(self.units.get('_'), 1) <= _units_weights.get(unit, 1):
             self.units['_'] = unit
         return self
-
-    def convert_to(self, type):
-        val = self.value
-        if not self.unit:
-            val *= _conv_factor.get(type, 1.0)
-        ret = NumberValue(val)
-        if type == 'deg' and ret.value > 360:
-            ret.value = ret.value % 360.0
-        ret.units = {type: _units_weights.get(type, 1), '_': type}
-        return ret
 
     @property
     def unit(self):
@@ -620,12 +607,6 @@ class ColorValue(Value):
             self.types[type] += val
         return self
 
-    def convert_to(self, type):
-        val = self.value
-        ret = ColorValue(val)
-        ret.types[type] = 1
-        return ret
-
     @property
     def type(self):
         type = ''
@@ -652,9 +633,6 @@ class QuotedStringValue(Value):
 
     def __hash__(self):
         return hash((True, self.value))
-
-    def convert_to(self, type):
-        return QuotedStringValue(self.value + type)
 
     def __str__(self):
         return str(self.__unicode__())

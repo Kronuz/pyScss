@@ -9,7 +9,7 @@ import logging
 import math
 import operator
 
-from scss.cssdefs import _conv_type, _units, _units_weights, _variable_re
+from scss.cssdefs import _conv_type, _units_weights, _variable_re
 from scss.functions.library import FunctionLibrary
 from scss.types import BooleanValue, ColorValue, ListValue, NumberValue, QuotedStringValue, StringValue
 
@@ -552,14 +552,3 @@ def comparable(number1, number2):
 def if_(condition, if_true, if_false=''):
     condition = bool(False if not condition or isinstance(condition, basestring) and (condition in ('0', 'false', 'undefined') or _variable_re.match(condition)) else condition)
     return if_true.__class__(if_true) if condition else if_true.__class__(if_false)
-
-
-# ------------------------------------------------------------------------------
-# Units -- not strictly functions, but implemented as such
-
-def convert_to_unit(value, type):
-    return value.convert_to(type)
-
-
-for unit in _units:
-    CORE_LIBRARY.add(convert_to_unit, unit, 2)
