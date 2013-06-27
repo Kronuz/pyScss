@@ -1956,7 +1956,7 @@ class Scss(object):
         rule[OPTIONS] = options 
         
         is_math_expr = True
-        if '/' in better_expr_str:
+        if '/' in re.sub('url\(.*\)', '', better_expr_str):
             # Check to see whether the slash represents a mathematic division or not
             # See: http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html#division-and-slash
             if ('$' in re.sub(r'#\{.*\$.*\}', '', better_expr_str) or
