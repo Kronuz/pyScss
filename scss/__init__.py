@@ -61,7 +61,6 @@ from scss.cssdefs import (
     _zero_units_re, _zero_re,
     _escape_chars_re,
     _spaces_re, _expand_rules_space_re, _collapse_properties_space_re,
-    _undefined_re,
     _strings_re, _prop_split_re,
 )
 from scss.expression import Calculator
@@ -928,28 +927,21 @@ class Scss(object):
         """
         Implements @if and @else if
         """
+        # "@if" indicates whether any kind of `if` since the last `@else` has
+        # succeeded, in which case `@else if` should be skipped
         if block.directive != '@if':
             if '@if' not in rule.options:
                 raise SyntaxError("@else with no @if (%s)" % (rule.file_and_line,))
-            val = not rule.options.get('@if', True)
-        else:
-            val = True
-        if val:
-            calculator = Calculator(rule.namespace)
-            val = calculator.calculate(block.argument)
-            if isinstance(val, (basestring, StringValue)):
-                if val != 'false' and not _undefined_re.match(unicode(val)):
-                    val = True
-                else:
-                    val = False
-            elif isinstance(val, (bool, BooleanValue)):
-                val = bool(val)
-            else:
-                val = True
-            if val:
-                rule.unparsed_contents = block.unparsed_contents
-                self.manage_children(rule, p_children, scope)
-            rule.options['@if'] = val
+            if rule.options['@if']:
+                # Last @if succeeded; stop here
+                return
+
+        calculator = Calculator(rule.namespace)
+        condition = calculator.calculate(block.argument)
+        if condition:
+            rule.unparsed_contents = block.unparsed_contents
+            self.manage_children(rule, p_children, scope)
+        rule.options['@if'] = condition
 
     @print_timing(10)
     def _do_else(self, rule, p_children, scope, block):
