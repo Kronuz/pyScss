@@ -134,8 +134,6 @@ class NumberValue(Value):
         self.units = {}
         if tokens is None:
             self.value = 0.0
-        elif isinstance(tokens, ParserValue):
-            self.value = float(tokens.value)
         elif isinstance(tokens, NumberValue):
             self.value = tokens.value
             self.units = tokens.units.copy()
@@ -335,8 +333,6 @@ class ListValue(Value):
         self.tokens = tokens
         if tokens is None:
             self.value = {}
-        elif isinstance(tokens, ParserValue):
-            self.value = self._reorder_list(tokens.value)
         elif isinstance(tokens, ListValue):
             self.value = tokens.value.copy()
         elif isinstance(tokens, Value):
