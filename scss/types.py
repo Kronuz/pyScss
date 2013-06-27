@@ -39,12 +39,6 @@ class Value(object):
     def __ge__(self, other):
         return self._do_cmps(self, other, operator.__ge__)
 
-    def __cmp__(self, other):
-        return self._do_cmps(self, other, operator.__cmp__)
-
-    def __rcmp__(self, other):
-        return self._do_cmps(other, self, operator.__cmp__)
-
     def __nonzero__(self):
         return bool(self.value)
 
