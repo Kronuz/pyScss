@@ -15,7 +15,6 @@ import os.path
 import time
 
 from scss import config
-from scss.cssdefs import _undefined_re
 from scss.functions.library import FunctionLibrary
 from scss.types import BooleanValue, ListValue, NumberValue, QuotedStringValue, StringValue
 from scss.util import escape, to_str
