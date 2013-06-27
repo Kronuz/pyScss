@@ -18,13 +18,6 @@ class ParserValue(object):
 class Value(object):
     is_null = False
 
-    @classmethod
-    def _do_bitops(cls, first, second, op):
-        first = StringValue(first)
-        second = StringValue(second)
-        k = op(first.value, second.value)
-        return first if first.value == k else second
-
     def __repr__(self):
         return '<%s: %s>' % (self.__class__.__name__, repr(self.value))
 
@@ -51,24 +44,6 @@ class Value(object):
 
     def __rcmp__(self, other):
         return self._do_cmps(other, self, operator.__cmp__)
-
-    def __and__(self, other):
-        return self._do_bitops(self, other, operator.__and__)
-
-    def __or__(self, other):
-        return self._do_bitops(self, other, operator.__or__)
-
-    def __xor__(self, other):
-        return self._do_bitops(self, other, operator.__xor__)
-
-    def __rand__(self, other):
-        return self._do_bitops(other, self, operator.__rand__)
-
-    def __ror__(self, other):
-        return self._do_bitops(other, self, operator.__ror__)
-
-    def __rxor__(self, other):
-        return self._do_bitops(other, self, operator.__rxor__)
 
     def __nonzero__(self):
         return bool(self.value)
