@@ -417,12 +417,6 @@ class ListValue(Value):
     def items(self):
         return sorted((k, v) for k, v in self.value.items() if k != '_')
 
-    def first(self):
-        for v in self.values():
-            if bool(v):
-                return v
-        return v
-
     def __getitem__(self, key):
         return self.value[key]
 

@@ -43,3 +43,11 @@ def test_blank(calc):
 
 def test_compact(calc):
     assert calc('compact(1 2 3 false 4 5 null 6 7)') == calc('1 2 3 4 5 6 7')
+
+def test_reject(calc):
+    assert calc('reject(a b c d, a, c)') == calc('b d')
+    assert calc('reject(a b c d, e)') == calc('a b c d')
+
+def test_first_value_of(calc):
+    assert calc('first-value-of(a b c d)') == calc('a')
+    assert calc('first-value-of("a b c d")') == calc('"a"')

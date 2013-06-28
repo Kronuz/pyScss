@@ -16,7 +16,7 @@ import time
 
 from scss import config
 from scss.functions.library import FunctionLibrary
-from scss.types import BooleanValue, ListValue, NumberValue, QuotedStringValue, StringValue
+from scss.types import BooleanValue, ListValue, NullValue, NumberValue, QuotedStringValue, StringValue
 from scss.util import escape, to_str
 
 log = logging.getLogger(__name__)
@@ -87,7 +87,7 @@ def reject(lst, *values):
         if isinstance(values, ListValue):
             values = values.value.values()
         elif not isinstance(values, (list, tuple)):
-            values = list(values)
+            values = ListValue([values])
     for i, item in lst.items():
         if item not in values:
             ret[i] = item
@@ -98,11 +98,17 @@ def reject(lst, *values):
 
 
 @register('first-value-of')
-def first_value_of(*lst):
-    if len(lst) == 1 and isinstance(lst[0], (list, tuple, ListValue)):
-        lst = ListValue(lst[0])
-    ret = ListValue(lst).first()
-    return ret.__class__(ret)
+def first_value_of(lst):
+    if isinstance(lst, QuotedStringValue):
+        first = lst.value.split()[0]
+        return type(lst)(first)
+    elif isinstance(lst, ListValue):
+        if len(lst):
+            return lst[0]
+        else:
+            return NullValue()
+    else:
+        return lst
 
 
 @register('-compass-list')
