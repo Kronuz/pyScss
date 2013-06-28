@@ -112,6 +112,9 @@ def test_comparison_stringerific():
     assert not calc('"abc" != "abc"')
     assert not calc('"abc" == "xyz"')
 
+    # Interaction with other types
+    assert calc('123 != "123"')
+
     # Sass strings don't support ordering
     for expression in (
             '"abc" < "xyz"',
@@ -123,6 +126,15 @@ def test_comparison_stringerific():
 
         with pytest.raises(TypeError):
             calc(expression)
+
+def test_comparison_null():
+    calc = Calculator(Namespace()).calculate
+
+    assert calc('null == null')
+    assert calc('null != 0')
+
+    with pytest.raises(TypeError):
+        calc('null < null')
 
 
 

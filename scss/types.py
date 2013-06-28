@@ -91,6 +91,9 @@ class NullValue(Value):
     def __str__(self):
         return 'null'
 
+    def __repr__(self):
+        return "<%s>" % (type(self).__name__,)
+
     def __nonzero__(self):
         return False
 
