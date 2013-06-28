@@ -102,9 +102,6 @@ class BooleanValue(Value):
     def __init__(self, value):
         self.value = bool(value)
 
-    def __hash__(self):
-        return hash(self.value)
-
     def __str__(self):
         return 'true' if self.value else 'false'
 
@@ -167,9 +164,6 @@ class NumberValue(Value):
             raise ValueError("Can't convert to CSS number: %s" % repr(tokens))
         if type is not None:
             self.units = {type: _units_weights.get(type, 1), '_': type}
-
-    def __hash__(self):
-        return hash((self.value, frozenset(self.units.items())))
 
     def __repr__(self):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.units))
@@ -379,9 +373,6 @@ class ListValue(Value):
         if separator:
             self.value['_'] = separator
 
-    def __hash__(self):
-        return hash((frozenset(self.value.items())))
-
     @classmethod
     def _do_op(cls, first, second, op):
         if isinstance(first, ListValue) and isinstance(second, ListValue):
@@ -538,9 +529,6 @@ class ColorValue(Value):
 
         return self
 
-    def __hash__(self):
-        return hash((tuple(self.value), frozenset(self.types.items())))
-
     def __repr__(self):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.types))
 
@@ -648,9 +636,6 @@ class QuotedStringValue(Value):
         else:
             self.value = to_str(tokens)
 
-    def __hash__(self):
-        return hash((True, self.value))
-
     def __str__(self):
         return str(self.__unicode__())
 
@@ -701,9 +686,6 @@ class QuotedStringValue(Value):
 
 
 class StringValue(QuotedStringValue):
-    def __hash__(self):
-        return hash((False, self.value))
-
     def __str__(self):
         return str(self.__unicode__())
 
