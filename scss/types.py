@@ -212,13 +212,8 @@ class NumberValue(Value):
             raise TypeError("Can't compare %r and %r" % (self, other))
 
         # TODO this will need to get more complicated for full unit support
-        first = self
-        second = other
-        try:
-            first = NumberValue(first)
-            second = NumberValue(second)
-        except ValueError:
-            return op(getattr(first, 'value', first), getattr(second, 'value', second))
+        first = NumberValue(self)
+        second = NumberValue(other)
         first_type = _conv_type.get(first.unit)
         second_type = _conv_type.get(second.unit)
         if first_type == second_type or first_type is None or second_type is None:
@@ -410,9 +405,6 @@ class ListValue(Value):
     def __str__(self):
         return to_str(self.value)
 
-    def __tuple__(self):
-        return tuple(sorted((k, v) for k, v in self.value.items() if k != '_'))
-
     def __iter__(self):
         return iter(self.values())
 
@@ -431,17 +423,8 @@ class ListValue(Value):
                 return v
         return v
 
-    def args(self):
-        return zip(*sorted((k, v) for k, v in self.value.items() if k != '_' and isinstance(k, int)))[1]
-
-    def kwargs(self):
-        return dict((k, v) for k, v in self.value.items() if k != '_' and not isinstance(k, int))
-
     def __getitem__(self, key):
-        if isinstance(key, int):
-            return self.args()[key]
-        else:
-            return self.kwargs()[key]
+        return self.value[key]
 
 
 class ColorValue(Value):
@@ -577,14 +560,6 @@ class ColorValue(Value):
 
     @classmethod
     def _do_op(cls, first, second, op):
-        if isinstance(first, ListValue) and isinstance(second, ListValue):
-            ret = ListValue(first)
-            for k, v in ret.items():
-                try:
-                    ret.value[k] = op(ret.value[k], second.value[k])
-                except KeyError:
-                    pass
-            return ret
         if isinstance(first, ListValue):
             ret = ListValue(first)
             for k, v in ret.items():

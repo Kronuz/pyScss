@@ -52,7 +52,7 @@ def test_reference_operations():
 
 
 
-# Operators: arithmetic (+ - * / %), comparison (== != < > <= >=), boolean
+# Operators: arithmetic (+ - * / %), unary (+ -), comparison (== != < > <= >=), boolean
 # Types: numbers, colors, strings, booleans, lists
 # Test them all!
 
@@ -122,7 +122,8 @@ def test_comparison_stringerific():
             '"abc" <= "abc"',
             '"xyz" > "abc"',
             '"xyz" >= "abc"',
-            '"xyz" >= "xyz"'):
+            '"xyz" >= "xyz"',
+            '123 < "456"'):
 
         with pytest.raises(TypeError):
             calc(expression)
