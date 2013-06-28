@@ -3,6 +3,8 @@ from scss.rule import Namespace
 #from scss.types import Number
 from scss.util import to_str
 
+import pytest
+
 # TODO fix constructors for various types, and stop using to_str in here
 
 def test_reference_operations():
@@ -103,23 +105,24 @@ def test_comparison_numeric():
 def test_comparison_stringerific():
     calc = Calculator(Namespace()).calculate
 
-    # TODO whoops these aren't supposed to work for strings
-    assert calc('"abc" < "xyz"')
-    assert calc('"abc" <= "xyz"')
-    assert calc('"abc" <= "abc"')
-    assert calc('"xyz" > "abc"')
-    assert calc('"xyz" >= "abc"')
-    assert calc('"xyz" >= "xyz"')
     assert calc('"abc" == "abc"')
     assert calc('"abc" != "xyz"')
 
     # Same tests, negated
-    assert not calc('"abc" > "xyz"')
-    assert not calc('"abc" >= "xyz"')
-    assert not calc('"xyz" < "abc"')
-    assert not calc('"xyz" <= "abc"')
     assert not calc('"abc" != "abc"')
     assert not calc('"abc" == "xyz"')
+
+    # Sass strings don't support ordering
+    for expression in (
+            '"abc" < "xyz"',
+            '"abc" <= "xyz"',
+            '"abc" <= "abc"',
+            '"xyz" > "abc"',
+            '"xyz" >= "abc"',
+            '"xyz" >= "xyz"'):
+
+        with pytest.raises(TypeError):
+            calc(expression)
 
 
 

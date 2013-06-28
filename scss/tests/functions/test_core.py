@@ -36,13 +36,13 @@ def test_rgba(calc):
     assert calc('rgba(red, 0.4)') == ColorValue.from_rgb(1., 0., 0., 0.4)
 
 def test_red(calc):
-    assert calc('red(orange)') == 255
+    assert calc('red(orange)') == NumberValue(255)
 
 def test_green(calc):
-    assert calc('green(orange)') == 165
+    assert calc('green(orange)') == NumberValue(165)
 
 def test_blue(calc):
-    assert calc('blue(orange)') == 0
+    assert calc('blue(orange)') == NumberValue(0)
 
 @xfail(reason="difference in rounding; ruby floors, we round")
 def test_mix(calc):
@@ -71,14 +71,13 @@ def test_hsla(calc):
     assert calc('hsla(30, 100%, 50%, 0.1)') == ColorValue.from_rgb(1., 0.5, 0., 0.1)
 
 def test_hue(calc):
-    # TODO deg; this shouldn't really pass
-    assert calc('hue(yellow)') == 60
+    assert calc('hue(yellow)') == NumberValue(60, type='deg')
 
 def test_saturation(calc):
-    assert calc('saturation(yellow)') == 1.
+    assert calc('saturation(yellow)') == NumberValue(100, type='%')
 
 def test_lightness(calc):
-    assert calc('lightness(yellow)') == 0.5
+    assert calc('lightness(yellow)') == NumberValue(50, type='%')
 
 # HSL manipulation functions
 

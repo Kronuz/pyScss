@@ -21,28 +21,35 @@ class Value(object):
     def __repr__(self):
         return '<%s: %s>' % (self.__class__.__name__, repr(self.value))
 
-    def __lt__(self, other):
-        return self._do_cmps(self, other, operator.__lt__)
-
-    def __le__(self, other):
-        return self._do_cmps(self, other, operator.__le__)
-
-    def __eq__(self, other):
-        return self._do_cmps(self, other, operator.__eq__)
-
-    def __ne__(self, other):
-        return self._do_cmps(self, other, operator.__ne__)
-
-    def __gt__(self, other):
-        return self._do_cmps(self, other, operator.__gt__)
-
-    def __ge__(self, other):
-        return self._do_cmps(self, other, operator.__ge__)
-
+    # Sass values are all true, except for booleans and nulls
     def __nonzero__(self):
-        # Sass values are all true, except for booleans and nulls
         return True
 
+    ### NOTE: From here on down, the operators are exposed to Sass code and
+    ### thus should ONLY return Sass types
+
+    # Reasonable default for equality
+    def __eq__(self, other):
+        return BooleanValue(
+            type(self) == type(other) and self.value == other.value)
+
+    def __ne__(self, other):
+        return BooleanValue(not self.__eq__(other))
+
+    # Only numbers support ordering
+    def __lt__(self, other):
+        raise TypeError("Can't compare %r with %r" % (self, other))
+
+    def __le__(self, other):
+        raise TypeError("Can't compare %r with %r" % (self, other))
+
+    def __gt__(self, other):
+        raise TypeError("Can't compare %r with %r" % (self, other))
+
+    def __ge__(self, other):
+        raise TypeError("Can't compare %r with %r" % (self, other))
+
+    # Math ops
     def __add__(self, other):
         return self._do_op(self, other, operator.__add__)
 
@@ -87,6 +94,9 @@ class NullValue(Value):
     def __nonzero__(self):
         return False
 
+    def __eq__(self, other):
+        return isinstance(other, NullValue)
+
 
 class BooleanValue(Value):
     def __init__(self, value):
@@ -100,10 +110,6 @@ class BooleanValue(Value):
 
     def __nonzero__(self):
         return self.value
-
-    @classmethod
-    def _do_cmps(cls, first, second, op):
-        return op(bool(first), bool(second))
 
     @classmethod
     def _do_op(cls, first, second, op):
@@ -186,8 +192,31 @@ class NumberValue(Value):
         val = to_str(val) + unit
         return val
 
-    @classmethod
-    def _do_cmps(cls, first, second, op):
+    def __eq__(self, other):
+        if not isinstance(other, NumberValue):
+            return BooleanValue(False)
+
+        return BooleanValue(self.value == other.value and self.unit == other.unit)
+
+    def __lt__(self, other):
+        return self._compare(other, operator.__lt__)
+
+    def __le__(self, other):
+        return self._compare(other, operator.__le__)
+
+    def __gt__(self, other):
+        return self._compare(other, operator.__gt__)
+
+    def __ge__(self, other):
+        return self._compare(other, operator.__ge__)
+
+    def _compare(self, other, op):
+        if not isinstance(other, NumberValue):
+            raise TypeError("Can't compare %r and %r" % (self, other))
+
+        # TODO this will need to get more complicated for full unit support
+        first = self
+        second = other
         try:
             first = NumberValue(first)
             second = NumberValue(second)
@@ -352,15 +381,6 @@ class ListValue(Value):
 
     def __hash__(self):
         return hash((frozenset(self.value.items())))
-
-    @classmethod
-    def _do_cmps(cls, first, second, op):
-        try:
-            first = ListValue(first)
-            second = ListValue(second)
-        except ValueError:
-            return op(getattr(first, 'value', first), getattr(second, 'value', second))
-        return op(first.value, second.value)
 
     @classmethod
     def _do_op(cls, first, second, op):
@@ -553,20 +573,16 @@ class ColorValue(Value):
             return 'rgba(%s%%, %s%%, %s%%, %s)' % (to_str(c[0] * 100.0 / 255.0), to_str(c[1] * 100.0 / 255.0), to_str(c[2] * 100.0 / 255.0), to_str(c[3]))
         return 'rgba(%d, %d, %d, %s)' % (round(c[0]), round(c[1]), round(c[2]), to_str(c[3]))
 
-    @classmethod
-    def _do_cmps(cls, first, second, op):
-        try:
-            first = ColorValue(first)
-            second = ColorValue(second)
-        except ValueError:
-            return op(getattr(first, 'value', first), getattr(second, 'value', second))
+    def __eq__(self, other):
+        if not isinstance(other, ColorValue):
+            return BooleanValue(False)
 
         # Round to the nearest 5 digits for comparisons; corresponds roughly to
         # 16 bits per channel, the most that generally matters.  Otherwise
         # float errors make equality fail for HSL colors.
-        first_rounded = tuple(round(n, 5) for n in first.value)
-        second_rounded = tuple(round(n, 5) for n in second.value)
-        return op(first_rounded, second_rounded)
+        left = tuple(round(n, 5) for n in self.value)
+        right = tuple(round(n, 5) for n in other.value)
+        return left == right
 
     @classmethod
     def _do_op(cls, first, second, op):
@@ -641,11 +657,8 @@ class QuotedStringValue(Value):
     def __unicode__(self):
         return '"%s"' % escape(self.value)
 
-    @classmethod
-    def _do_cmps(cls, first, second, op):
-        first = QuotedStringValue(first)
-        second = QuotedStringValue(second)
-        return op(first.value, second.value)
+    def __eq__(self, other):
+        return BooleanValue(isinstance(other, QuotedStringValue) and self.value == other.value)
 
     @classmethod
     def _do_op(cls, first, second, op):
