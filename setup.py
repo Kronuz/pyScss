@@ -6,7 +6,8 @@ from distutils.command.build_ext import build_ext
 from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
 
-from scss.scss_meta import PROJECT, URL, VERSION, AUTHOR, AUTHOR_EMAIL, LICENSE, DOWNLOAD_URL
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'scss'))
+from scss_meta import PROJECT, URL, VERSION, AUTHOR, AUTHOR_EMAIL, LICENSE, DOWNLOAD_URL
 
 # fail safe compilation shamelessly stolen from the simplejson
 # setup.py file.  Original author: Bob Ippolito
