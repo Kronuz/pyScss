@@ -7,7 +7,7 @@ import re
 import sys
 from collections import deque
 
-import scss
+from scss import config
 from scss import Scss, log, spawn_rule, to_str, profiling
 from scss import _prop_split_re
 from scss.scss_meta import BUILD_INFO
@@ -58,25 +58,27 @@ def main():
                       help="Static root path (Where images and static resources are located)")
     paths_group.add_option("-A", "--assets-root", metavar="PATH", dest="assets_root",
                       help="Assets root path (Sprite images will be created here)")
+    paths_group.add_option("-a", "--assets-url", metavar="URL", dest="assets_url",
+                      help="URL to reach the files in your assets_root")
     parser.add_option_group(paths_group)
 
     (options, args) = parser.parse_args()
 
     # General runtime configuration
-    scss.VERBOSITY = 0
+    config.VERBOSITY = 0
     if options.time:
-        scss.VERBOSITY = 2
+        config.VERBOSITY = 2
     if options.static_root is not None:
-        scss.STATIC_ROOT = options.static_root
+        config.STATIC_ROOT = options.static_root
     if options.assets_root is not None:
-        scss.ASSETS_ROOT = options.assets_root
+        config.ASSETS_ROOT = options.assets_root
     if options.load_paths is not None:
-        # TODO: Convert global LOAD_PATHS to a list. Use it directly.
+        # TODO: Convert global config.LOAD_PATHS to a list. Use it directly.
         # Doing the above will break backwards compatibility!
-        if hasattr(scss.LOAD_PATHS, 'split'):
-            load_path_list = [p.strip() for p in scss.LOAD_PATHS.split(',')]
+        if hasattr(config.LOAD_PATHS, 'split'):
+            load_path_list = [p.strip() for p in config.LOAD_PATHS.split(',')]
         else:
-            load_path_list = list(scss.LOAD_PATHS)
+            load_path_list = list(config.LOAD_PATHS)
 
         for path_param in options.load_paths:
             for p in path_param.replace(os.pathsep, ',').replace(';', ',').split(','):
@@ -84,11 +86,13 @@ def main():
                 if p and p not in load_path_list:
                     load_path_list.append(p)
 
-        # TODO: Remove this once global LOAD_PATHS is a list.
-        if hasattr(scss.LOAD_PATHS, 'split'):
-            scss.LOAD_PATHS = ','.join(load_path_list)
+        # TODO: Remove this once global config.LOAD_PATHS is a list.
+        if hasattr(config.LOAD_PATHS, 'split'):
+            config.LOAD_PATHS = ','.join(load_path_list)
         else:
-            scss.LOAD_PATHS = load_path_list
+            config.LOAD_PATHS = load_path_list
+    if options.assets_url is not None:
+        config.ASSETS_URL = options.assets_url
 
     # Execution modes
     if options.test:
