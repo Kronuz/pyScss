@@ -16,7 +16,7 @@ import time
 
 from scss import config
 from scss.functions.library import FunctionLibrary
-from scss.types import BooleanValue, ListValue, NullValue, NumberValue, QuotedStringValue, StringValue
+from scss.types import BooleanValue, ListValue, Null, NumberValue, QuotedStringValue, StringValue
 from scss.util import escape, to_str
 
 log = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ def first_value_of(lst):
         if len(lst):
             return lst[0]
         else:
-            return NullValue()
+            return Null()
     else:
         return lst
 

@@ -86,7 +86,7 @@ class Value(object):
         return self.__str__()
 
 
-class NullValue(Value):
+class Null(Value):
     is_null = True
     sass_type_name = u'null'
 
@@ -103,7 +103,7 @@ class NullValue(Value):
         return False
 
     def __eq__(self, other):
-        return isinstance(other, NullValue)
+        return isinstance(other, Null)
 
 
 class BooleanValue(Value):

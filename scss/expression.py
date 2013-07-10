@@ -7,7 +7,7 @@ import re
 
 import scss.config as config
 from scss.cssdefs import is_builtin_css_function, _colors, _expr_glob_re, _interpolate_re, _units, _variable_re
-from scss.types import BooleanValue, ColorValue, ListValue, NullValue, NumberValue, ParserValue, String
+from scss.types import BooleanValue, ColorValue, ListValue, Null, NumberValue, ParserValue, String
 from scss.util import dequote, normalize_var, to_str
 
 ################################################################################
@@ -306,7 +306,7 @@ def parse_bareword(word):
         ret.tokens = ParserValue(word)
         return ret
     elif word in ('null', 'undefined'):
-        return NullValue()
+        return Null()
     elif word == 'true':
         return BooleanValue(True)
     elif word == 'false':

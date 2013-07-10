@@ -67,7 +67,7 @@ from scss.expression import Calculator
 from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
 from scss.rule import UnparsedBlock, SassRule
-from scss.types import BooleanValue, ListValue, NullValue, NumberValue, StringValue
+from scss.types import BooleanValue, ListValue, Null, NumberValue, StringValue
 from scss.util import depar, dequote, normalize_var, split_params, to_str, profile, print_timing
 
 log = logging.getLogger(__name__)
@@ -657,7 +657,7 @@ class Scss(object):
                     self.manage_children(_rule, p_children, scope)
                     ret = _rule.retval
                     if ret is None:
-                        ret = NullValue()
+                        ret = Null()
                     return ret
                 return __call
             _mixin = _call(mixin)
