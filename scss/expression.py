@@ -601,7 +601,6 @@ class SassExpression(Parser):
     expr_slst_rsts = set(['LPAR', 'END', 'COLOR', 'QSTR', 'RPAR', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'SIGN', 'ID'])
 
 
-    expr_lst_rsts_ = None
 
 ### Grammar ends.
 ################################################################################
