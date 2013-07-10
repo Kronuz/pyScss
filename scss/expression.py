@@ -7,7 +7,7 @@ import re
 
 import scss.config as config
 from scss.cssdefs import is_builtin_css_function, _colors, _expr_glob_re, _interpolate_re, _units, _variable_re
-from scss.types import BooleanValue, ColorValue, ListValue, NullValue, NumberValue, ParserValue, QuotedStringValue, StringValue
+from scss.types import BooleanValue, ColorValue, ListValue, NullValue, NumberValue, ParserValue, String
 from scss.util import dequote, normalize_var, to_str
 
 ################################################################################
@@ -253,7 +253,9 @@ class CallOp(Expression):
                 else:
                     rendered_args.append("%s: %s" % (var, rendered_value))
 
-            return StringValue("%s(%s)" % (self.func_name, ", ".join(rendered_args)))
+            return String(
+                u"%s(%s)" % (self.func_name, u", ".join(rendered_args)),
+                quotes=None)
         else:
             return func(*args, **kwargs)
 
@@ -310,7 +312,7 @@ def parse_bareword(word):
     elif word == 'false':
         return BooleanValue(False)
     else:
-        return StringValue(ParserValue(word))
+        return String(word, quotes=None)
 
 
 
@@ -531,10 +533,10 @@ class SassExpression(Parser):
             return Literal(NumberValue(float(NUM)))
         elif _token_ == 'STR':
             STR = self._scan('STR')
-            return Literal(StringValue(ParserValue(STR)))
+            return Literal(String(STR[1:-1], quotes="'"))
         elif _token_ == 'QSTR':
             QSTR = self._scan('QSTR')
-            return Literal(QuotedStringValue(ParserValue(QSTR)))
+            return Literal(String(QSTR[1:-1], quotes='"'))
         elif _token_ == 'COLOR':
             COLOR = self._scan('COLOR')
             return Literal(ColorValue(ParserValue(COLOR)))

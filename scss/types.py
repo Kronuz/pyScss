@@ -17,6 +17,7 @@ class ParserValue(object):
 
 class Value(object):
     is_null = False
+    sass_type_name = u'unknown'
 
     def __repr__(self):
         return '<%s: %s>' % (self.__class__.__name__, repr(self.value))
@@ -81,9 +82,13 @@ class Value(object):
             self.value = obj
         return self
 
+    def render(self):
+        return self.__str__()
+
 
 class NullValue(Value):
     is_null = True
+    sass_type_name = u'null'
 
     def __init__(self):
         pass
@@ -102,6 +107,8 @@ class NullValue(Value):
 
 
 class BooleanValue(Value):
+    sass_type_name = u'bool'
+
     def __init__(self, value):
         self.value = bool(value)
 
@@ -139,6 +146,8 @@ class BooleanValue(Value):
 
 
 class NumberValue(Value):
+    sass_type_name = u'number'
+
     def __init__(self, tokens, type=None):
         self.tokens = tokens
         self.units = {}
@@ -223,8 +232,8 @@ class NumberValue(Value):
 
     @classmethod
     def _do_op(cls, first, second, op):
-        if not isinstance(first, NumberValue) or not isinstance(second, NumberValue):
-            return op(first.value if isinstance(first, NumberValue) else first, second.value if isinstance(second, NumberValue) else second)
+        if op == operator.__add__ and isinstance(second, String):
+            return String(first.render(), quotes=None) + second
 
         first_unit = first.unit
         second_unit = second.unit
@@ -299,6 +308,8 @@ class NumberValue(Value):
 
 
 class ListValue(Value):
+    sass_type_name = u'list'
+
     def __init__(self, tokens, separator=None):
         self.tokens = tokens
         if tokens is None:
@@ -379,6 +390,8 @@ class ListValue(Value):
 
 
 class ColorValue(Value):
+    sass_type_name = u'color'
+
     HEX2RGBA = {
         9: lambda c: (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), int(c[7:9], 16)),
         7: lambda c: (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), 1.0),
@@ -542,73 +555,59 @@ class ColorValue(Value):
         return type
 
 
-class QuotedStringValue(Value):
-    def __init__(self, tokens):
-        self.tokens = tokens
-        if tokens is None:
-            self.value = ''
-        elif isinstance(tokens, ParserValue):
-            self.value = dequote(tokens.value)
-        elif isinstance(tokens, QuotedStringValue):
-            self.value = tokens.value
-        else:
-            self.value = to_str(tokens)
+class String(Value):
+    sass_type_name = u'string'
+
+    """Represents both CSS quoted string values and CSS identifiers (such as
+    `left`).
+
+    Makes no distinction between single and double quotes, except that the same
+    quotes are preserved on string literals that pass through unmodified.
+    Otherwise, double quotes are used.
+    """
+
+    def __init__(self, value, quotes='"'):
+        if isinstance(value, String):
+            # TODO unclear if this should be here, but many functions rely on
+            # it
+            value = value.value
+        elif isinstance(value, NumberValue):
+            # TODO this may only be necessary in the case of __radd__ and
+            # number values
+            value = str(value)
+
+        if isinstance(value, str):
+            # TODO this blows!  need to be unicode-clean so this never happens.
+            value = value.decode('ascii')
+
+        if not isinstance(value, unicode):
+            raise TypeError("Expected unicode, got {0!r}".format(value))
+
+        # TODO probably disallow creating an unquoted string outside a
+        # set of chars like [-a-zA-Z0-9]+
+
+        self.value = value
+        self.quotes = quotes
 
     def __str__(self):
-        return str(self.__unicode__())
-
-    def __unicode__(self):
-        return '"%s"' % escape(self.value)
+        if self.quotes:
+            return self.quotes + escape(self.value) + self.quotes
+        else:
+            return self.value
 
     def __eq__(self, other):
-        return BooleanValue(isinstance(other, QuotedStringValue) and self.value == other.value)
-
-    @classmethod
-    def _do_op(cls, first, second, op):
-        first = QuotedStringValue(first)
-        first_value = first.value
-        if op == operator.__mul__:
-            second = NumberValue(second)
-            second_value = int(second.value)
-        else:
-            second = QuotedStringValue(second)
-            second_value = second.value
-        val = op(first_value, second_value)
-        ret = QuotedStringValue(None).merge(first).merge(second)
-        ret.value = val
-        return ret
-
-    def merge(self, obj):
-        obj = QuotedStringValue(obj)
-        self.value = obj.value
-        return self
-
-
-class StringValue(QuotedStringValue):
-    def __str__(self):
-        return str(self.__unicode__())
-
-    def __unicode__(self):
-        return self.value
+        return BooleanValue(isinstance(other, String) and self.value == other.value)
 
     def __add__(self, other):
-        if isinstance(other, ListValue):
-            return self._do_op(self, other, operator.__add__)
-        string_class = StringValue
-        if self.__class__ == QuotedStringValue or other.__class__ == QuotedStringValue:
-            string_class = QuotedStringValue
-        other = string_class(other)
-        if not isinstance(other, (QuotedStringValue, basestring)):
-            return string_class(self.value + '+' + other.value)
-        return string_class(self.value + other.value)
+        if isinstance(other, String):
+            other_value = other.value
+        else:
+            other_value = other.render()
 
-    def __radd__(self, other):
-        if isinstance(other, ListValue):
-            return self._do_op(other, self, operator.__add__)
-        string_class = StringValue
-        if self.__class__ == QuotedStringValue or other.__class__ == QuotedStringValue:
-            string_class = QuotedStringValue
-        other = string_class(other)
-        if not isinstance(other, (QuotedStringValue, basestring)):
-            return string_class(other.value + '+' + self.value)
-        return string_class(other.value + self.value)
+        return String(
+            self.value + other_value,
+            quotes='"' if self.quotes else None)
+
+
+QuotedStringValue = String
+StringValue = String

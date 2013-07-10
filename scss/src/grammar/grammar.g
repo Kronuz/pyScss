@@ -90,9 +90,9 @@ parser SassExpression:
                                   UNITS                     {{ return Literal(NumberValue(float(NUM), type=UNITS)) }}
                               ]                             {{ return Literal(NumberValue(float(NUM))) }}
                               |
-                              STR                           {{ return Literal(StringValue(ParserValue(STR))) }}
+                              STR                           {{ return Literal(String(STR[1:-1], quotes="'")) }}
                               |
-                              QSTR                          {{ return Literal(QuotedStringValue(ParserValue(QSTR))) }}
+                              QSTR                          {{ return Literal(String(QSTR[1:-1], quotes='"')) }}
                               |
                               COLOR                         {{ return Literal(ColorValue(ParserValue(COLOR))) }}
                               |

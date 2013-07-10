@@ -11,7 +11,7 @@ import operator
 
 from scss.cssdefs import _conv_type, _units_weights, _variable_re
 from scss.functions.library import FunctionLibrary
-from scss.types import BooleanValue, ColorValue, ListValue, NumberValue, QuotedStringValue, StringValue
+from scss.types import BooleanValue, ColorValue, ListValue, NumberValue, QuotedStringValue, StringValue, String
 
 log = logging.getLogger(__name__)
 
@@ -217,7 +217,7 @@ def lightness(color):
 @register('ie-hex-str', 1)
 def ie_hex_str(color):
     c = ColorValue(color).value
-    return StringValue('#%02X%02X%02X%02X' % (round(c[3] * 255), round(c[0]), round(c[1]), round(c[2])))
+    return String(u'#%02X%02X%02X%02X' % (round(c[3] * 255), round(c[0]), round(c[1]), round(c[2])))
 
 
 # ------------------------------------------------------------------------------
@@ -439,7 +439,7 @@ def nth(lst, n):
     """
     Return the Nth item in the string
     """
-    n = StringValue(n).value
+    n = NumberValue(n).value
     lst = ListValue(lst).value
     try:
         n = int(float(n)) - 1
@@ -511,17 +511,7 @@ def index(lst, val):
 
 @register('type-of', 1)
 def _type_of(obj):  # -> bool, number, string, color, list
-    if isinstance(obj, BooleanValue):
-        return StringValue('bool')
-    if isinstance(obj, NumberValue):
-        return StringValue('number')
-    if isinstance(obj, ColorValue):
-        return StringValue('color')
-    if isinstance(obj, ListValue):
-        return StringValue('list')
-    if isinstance(obj, basestring) and _variable_re.match(obj):
-        return StringValue('undefined')
-    return StringValue('string')
+    return String(obj.sass_type_name)
 
 
 @register('unit', 1)

@@ -67,8 +67,9 @@ def test_addition():
     assert calc('abc + 123') == 'abc123'
 
     assert calc('abc + def') == 'abcdef'
-    assert calc('abc + "def"') == '"abcdef"'
+    assert calc('abc + "def"') == 'abcdef'
     assert calc('"abc" + def') == '"abcdef"'
+    assert calc('"abc" + "def"') == '"abcdef"'
 
     assert calc('#010305 + #050301') == '#060606'
     assert calc('#ffffff + #ffffff') == '#ffffff'

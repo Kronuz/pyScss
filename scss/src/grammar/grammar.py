@@ -190,10 +190,10 @@ class SassExpression(Parser):
             return Literal(NumberValue(float(NUM)))
         elif _token_ == 'STR':
             STR = self._scan('STR')
-            return Literal(StringValue(ParserValue(STR)))
+            return Literal(String(STR[1:-1], quotes="'"))
         elif _token_ == 'QSTR':
             QSTR = self._scan('QSTR')
-            return Literal(QuotedStringValue(ParserValue(QSTR)))
+            return Literal(String(QSTR[1:-1], quotes='"'))
         elif _token_ == 'COLOR':
             COLOR = self._scan('COLOR')
             return Literal(ColorValue(ParserValue(COLOR)))

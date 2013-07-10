@@ -1,5 +1,5 @@
 a {
-	@each $link_color in 'red', 'blue' {
+	@each $link_color in red, blue {
 		color: $link-color;
 	}
 }
