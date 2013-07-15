@@ -289,7 +289,7 @@ class SourceFile(object):
 
 
 class Scss(object):
-    def __init__(self, scss_vars=None, scss_opts=None, scss_files=None, super_selector=None, library=ALL_BUILTINS_LIBRARY, search_paths=None):
+    def __init__(self, scss_vars=None, scss_opts=None, scss_files=None, super_selector=None, library=ALL_BUILTINS_LIBRARY, func_registry=None, search_paths=None):
         if super_selector:
             self.super_selector = super_selector + ' '
         else:
@@ -297,7 +297,9 @@ class Scss(object):
         self._scss_vars = scss_vars
         self._scss_opts = scss_opts
         self._scss_files = scss_files
-        self._library = library
+        # NOTE: func_registry is backwards-compatibility for only one user and
+        # has never existed in a real release
+        self._library = func_registry or library
         self._search_paths = search_paths
 
         self.reset()
