@@ -238,7 +238,7 @@ class CallOp(Expression):
             func = calculator.namespace.function(self.func_name, num_args)
             # @functions take a ns as first arg.  TODO: Python functions possibly
             # should too
-            if func.__name__ == '__call':
+            if getattr(func, '__name__', None) == '__call':
                 func = partial(func, calculator.namespace)
         except KeyError:
             if not is_builtin_css_function(self.func_name):
