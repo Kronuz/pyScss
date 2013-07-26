@@ -426,8 +426,6 @@ class Scss(object):
                         exceeded)
             final_cont += fcont
 
-        final_cont = self.post_process(final_cont)
-
         return final_cont
 
     compile = Compilation
@@ -1468,13 +1466,3 @@ class Scss(object):
 
             result += _tb + prop + ';' + nl
         return result
-
-    @print_timing(3)
-    def post_process(self, cont):
-        compress = self.scss_opts.get('compress', 1) and 'compress_' or ''
-        if compress:
-            # zero units out (i.e. 0px or 0em -> 0):
-            cont = _zero_units_re.sub('0', cont)
-            # remove zeros before decimal point (i.e. 0.3 -> .3)
-            cont = _zero_re.sub('.', cont)
-        return cont
