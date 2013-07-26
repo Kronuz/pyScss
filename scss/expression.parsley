@@ -1,0 +1,166 @@
+# Character classes
+UNITS = < 'p' 'x' | 'c' 'm' | 'm' 'm' | 'h' 'z' | 'i' 'n' | '%' >
+
+### NOTE: These definitions are implemented in Python as an optimization,
+### because lots of | has the most parsley overhead.  The Python
+### implementations are intended to match the behavior of the rules below.
+#_space = ' ' | '\r' | '\n' | '\f' | '\t'
+#ws = < _space+ >
+#ows = < _space* >
+#hex = DIGIT | 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F'
+#letterish = letter | '_' | '-'
+
+escape = '\\' (
+        '\n' -> ''
+        # TODO this is supposed to replace junk with FFFD
+        | <hex{1,6}>:cp ws? -> unichr(int(cp, 16))
+        # TODO i think this should be...  more specific?  ascii + valid unicode?
+        # see also: rx.rb
+        | anything
+    )
+
+#
+# Tokens
+identifier = < letterish (letterish | digit)* >
+number = < digit+ ('.' digit*)? | '.' digit+ >
+variable = < '$' identifier >
+
+
+# Components
+expression = comma_list
+
+comma_list = spaced_list:head (
+        ows ',' ows
+        spaced_list:tail -> tail
+    )*:tails -> ListLiteral([head] + tails) if tails else head
+
+spaced_list = single_expression:head (
+        ws
+        single_expression:tail -> tail
+    )*:tails -> ListLiteral([head] + tails, comma=False) if tails else head
+
+
+single_expression = or_test
+
+or_test = and_test:head (
+        'o' 'r'
+        and_test:tail -> tail
+    )*:tails -> AnyOp(*[head] + tails) if tails else head
+
+and_test = not_test:head (
+        'a' 'n' 'd'
+        not_test:tail -> tail
+    )*:tails -> AllOp(*[head] + tails) if tails else head
+
+not_test = comparison | ( 'n' 'o' 't' not_test:node -> NotOp(node) )
+
+comparison = add_expr:node (
+        ows '<' ows add_expr:operand (-> BinaryOp(operator.lt, node, operand)):node
+        | ows '>' ows add_expr:operand (-> BinaryOp(operator.gt, node, operand)):node
+        | ows '<' '=' ows add_expr:operand (-> BinaryOp(operator.le, node, operand)):node
+        | ows '>' '=' ows add_expr:operand (-> BinaryOp(operator.ge, node, operand)):node
+        | ows '=' '=' ows add_expr:operand (-> BinaryOp(operator.eq, node, operand)):node
+        | ows '!' '=' ows add_expr:operand (-> BinaryOp(operator.ne, node, operand)):node
+    )* -> node
+
+add_expr = mult_expr:node (
+        ows '+' ows mult_expr:operand (-> BinaryOp(operator.add, node, operand)):node
+        | ows '-' ows mult_expr:operand (-> BinaryOp(operator.sub, node, operand)):node
+    )* -> node
+
+mult_expr = unary_expr:node (
+        ows '*' ows unary_expr:operand (-> BinaryOp(operator.mul, node, operand)):node
+        | ows '/' ows unary_expr:operand (-> BinaryOp(operator.div, node, operand)):node
+    )* -> node
+
+unary_expr = (
+        '-' unary_expr:node -> UnaryOp(operator.neg, node)
+        | '+' unary_expr:node -> UnaryOp(operator.pos, node)
+        | atom
+    )
+
+atom = (
+        # Parenthesized expression
+        '(' comma_list:node ')' -> node
+
+        # Old xCSS-style parenthesized expression
+        # TODO kill this off
+        | '[' comma_list:node ']' -> node
+
+        # URL literal
+        | 'u' 'r' 'l' '(' (string | uri):s ')' -> FunctionLiteral('url', s)
+
+        # Function call
+        | identifier:name '(' argspec:args ')' -> CallOp(name, args)
+
+        # Bareword
+        | < '!'? identifier >:word -> Literal(parse_bareword(word))
+
+        # Number
+        | number:number < '%' | letter+ >?:unit -> Literal(NumberValue(float(number), type=unit))
+
+        # String
+        | string
+
+        # Color literal
+        # TODO: stop making ColorValue finish this parsing
+        | < '#' (
+            <hex{2}>:red <hex{2}>:green <hex{2}>:blue
+                #-> Literal(ColorValue.from_rgb(int(red, 16) / 255., int(green, 16) / 255., int(blue, 16) / 255.))
+            | hex:red hex:green hex:blue
+                #-> Literal(ColorValue.from_rgb(int(red, 16) / 15., int(green, 16) / 15., int(blue, 16) / 15.))
+        ) >:color -> Literal(ColorValue(ParserValue(color)))
+
+        # Variable
+        | variable:name -> Variable(name)
+    )
+
+
+### Strings, literals, and interpolation
+# TODO I'm not entirely sure any of these character classes are correct
+# TODO ruby sass appears to preserve escapes
+
+uri = (
+        escape
+        | anything:ch ?(ord(ch) > 32 and ch not in ' !"$\'()') -> ch
+    )*:s -> Literal(String(''.join(s), quotes=None))
+
+string = (
+        '"' string_contents('"'):node '"' -> node
+        | '\'' string_contents('\''):node '\'' -> node
+    )
+
+interpolation = '#' '{' expression:node '}' -> node
+
+string_contents :quote = (
+        (
+            string_part(quote):before
+            -> Literal(String(before, quotes=quote))
+        ):retval
+        (
+            (
+                interpolation:node
+                string_part(quote):after
+                -> Interpolation(retval, node, Literal(String(after, quotes=quote)), quotes=quote)
+            ):retval
+        )*
+    ) -> retval
+
+string_part :quote = <(
+        '#' ~'{'
+        | anything:ch ?(ch not in ('#', quote))
+    )*>
+
+
+### Function definitions and arguments
+argspec = argspec_item:head (
+        ows ',' ows
+        argspec_item:tail -> tail
+    )*:tails -> ArgspecLiteral([head] + tails)
+
+
+argspec_item = (
+        ( variable:name ows ':' ows -> name )?:name
+        spaced_list:value
+        -> (name, value)
+    )

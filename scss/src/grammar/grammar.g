@@ -38,6 +38,12 @@ parser SassExpression:
     token KWID: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\s*:)"
     token ID: "[-a-zA-Z_][-a-zA-Z0-9_]*"
     token BANG_IMPORTANT: "!important"
+    token LINTERP: "#[{]"
+    token RINTERP: "[}]"
+    token SQUOT: "'"
+    token DQUOT: '"'
+    token SQCHAR: "([^'#]|#(?![{]))*"
+    token DQCHAR: '([^"#]|#(?![{]))*'
 
     # Goals:
     rule goal:          expr_lst END                {{ return expr_lst }}
@@ -126,9 +132,25 @@ parser SassExpression:
                         | ID                        {{ return Literal(parse_bareword(ID)) }}
                         | NUM                       {{ UNITS = None }}
                             [ UNITS ]               {{ return Literal(Number(float(NUM), unit=UNITS)) }}
-                        | STR                       {{ return Literal(String(STR[1:-1], quotes="'")) }}
-                        | QSTR                      {{ return Literal(String(QSTR[1:-1], quotes='"')) }}
                         | COLOR                     {{ return Literal(Color(ParserValue(COLOR))) }}
+                        | SQUOT
+                            SQCHAR                  {{ v = Literal(String(SQCHAR, quotes="'")) }}
+                            (
+                                LINTERP
+                                expr_lst
+                                RINTERP
+                                SQCHAR              {{ v = Interpolation(v, expr_lst, Literal(String(SQCHAR, quotes="'")), quotes="'") }}
+                            )*
+                            SQUOT                   {{ return v }}
+                        | DQUOT
+                            DQCHAR                  {{ v = Literal(String(DQCHAR, quotes='"')) }}
+                            (
+                                LINTERP
+                                expr_lst
+                                RINTERP
+                                DQCHAR              {{ v = Interpolation(v, expr_lst, Literal(String(DQCHAR, quotes='"')), quotes='"') }}
+                            )*
+                            DQUOT                   {{ return v }}
                         | VAR                       {{ return Variable(VAR) }}
 
     rule kwatom:

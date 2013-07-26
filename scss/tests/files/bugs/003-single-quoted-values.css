@@ -1,0 +1,6 @@
+div {
+  label: 'a b';
+}
+div:after {
+  content: '';
+}
