@@ -764,7 +764,6 @@ class Scss(object):
             return
 
         full_filename = None
-        i_codestr = None
         names = block.argument.split(',')
         for name in names:
             name = dequote(name.strip())
@@ -778,8 +777,9 @@ class Scss(object):
             filename = os.path.basename(name)
             dirname = os.path.dirname(name)
 
+            source_file = None
             try:
-                i_codestr = self.source_file_index[name]
+                source_file = self.source_file_index[name]
             except KeyError:
                 i_codestr = None
 
@@ -824,7 +824,7 @@ class Scss(object):
                     source_file = SourceFile(full_filename, i_codestr, parent_dir=os.path.dirname(full_filename))
                     self.source_files.append(source_file)
                     self.source_file_index[name] = source_file
-            if i_codestr is None:
+            if source_file is None:
                 load_paths = load_paths and "\nLoad paths:\n\t%s" % "\n\t".join(load_paths) or ''
                 unsupported = unsupported and "\nPossible matches (for unsupported file format SASS):\n\t%s" % "\n\t".join(unsupported) or ''
                 log.warn("File to import not found or unreadable: '%s' (%s)%s%s", filename, rule.file_and_line, load_paths, unsupported)
