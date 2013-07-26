@@ -773,6 +773,7 @@ class Scss(object):
                 # If already imported in this scope, skip
                 continue
 
+            source_file = None
             full_filename, seen_paths = self._find_import(rule, name)
 
             if full_filename is None:
