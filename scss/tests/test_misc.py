@@ -34,4 +34,4 @@ def test_extend_across_files():
 }
 """
 
-    assert actual == expected
+    assert expected == actual

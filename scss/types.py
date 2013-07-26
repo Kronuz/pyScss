@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import colorsys
 import operator
 
-from scss.cssdefs import _conv_factor, _conv_type, _units_weights
+from scss.cssdefs import COLOR_LOOKUP, COLOR_NAMES, _conv_factor, _conv_type, _units_weights
 from scss.util import escape, to_float, to_str
 
 
@@ -82,7 +82,7 @@ class Value(object):
             self.value = obj
         return self
 
-    def render(self):
+    def render(self, compress=False, short_colors=False):
         return self.__str__()
 
 
@@ -104,6 +104,9 @@ class Null(Value):
 
     def __eq__(self, other):
         return isinstance(other, Null)
+
+    def render(self, compress=False, short_colors=False):
+        return 'null'
 
 
 class BooleanValue(Value):
@@ -143,6 +146,12 @@ class BooleanValue(Value):
         second = BooleanValue(second)
         val = op(first.value, second.value)
         return BooleanValue(val)
+
+    def render(self, compress=False, short_colors=False):
+        if self.value:
+            return 'true'
+        else:
+            return 'false'
 
 
 class NumberValue(Value):
@@ -306,6 +315,20 @@ class NumberValue(Value):
                     break
         return unit
 
+    def render(self, compress=False, short_colors=False):
+        if compress and self.value == 0:
+            return '0'
+
+        unit = self.unit
+        val = "%0.05f" % (self.value / _conv_factor.get(unit, 1.0),)
+        val = val.rstrip('0').rstrip('.')
+
+        if compress and val.startswith('0.'):
+            # Strip off leading zero when compressing
+            val = val[1:]
+
+        return val + unit
+
 
 class ListValue(Value):
     sass_type_name = u'list'
@@ -338,6 +361,10 @@ class ListValue(Value):
             separator = self.value.pop('_', None)
         if separator:
             self.value['_'] = separator
+
+    @property
+    def separator(self):
+        return self.value.get('_', '')
 
     @classmethod
     def _do_op(cls, first, second, op):
@@ -387,6 +414,16 @@ class ListValue(Value):
 
     def __getitem__(self, key):
         return self.value[key]
+
+    def render(self, compress=False, short_colors=False):
+        delim = self.separator
+        if not compress or not delim:
+            delim += ' '
+
+        return delim.join(
+            item.render(compress=compress, short_colors=short_colors)
+            for item in self.values()
+        )
 
 
 class ColorValue(Value):
@@ -479,6 +516,19 @@ class ColorValue(Value):
 
         return self
 
+    @classmethod
+    def from_name(cls, name):
+        """Build a Color from a CSS color name."""
+        self = cls.__new__(cls)  # TODO
+        self.tokens = ParserValue(name)
+
+        r, g, b = COLOR_NAMES[name]
+
+        self.value = r, g, b, 1.0
+        self.types = {'rgb': 1}
+
+        return self
+
     def __repr__(self):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.types))
 
@@ -554,6 +604,37 @@ class ColorValue(Value):
                     break
         return type
 
+    def render(self, compress=False, short_colors=False):
+        if not compress and not short_colors:
+            return self.__str__()
+
+        candidates = []
+
+        # TODO this assumes CSS resolution is 8-bit per channel, but so does
+        # Ruby.
+        r, g, b, a = self.value
+        r, g, b = int(round(r)), int(round(g)), int(round(b))
+
+        if a == 1:
+            # Try color name
+            if (r, g, b) in COLOR_LOOKUP:
+                candidates.append(COLOR_LOOKUP[r, g, b])
+
+            # Hex is always shorter than function notation
+            if all(ch % 17 == 0 for ch in (r, g, b)):
+                candidates.append("#%1x%1x%1x" % (r // 17, g // 17, b // 17))
+            else:
+                candidates.append("#%02x%02x%02x" % (r, g, b))
+        else:
+            # Can't use hex notation for RGBA
+            if compress:
+                sp = ''
+            else:
+                sp = ' '
+            candidates.append("rgba(%d,%s%d,%s%d,%s%.2g)" % (r, sp, g, sp, b, sp, a))
+
+        return min(candidates, key=len)
+
 
 class String(Value):
     sass_type_name = u'string'
@@ -607,6 +688,9 @@ class String(Value):
         return String(
             self.value + other_value,
             quotes='"' if self.quotes else None)
+
+    def render(self, compress=False, short_colors=False):
+        return self.__str__()
 
 
 QuotedStringValue = String

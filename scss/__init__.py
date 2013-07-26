@@ -57,7 +57,6 @@ import textwrap
 from scss import config
 from scss.cssdefs import (
     SEPARATOR,
-    _short_color_re, _reverse_colors, _reverse_colors_re,
     _ml_comment_re, _sl_comment_re,
     _zero_units_re, _zero_re,
     _escape_chars_re,
@@ -125,10 +124,7 @@ _default_scss_vars = {
 _default_scss_opts = {
     'verbosity': config.VERBOSITY,
     'compress': 1,
-    'compress_short_colors': 1,  # Converts things like #RRGGBB to #RGB
-    'compress_reverse_colors': 1,  # Gets the shortest name of all for colors
-    'short_colors': 0,  # Converts things like #RRGGBB to #RGB
-    'reverse_colors': 0,  # Gets the shortest name of all for colors
+    'short_colors': 0,
 }
 
 _default_search_paths = ['.']
@@ -1080,6 +1076,7 @@ class Scss(object):
 
         _prop = (scope or '') + prop
         if is_var or prop.startswith('$') and value is not None:
+            # Variable assignment
             _prop = normalize_var(_prop)
             try:
                 existing_value = rule.namespace.variable(_prop)
@@ -1095,8 +1092,19 @@ class Scss(object):
 
                 rule.namespace.set_variable(_prop, value)
         else:
+            # Regular property destined for output
             _prop = calculator.apply_vars(_prop)
-            rule.properties.append((_prop, to_str(value) if value is not None else None))
+            if value is None:
+                pass
+            elif isinstance(value, basestring):
+                # TODO kill this branch
+                pass
+            else:
+                value = value.render(
+                    compress=self.scss_opts.get('compress', True),
+                    short_colors=self.scss_opts.get('short_colors', False),
+                )
+            rule.properties.append((_prop, value))
 
     @print_timing(10)
     def _nest_rules(self, rule, p_children, scope, block):
@@ -1432,8 +1440,8 @@ class Scss(object):
             if not skip_selectors:
                 result += self._print_properties(rule.properties, sc, sp, tb * len(ancestry), nl, wrap)
 
-        if not sc and result and result[-1] == ';':
-            result = result[:-1]
+            if not sc and result and result[-1] == ';':
+                result = result[:-1]
 
         for i in reversed(range(len(old_ancestry))):
             result += tb * i + '}' + nl
@@ -1464,12 +1472,6 @@ class Scss(object):
     @print_timing(3)
     def post_process(self, cont):
         compress = self.scss_opts.get('compress', 1) and 'compress_' or ''
-        # short colors:
-        if self.scss_opts.get(compress + 'short_colors', 1):
-            cont = _short_color_re.sub(r'#\1\2\3', cont)
-        # color names:
-        if self.scss_opts.get(compress + 'reverse_colors', 1):
-            cont = _reverse_colors_re.sub(lambda m: _reverse_colors[m.group(0).lower()], cont)
         if compress:
             # zero units out (i.e. 0px or 0em -> 0):
             cont = _zero_units_re.sub('0', cont)

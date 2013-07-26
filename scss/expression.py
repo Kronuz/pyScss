@@ -6,7 +6,7 @@ import operator
 import re
 
 import scss.config as config
-from scss.cssdefs import is_builtin_css_function, _colors, _expr_glob_re, _interpolate_re, _units, _variable_re
+from scss.cssdefs import COLOR_NAMES, is_builtin_css_function, _expr_glob_re, _interpolate_re, _units, _variable_re
 from scss.types import BooleanValue, ColorValue, ListValue, Null, NumberValue, ParserValue, String
 from scss.util import dequote, normalize_var, to_str
 
@@ -300,11 +300,8 @@ class ArgspecLiteral(Expression):
 
 
 def parse_bareword(word):
-    if word in _colors:
-        # TODO tidy this up once constructors are more reliable
-        ret = ColorValue(ParserValue(_colors[word]))
-        ret.tokens = ParserValue(word)
-        return ret
+    if word in COLOR_NAMES:
+        return ColorValue.from_name(word)
     elif word in ('null', 'undefined'):
         return Null()
     elif word == 'true':
