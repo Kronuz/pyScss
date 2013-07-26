@@ -768,7 +768,8 @@ class Scss(object):
         names = block.argument.split(',')
         for name in names:
             name = dequote(name.strip())
-            if '@import ' + name in rule.options:
+            import_key = ('@import', name, rule.source_file.parent_dir)
+            if import_key in rule.options:
                 # If already imported in this scope, skip
                 continue
 
@@ -783,9 +784,9 @@ class Scss(object):
                 i_codestr = None
 
                 for path in self.search_paths:
-                    for basepath in ['.', rule.source_file.parent_dir]:
+                    for basepath in [rule.source_file.parent_dir, '.']:
                         i_codestr = None
-                        full_path = os.path.realpath(os.path.join(path, basepath, dirname))
+                        full_path = os.path.realpath(os.path.join(basepath, path, dirname))
                         if full_path in load_paths:
                             continue
                         try:
@@ -842,7 +843,7 @@ class Scss(object):
                     namespace=rule.namespace,
                 )
                 self.manage_children(_rule, p_children, scope)
-                rule.options['@import ' + name] = True
+                rule.options[import_key] = True
 
     @print_timing(10)
     def _do_magic_import(self, rule, p_children, scope, block):
