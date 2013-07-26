@@ -283,7 +283,6 @@ def elements_of_type(display):
 @register('enumerate', 3)
 @register('enumerate', 4)
 def enumerate_(prefix, frm, through, separator='-'):
-    prefix = StringValue(prefix).value
     separator = StringValue(separator).value
     try:
         frm = int(getattr(frm, 'value', frm))
@@ -298,13 +297,15 @@ def enumerate_(prefix, frm, through, separator='-'):
         rev = reversed
     else:
         rev = lambda x: x
-    if prefix:
-        ret = [prefix + separator + str(i) for i in rev(range(frm, through + 1))]
-    else:
-        ret = [NumberValue(i) for i in rev(range(frm, through + 1))]
-    ret = dict(enumerate(ret))
-    ret['_'] = ','
-    return ret
+
+    ret = []
+    for i in rev(range(frm, through + 1)):
+        if prefix.value:
+            ret.append(StringValue(prefix.value + separator + str(i), quotes=prefix.quotes))
+        else:
+            ret.append(NumberValue(i))
+
+    return ListValue(ret, separator=',')
 
 
 @register('headers', 0)

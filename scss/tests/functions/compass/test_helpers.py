@@ -51,3 +51,9 @@ def test_reject(calc):
 def test_first_value_of(calc):
     assert calc('first-value-of(a b c d)') == calc('a')
     assert calc('first-value-of("a b c d")') == calc('"a"')
+
+
+
+
+def test_enumerate(calc):
+    assert calc('enumerate(foo, 4, 7)') == calc('foo-4, foo-5, foo-6, foo-7')
