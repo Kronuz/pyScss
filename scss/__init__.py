@@ -377,7 +377,7 @@ class Scss(object):
         from scss.rule import Namespace
         namespace = Namespace(variables=self.scss_vars, functions=self._library)
 
-        children = deque()
+        children = []
         for source_file in self.source_files:
             rule = SassRule(
                 source_file=source_file,
@@ -492,13 +492,14 @@ class Scss(object):
         return selectors, parents
 
     @print_timing(3)
-    def parse_children(self, children):
+    def parse_children(self, children, scope=None):
+        children = deque(children)
         while children:
             rule = children.popleft()
 
             # manage children or expand children:
             new_children = deque()
-            self.manage_children(rule, new_children, None)
+            self.manage_children(rule, new_children, scope)
             children.extendleft(new_children)
 
             self.rules.append(rule)
