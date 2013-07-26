@@ -226,10 +226,10 @@ class BlockHeader(object):
 
             return BlockAtRuleHeader(directive, argument)
         else:
-            if prop.endswith(u':') or u': ' in prop:
+            if prop.endswith(':') or ': ' in prop:
                 # Syntax is "<scope>: [prop]" -- if the optional prop exists,
                 # it becomes the first rule with no suffix
-                scope, unscoped_value = prop.split(u':', 1)
+                scope, unscoped_value = prop.split(':', 1)
                 scope = scope.rstrip()
                 unscoped_value = unscoped_value.lstrip()
                 return BlockScopeHeader(scope, unscoped_value)
