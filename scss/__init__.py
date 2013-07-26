@@ -47,6 +47,7 @@ __license__ = LICENSE
 
 from collections import defaultdict, deque
 import glob
+from itertools import product
 import logging
 import os.path
 import re
@@ -772,78 +773,79 @@ class Scss(object):
                 # If already imported in this scope, skip
                 continue
 
-            unsupported = []
-            load_paths = []
-            filename = os.path.basename(name)
-            dirname = os.path.dirname(name)
+            full_filename, seen_paths = self._find_import(rule, name)
 
-            source_file = None
-            try:
-                source_file = self.source_file_index[name]
-            except KeyError:
-                i_codestr = None
+            if full_filename is None:
+                i_codestr = self._do_magic_import(rule, p_children, scope, block)
 
-                for path in self.search_paths:
-                    for basepath in [rule.source_file.parent_dir, '.']:
-                        i_codestr = None
-                        full_path = os.path.realpath(os.path.join(basepath, path, dirname))
-                        if full_path in load_paths:
-                            continue
-                        try:
-                            full_filename = os.path.join(full_path, '_' + filename)
-                            i_codestr = open(full_filename + '.scss').read()
-                            full_filename += '.scss'
-                        except IOError:
-                            if os.path.exists(full_filename + '.sass'):
-                                unsupported.append(full_filename + '.sass')
-                            try:
-                                full_filename = os.path.join(full_path, filename)
-                                i_codestr = open(full_filename + '.scss').read()
-                                full_filename += '.scss'
-                            except IOError:
-                                if os.path.exists(full_filename + '.sass'):
-                                    unsupported.append(full_filename + '.sass')
-                                try:
-                                    full_filename = os.path.join(full_path, '_' + filename)
-                                    i_codestr = open(full_filename).read()
-                                except IOError:
-                                    try:
-                                        full_filename = os.path.join(full_path, filename)
-                                        i_codestr = open(full_filename).read()
-                                    except IOError:
-                                        pass
-                        if i_codestr is not None:
-                            break
-                        else:
-                            load_paths.append(full_path)
-                    if i_codestr is not None:
-                        break
-                if i_codestr is None:
-                    i_codestr = self._do_magic_import(rule, p_children, scope, block)
                 if i_codestr is not None:
-                    source_file = SourceFile(full_filename, i_codestr, parent_dir=os.path.dirname(full_filename))
-                    self.source_files.append(source_file)
-                    self.source_file_index[name] = source_file
-            if source_file is None:
-                load_paths = load_paths and "\nLoad paths:\n\t%s" % "\n\t".join(load_paths) or ''
-                unsupported = unsupported and "\nPossible matches (for unsupported file format SASS):\n\t%s" % "\n\t".join(unsupported) or ''
-                log.warn("File to import not found or unreadable: '%s' (%s)%s%s", filename, rule.file_and_line, load_paths, unsupported)
-            else:
-                _rule = SassRule(
-                    source_file=source_file,
-                    lineno=block.lineno,
-                    unparsed_contents=source_file.contents,
+                    source_file = SourceFile.from_string(i_codestr)
 
-                    # rule
-                    #dependent_rules
-                    options=rule.options,
-                    properties=rule.properties,
-                    extends_selectors=rule.extends_selectors,
-                    ancestry=rule.ancestry,
-                    namespace=rule.namespace,
+            elif full_filename in self.source_file_index:
+                source_file = self.source_file_index[full_filename]
+
+            else:
+                with open(full_filename) as f:
+                    source = f.read()
+                source_file = SourceFile(
+                    full_filename,
+                    source,
+                    parent_dir=os.path.dirname(full_filename),
                 )
-                self.manage_children(_rule, p_children, scope)
-                rule.options[import_key] = True
+
+                self.source_files.append(source_file)
+                self.source_file_index[full_filename] = source_file
+
+            if source_file is None:
+                load_paths_msg = "\nLoad paths:\n\t%s" % "\n\t".join(seen_paths)
+                log.warn("File to import not found or unreadable: '%s' (%s)%s", name, rule.file_and_line, load_paths_msg)
+                continue
+
+            _rule = SassRule(
+                source_file=source_file,
+                lineno=block.lineno,
+                unparsed_contents=source_file.contents,
+
+                # rule
+                #dependent_rules
+                options=rule.options,
+                properties=rule.properties,
+                extends_selectors=rule.extends_selectors,
+                ancestry=rule.ancestry,
+                namespace=rule.namespace,
+            )
+            self.manage_children(_rule, p_children, scope)
+            rule.options[import_key] = True
+
+    def _find_import(self, rule, name):
+        """Find the file referred to by an @import.
+
+        Takes a name from an @import and returns an absolute path, or None.
+        """
+        name, ext = os.path.splitext(name)
+        if ext:
+            search_exts = [ext]
+        else:
+            search_exts = ['.scss', '.sass']
+
+        dirname, name = os.path.split(name)
+
+        seen_paths = []
+
+        for path in self.search_paths:
+            for basepath in [rule.source_file.parent_dir, '.']:
+                full_path = os.path.realpath(os.path.join(basepath, path, dirname))
+
+                if full_path in seen_paths:
+                    continue
+                seen_paths.append(full_path)
+
+                for prefix, suffix in product(('_', ''), search_exts):
+                    full_filename = os.path.join(full_path, prefix + name + suffix)
+                    if os.path.exists(full_filename):
+                        return full_filename, seen_paths
+
+        return None, seen_paths
 
     @print_timing(10)
     def _do_magic_import(self, rule, p_children, scope, block):
