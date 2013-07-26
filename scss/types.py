@@ -4,7 +4,7 @@ import colorsys
 import operator
 
 from scss.cssdefs import _conv_factor, _conv_type, _units_weights
-from scss.util import dequote, escape, to_float, to_str
+from scss.util import escape, to_float, to_str
 
 
 ################################################################################

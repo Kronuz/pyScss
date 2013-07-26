@@ -517,10 +517,10 @@ class Scss(object):
                 code = code.lower()
                 if code == '@warn':
                     value = calculator.calculate(block.argument)
-                    log.warn(dequote(to_str(value)))
+                    log.warn(repr(value))
                 elif code == '@print':
                     value = calculator.calculate(block.argument)
-                    print >>sys.stderr, dequote(to_str(value))
+                    print >>sys.stderr, repr(value)
                 elif code == '@raw':
                     value = calculator.calculate(block.argument)
                     print >>sys.stderr, repr(value)
