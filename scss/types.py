@@ -667,7 +667,7 @@ class String(Value):
         # TODO probably disallow creating an unquoted string outside a
         # set of chars like [-a-zA-Z0-9]+
 
-        self.value = value
+        self.value = value.encode('ascii')
         self.quotes = quotes
 
     def __str__(self):
