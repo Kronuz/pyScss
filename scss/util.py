@@ -2,7 +2,6 @@ import re
 import sys
 import time
 
-import pstats
 import cProfile
 try:
     from cStringIO import StringIO
@@ -113,6 +112,7 @@ def print_timing(level=0):
 ################################################################################
 # Profiler decorator
 def profile(fn):
+    import pstats
     def wrapper(*args, **kwargs):
         profiler = cProfile.Profile()
         stream = StringIO()
