@@ -169,7 +169,7 @@ class SassExpression(Parser):
             LPAR = self._scan('LPAR')
             expr_lst = self.expr_lst()
             RPAR = self._scan('RPAR')
-            return expr_lst
+            return Parentheses(expr_lst)
         elif _token_ == 'ID':
             ID = self._scan('ID')
             return Literal(parse_bareword(ID))

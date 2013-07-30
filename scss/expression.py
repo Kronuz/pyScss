@@ -162,16 +162,34 @@ class Expression(object):
     def __repr__(self):
         return repr(self.__dict__)
 
-    def evaluate(self, calculator):
+    def evaluate(self, calculator, divide=False):
+        """Evaluate this AST node, and return a Sass value.
+
+        `divide` indicates whether a descendant node representing a division
+        should be forcibly treated as a division.  See the commentary in
+        `BinaryOp`.
+        """
         raise NotImplementedError
+
+class Parentheses(object):
+    """An expression of the form `(foo)`.
+
+    Only exists to force a slash to be interpreted as division when contained
+    within parentheses.
+    """
+    def __init__(self, contents):
+        self.contents = contents
+
+    def evaluate(self, calculator, divide=False):
+        return self.contents.evaluate(calculator, divide=True)
 
 class UnaryOp(Expression):
     def __init__(self, op, operand):
         self.op = op
         self.operand = operand
 
-    def evaluate(self, calculator):
-        return self.op(self.operand.evaluate(calculator))
+    def evaluate(self, calculator, divide=False):
+        return self.op(self.operand.evaluate(calculator, divide=True))
 
 class BinaryOp(Expression):
     def __init__(self, op, left, right):
@@ -179,40 +197,55 @@ class BinaryOp(Expression):
         self.left = left
         self.right = right
 
-    def evaluate(self, calculator):
-        left = self.left.evaluate(calculator)
-        right = self.right.evaluate(calculator)
+    def evaluate(self, calculator, divide=False):
+        left = self.left.evaluate(calculator, divide=True)
+        right = self.right.evaluate(calculator, divide=True)
+
+        # Special handling of division: treat it as a literal slash if both
+        # operands are literals, there are parentheses, or this is part of a
+        # bigger expression.
+        # The first condition is covered by the type check.  The other two are
+        # covered by the `divide` argument: other nodes that perform arithmetic
+        # will pass in True, indicating that this should always be a division.
+        if (
+                self.op is operator.div
+                and not divide
+                and isinstance(self.left, Literal)
+                and isinstance(self.right, Literal)
+            ):
+            return String(left.render() + ' / ' + right.render(), quotes=None)
+
         return self.op(left, right)
 
 class AnyOp(Expression):
     def __init__(self, *operands):
         self.operands = operands
 
-    def evaluate(self, calculator):
-        operands = [operand.evaluate(calculator) for operand in self.operands]
+    def evaluate(self, calculator, divide=False):
+        operands = [operand.evaluate(calculator, divide=True) for operand in self.operands]
         return any(operands)
 
 class AllOp(Expression):
     def __init__(self, *operands):
         self.operands = operands
 
-    def evaluate(self, calculator):
-        operands = [operand.evaluate(calculator) for operand in self.operands]
+    def evaluate(self, calculator, divide=False):
+        operands = [operand.evaluate(calculator, divide=True) for operand in self.operands]
         return all(operands)
 
 class NotOp(Expression):
     def __init__(self, operand):
         self.operand = operand
 
-    def evaluate(self, calculator):
-        return not(self.operand.evaluate(calculator))
+    def evaluate(self, calculator, divide=False):
+        return not(self.operand.evaluate(calculator, divide=True))
 
 class CallOp(Expression):
     def __init__(self, func_name, argspec):
         self.func_name = func_name
         self.argspec = argspec
 
-    def evaluate(self, calculator):
+    def evaluate(self, calculator, divide=False):
         # TODO bake this into the context and options "dicts", plus library
         name = normalize_var(self.func_name)
 
@@ -223,7 +256,7 @@ class CallOp(Expression):
         kwargs = {}
         evald_argpairs = []
         for var, expr in self.argspec.argpairs:
-            value = expr.evaluate(calculator)
+            value = expr.evaluate(calculator, divide=True)
             evald_argpairs.append((var, value))
 
             if var is None:
@@ -263,14 +296,14 @@ class Literal(Expression):
     def __init__(self, value):
         self.value = value
 
-    def evaluate(self, calculator):
+    def evaluate(self, calculator, divide=False):
         return self.value
 
 class Variable(Expression):
     def __init__(self, name):
         self.name = name
 
-    def evaluate(self, calculator):
+    def evaluate(self, calculator, divide=False):
         try:
             value = calculator.namespace.variable(self.name)
         except KeyError:
@@ -290,8 +323,8 @@ class ListLiteral(Expression):
         self.items = items
         self.comma = comma
 
-    def evaluate(self, calculator):
-        items = [item.evaluate(calculator) for item in self.items]
+    def evaluate(self, calculator, divide=False):
+        items = [item.evaluate(calculator, divide=divide) for item in self.items]
         return ListValue(items, separator="," if self.comma else "")
 
 class ArgspecLiteral(Expression):
@@ -509,7 +542,7 @@ class SassExpression(Parser):
             LPAR = self._scan('LPAR')
             expr_lst = self.expr_lst()
             RPAR = self._scan('RPAR')
-            return expr_lst
+            return Parentheses(expr_lst)
         elif _token_ == 'ID':
             ID = self._scan('ID')
             return Literal(parse_bareword(ID))

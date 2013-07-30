@@ -76,7 +76,7 @@ parser SassExpression:
                         | ADD u_expr                {{ return UnaryOp(operator.pos, u_expr) }}
                         | atom                      {{ return atom }}
 
-    rule atom:          LPAR expr_lst RPAR          {{ return expr_lst }}
+    rule atom:          LPAR expr_lst RPAR          {{ return Parentheses(expr_lst) }}
                         | ID                        {{ return Literal(parse_bareword(ID)) }}
                         | FNCT                      {{ v = ArgspecLiteral([]) }}
                             LPAR [
