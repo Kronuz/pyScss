@@ -52,8 +52,70 @@ def test_first_value_of(calc):
     assert calc('first-value-of(a b c d)') == calc('a')
     assert calc('first-value-of("a b c d")') == calc('"a"')
 
+# -compass-list
+
+# -compass-space-list
+
+# -compass-slice
 
 
+## Property prefixing
+
+# prefixed
+
+# prefix
+
+# -moz...
+
+
+## Selector generation
+
+# append-selector
+
+# elements-of-type
 
 def test_enumerate(calc):
     assert calc('enumerate(foo, 4, 7)') == calc('foo-4, foo-5, foo-6, foo-7')
+
+# headers/headings
+
+# nest
+
+# range
+
+
+## Working with CSS constants
+
+# position
+
+def test_opposite_position(calc):
+    assert calc('opposite-position(left)') == calc('right')
+    assert calc('opposite-position(top)') == calc('bottom')
+    assert calc('opposite-position(center)') == calc('center')
+    assert calc('opposite-position(top left)') == calc('bottom right')
+    assert calc('opposite-position(center right)') == calc('center left')
+
+
+## Math
+
+# pi
+
+# sin
+
+# cos
+
+# tan
+
+
+## Fonts
+
+# font-url
+
+# font-files
+
+# inline-font-files
+
+
+## External stylesheets
+
+# stylesheet-url

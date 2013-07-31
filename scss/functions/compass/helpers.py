@@ -13,6 +13,7 @@ import math
 import mimetypes
 import os.path
 import time
+import warnings
 
 from scss import config
 from scss.functions.library import FunctionLibrary
@@ -383,37 +384,47 @@ def range_(frm, through=None):
 # ------------------------------------------------------------------------------
 # Working with CSS constants
 
-def _position(opposite, p):
-    pos = []
-    hrz = vrt = None
-    nums = [v for v in p if isinstance(v, NumberValue)]
+OPPOSITE_POSITIONS = dict(
+    top='bottom',
+    bottom='top',
+    left='right',
+    right='left',
+    center='center',
+)
 
-    if 'left' in p:
-        hrz = 'right' if opposite else 'left'
-    elif 'right' in p:
-        hrz = 'left' if opposite else 'right'
-    elif 'center' in p:
-        hrz = 'center'
+def _position(opposite, positions):
+    if isinstance(positions, ListValue):
+        positions = positions.values()
+    else:
+        positions = [positions]
 
-    if 'top' in p:
-        vrt = 'bottom' if opposite else 'top'
-    elif 'bottom' in p:
-        vrt = 'top' if opposite else 'bottom'
-    elif 'center' in p:
-        hrz = 'center'
+    ret = []
+    for pos in positions:
+        if isinstance(pos, StringValue):
+            if pos.value in OPPOSITE_POSITIONS:
+                if opposite:
+                    opp = OPPOSITE_POSITIONS[pos.value]
+                    ret.append(StringValue(opp, quotes=None))
+                else:
+                    ret.append(pos)
 
-    if hrz == vrt:
-        vrt = None
+                continue
 
-    if hrz is not None:
-        pos.append(hrz)
-    elif len(nums):
-        pos.append(nums.pop(0))
-    if vrt is not None:
-        pos.append(vrt)
-    elif len(nums):
-        pos.append(nums.pop(0))
-    return ListValue(pos + nums)
+        elif isinstance(pos, NumberValue):
+            if pos.unit == '%':
+                if opposite:
+                    ret.append(NumberValue(100 - pos.value, '%'))
+                else:
+                    ret.append(pos)
+                continue
+
+        warnings.warn("Can't find opposite for position %r" % (pos,))
+        ret.append(pos)
+
+    if len(ret) == 1:
+        return ret[0]
+    else:
+        return ListValue(ret, separator='')
 
 
 @register('position')
@@ -534,7 +545,7 @@ def inline_font_files(*args):
 
 
 # ------------------------------------------------------------------------------
-# Fonts
+# External stylesheets
 
 @register('stylesheet-url', 1)
 @register('stylesheet-url', 2)
