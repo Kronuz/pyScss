@@ -71,13 +71,13 @@ def test_hsla(calc):
     assert calc('hsla(30, 100%, 50%, 0.1)') == ColorValue.from_rgb(1., 0.5, 0., 0.1)
 
 def test_hue(calc):
-    assert calc('hue(yellow)') == NumberValue(60, type='deg')
+    assert calc('hue(yellow)') == NumberValue(60, unit='deg')
 
 def test_saturation(calc):
-    assert calc('saturation(yellow)') == NumberValue(100, type='%')
+    assert calc('saturation(yellow)') == NumberValue(100, unit='%')
 
 def test_lightness(calc):
-    assert calc('lightness(yellow)') == NumberValue(50, type='%')
+    assert calc('lightness(yellow)') == NumberValue(50, unit='%')
 
 # HSL manipulation functions
 

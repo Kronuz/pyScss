@@ -21,6 +21,31 @@ register = CORE_LIBRARY.register
 # ------------------------------------------------------------------------------
 # Color creation
 
+def _constrain(n, lb, ub):
+    if n < lb:
+        return lb
+    elif n > ub:
+        return ub
+    else:
+        return n
+
+def _apply_percentage(n, relto=1):
+    """Given a unitless Number, returns its value.  Given a percentage Number,
+    returns its value divided by 100%.  Raises TypeError otherwise.
+
+    The optional `relto` gives a value for what "100%" means; percentages will
+    be scaled by this value before being returned.
+    """
+    if not isinstance(n, NumberValue):
+        raise TypeError("Expected number, got %r" % (n,))
+
+    if n.is_unitless:
+        return n.value
+    elif n.unit == '%':
+        return n.value * relto / 100.
+    else:
+        raise TypeError("Expected unitless number or percentage, got %r" % (n,))
+
 def _color_type(color, a, type):
     color = ColorValue(color).value
     a = NumberValue(a).value if a is not None else color[3]
@@ -32,21 +57,17 @@ def _color_type(color, a, type):
 
 @register('rgba', 4)
 def rgba(r, g, b, a, type='rgba'):
-    c = NumberValue(r), NumberValue(g), NumberValue(b), NumberValue(a)
+    channels = []
+    for ch in (r, g, b):
+        channels.append(_constrain(_apply_percentage(ch, relto=255), 0, 255))
 
-    col = [c[i].value * 255.0 if (c[i].unit == '%' or c[i].value > 0 and c[i].value <= 1) else
-            0.0 if c[i].value < 0 else
-            255.0 if c[i].value > 255 else
-            c[i].value
-            for i in range(3)
-          ]
-    col += [0.0 if c[3].value < 0 else 1.0 if c[3].value > 1 else c[3].value]
-    col += [type]
-    return ColorValue(col)
+    channels.append(_constrain(_apply_percentage(a), 0, 1))
+    channels.append(type)
+    return ColorValue(channels)
 
 @register('rgb', 3)
 def rgb(r, g, b, type='rgb'):
-    return rgba(r, g, b, 1.0, type)
+    return rgba(r, g, b, NumberValue(1.0), type)
 
 
 @register('rgba', 1)
@@ -61,23 +82,22 @@ def rgb1(color):
 
 @register('hsla', 4)
 def hsla(h, s, l, a, type='hsla'):
-    c = NumberValue(h), NumberValue(s), NumberValue(l), NumberValue(a)
-    col = [c[0] if (c[0].unit == '%' and c[0].value > 0 and c[0].value <= 1) else (c[0].value % 360.0) / 360.0]
-    col += [0.0 if cl <= 0 else 1.0 if cl >= 1.0 else cl
-            for cl in [
-                c[i].value if (c[i].unit == '%' or c[i].value > 0 and c[i].value <= 1) else
-                c[i].value / 100.0
-                for i in range(1, 4)
-              ]
-           ]
-    col += [type]
-    c = [c * 255.0 for c in colorsys.hls_to_rgb(col[0], 0.99999999 if col[2] == 1 else col[2], 0.99999999 if col[1] == 1 else col[1])] + [col[3], type]
-    col = ColorValue(c)
-    return col
+    rgb = colorsys.hls_to_rgb(
+        _apply_percentage(h, relto=360) % 360 / 360,
+        # Ruby sass treats plain numbers for saturation and lightness as though
+        # they were percentages, just without the %
+        _constrain(_apply_percentage(l, relto=100), 0, 100) / 100,
+        _constrain(_apply_percentage(s, relto=100), 0, 100) / 100,
+    )
+
+    channels = list(ch * 255 for ch in rgb)
+    channels.append(_constrain(_apply_percentage(a), 0, 1))
+    channels.append(type)
+    return ColorValue(channels)
 
 @register('hsl', 3)
 def hsl(h, s, l, type='hsl'):
-    return hsla(h, s, l, 1.0, type)
+    return hsla(h, s, l, NumberValue(1), type)
 
 
 @register('hsla', 1)
@@ -141,8 +161,7 @@ def mix(color1, color2, weight=None):
 
     c1 = ColorValue(color1).value
     c2 = ColorValue(color2).value
-    p = NumberValue(weight).value if weight is not None else 0.5
-    p = 0.0 if p < 0 else 1.0 if p > 1 else p
+    p = _constrain(_apply_percentage(weight), 0, 1) if weight is not None else 0.5
 
     w = p * 2 - 1
     a = c1[3] - c2[3]
@@ -191,27 +210,21 @@ def alpha(color):
 def hue(color):
     c = ColorValue(color).value
     h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
-    ret = NumberValue(h * 360.0)
-    ret.units = {'deg': _units_weights.get('deg', 1), '_': 'deg'}
-    return ret
+    return NumberValue(h * 360, unit='deg')
 
 
 @register('saturation', 1)
 def saturation(color):
     c = ColorValue(color).value
     h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
-    ret = NumberValue(s)
-    ret.units = {'%': _units_weights.get('%', 1), '_': '%'}
-    return ret
+    return NumberValue(s * 100, unit='%')
 
 
 @register('lightness', 1)
 def lightness(color):
     c = ColorValue(color).value
     h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
-    ret = NumberValue(l)
-    ret.units = {'%': _units_weights.get('%', 1), '_': '%'}
-    return ret
+    return NumberValue(l * 100, unit='%')
 
 
 @register('ie-hex-str', 1)
@@ -263,8 +276,8 @@ def __hsl_op(op, color, h, s, l):
     l = None if l is None else NumberValue(l)
     a = [
         None if h is None else h.value / 360.0,
-        None if s is None else s.value / 100.0 if s.unit != '%' and s.value >= 1 else s.value,
-        None if l is None else l.value / 100.0 if l.unit != '%' and l.value >= 1 else l.value,
+        None if s is None else _apply_percentage(s),
+        None if l is None else _apply_percentage(l),
     ]
     # Convert to HSL:
     h, l, s = list(colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0))
@@ -396,9 +409,13 @@ def quote(*args):
 
 @register('percentage', 1)
 def percentage(value):
-    value = NumberValue(value)
-    value.units = {'%': _units_weights.get('%', 1), '_': '%'}
-    return value
+    if not isinstance(value, NumberValue):
+        raise TypeError("Expected number, got %r" % (value,))
+
+    if not value.is_unitless:
+        raise TypeError("Expected unitless number, got %r" % (value,))
+
+    return value * NumberValue(100, unit='%')
 
 CORE_LIBRARY.add(NumberValue.wrap_python_function(abs), 'abs', 1)
 CORE_LIBRARY.add(NumberValue.wrap_python_function(round), 'round', 1)
@@ -522,8 +539,10 @@ def _unit(number):  # -> px, em, cm, etc.
 
 @register('unitless', 1)
 def unitless(value):
-    value = NumberValue(value)
-    return BooleanValue(not bool(value.unit))
+    if not isinstance(value, NumberValue):
+        raise TypeError("Expected number, got %r" % (value,))
+
+    return BooleanValue(value.is_unitless)
 
 
 @register('comparable', 2)

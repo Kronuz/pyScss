@@ -67,8 +67,6 @@ class Calculator(object):
                         # TODO this used to test for _dequote
                         if m.group(1):
                             v = dequote(v)
-                    elif v is not None:
-                        v = to_str(v)
                     else:
                         v = m.group(0)
                     return v
@@ -280,7 +278,7 @@ class CallOp(Expression):
 
             rendered_args = []
             for var, value in evald_argpairs:
-                rendered_value = to_str(value)
+                rendered_value = value.render()
                 if var is None:
                     rendered_args.append(rendered_value)
                 else:
@@ -561,7 +559,7 @@ class SassExpression(Parser):
             NUM = self._scan('NUM')
             if self._peek(self.atom_rsts_) == 'UNITS':
                 UNITS = self._scan('UNITS')
-                return Literal(NumberValue(float(NUM), type=UNITS))
+                return Literal(NumberValue(float(NUM), unit=UNITS))
             return Literal(NumberValue(float(NUM)))
         elif _token_ == 'STR':
             STR = self._scan('STR')

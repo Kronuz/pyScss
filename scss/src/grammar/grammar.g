@@ -83,7 +83,7 @@ parser SassExpression:
                                 argspec             {{ v = argspec }}
                             ] RPAR                  {{ return CallOp(FNCT, v) }}
                         | NUM [
-                                UNITS               {{ return Literal(NumberValue(float(NUM), type=UNITS)) }}
+                                UNITS               {{ return Literal(NumberValue(float(NUM), unit=UNITS)) }}
                             ]                       {{ return Literal(NumberValue(float(NUM))) }}
                         | STR                       {{ return Literal(String(STR[1:-1], quotes="'")) }}
                         | QSTR                      {{ return Literal(String(QSTR[1:-1], quotes='"')) }}

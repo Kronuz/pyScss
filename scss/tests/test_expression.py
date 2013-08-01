@@ -1,11 +1,10 @@
 from scss.expression import Calculator
 from scss.rule import Namespace
-#from scss.types import Number
+from scss.types import NumberValue
 from scss.util import to_str
 
 import pytest
 
-# TODO fix constructors for various types, and stop using to_str in here
 
 def test_reference_operations():
     """Test the example expressions in the reference document:
@@ -14,16 +13,16 @@ def test_reference_operations():
     """
     # TODO: break this into its own file and add the entire reference guide
     ns = Namespace()
-    calc = lambda expr: to_str(Calculator(ns).calculate(expr))
+    calc = lambda expr: Calculator(ns).evaluate_expression(expr).render()
 
     # Simple example
-    assert calc('1in + 8pt') == '1.111in'
+    assert calc('1in + 8pt') == '1.11111in'
 
     # Division
     ns.set_variable('$width', '1000px')
     ns.set_variable('$font-size', '12px')
     ns.set_variable('$line-height', '30px')
-    assert calc('10px/8px') == '10px/8px'   # plain CSS; no division
+    assert calc('10px/8px') == '10px / 8px' # plain CSS; no division
     assert calc('$width/2') == '500px'      # uses a variable; does division
     assert calc('(500px/2)') == '250px'     # uses parens; does division
     assert calc('5px + 8px/2px') == '9px'   # uses +; does division
@@ -82,6 +81,11 @@ def test_subtraction():
     # TODO test that subtracting e.g. strings doesn't work
 
     assert calc('#0f0f0f - #050505') == '#0a0a0a'
+
+def test_division():
+    calc = Calculator(Namespace()).calculate
+
+    assert calc('(5px / 5px)') == NumberValue(1)
 
 def test_comparison_numeric():
     calc = Calculator(Namespace()).calculate

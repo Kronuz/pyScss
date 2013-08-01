@@ -1,7 +1,10 @@
+from math import pi
 import re
 
-# Pre-defined CSS color names.
+# ------------------------------------------------------------------------------
+# Built-in CSS color names
 # See: http://www.w3.org/TR/css3-color/#svg-color
+
 COLOR_NAMES = {
     'aliceblue': (240, 248, 255),
     'antiquewhite': (250, 235, 215),
@@ -145,6 +148,70 @@ COLOR_NAMES = {
     'yellowgreen': (154, 205, 50)
 }
 COLOR_LOOKUP = dict((v, k) for (k, v) in COLOR_NAMES.items())
+
+# ------------------------------------------------------------------------------
+# Built-in CSS units
+# See: http://www.w3.org/TR/2013/CR-css3-values-20130730/#numeric-types
+
+# Maps units to a set of common units per type, with conversion factors
+BASE_UNIT_CONVERSIONS = {
+    # Lengths
+    'mm': (1, 'mm'),
+    'cm': (10, 'mm'),
+    'in': (25.4, 'mm'),
+    'px': (25.4 / 96, 'mm'),
+    'pt': (25.4 / 72, 'mm'),
+    'pc': (25.4 / 6, 'mm'),
+
+    # Angles
+    'deg': (1 / 360, 'turn'),
+    'grad': (1 / 400, 'turn'),
+    'rad': (pi / 2, 'turn'),
+    'turn': (1, 'turn'),
+
+    # Times
+    'ms': (1, 'ms'),
+    's':  (1000, 'ms'),
+
+    # Frequencies
+    'hz': (1, 'hz'),
+    'khz': (1000, 'hz'),
+
+    # Resolutions
+    'dpi': (1, 'dpi'),
+    'dpcm': (2.54, 'dpi'),
+    'dppx': (96, 'dpi'),
+}
+
+def convert_units_to_base_units(units):
+    """Convert a set of units into a set of "base" units.
+
+    Returns a 2-tuple of `factor, new_units`.
+    """
+    total_factor = 1
+    new_units = []
+    for unit in units:
+        if unit not in BASE_UNIT_CONVERSIONS:
+            continue
+
+        factor, new_unit = BASE_UNIT_CONVERSIONS[unit]
+        total_factor *= factor
+        new_units.append(new_unit)
+
+    new_units.sort()
+    return total_factor, tuple(new_units)
+
+
+# A fixed set of units can be omitted when the value is 0
+# See: http://www.w3.org/TR/2013/CR-css3-values-20130730/#lengths
+ZEROABLE_UNITS = frozenset((
+    # Relative lengths
+    'em', 'ex', 'ch', 'rem',
+    # Viewport
+    'vw', 'vh', 'vmin', 'vmax',
+    # Absolute lengths
+    'cm', 'mm', 'in', 'px', 'pt', 'pc',
+))
 
 _units_weights = {
     'em': 10,

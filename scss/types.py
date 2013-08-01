@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import colorsys
 import operator
 
-from scss.cssdefs import COLOR_LOOKUP, COLOR_NAMES, _conv_factor, _conv_type, _units_weights
+from scss.cssdefs import COLOR_LOOKUP, COLOR_NAMES, ZEROABLE_UNITS, convert_units_to_base_units
 from scss.util import escape, to_float, to_str
 
 
@@ -157,37 +157,35 @@ class BooleanValue(Value):
 class NumberValue(Value):
     sass_type_name = u'number'
 
-    def __init__(self, tokens, type=None):
-        self.tokens = tokens
-        self.units = {}
-        if tokens is None:
-            self.value = 0.0
-        elif isinstance(tokens, NumberValue):
-            self.value = tokens.value
-            self.units = tokens.units.copy()
-            if tokens.units:
-                type = None
-        elif isinstance(tokens, (StringValue, basestring)):
-            tokens = getattr(tokens, 'value', tokens)
-            try:
-                if tokens and tokens[-1] == '%':
-                    self.value = to_float(tokens[:-1]) / 100.0
-                    self.units = {'%': _units_weights.get('%', 1), '_': '%'}
-                else:
-                    self.value = to_float(tokens)
-            except ValueError:
-                raise ValueError("Value is not a Number! (%s)" % tokens)
-        elif isinstance(tokens, (int, float)):
-            # TODO i don't like this; should store the original and only divide
-            # when converting.  requires fixing __str__ though
-            self.value = float(tokens) * _conv_factor.get(type, 1.0)
-        else:
-            raise ValueError("Can't convert to CSS number: %s" % repr(tokens))
-        if type is not None:
-            self.units = {type: _units_weights.get(type, 1), '_': type}
+    def __init__(self, amount, unit_numer=(), unit_denom=(), unit=None):
+        if isinstance(amount, NumberValue):
+            assert not unit and not unit_numer and not unit_denom
+            self.value = amount.value
+            self.unit_numer = amount.unit_numer
+            self.unit_denom = amount.unit_denom
+            return
+
+        if not isinstance(amount, (int, float)):
+            raise TypeError("Expected number, got %r" % (amount,))
+
+        self.value = amount
+
+        if unit is not None:
+            unit_numer = unit_numer + (unit,)
+
+        self.unit_numer = tuple(sorted(unit_numer))
+        self.unit_denom = tuple(sorted(unit_denom))
 
     def __repr__(self):
-        return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.units))
+        full_unit = ' * '.join(self.unit_numer)
+        if self.unit_denom:
+            full_unit += ' / '
+            full_unit += ' * '.join(self.unit_denom)
+
+            if full_unit:
+                full_unit = ' ' + full_unit
+
+        return '<%s: %r%s>' % (self.__class__.__name__, self.value, full_unit)
 
     def __int__(self):
         return int(self.value)
@@ -202,16 +200,13 @@ class NumberValue(Value):
         return self
 
     def __str__(self):
-        unit = self.unit
-        val = self.value / _conv_factor.get(unit, 1.0)
-        val = to_str(val) + unit
-        return val
+        return self.render()
 
     def __eq__(self, other):
         if not isinstance(other, NumberValue):
             return BooleanValue(False)
 
-        return BooleanValue(self.value == other.value and self.unit == other.unit)
+        return self._compare(other, operator.__eq__)
 
     def __lt__(self, other):
         return self._compare(other, operator.__lt__)
@@ -229,45 +224,107 @@ class NumberValue(Value):
         if not isinstance(other, NumberValue):
             raise TypeError("Can't compare %r and %r" % (self, other))
 
-        # TODO this will need to get more complicated for full unit support
-        first = NumberValue(self)
-        second = NumberValue(other)
-        first_type = _conv_type.get(first.unit)
-        second_type = _conv_type.get(second.unit)
-        if first_type == second_type or first_type is None or second_type is None:
-            return op(first.value, second.value)
-        else:
-            return op(first_type, second_type)
+        left = self.to_base_units()
+        right = other.to_base_units()
 
-    @classmethod
-    def _do_op(cls, first, second, op):
-        if op == operator.__add__ and isinstance(second, String):
-            return String(first.render(), quotes=None) + second
+        if left.unit_numer != right.unit_numer or left.unit_denom != right.unit_denom:
+            raise ValueError("Can't reconcile units: %r and %r" % (self, other))
 
-        first_unit = first.unit
-        second_unit = second.unit
-        if op == operator.__add__ or op == operator.__sub__:
-            if first_unit == '%' and not second_unit:
-                second.units = {'%': _units_weights.get('%', 1), '_': '%'}
-                second.value /= 100.0
-            elif first_unit == '%' and second_unit != '%':
-                first = NumberValue(second) * first.value
-            elif second_unit == '%' and not first_unit:
-                first.units = {'%': _units_weights.get('%', 1), '_': '%'}
-                first.value /= 100.0
-            elif second_unit == '%' and first_unit != '%':
-                second = NumberValue(first) * second.value
-        elif op == operator.__div__:
-            if first_unit and first_unit == second_unit:
-                first.units = {}
-                second.units = {}
+        return op(left.value, right.value)
 
-        val = op(first.value, second.value)
+    def __mul__(self, other):
+        if not isinstance(other, NumberValue):
+            return NotImplemented
 
-        ret = NumberValue(None).merge(first)
-        ret = ret.merge(second)
-        ret.value = val
-        return ret
+        amount = self.value * other.value
+        # TODO cancel out units if appropriate
+        numer = self.unit_numer + other.unit_numer
+        denom = self.unit_denom + other.unit_denom
+
+        return NumberValue(amount, unit_numer=numer, unit_denom=denom)
+
+    def __div__(self, other):
+        if not isinstance(other, NumberValue):
+            return NotImplemented
+
+        amount = self.value / other.value
+        numer = list(self.unit_numer + other.unit_denom)
+        denom = list(self.unit_denom + other.unit_numer)
+
+        # Cancel out like units
+        # TODO cancel out relatable units too
+        numer2 = []
+        for unit in numer:
+            try:
+                denom.remove(unit)
+            except ValueError:
+                numer2.append(unit)
+
+        return NumberValue(amount, unit_numer=numer2, unit_denom=denom)
+
+    def __add__(self, other):
+        # Numbers auto-cast to strings when added to other strings
+        if isinstance(other, String):
+            return String(self.render(), quotes=None) + other
+
+        return self._add_sub(other, operator.add)
+
+    def __sub__(self, other):
+        return self._add_sub(other, operator.sub)
+
+    def _add_sub(self, other, op):
+        """Implements both addition and subtraction."""
+        if not isinstance(other, NumberValue):
+            return NotImplemented
+
+        # If either side is unitless, inherit the other side's units.  Skip all
+        # the rest of the conversion math, too.
+        if self.is_unitless or other.is_unitless:
+            return NumberValue(
+                op(self.value, other.value),
+                self.unit_numer or other.unit_numer,
+                self.unit_denom or other.unit_denom,
+            )
+
+        # Reduce both operands to the same units
+        left = self.to_base_units()
+        right = other.to_base_units()
+
+        if left.unit_numer != right.unit_numer or left.unit_denom != right.unit_denom:
+            raise ValueError("Can't reconcile units: %r and %r" % (self, other))
+
+        new_amount = op(left.value, right.value)
+
+        # Convert back to the left side's units
+        return NumberValue(
+            new_amount * self.value / left.value,
+            self.unit_numer,
+            self.unit_denom,
+        )
+
+
+    ### Helper methods, mostly used internally
+
+    def to_base_units(self):
+        """Convert to a fixed set of "base" units.  The particular units are
+        arbitrary; what's important is that they're consistent.
+
+        Used for addition and comparisons.
+        """
+        # Convert to "standard" units, as defined by the conversions dict above
+        amount = self.value
+
+        numer_factor, numer_units = convert_units_to_base_units(self.unit_numer)
+        denom_factor, denom_units = convert_units_to_base_units(self.unit_denom)
+
+        return NumberValue(
+            amount * numer_factor / denom_factor,
+            numer_units,
+            denom_units,
+        )
+
+
+    ### Utilities for public consumption
 
     @classmethod
     def wrap_python_function(cls, fn):
@@ -280,47 +337,45 @@ class NumberValue(Value):
             # TODO enforce no units for trig?
             python_arg = sass_arg.value
             python_ret = fn(python_arg)
-            sass_ret = cls(python_ret, type=sass_arg.unit)
+            sass_ret = cls(python_ret, unit=sass_arg.unit)
             return sass_ret
 
         return wrapped
 
-    def merge(self, obj):
-        obj = NumberValue(obj)
-        self.value = obj.value
-        for unit, val in obj.units.items():
-            if unit != '_':
-                self.units.setdefault(unit, 0)
-                self.units[unit] += val
-        unit = obj.unit
-        if _units_weights.get(self.units.get('_'), 1) <= _units_weights.get(unit, 1):
-            self.units['_'] = unit
-        return self
-
     @property
     def unit(self):
-        unit = ''
-        if self.units:
-            if '_'in self.units:
-                units = self.units.copy()
-                _unit = units.pop('_')
-                units.setdefault(_unit, 0)
-                units[_unit] += _units_weights.get(_unit, 1)  # Give more weight to the first unit ever set
-            else:
-                units = self.units
-            units = sorted(units, key=units.get)
-            while len(units):
-                unit = units.pop()
-                if unit:
-                    break
-        return unit
+        if self.unit_denom:
+            raise TypeError
+
+        if not self.unit_numer:
+            return ''
+
+        if len(self.unit_numer) != 1:
+            raise TypeError
+
+        return self.unit_numer[0]
+
+    @property
+    def has_simple_unit(self):
+        """Returns True iff the unit is expressible in CSS, i.e., has no
+        denominator and at most one unit in the numerator.
+        """
+        return len(self.unit_numer) <= 1 and not self.unit_denom
+
+    @property
+    def is_unitless(self):
+        return not self.unit_numer and not self.unit_denom
 
     def render(self, compress=False, short_colors=False):
-        if compress and self.value == 0:
-            return '0'
+        if not self.has_simple_unit:
+            raise ValueError("Can't express compound units in CSS: %r" % (self,))
 
         unit = self.unit
-        val = "%0.05f" % (self.value / _conv_factor.get(unit, 1.0),)
+
+        if compress and unit in ZEROABLE_UNITS and self.value == 0:
+            return '0'
+
+        val = "%0.05f" % round(self.value, 5)
         val = val.rstrip('0').rstrip('.')
 
         if compress and val.startswith('0.'):

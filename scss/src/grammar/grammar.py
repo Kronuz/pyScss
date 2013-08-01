@@ -186,7 +186,7 @@ class SassExpression(Parser):
             NUM = self._scan('NUM')
             if self._peek(self.atom_rsts_) == 'UNITS':
                 UNITS = self._scan('UNITS')
-                return Literal(NumberValue(float(NUM), type=UNITS))
+                return Literal(NumberValue(float(NUM), unit=UNITS))
             return Literal(NumberValue(float(NUM)))
         elif _token_ == 'STR':
             STR = self._scan('STR')
