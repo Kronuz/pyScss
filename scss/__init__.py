@@ -58,7 +58,6 @@ from scss import config
 from scss.cssdefs import (
     SEPARATOR,
     _ml_comment_re, _sl_comment_re,
-    _zero_units_re, _zero_re,
     _escape_chars_re,
     _spaces_re, _expand_rules_space_re, _collapse_properties_space_re,
     _strings_re, _prop_split_re,

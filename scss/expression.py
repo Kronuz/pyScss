@@ -6,7 +6,7 @@ import operator
 import re
 
 import scss.config as config
-from scss.cssdefs import COLOR_NAMES, is_builtin_css_function, _expr_glob_re, _interpolate_re, _units, _variable_re
+from scss.cssdefs import COLOR_NAMES, is_builtin_css_function, _expr_glob_re, _interpolate_re, _variable_re
 from scss.types import BooleanValue, ColorValue, ListValue, Null, NumberValue, ParserValue, String
 from scss.util import dequote, normalize_var, to_str
 

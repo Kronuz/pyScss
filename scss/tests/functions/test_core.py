@@ -315,7 +315,6 @@ def test_unitless(calc):
     assert calc('unitless(100)') == calc('true')
     assert calc('unitless(100px)') == calc('false')
 
-@xfail(reason="pyscss erroneously converts between px and em")
 def test_comparable(calc):
     # Examples from the Ruby docs
     assert calc('comparable(2px, 1px)') == calc('true')

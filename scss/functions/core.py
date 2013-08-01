@@ -9,7 +9,7 @@ import logging
 import math
 import operator
 
-from scss.cssdefs import _conv_type, _units_weights, _variable_re
+from scss.cssdefs import _variable_re
 from scss.functions.library import FunctionLibrary
 from scss.types import BooleanValue, ColorValue, ListValue, NumberValue, QuotedStringValue, StringValue, String
 
@@ -547,10 +547,11 @@ def unitless(value):
 
 @register('comparable', 2)
 def comparable(number1, number2):
-    n1, n2 = NumberValue(number1), NumberValue(number2)
-    type1 = _conv_type.get(n1.unit)
-    type2 = _conv_type.get(n2.unit)
-    return BooleanValue(type1 == type2)
+    left = number1.to_base_units()
+    right = number2.to_base_units()
+    return BooleanValue(
+        left.unit_numer == right.unit_numer
+        and left.unit_denom == right.unit_denom)
 
 
 # ------------------------------------------------------------------------------
