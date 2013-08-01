@@ -256,6 +256,7 @@ BUILTIN_FUNCTIONS = frozenset([
     # Others
     'color-stop',           # Older version of CSS3 gradients
     'mask',                 # ???
+    'from', 'to',           # Very old WebKit gradient syntax
 ])
 
 
