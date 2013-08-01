@@ -1,7 +1,6 @@
 # python yapps2.py grammar.g grammar.py
 
 ################################################################################
-#'(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'
 ## Grammar compiled using Yapps:
 
 import re
@@ -35,7 +34,7 @@ class SassExpressionScanner(Scanner):
         ('GT', '>'),
         ('STR', "'[^']*'"),
         ('QSTR', '"[^"]*"'),
-        ('UNITS', '(?<!\\s)(?:px|cm|mm|hz|%)(?![-\\w])'),
+        ('UNITS', '(?<!\\s)(?:[a-zA-Z]+|%)(?![-\\w])'),
         ('NUM', '(?:\\d+(?:\\.\\d*)?|\\.\\d+)'),
         ('COLOR', '#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])'),
         ('VAR', '\\$[-a-zA-Z0-9_]+'),
@@ -186,7 +185,7 @@ class SassExpression(Parser):
             NUM = self._scan('NUM')
             if self._peek(self.atom_rsts_) == 'UNITS':
                 UNITS = self._scan('UNITS')
-                return Literal(NumberValue(float(NUM), unit=UNITS))
+                return Literal(NumberValue(float(NUM), unit=UNITS.lower()))
             return Literal(NumberValue(float(NUM)))
         elif _token_ == 'STR':
             STR = self._scan('STR')

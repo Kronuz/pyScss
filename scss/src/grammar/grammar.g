@@ -1,7 +1,6 @@
 # python yapps2.py grammar.g grammar.py
 
 ################################################################################
-#'(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'
 ## Grammar compiled using Yapps:
 %%
 parser SassExpression:
@@ -27,7 +26,7 @@ parser SassExpression:
     token GT: ">"
     token STR: "'[^']*'"
     token QSTR: '"[^"]*"'
-    token UNITS: "(?<!\s)(?:px|cm|mm|hz|%)(?![-\w])"
+    token UNITS: "(?<!\s)(?:[a-zA-Z]+|%)(?![-\w])"
     token NUM: "(?:\d+(?:\.\d*)?|\.\d+)"
     token COLOR: "#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])"
     token VAR: "\$[-a-zA-Z0-9_]+"
@@ -83,7 +82,7 @@ parser SassExpression:
                                 argspec             {{ v = argspec }}
                             ] RPAR                  {{ return CallOp(FNCT, v) }}
                         | NUM [
-                                UNITS               {{ return Literal(NumberValue(float(NUM), unit=UNITS)) }}
+                                UNITS               {{ return Literal(NumberValue(float(NUM), unit=UNITS.lower())) }}
                             ]                       {{ return Literal(NumberValue(float(NUM))) }}
                         | STR                       {{ return Literal(String(STR[1:-1], quotes="'")) }}
                         | QSTR                      {{ return Literal(String(QSTR[1:-1], quotes='"')) }}

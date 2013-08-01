@@ -182,7 +182,7 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 			if (skip) {
 				max = (restrictions_sz > self->ignore_sz) ? restrictions_sz : self->ignore_sz;
 				for (k = 0; k < max; k++) {
-					if (k < restrictions_sz && regex == Pattern_regex(restrictions[k].tok, restrictions[k].expr)) {
+					if (k < restrictions_sz && strcmp(regex->tok, restrictions[k].tok) == 0) {
 						skip = 0;
 						break;
 					}
@@ -255,7 +255,7 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 				p_restriction->patterns = PyMem_New(Pattern *, restrictions_sz);
 				p_restriction->patterns_sz = 0;
 				for (j = 0; j < restrictions_sz; j++) {
-					regex = Pattern_regex(restrictions[k].tok, restrictions[k].expr);
+					regex = Pattern_regex(restrictions[j].tok, restrictions[j].expr);
 					if (regex) {
 						p_restriction->patterns[p_restriction->patterns_sz++] = regex;
 					}
@@ -416,7 +416,7 @@ Scanner_token(Scanner *self, int i, Pattern restrictions[], int restrictions_sz)
 				found = 0;
 				for (k = 0; k < self->restrictions[i].patterns_sz; k++) {
 					regex = Pattern_regex(restrictions[j].tok, restrictions[j].expr);
-					if (regex == self->restrictions[i].patterns[k]) {
+					if (strcmp(restrictions[j].tok, self->restrictions[i].patterns[k]->tok) == 0) {
 						found = 1;
 						break;
 					}

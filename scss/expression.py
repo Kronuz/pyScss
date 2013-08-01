@@ -361,8 +361,11 @@ class Parser(object):
         Returns the token type for lookahead; if there are any args
         then the list of args is the set of token types to allow
         """
-        tok = self._scanner.token(self._pos, types)
-        return tok[2]
+        try:
+            tok = self._scanner.token(self._pos, types)
+            return tok[2]
+        except SyntaxError:
+            return None
 
     def _scan(self, type):
         """
@@ -380,7 +383,6 @@ class Parser(object):
 
 
 ################################################################################
-#'(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'
 ## Grammar compiled using Yapps:
 class SassExpressionScanner(Scanner):
     patterns = None
@@ -408,7 +410,7 @@ class SassExpressionScanner(Scanner):
         ('GT', '>'),
         ('STR', "'[^']*'"),
         ('QSTR', '"[^"]*"'),
-        ('UNITS', '(?<!\\s)(?:' + '|'.join(_units) + ')(?![-\\w])'),
+        ('UNITS', '(?<!\\s)(?:[a-zA-Z]+|%)(?![-\\w])'),
         ('NUM', '(?:\\d+(?:\\.\\d*)?|\\.\\d+)'),
         ('COLOR', '#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])'),
         ('VAR', '\\$[-a-zA-Z0-9_]+'),
@@ -559,7 +561,7 @@ class SassExpression(Parser):
             NUM = self._scan('NUM')
             if self._peek(self.atom_rsts_) == 'UNITS':
                 UNITS = self._scan('UNITS')
-                return Literal(NumberValue(float(NUM), unit=UNITS))
+                return Literal(NumberValue(float(NUM), unit=UNITS.lower()))
             return Literal(NumberValue(float(NUM)))
         elif _token_ == 'STR':
             STR = self._scan('STR')

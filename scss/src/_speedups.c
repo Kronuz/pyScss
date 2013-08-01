@@ -161,8 +161,9 @@ scss_Scanner_rewind(scss_Scanner *self, PyObject *args)
 static PyObject *
 scss_Scanner_token(scss_Scanner *self, PyObject *args)
 {
+	PyObject *iter;
 	PyObject *item;
-	int i, is_tuple;
+	int i;
 	long size;
 
 	Token *p_token;
@@ -173,18 +174,19 @@ scss_Scanner_token(scss_Scanner *self, PyObject *args)
 	int restrictions_sz = 0;
 	if (self->scanner != NULL) {
 		if (PyArg_ParseTuple(args, "i|O", &token_num, &restrictions)) {
-			is_tuple = PyTuple_Check(restrictions);
-			if (is_tuple || PyList_Check(restrictions)) {
-				size = is_tuple ? PyTuple_Size(restrictions) : PyList_Size(restrictions);
+			size = PySequence_Size(restrictions);
+			if (size != -1) {
 				_restrictions = PyMem_New(Pattern, size);
-				for (i = 0; i < size; ++i) {
-					item = is_tuple ? PyTuple_GetItem(restrictions, i) : PyList_GetItem(restrictions, i);
+				iter = PyObject_GetIter(restrictions);
+				while (item = PyIter_Next(iter)) {
 					if (PyString_Check(item)) {
 						_restrictions[restrictions_sz].tok = PyString_AsString(item);
 						_restrictions[restrictions_sz].expr = NULL;
 						restrictions_sz++;
 					}
+					Py_DECREF(item);
 				}
+				Py_DECREF(iter);
 			}
 			p_token = Scanner_token(self->scanner, token_num, _restrictions, restrictions_sz);
 
