@@ -67,7 +67,7 @@ def __color_stops(percentages, *args):
         max_stops = max(s and (s.value if s.unit != '%' else None) or None for s in stops)
     else:
         max_stops = max(s and (s if s.unit != '%' else None) or None for s in stops)
-    stops = [s and (s.value / max_stops if s.unit != '%' else s.value) for s in stops]
+    stops = [s and (s / max_stops if s.unit != '%' else s) for s in stops]
 
     init = 0
     start = None
@@ -293,30 +293,30 @@ def linear_gradient(*args):
     args.extend('%s %s' % (c, to_str(s)) for s, c in color_stops)
 
     to__s = 'linear-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
-    ret = StringValue(to__s)
+    ret = StringValue(to__s, quotes=None)
 
     def to__css2():
-        return StringValue('')
+        return StringValue('', quotes=None)
     ret.to__css2 = to__css2
 
     def to__moz():
-        return StringValue('-moz-' + to__s)
+        return StringValue('-moz-' + to__s, quotes=None)
     ret.to__moz = to__moz
 
     def to__pie():
-        return StringValue('-pie-' + to__s)
+        return StringValue('-pie-' + to__s, quotes=None)
     ret.to__pie = to__pie
 
     def to__ms():
-        return StringValue('-ms-' + to__s)
+        return StringValue('-ms-' + to__s, quotes=None)
     ret.to__ms = to__ms
 
     def to__o():
-        return StringValue('-o-' + to__s)
+        return StringValue('-o-' + to__s, quotes=None)
     ret.to__o = to__o
 
     def to__webkit():
-        return StringValue('-webkit-' + to__s)
+        return StringValue('-webkit-' + to__s, quotes=None)
     ret.to__webkit = to__webkit
 
     def to__owg():
@@ -327,7 +327,7 @@ def linear_gradient(*args):
         ]
         args.extend('color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops)
         ret = '-webkit-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
-        return StringValue(ret)
+        return StringValue(ret, quotes=None)
     ret.to__owg = to__owg
 
     def to__svg():

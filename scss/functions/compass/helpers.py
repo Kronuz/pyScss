@@ -417,6 +417,13 @@ def _position(opposite, positions):
                 else:
                     ret.append(pos)
                 continue
+            elif pos.unit == 'deg':
+                # TODO support other angle types?
+                if opposite:
+                    ret.append(NumberValue((pos.value + 180) % 360, 'deg'))
+                else:
+                    ret.append(pos)
+                continue
 
         warnings.warn("Can't find opposite for position %r" % (pos,))
         ret.append(pos)
