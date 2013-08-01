@@ -163,7 +163,6 @@ scss_Scanner_token(scss_Scanner *self, PyObject *args)
 {
 	PyObject *iter;
 	PyObject *item;
-	int i;
 	long size;
 
 	Token *p_token;
@@ -178,7 +177,7 @@ scss_Scanner_token(scss_Scanner *self, PyObject *args)
 			if (size != -1) {
 				_restrictions = PyMem_New(Pattern, size);
 				iter = PyObject_GetIter(restrictions);
-				while (item = PyIter_Next(iter)) {
+				while ((item = PyIter_Next(iter))) {
 					if (PyString_Check(item)) {
 						_restrictions[restrictions_sz].tok = PyString_AsString(item);
 						_restrictions[restrictions_sz].expr = NULL;
