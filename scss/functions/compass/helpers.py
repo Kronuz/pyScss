@@ -302,7 +302,7 @@ def enumerate_(prefix, frm, through, separator='-'):
     ret = []
     for i in rev(range(frm, through + 1)):
         if prefix.value:
-            ret.append(StringValue(prefix.value + separator + str(i), quotes=prefix.quotes))
+            ret.append(StringValue(prefix.value + separator + str(i), quotes=None))
         else:
             ret.append(NumberValue(i))
 

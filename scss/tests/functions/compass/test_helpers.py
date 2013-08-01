@@ -76,6 +76,7 @@ def test_first_value_of(calc):
 
 def test_enumerate(calc):
     assert calc('enumerate(foo, 4, 7)') == calc('foo-4, foo-5, foo-6, foo-7')
+    assert calc('enumerate("bar", 8, 10)') == calc('bar-8, bar-9, bar-10')
 
 # headers/headings
 
