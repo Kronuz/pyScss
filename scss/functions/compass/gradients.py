@@ -42,32 +42,34 @@ def __color_stops(percentages, *args):
     prev_color = False
     for c in args:
         if isinstance(c, ListValue):
-            for i, c in c.items():
-                if isinstance(c, ColorValue):
-                    if prev_color:
-                        stops.append(None)
-                    colors.append(c)
-                    prev_color = True
-                elif isinstance(c, NumberValue):
-                    stops.append(c)
-                    prev_color = False
+            cs = c.values()
         else:
+            cs = [c]
+
+        for c in cs:
             if isinstance(c, ColorValue):
                 if prev_color:
                     stops.append(None)
                 colors.append(c)
                 prev_color = True
             elif isinstance(c, NumberValue):
-                stops.append(NumberValue(c))
+                stops.append(c)
                 prev_color = False
+
     if prev_color:
         stops.append(None)
     stops = stops[:len(colors)]
+    if stops[0] is None:
+        stops[0] = NumberValue(0, '%')
+    if stops[-1] is None:
+        stops[-1] = NumberValue(100, '%')
+
     if percentages:
         max_stops = max(s and (s.value if s.unit != '%' else None) or None for s in stops)
     else:
-        max_stops = max(s and (s if s.unit != '%' else None) or None for s in stops)
-    stops = [s and (s / max_stops if s.unit != '%' else s) for s in stops]
+        max_stops = max(s if s and s.unit != '%' else None for s in stops)
+
+    stops = [s / max_stops if s and s.unit != '%' else s for s in stops]
 
     init = 0
     start = None
@@ -79,14 +81,14 @@ def __color_stops(percentages, *args):
         else:
             final = s
             if start is not None:
-                stride = (final - init) / (end - start + 1 + (1 if i < len(stops) else 0))
+                stride = (final - init) / NumberValue(end - start + 1 + (1 if i < len(stops) else 0))
                 for j in range(start, end + 1):
-                    stops[j] = init + stride * (j - start + 1)
+                    stops[j] = init + stride * NumberValue(j - start + 1)
             init = final
             start = None
 
     if not max_stops or percentages:
-        stops = [NumberValue(s, '%') for s in stops]
+        pass
     else:
         stops = [s * max_stops for s in stops]
     return zip(stops, colors)

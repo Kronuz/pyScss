@@ -296,11 +296,10 @@ class NumberValue(Value):
         new_amount = op(left.value, right.value)
 
         # Convert back to the left side's units
-        return NumberValue(
-            new_amount * self.value / left.value,
-            self.unit_numer,
-            self.unit_denom,
-        )
+        if left.value != 0:
+            new_amount = new_amount * self.value / left.value
+
+        return NumberValue(new_amount, self.unit_numer, self.unit_denom)
 
 
     ### Helper methods, mostly used internally
