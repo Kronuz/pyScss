@@ -577,10 +577,13 @@ class ColorValue(Value):
         self = cls.__new__(cls)  # TODO
         self.tokens = ParserValue(name)
 
-        r, g, b = COLOR_NAMES[name]
+        r, g, b, a = COLOR_NAMES[name]
 
-        self.value = r, g, b, 1.0
-        self.types = {'rgb': 1}
+        self.value = r, g, b, a
+        if a == 1.0:
+            self.types = {'rgb': 1}
+        else:
+            self.types = {'rgba': 1}
 
         return self
 
@@ -670,11 +673,12 @@ class ColorValue(Value):
         r, g, b, a = self.value
         r, g, b = int(round(r)), int(round(g)), int(round(b))
 
-        if a == 1:
-            # Try color name
-            if (r, g, b) in COLOR_LOOKUP:
-                candidates.append(COLOR_LOOKUP[r, g, b])
+        # Try color name
+        key = r, g, b, a
+        if key in COLOR_LOOKUP:
+            candidates.append(COLOR_LOOKUP[key])
 
+        if a == 1:
             # Hex is always shorter than function notation
             if all(ch % 17 == 0 for ch in (r, g, b)):
                 candidates.append("#%1x%1x%1x" % (r // 17, g // 17, b // 17))

@@ -333,8 +333,6 @@ class ArgspecLiteral(Expression):
 def parse_bareword(word):
     if word in COLOR_NAMES:
         return ColorValue.from_name(word)
-    elif word == 'transparent':
-        return ColorValue.from_rgb(0, 0, 0, 0)
     elif word in ('null', 'undefined'):
         return Null()
     elif word == 'true':
