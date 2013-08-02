@@ -1,4 +1,3 @@
-from scss.compat import ChainMap
 from scss.cssdefs import _has_placeholder_re
 
 
@@ -8,21 +7,54 @@ def normalize_var(name):
     else:
         return name
 
+class VariableScope(object):
+    """Implements Sass variable scoping.
+
+    Similar to `ChainMap`, except that assigning a new value will replace an
+    existing value, not mask it.
+    """
+    def __init__(self, *maps):
+        self.maps = [dict()] + list(maps)
+
+    def __repr__(self):
+        return "<VariableScope(%s)>" % (', '.join(repr(map) for map in self.maps),)
+
+    def __getitem__(self, key):
+        for map in self.maps:
+            if key in map:
+                return map[key]
+
+        raise KeyError(key)
+
+    def __setitem__(self, key, value):
+        for map in self.maps:
+            if key in map:
+                map[key] = value
+                return
+
+        self.maps[0][key] = value
+
+    def new_child(self):
+        return VariableScope(*self.maps)
+
+
 class Namespace(object):
     """..."""
 
     def __init__(self, variables=None, functions=None, mixins=None):
         if variables is None:
-            self._variables = ChainMap()
+            self._variables = VariableScope()
         else:
-            self._variables = ChainMap(variables)
+            # TODO parse into sass values once that's a thing, or require them
+            # all to be
+            self._variables = VariableScope(variables)
 
         if functions is None:
-            self._functions = ChainMap()
+            self._functions = VariableScope()
         else:
-            self._functions = ChainMap(functions._functions)
+            self._functions = VariableScope(functions._functions)
 
-        self._mixins = ChainMap()
+        self._mixins = VariableScope()
 
     @classmethod
     def derive_from(cls, *others):
@@ -32,9 +64,9 @@ class Namespace(object):
             self._functions = others[0]._functions.new_child()
             self._mixins = others[0]._mixins.new_child()
         else:
-            self._variables = ChainMap(other._variables for other in others)
-            self._functions = ChainMap(other._functions for other in others)
-            self._mixins = ChainMap(other._mixins for other in others)
+            self._variables = VariableScope(other._variables for other in others)
+            self._functions = VariableScope(other._functions for other in others)
+            self._mixins = VariableScope(other._mixins for other in others)
         return self
 
     def derive(self):
