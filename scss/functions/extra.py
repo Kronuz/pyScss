@@ -8,15 +8,12 @@ import logging
 import os.path
 import random
 
+import six
+
 from scss import config
 from scss.functions.library import FunctionLibrary
 from scss.types import ColorValue, NumberValue, StringValue, ListValue
 from scss.util import escape
-
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
 
 try:
     from PIL import Image, ImageDraw
@@ -325,7 +322,7 @@ def background_noise(density=None, opacity=None, size=None, monochrome=False, in
             inline = True  # Retry inline version
         url = '%s%s' % (config.ASSETS_URL, asset_file)
     if inline:
-        output = StringIO()
+        output = six.BytesIO()
         new_image.save(output, format='PNG')
         contents = output.getvalue()
         output.close()
@@ -409,7 +406,7 @@ def background_brushed(density=None, intensity=None, color=None, opacity=None, s
             inline = True  # Retry inline version
         url = '%s%s' % (config.ASSETS_URL, asset_file)
     if inline:
-        output = StringIO()
+        output = six.BytesIO()
         new_image.save(output, format='PNG')
         contents = output.getvalue()
         output.close()
@@ -476,7 +473,7 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
             inline = True  # Retry inline version
         url = '%s%s' % (config.ASSETS_URL, asset_file)
     if inline:
-        output = StringIO()
+        output = six.BytesIO()
         new_image.save(output, format='PNG')
         contents = output.getvalue()
         output.close()
@@ -501,7 +498,7 @@ def image_color(color, width=1, height=1):
         size=(w, h),
         color=(c[0], c[1], c[2], int(c[3] * 255.0))
     )
-    output = StringIO()
+    output = six.BytesIO()
     new_image.save(output, format='PNG')
     contents = output.getvalue()
     output.close()

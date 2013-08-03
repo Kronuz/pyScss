@@ -36,6 +36,7 @@ xCSS:
 
 """
 from __future__ import absolute_import
+from __future__ import print_function
 
 from scss.scss_meta import BUILD_INFO, PROJECT, VERSION, REVISION, URL, AUTHOR, AUTHOR_EMAIL, LICENSE
 
@@ -53,6 +54,8 @@ import os.path
 import re
 import sys
 import textwrap
+
+import six
 
 from scss import config
 from scss.cssdefs import (
@@ -77,7 +80,7 @@ locate_blocks = None
 try:
     from scss._speedups import locate_blocks
 except ImportError:
-    print >>sys.stderr, "Scanning acceleration disabled (_speedups not found)!"
+    sys.stderr.write("Scanning acceleration disabled (_speedups not found)!\n")
     from scss._native import locate_blocks
 
 ################################################################################
@@ -322,12 +325,12 @@ class Scss(object):
         # defined globally to just searching the current directory
         self.search_paths = list(_default_search_paths)
         if self._search_paths is not None:
-            assert not isinstance(self._search_paths, basestring), \
+            assert not isinstance(self._search_paths, six.string_types), \
                 "`search_paths` should be an iterable, not a string"
             self.search_paths.extend(self._search_paths)
         else:
             if config.LOAD_PATHS:
-                if isinstance(config.LOAD_PATHS, basestring):
+                if isinstance(config.LOAD_PATHS, six.string_types):
                     # Back-compat: allow comma-delimited
                     self.search_paths.extend(config.LOAD_PATHS.split(','))
                 else:
@@ -725,7 +728,7 @@ class Scss(object):
             value = calculator.calculate(value)
             m_vars.set_variable(m_param, value)
         for p in m_params:
-            if p not in new_params and isinstance(m_vars.variable(p), basestring):
+            if p not in new_params and isinstance(m_vars.variable(p), six.string_types):
                 value = calculator.calculate(m_vars.variable(p))
                 m_vars.set_variable(p, value)
 
@@ -1022,7 +1025,7 @@ class Scss(object):
     #     first_val = None
     #     while True:
     #         val = self.calculator.calculate(block.argument, rule, rule.context, rule.options)
-    #         val = bool(False if not val or isinstance(val, basestring) and (val in ('0', 'false', 'undefined') or _variable_re.match(val)) else val)
+    #         val = bool(False if not val or isinstance(val, six.string_types) and (val in ('0', 'false', 'undefined') or _variable_re.match(val)) else val)
     #         if first_val is None:
     #             first_val = val
     #         if not val:
@@ -1093,7 +1096,7 @@ class Scss(object):
             _prop = calculator.apply_vars(_prop)
             if value is None:
                 pass
-            elif isinstance(value, basestring):
+            elif isinstance(value, six.string_types):
                 # TODO kill this branch
                 pass
             else:

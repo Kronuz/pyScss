@@ -1,6 +1,7 @@
 """Image utilities ported from Compass."""
 
 from __future__ import absolute_import
+from __future__ import print_function
 
 import base64
 import hashlib
@@ -9,18 +10,14 @@ import mimetypes
 import os.path
 import time
 
+import six
+
 from scss import config
 from scss.functions.compass import _image_size_cache
+from scss.functions.compass.helpers import add_cache_buster
 from scss.functions.library import FunctionLibrary
 from scss.types import ColorValue, ListValue, NumberValue, StringValue
 from scss.util import escape
-
-from scss.functions.compass.helpers import add_cache_buster
-
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
 
 try:
     from PIL import Image
@@ -153,7 +150,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
                 if cache_buster:
                     url = add_cache_buster(url, filetime)
             if inline:
-                output = StringIO()
+                output = six.BytesIO()
                 new_image.save(output, format='PNG')
                 contents = output.getvalue()
                 output.close()

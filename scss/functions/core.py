@@ -9,6 +9,8 @@ import logging
 import math
 import operator
 
+import six
+
 from scss.cssdefs import _variable_re
 from scss.functions.library import FunctionLibrary
 from scss.types import BooleanValue, ColorValue, ListValue, NumberValue, QuotedStringValue, StringValue, String
@@ -560,5 +562,5 @@ def comparable(number1, number2):
 @register('if', 2)
 @register('if', 3)
 def if_(condition, if_true, if_false=''):
-    condition = bool(False if not condition or isinstance(condition, basestring) and (condition in ('0', 'false', 'undefined') or _variable_re.match(condition)) else condition)
+    condition = bool(False if not condition or isinstance(condition, six.string_types) and (condition in ('0', 'false', 'undefined') or _variable_re.match(condition)) else condition)
     return if_true.__class__(if_true) if condition else if_true.__class__(if_false)

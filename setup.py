@@ -100,6 +100,9 @@ def run_setup(with_binary):
             "Topic :: Text Processing :: Markup",
             "Topic :: Software Development :: Libraries :: Python Modules"
         ],
+        requires=[
+            'six',
+        ],
         packages=[
             'scss',
             'scss.functions',

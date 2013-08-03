@@ -1,8 +1,13 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
+import six
+
 from scss.cssdefs import _has_placeholder_re
 
 
 def normalize_var(name):
-    if isinstance(name, basestring):
+    if isinstance(name, six.string_types):
         return name.replace('_', '-')
     else:
         return name
@@ -79,7 +84,7 @@ class Namespace(object):
 
     def set_variable(self, name, value):
         name = normalize_var(name)
-        assert not (isinstance(value, basestring) and value.startswith('$'))
+        assert not (isinstance(value, six.string_types) and value.startswith('$'))
         #assert isinstance(value, Value)
         self._variables[name] = value
 

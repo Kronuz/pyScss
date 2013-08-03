@@ -5,6 +5,8 @@ import logging
 import operator
 import re
 
+import six
+
 import scss.config as config
 from scss.cssdefs import COLOR_NAMES, is_builtin_css_function, _expr_glob_re, _interpolate_re, _variable_re
 from scss.types import BooleanValue, ColorValue, ListValue, Null, NumberValue, ParserValue, String
@@ -54,7 +56,7 @@ class Calculator(object):
         return cont
 
     def apply_vars(self, cont):
-        if isinstance(cont, basestring) and '$' in cont:
+        if isinstance(cont, six.string_types) and '$' in cont:
             try:
                 # Optimization: the full cont is a variable in the context,
                 cont = self.namespace.variable(cont)
@@ -93,7 +95,7 @@ class Calculator(object):
     # TODO only used by magic-import...?
     def interpolate(self, var):
         value = self.namespace.variable(var)
-        if var != value and isinstance(value, basestring):
+        if var != value and isinstance(value, six.string_types):
             _vi = self.evaluate_expression(value)
             if _vi is not None:
                 value = _vi
@@ -103,7 +105,7 @@ class Calculator(object):
     def evaluate_expression(self, expr):
         results = None
 
-        if not isinstance(expr, basestring):
+        if not isinstance(expr, six.string_types):
             results = expr
 
         if results is None:
@@ -112,7 +114,7 @@ class Calculator(object):
             except KeyError:
                 pass
 
-            if not isinstance(expr, basestring):
+            if not isinstance(expr, six.string_types):
                 results = expr
 
         ast = None
@@ -128,7 +130,7 @@ class Calculator(object):
                 except SyntaxError:
                     if config.DEBUG:
                         raise
-                except Exception, e:
+                except Exception:
                     # TODO hoist me up since the rule is gone
                     #log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule.file_and_line)
                     if config.DEBUG:
@@ -310,7 +312,7 @@ class Variable(Expression):
             raise
             return self.name
         else:
-            if isinstance(value, basestring):
+            if isinstance(value, six.string_types):
                 evald = calculator.evaluate_expression(value)
                 if evald is not None:
                     return evald

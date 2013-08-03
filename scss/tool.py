@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from __future__ import absolute_import
+from __future__ import print_function
 
 import logging
 import os
@@ -109,7 +110,7 @@ def main():
         import doctest
         doctest.testfile('tests/tests.rst')
     elif options.version:
-        print BUILD_INFO
+        print(BUILD_INFO)
     elif options.interactive:
         from pprint import pprint
         try:
@@ -131,7 +132,7 @@ def main():
         options = css.scss_opts
         source_file = SourceFile.from_string('', '<shell>', line_numbers=False)
         rule = SassRule(source_file, context=context, options=options, is_sass=is_sass)
-        print "Welcome to %s interactive shell" % BUILD_INFO
+        print("Welcome to %s interactive shell" % (BUILD_INFO,))
         while True:
             try:
                 s = raw_input('>>> ').strip()
@@ -171,7 +172,7 @@ def main():
                             if code:
                                 final_cont += code
                         final_cont = css.post_process(final_cont)
-                        print final_cont
+                        print(final_cont)
                         continue
                 elif s == 'ls' or s.startswith('show(') or s.startswith('show ') or s.startswith('ls(') or s.startswith('ls '):
                     m = re.match(r'(?:show|ls)(\()?\s*([^,/\\) ]*)(?:[,/\\ ]([^,/\\ )]+))*(?(1)\))', s, re.IGNORECASE)
@@ -218,9 +219,9 @@ def main():
                                     fn_name, _, _ = k.partition(':')
                                     if fn_name not in seen:
                                         seen.add(fn_name)
-                                        print fn_name + '(' + ', '.join(p + (': ' + mixin[1].get(p) if p in mixin[1] else '') for p in mixin[0]) + ') {'
-                                        print '  ' + '\n  '.join(l for l in mixin[2].split('\n'))
-                                        print '}'
+                                        print(fn_name + '(' + ', '.join(p + (': ' + mixin[1].get(p) if p in mixin[1] else '') for p in mixin[0]) + ') {')
+                                        print('  ' + '\n  '.join(l for l in mixin[2].split('\n')))
+                                        print('}')
                             else:
                                 d = dict((k[len(name) + 2:].split(':')[0], v) for k, v in options.items() if k.startswith('@' + name + ' '))
                                 pprint(sorted(d))
@@ -233,8 +234,8 @@ def main():
                     continue
                 s = to_str(css.calculator.calculate(s, context, rule))
                 s = css.post_process(s)
-                print s
-        print "Bye!"
+                print(s)
+        print("Bye!")
     elif options.watch:
         import time
         try:
@@ -285,7 +286,7 @@ def main():
                 else:
                     dest_path = os.path.join(os.path.dirname(src_path), fname)
 
-                print "Compiling %s => %s" % (src_path, dest_path)
+                print("Compiling %s => %s" % (src_path, dest_path))
                 dest_file = open(dest_path, 'w')
                 dest_file.write(self.css.compile(scss_file=src_path))
 
@@ -329,7 +330,7 @@ def main():
             output.write(css.compile(sys.stdin.read(), is_sass=options.is_sass))
 
         for f, t in profiling.items():
-            print >>sys.stderr, "%s took %03fs" % (f, t)
+            sys.stderr.write("%s took %03fs" % (f, t))
 
 if __name__ == "__main__":
     main()

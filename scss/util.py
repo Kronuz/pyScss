@@ -1,12 +1,11 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import re
 import sys
 import time
 
-import cProfile
-try:
-    from cStringIO import StringIO
-except:
-    from StringIO import StringIO
+import six
 
 from scss import config
 
@@ -112,10 +111,11 @@ def print_timing(level=0):
 ################################################################################
 # Profiler decorator
 def profile(fn):
+    import cProfile
     import pstats
     def wrapper(*args, **kwargs):
         profiler = cProfile.Profile()
-        stream = StringIO()
+        stream = six.StringIO()
         profiler.enable()
         try:
             res = fn(*args, **kwargs)

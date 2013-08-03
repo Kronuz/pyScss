@@ -7,6 +7,8 @@ from __future__ import absolute_import
 import base64
 import logging
 
+import six
+
 from scss.functions.library import FunctionLibrary
 from scss.functions.compass.helpers import opposite_position, position
 from scss.types import ColorValue, ListValue, NumberValue, StringValue
@@ -23,7 +25,7 @@ def __color_stops(percentages, *args):
     if len(args) == 1:
         if isinstance(args[0], (list, tuple, ListValue)):
             return ListValue(args[0]).values()
-        elif isinstance(args[0], (StringValue, basestring)):
+        elif isinstance(args[0], (StringValue, six.string_types)):
             color_stops = []
             colors = split_params(args[0].value)
             for color in colors:
@@ -160,7 +162,7 @@ def color_stops_in_percentages(*args):
 
 def _get_gradient_position_and_angle(args):
     for arg in args:
-        if isinstance(arg, (StringValue, NumberValue, basestring)):
+        if isinstance(arg, (StringValue, NumberValue, six.string_types)):
             _arg = [arg]
         elif isinstance(arg, (list, tuple, ListValue)):
             _arg = arg
@@ -190,7 +192,7 @@ def _get_gradient_position_and_angle(args):
 
 def _get_gradient_shape_and_size(args):
     for arg in args:
-        if isinstance(arg, (StringValue, NumberValue, basestring)):
+        if isinstance(arg, (StringValue, NumberValue, six.string_types)):
             _arg = [arg]
         elif isinstance(arg, (list, tuple, ListValue)):
             _arg = arg
@@ -345,7 +347,7 @@ def radial_svg_gradient(*args):
         args = ListValue(args[0]).values()
     color_stops = args
     center = None
-    if isinstance(args[-1], (StringValue, NumberValue, basestring)):
+    if isinstance(args[-1], (StringValue, NumberValue, six.string_types)):
         center = args[-1]
         color_stops = args[:-1]
     color_stops = __color_stops(False, *color_stops)
@@ -363,7 +365,7 @@ def linear_svg_gradient(*args):
         args = ListValue(args[0]).values()
     color_stops = args
     start = None
-    if isinstance(args[-1], (StringValue, NumberValue, basestring)):
+    if isinstance(args[-1], (StringValue, NumberValue, six.string_types)):
         start = args[-1]
         color_stops = args[:-1]
     color_stops = __color_stops(False, *color_stops)

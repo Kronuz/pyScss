@@ -1,3 +1,3 @@
-import tool
+import scss.tool
 
-tool.main()
+scss.tool.main()
