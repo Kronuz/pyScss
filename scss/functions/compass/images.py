@@ -11,6 +11,7 @@ import os.path
 import time
 
 import six
+from six.moves import xrange
 
 from scss import config
 from scss.functions.compass import _image_size_cache

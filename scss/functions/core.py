@@ -10,6 +10,7 @@ import math
 import operator
 
 import six
+from six.moves import xrange
 
 from scss.cssdefs import _variable_re
 from scss.functions.library import FunctionLibrary

@@ -1,7 +1,10 @@
 from __future__ import absolute_import
+from __future__ import print_function
 
 import colorsys
 import operator
+
+import six
 
 from scss.cssdefs import COLOR_LOOKUP, COLOR_NAMES, ZEROABLE_UNITS, convert_units_to_base_units
 from scss.util import escape, to_float, to_str
@@ -23,8 +26,12 @@ class Value(object):
         return '<%s: %s>' % (self.__class__.__name__, repr(self.value))
 
     # Sass values are all true, except for booleans and nulls
-    def __nonzero__(self):
+    def __bool__(self):
         return True
+
+    def __nonzero__(self):
+        # Py 2's name for __bool__
+        return self.__bool__()
 
     ### NOTE: From here on down, the operators are exposed to Sass code and
     ### thus should ONLY return Sass types
@@ -57,11 +64,11 @@ class Value(object):
     def __radd__(self, other):
         return self._do_op(other, self, operator.__add__)
 
-    def __div__(self, other):
-        return self._do_op(self, other, operator.__div__)
+    def __truediv__(self, other):
+        return self._do_op(self, other, operator.__truediv__)
 
-    def __rdiv__(self, other):
-        return self._do_op(other, self, operator.__div__)
+    def __rtruediv__(self, other):
+        return self._do_op(other, self, operator.__truediv__)
 
     def __sub__(self, other):
         return self._do_op(self, other, operator.__sub__)
@@ -99,7 +106,7 @@ class Null(Value):
     def __repr__(self):
         return "<%s>" % (type(self).__name__,)
 
-    def __nonzero__(self):
+    def __bool__(self):
         return False
 
     def __eq__(self, other):
@@ -118,7 +125,7 @@ class BooleanValue(Value):
     def __str__(self):
         return 'true' if self.value else 'false'
 
-    def __nonzero__(self):
+    def __bool__(self):
         return self.value
 
     @classmethod
@@ -243,7 +250,7 @@ class NumberValue(Value):
 
         return NumberValue(amount, unit_numer=numer, unit_denom=denom)
 
-    def __div__(self, other):
+    def __truediv__(self, other):
         if not isinstance(other, NumberValue):
             return NotImplemented
 
@@ -445,23 +452,20 @@ class ListValue(Value):
     def _reorder_list(self, lst):
         return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
 
-    def __nonzero__(self):
-        return len(self)
-
     def __len__(self):
         return len(self.value) - (1 if '_' in self.value else 0)
 
     def __str__(self):
-        return to_str(self.value)
+        return self.render()
 
     def __iter__(self):
         return iter(self.values())
 
     def values(self):
-        return zip(*self.items())[1]
+        return list(zip(*self.items()))[1]
 
     def keys(self):
-        return zip(*self.items())[0]
+        return list(zip(*self.items()))[0]
 
     def items(self):
         return sorted((k, v) for k, v in self.value.items() if k != '_')
@@ -715,17 +719,21 @@ class String(Value):
             # number values
             value = str(value)
 
-        if isinstance(value, str):
+        if isinstance(value, six.binary_type):
             # TODO this blows!  need to be unicode-clean so this never happens.
             value = value.decode('ascii')
 
-        if not isinstance(value, unicode):
-            raise TypeError("Expected unicode, got {0!r}".format(value))
+        if not isinstance(value, six.text_type):
+            raise TypeError("Expected string, got {0!r}".format(value))
 
         # TODO probably disallow creating an unquoted string outside a
         # set of chars like [-a-zA-Z0-9]+
 
-        self.value = value.encode('ascii')
+        if six.PY3:
+            self.value = value
+        else:
+            # TODO not unicode clean on 2 yet...
+            self.value = value.encode('ascii')
         self.quotes = quotes
 
     def __str__(self):

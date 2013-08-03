@@ -208,7 +208,7 @@ class BinaryOp(Expression):
         # covered by the `divide` argument: other nodes that perform arithmetic
         # will pass in True, indicating that this should always be a division.
         if (
-                self.op is operator.div
+                self.op is operator.truediv
                 and not divide
                 and isinstance(self.left, Literal)
                 and isinstance(self.right, Literal)
@@ -521,7 +521,7 @@ class SassExpression(Parser):
             else:  # == 'DIV'
                 DIV = self._scan('DIV')
                 u_expr = self.u_expr()
-                v = BinaryOp(operator.div, v, u_expr)
+                v = BinaryOp(operator.truediv, v, u_expr)
         return v
 
     def u_expr(self):

@@ -7,6 +7,8 @@ import re
 import sys
 from datetime import datetime
 
+from six.moves import xrange
+
 import pstats
 import cProfile
 from cStringIO import StringIO

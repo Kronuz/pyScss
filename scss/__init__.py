@@ -341,7 +341,7 @@ class Scss(object):
         self.source_files = []
         self.source_file_index = {}
         if self._scss_files is not None:
-            for name, contents in self._scss_files.iteritems():
+            for name, contents in list(self._scss_files.items()):
                 if name in self.source_file_index:
                     raise KeyError("Duplicate filename %r" % name)
                 source_file = SourceFile(name, contents)
@@ -1284,7 +1284,7 @@ class Scss(object):
         # To be able to manage multiple extends, you need to
         # destroy the actual node and create many nodes that have
         # mono extend. The first one gets all the css rules
-        for (selectors, parents), rules in grouped_rules.items():
+        for (selectors, parents), rules in list(grouped_rules.items()):
             if len(parents) <= 1:
                 continue
 
@@ -1299,7 +1299,7 @@ class Scss(object):
         while parents_left and cnt < 10:
             cnt += 1
             parents_left = False
-            for key in grouped_rules.keys():
+            for key in list(grouped_rules.keys()):
                 if key not in grouped_rules:
                     # Nodes might have been renamed while linking parents...
                     continue

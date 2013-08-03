@@ -27,6 +27,8 @@ except ImportError:
     except:
         Image = None
 
+from six.moves import xrange
+
 from scss import config
 from scss.functions.compass import _image_size_cache
 from scss.functions.compass.layouts import PackedSpritesLayout, HorizontalSpritesLayout, VerticalSpritesLayout, DiagonalSpritesLayout
