@@ -998,7 +998,7 @@ class Scss(object):
         var, _, valuestring = block.argument.partition(' in ')
         calculator = Calculator(rule.namespace)
         values = calculator.calculate(valuestring)
-        if not name:
+        if not values:
             return
 
         var = var.strip()
