@@ -223,7 +223,7 @@ class AnyOp(Expression):
 
     def evaluate(self, calculator, divide=False):
         operands = [operand.evaluate(calculator, divide=True) for operand in self.operands]
-        return any(operands)
+        return BooleanValue(any(operands))
 
 class AllOp(Expression):
     def __init__(self, *operands):
@@ -231,14 +231,15 @@ class AllOp(Expression):
 
     def evaluate(self, calculator, divide=False):
         operands = [operand.evaluate(calculator, divide=True) for operand in self.operands]
-        return all(operands)
+        return BooleanValue(all(operands))
 
 class NotOp(Expression):
     def __init__(self, operand):
         self.operand = operand
 
     def evaluate(self, calculator, divide=False):
-        return not(self.operand.evaluate(calculator, divide=True))
+        operand = self.operand.evaluate(calculator, divide=True)
+        return BooleanValue(not(operand))
 
 class CallOp(Expression):
     def __init__(self, func_name, argspec):

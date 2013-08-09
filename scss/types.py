@@ -59,34 +59,33 @@ class Value(object):
 
     # Math ops
     def __add__(self, other):
-        return self._do_op(self, other, operator.__add__)
-
-    def __radd__(self, other):
-        return self._do_op(other, self, operator.__add__)
-
-    def __truediv__(self, other):
-        return self._do_op(self, other, operator.__truediv__)
-
-    def __rtruediv__(self, other):
-        return self._do_op(other, self, operator.__truediv__)
-
-    def __div__(self, other):
-        return self.__truediv__(other)
-
-    def __rdiv__(self, other):
-        return self.__rtruediv__(other)
+        # Default behavior is to treat both sides like strings
+        if isinstance(other, String):
+            return String(self.render() + other.value, quotes=other.quotes)
+        return String(self.render() + other.render())
 
     def __sub__(self, other):
-        return self._do_op(self, other, operator.__sub__)
+        # Default behavior is to treat the whole expression like one string
+        return String(self.render() + "-" + other.render())
 
-    def __rsub__(self, other):
-        return self._do_op(other, self, operator.__sub__)
+    def __div__(self, other):
+        return String(self.render() + "/" + other.render())
+
+    # Sass types have no notion of floor vs true division
+    def __truediv__(self, other):
+        return self.__div__(other)
+
+    def __floordiv__(self, other):
+        return self.__div__(other)
 
     def __mul__(self, other):
-        return self._do_op(self, other, operator.__mul__)
+        raise NotImplementedError
 
-    def __rmul__(self, other):
-        return self._do_op(other, self, operator.__mul__)
+    def __pos__(self):
+        return String("+" + self.render())
+
+    def __neg__(self):
+        return String("-" + self.render())
 
     def merge(self, obj):
         if isinstance(obj, Value):
@@ -139,32 +138,6 @@ class BooleanValue(Value):
 
     def __bool__(self):
         return self.value
-
-    @classmethod
-    def _do_op(cls, first, second, op):
-        if isinstance(first, ListValue) and isinstance(second, ListValue):
-            ret = ListValue(first)
-            for k, v in ret.items():
-                try:
-                    ret.value[k] = op(ret.value[k], second.value[k])
-                except KeyError:
-                    pass
-            return ret
-        if isinstance(first, ListValue):
-            ret = ListValue(first)
-            for k, v in ret.items():
-                ret.value[k] = op(ret.value[k], second)
-            return ret
-        if isinstance(second, ListValue):
-            ret = ListValue(second)
-            for k, v in ret.items():
-                ret.value[k] = op(first, ret.value[k])
-            return ret
-
-        first = BooleanValue(first)
-        second = BooleanValue(second)
-        val = op(first.value, second.value)
-        return BooleanValue(val)
 
     def render(self, compress=False, short_colors=False):
         if self.value:
@@ -486,28 +459,6 @@ class List(Value):
         else:
             return ' '
 
-    @classmethod
-    def _do_op(cls, first, second, op):
-        if isinstance(first, ListValue) and isinstance(second, ListValue):
-            ret = ListValue(first)
-            for k, v in ret.items():
-                try:
-                    ret.value[k] = op(ret.value[k], second.value[k])
-                except KeyError:
-                    pass
-            return ret
-        if isinstance(first, ListValue):
-            ret = ListValue(first)
-            for k, v in ret.items():
-                ret.value[k] = op(ret.value[k], second)
-            return ret
-        if isinstance(second, ListValue):
-            ret = ListValue(second)
-
-            for k, v in ret.items():
-                ret.value[k] = op(first, ret.value[k])
-            return ret
-
     def _reorder_list(self, lst):
         return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
 
@@ -691,11 +642,21 @@ class ColorValue(Value):
         # float errors make equality fail for HSL colors.
         left = tuple(round(n, 5) for n in self.value)
         right = tuple(round(n, 5) for n in other.value)
-        return left == right
+        return BooleanValue(left == right)
 
-    @classmethod
-    def _do_op(cls, first, second, op):
-        first = ColorValue(first)
+    def __add__(self, other):
+        return self._operate(other, operator.add)
+
+    def __sub__(self, other):
+        return self._operate(other, operator.sub)
+
+    def __mul__(self, other):
+        return self._operate(other, operator.mul)
+
+    def __div__(self, other):
+        return self._operate(other, operator.div)
+
+    def _operate(first, second, op):
         second = ColorValue(second)
         val = [op(first.value[i], second.value[i]) for i in range(4)]
         val[3] = (first.value[3] + second.value[3]) / 2
