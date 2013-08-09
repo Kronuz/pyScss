@@ -70,6 +70,12 @@ class Value(object):
     def __rtruediv__(self, other):
         return self._do_op(other, self, operator.__truediv__)
 
+    def __div__(self, other):
+        return self.__truediv__(other)
+
+    def __rdiv__(self, other):
+        return self.__rtruediv__(other)
+
     def __sub__(self, other):
         return self._do_op(self, other, operator.__sub__)
 
