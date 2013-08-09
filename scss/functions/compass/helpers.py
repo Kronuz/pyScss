@@ -79,15 +79,8 @@ def compact(*args):
 @register('reject')
 def reject(lst, *values):
     """Removes the given values from the list"""
-    if not isinstance(lst, List):
-        lst = List(lst)
-
-    if len(values) == 1:
-        values = values[0]
-        if isinstance(values, (list, tuple, List)):
-            values = frozenset(values)
-        else:
-            values = frozenset([values])
+    lst = List.from_maybe(lst)
+    values = frozenset(List.from_maybe_starargs(values))
 
     ret = []
     for item in lst:
@@ -112,12 +105,7 @@ def first_value_of(lst):
 
 @register('-compass-list')
 def dash_compass_list(*args):
-    use_comma = False
-    if len(args) == 1 and isinstance(args[0], (list, tuple, List)):
-        args = args[0]
-    if isinstance(args, List):
-        use_comma = args.use_comma
-    return List(args, use_comma=use_comma)
+    return List.from_maybe_starargs(args)
 
 
 @register('-compass-space-list')
@@ -150,14 +138,9 @@ def dash_compass_slice(lst, start_index, end_index=None):
 @register('prefixed')
 def prefixed(prefix, *args):
     to_fnct_str = 'to_' + to_str(prefix).replace('-', '_')
-    for arg in args:
-        if isinstance(arg, List):
-            for iarg in arg:
-                if hasattr(iarg, to_fnct_str):
-                    return BooleanValue(True)
-        else:
-            if hasattr(arg, to_fnct_str):
-                return BooleanValue(True)
+    for arg in List.from_maybe_starargs(args):
+        if hasattr(arg, to_fnct_str):
+            return BooleanValue(True)
     return BooleanValue(False)
 
 
@@ -380,10 +363,7 @@ OPPOSITE_POSITIONS = dict(
 )
 
 def _position(opposite, positions):
-    if isinstance(positions, List):
-        positions = positions.value
-    else:
-        positions = [positions]
+    positions = List.from_maybe(positions)
 
     ret = []
     for pos in positions:
@@ -415,10 +395,7 @@ def _position(opposite, positions):
         warnings.warn("Can't find opposite for position %r" % (pos,))
         ret.append(pos)
 
-    if len(ret) == 1:
-        return ret[0]
-    else:
-        return List(ret, use_comma=False)
+    return List(ret, use_comma=False).maybe()
 
 
 @register('position')
@@ -482,8 +459,7 @@ def _font_url(path, only_path=False, cache_buster=True, inline=False):
 
 
 def _font_files(args, inline):
-    if len(args) == 1 and isinstance(args[0], (list, tuple, List)):
-        args = list(args[0])
+    args = List.from_maybe_starargs(args)
     n = 0
     params = [[], []]
     for arg in args:

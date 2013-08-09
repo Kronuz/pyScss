@@ -449,7 +449,7 @@ class List(Value):
         return cls(values, use_comma=use_comma)
 
     @classmethod
-    def from_maybe_starargs(cls, args):
+    def from_maybe_starargs(cls, args, use_comma=True):
         """If `args` has one element which appears to be a list, return it.
         Otherwise, return a list as normal.
 
@@ -461,9 +461,9 @@ class List(Value):
             if isinstance(args[0], cls):
                 return args[0]
             elif isinstance(args[0], (list, tuple)):
-                return cls(args[0])
+                return cls(args[0], use_comma=use_comma)
 
-        return cls(args)
+        return cls(args, use_comma=use_comma)
 
     @property
     def separator(self):

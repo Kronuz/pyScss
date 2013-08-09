@@ -69,7 +69,7 @@ from scss.expression import Calculator
 from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
 from scss.rule import UnparsedBlock, SassRule
-from scss.types import BooleanValue, ListValue, Null, NumberValue, StringValue
+from scss.types import BooleanValue, List, Null, NumberValue, StringValue
 from scss.util import depar, dequote, normalize_var, split_params, to_str, profile, print_timing
 
 log = logging.getLogger(__name__)
@@ -995,18 +995,17 @@ class Scss(object):
         """
         Implements @each
         """
-        var, _, name = block.argument.partition(' in ')
+        var, _, valuestring = block.argument.partition(' in ')
         calculator = Calculator(rule.namespace)
-        name = calculator.calculate(name)
+        values = calculator.calculate(valuestring)
         if not name:
             return
 
-        iterable = ListValue(name)
         var = var.strip()
         var = calculator.do_glob_math(var)
         var = normalize_var(var)
 
-        for v in iterable:
+        for v in List.from_maybe(values):
             inner_rule = rule.copy()
             inner_rule.namespace = inner_rule.namespace.derive()
             inner_rule.unparsed_contents = block.unparsed_contents
