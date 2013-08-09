@@ -312,11 +312,11 @@ def headers(frm=None, to=None):
             frm = 1
             to = 6
         else:
-            frm = 1
             try:
                 to = int(getattr(frm, 'value', frm))
             except ValueError:
                 to = 6
+            frm = 1
     else:
         try:
             frm = 1 if frm is None else int(getattr(frm, 'value', frm))
@@ -326,10 +326,8 @@ def headers(frm=None, to=None):
             to = 6 if to is None else int(getattr(to, 'value', to))
         except ValueError:
             to = 6
-    ret = ['h' + str(i) for i in range(frm, to + 1)]
-    ret = dict(enumerate(ret))
-    ret['_'] = ','
-    return ret
+    ret = [StringValue('h' + str(i)) for i in range(frm, to + 1)]
+    return List(ret, use_comma=True)
 
 
 @register('nest')

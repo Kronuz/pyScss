@@ -78,7 +78,12 @@ def test_enumerate(calc):
     assert calc('enumerate(foo, 4, 7)') == calc('foo-4, foo-5, foo-6, foo-7')
     assert calc('enumerate("bar", 8, 10)') == calc('bar-8, bar-9, bar-10')
 
-# headers/headings
+def test_headings(calc):
+    assert calc('headings()') == calc('h1, h2, h3, h4, h5, h6')
+    assert calc('headings(all)') == calc('h1, h2, h3, h4, h5, h6')
+    assert calc('headings(2)') == calc('h1, h2')
+    assert calc('headings(2, 5)') == calc('h2, h3, h4, h5')
+
 
 # nest
 
