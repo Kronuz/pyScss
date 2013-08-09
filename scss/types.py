@@ -112,6 +112,9 @@ class Null(Value):
     def __repr__(self):
         return "<%s>" % (type(self).__name__,)
 
+    def __hash__(self):
+        return hash(None)
+
     def __bool__(self):
         return False
 
@@ -130,6 +133,9 @@ class BooleanValue(Value):
 
     def __str__(self):
         return 'true' if self.value else 'false'
+
+    def __hash__(self):
+        return hash(self.value)
 
     def __bool__(self):
         return self.value
@@ -199,6 +205,9 @@ class NumberValue(Value):
                 full_unit = ' ' + full_unit
 
         return '<%s: %r%s>' % (self.__class__.__name__, self.value, full_unit)
+
+    def __hash__(self):
+        return hash((self.value, self.unit_numer, self.unit_denom))
 
     def __int__(self):
         return int(self.value)
@@ -465,9 +474,8 @@ class List(Value):
 
         return cls(args, use_comma=use_comma)
 
-    @property
-    def separator(self):
-        return self.value.get('_', '')
+    def __hash__(self):
+        return hash((self.value, self.use_comma))
 
     def delimiter(self, compress=False):
         if self.use_comma:
@@ -642,6 +650,9 @@ class ColorValue(Value):
     def __repr__(self):
         return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.types))
 
+    def __hash__(self):
+        return hash(self.value)
+
     def __str__(self):
         # TODO bit of a hack?
         if self.tokens is not None and isinstance(self.tokens, ParserValue):
@@ -784,6 +795,9 @@ class String(Value):
             # TODO not unicode clean on 2 yet...
             self.value = value.encode('ascii')
         self.quotes = quotes
+
+    def __hash__(self):
+        return hash(self.value)
 
     def __str__(self):
         if self.quotes:
