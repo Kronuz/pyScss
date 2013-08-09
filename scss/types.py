@@ -418,38 +418,6 @@ class List(Value):
         self.value = list(tokens)
         # TODO...
         self.use_comma = separator == ","
-        return
-
-
-
-
-        self.tokens = tokens
-        if tokens is None:
-            self.value = {}
-        elif isinstance(tokens, ListValue):
-            self.value = tokens.value.copy()
-        elif isinstance(tokens, Value):
-            self.value = {0: tokens}
-        elif isinstance(tokens, dict):
-            self.value = self._reorder_list(tokens)
-        elif isinstance(tokens, (list, tuple)):
-            self.value = dict(enumerate(tokens))
-        else:
-            if isinstance(tokens, StringValue):
-                tokens = tokens.value
-            tokens = to_str(tokens)
-            lst = [i for i in tokens.split() if i]
-            if len(lst) == 1:
-                lst = [i.strip() for i in lst[0].split(',') if i.strip()]
-                if len(lst) > 1:
-                    separator = ',' if separator is None else separator
-                else:
-                    lst = [tokens]
-            self.value = dict(enumerate(lst))
-        if separator is None:
-            separator = self.value.pop('_', None)
-        if separator:
-            self.value['_'] = separator
 
     @classmethod
     def maybe_new(cls, values, use_comma=True):
