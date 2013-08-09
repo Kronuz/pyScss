@@ -1001,19 +1001,16 @@ class Scss(object):
         if not name:
             return
 
-        name = ListValue(name)
+        iterable = ListValue(name)
         var = var.strip()
         var = calculator.do_glob_math(var)
         var = normalize_var(var)
 
-        for n, v in name.items():
-            v = to_str(v)
+        for v in iterable:
             inner_rule = rule.copy()
             inner_rule.namespace = inner_rule.namespace.derive()
             inner_rule.unparsed_contents = block.unparsed_contents
             inner_rule.namespace.set_variable(var, v)
-            if not isinstance(n, int):
-                inner_rule.namespace.set_variable(n, v)
             self.manage_children(inner_rule, p_children, scope)
 
     # @print_timing(10)

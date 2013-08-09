@@ -17,7 +17,7 @@ from scss import config
 from scss.functions.compass import _image_size_cache
 from scss.functions.compass.helpers import add_cache_buster
 from scss.functions.library import FunctionLibrary
-from scss.types import ColorValue, ListValue, NumberValue, StringValue
+from scss.types import ColorValue, List, NumberValue, StringValue
 from scss.util import escape
 
 try:
@@ -68,26 +68,16 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
             filetime = 'NA'
     BASE_URL = config.STATIC_URL
     if path:
-        dst_colors = dst_color
-        if isinstance(dst_colors, ListValue):
-            dst_colors = [list(ColorValue(v).value[:3]) for n, v in dst_colors.items() if v]
-        else:
-            dst_colors = [list(ColorValue(dst_colors).value[:3])] if dst_colors else []
+        dst_colors = [list(ColorValue(v).value[:3]) for v in List.from_maybe(dst_color) if v]
 
         src_colors = src_color
-        if isinstance(src_colors, ListValue):
-            src_colors = [tuple(ColorValue(v).value[:3]) if v else (0, 0, 0) for n, v in src_colors.items()]
-        else:
-            src_colors = [tuple(ColorValue(src_colors).value[:3]) if src_colors else (0, 0, 0)]
+        src_colors = [tuple(ColorValue(v).value[:3]) if v else (0, 0, 0) for v in List.from_maybe(src_color)]
 
         len_colors = max(len(dst_colors), len(src_colors))
         dst_colors = (dst_colors * len_colors)[:len_colors]
         src_colors = (src_colors * len_colors)[:len_colors]
 
-        if isinstance(spacing, ListValue):
-            spacing = [int(NumberValue(v).value) for n, v in spacing.items()]
-        else:
-            spacing = [int(NumberValue(spacing).value)]
+        spacing = [int(NumberValue(v).value) for v in List.from_maybe(spacing)]
         spacing = (spacing * 4)[:4]
 
         file_name, file_ext = os.path.splitext(os.path.normpath(filepath).replace('\\', '_').replace('/', '_'))

@@ -260,7 +260,6 @@ def test_nth(calc):
     assert calc('nth(10px 20px 30px, 1)') == calc('10px')
     assert calc('nth((Helvetica, Arial, sans-serif), 3)') == calc('sans-serif')
 
-@xfail(reason="second example broken, unclear why")
 def test_join(calc):
     # Examples from the Ruby docs
     assert calc('join(10px 20px, 30px 40px)') == calc('10px 20px 30px 40px')
@@ -269,7 +268,6 @@ def test_join(calc):
     assert calc('join(10px, 20px, comma)') == calc('10px, 20px')
     assert calc('join((blue, red), (#abc, #def), space)') == calc('blue red #abc #def')
 
-@xfail(reason="possibly a problem with list equality?")
 def test_append(calc):
     # Examples from the Ruby docs
     assert calc('append(10px 20px, 30px)') == calc('10px 20px 30px')
@@ -301,7 +299,6 @@ def test_type_of(calc):
     assert calc('type-of(#fff)') == calc('color')
     assert calc('type-of(blue)') == calc('color')
 
-@xfail(reason="numeric type does not yet understand multiple units")
 def test_unit(calc):
     # Examples from the Ruby docs
     assert calc('unit(100)') == calc('""')

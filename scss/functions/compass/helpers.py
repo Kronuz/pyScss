@@ -17,7 +17,7 @@ import warnings
 
 from scss import config
 from scss.functions.library import FunctionLibrary
-from scss.types import BooleanValue, ListValue, Null, NumberValue, QuotedStringValue, StringValue
+from scss.types import BooleanValue, List, Null, NumberValue, QuotedStringValue, StringValue
 from scss.util import escape, to_str
 
 log = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ def blank(*objs):
             is_blank = not o
         elif isinstance(o, QuotedStringValue):
             is_blank = not len(o.value.strip())
-        elif isinstance(o, ListValue):
+        elif isinstance(o, List):
             is_blank = all(blank(el) for el in o)
         else:
             is_blank = False
@@ -65,37 +65,35 @@ def blank(*objs):
 @register('compact')
 def compact(*args):
     """Returns a new list after removing any non-true values"""
-    sep = ','
-    if len(args) == 1 and isinstance(args[0], ListValue):
-        sep = args[0].value.get('_', '')
+    use_comma = True
+    if len(args) == 1 and isinstance(args[0], List):
+        use_comma = args[0].use_comma
         args = args[0]
 
-    return ListValue(
+    return List(
         [arg for arg in args if arg],
-        separator=sep,
+        use_comma=use_comma,
     )
 
 
 @register('reject')
 def reject(lst, *values):
     """Removes the given values from the list"""
-    ret = {}
-    if not isinstance(lst, ListValue):
-        lst = ListValue(lst)
-    lst = lst.value
+    if not isinstance(lst, List):
+        lst = List(lst)
+
     if len(values) == 1:
         values = values[0]
-        if isinstance(values, ListValue):
-            values = values.value.values()
-        elif not isinstance(values, (list, tuple)):
-            values = ListValue([values])
-    for i, item in lst.items():
+        if isinstance(values, (list, tuple, List)):
+            values = frozenset(values)
+        else:
+            values = frozenset([values])
+
+    ret = []
+    for item in lst:
         if item not in values:
-            ret[i] = item
-    separator = lst.get('_', None)
-    if separator is not None:
-        ret['_'] = separator
-    return ListValue(ret)
+            ret.append(item)
+    return List(ret, use_comma=lst.use_comma)
 
 
 @register('first-value-of')
@@ -103,7 +101,7 @@ def first_value_of(lst):
     if isinstance(lst, QuotedStringValue):
         first = lst.value.split()[0]
         return type(lst)(first)
-    elif isinstance(lst, ListValue):
+    elif isinstance(lst, List):
         if len(lst):
             return lst[0]
         else:
@@ -114,15 +112,12 @@ def first_value_of(lst):
 
 @register('-compass-list')
 def dash_compass_list(*args):
-    separator = None
-    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
-        args = ListValue(args[0]).values()
-    else:
-        separator = ','
-    ret = ListValue(args)
-    if separator:
-        ret.value['_'] = separator
-    return ret
+    use_comma = False
+    if len(args) == 1 and isinstance(args[0], (list, tuple, List)):
+        args = args[0]
+    if isinstance(args, List):
+        use_comma = args.use_comma
+    return List(args, use_comma=use_comma)
 
 
 @register('-compass-space-list')
@@ -141,14 +136,12 @@ def dash_compass_slice(lst, start_index, end_index=None):
     start_index = NumberValue(start_index).value
     end_index = NumberValue(end_index).value if end_index is not None else None
     ret = {}
-    lst = ListValue(lst).value
-    for i, item in lst.items():
-        if not isinstance(i, int):
-            if i == '_':
-                ret[i] = item
-        elif i > start_index and end_index is None or i <= end_index:
-            ret[i] = item
-    return ListValue(ret)
+    lst = List(lst)
+    if end_index:
+        # This function has an inclusive end, but Python slicing is exclusive
+        end_index += 1
+    ret = lst.value[start_index:end_index]
+    return List(ret, use_comma=lst.use_comma)
 
 
 # ------------------------------------------------------------------------------
@@ -158,8 +151,8 @@ def dash_compass_slice(lst, start_index, end_index=None):
 def prefixed(prefix, *args):
     to_fnct_str = 'to_' + to_str(prefix).replace('-', '_')
     for arg in args:
-        if isinstance(arg, ListValue):
-            for k, iarg in arg.value.items():
+        if isinstance(arg, List):
+            for iarg in arg:
                 if hasattr(iarg, to_fnct_str):
                     return BooleanValue(True)
         else:
@@ -173,22 +166,21 @@ def prefix(prefix, *args):
     to_fnct_str = 'to_' + to_str(prefix).replace('-', '_')
     args = list(args)
     for i, arg in enumerate(args):
-        if isinstance(arg, ListValue):
-            _value = {}
-            for k, iarg in arg.value.items():
+        if isinstance(arg, List):
+            _value = []
+            for iarg in arg:
                 to_fnct = getattr(iarg, to_fnct_str, None)
                 if to_fnct:
-                    _value[k] = to_fnct()
+                    _value.append(to_fnct())
                 else:
-                    _value[k] = iarg
-            args[i] = ListValue(_value)
+                    _value.append(iarg)
+            args[i] = List(_value)
         else:
             to_fnct = getattr(arg, to_fnct_str, None)
             if to_fnct:
                 args[i] = to_fnct()
-    if len(args) == 1:
-        return args[0]
-    return ListValue(args, ',')
+
+    return List.maybe_new(args, use_comma=True)
 
 
 @register('-moz')
@@ -233,8 +225,8 @@ def dash_o(*args):
 
 @register('append-selector', 2)
 def append_selector(selector, to_append):
-    if isinstance(selector, ListValue):
-        lst = selector.values()
+    if isinstance(selector, List):
+        lst = selector.value
     else:
         lst = StringValue(selector).value.split(',')
     to_append = StringValue(to_append).value.strip()
@@ -257,18 +249,18 @@ _elements_of_type_html5_block = 'article, aside, details, figcaption, figure, fo
 _elements_of_type_html5_inline = 'audio, canvas, command, datalist, embed, keygen, mark, meter, output, progress, rp, rt, ruby, time, video, wbr'
 _elements_of_type_html5 = 'article, aside, audio, canvas, command, datalist, details, embed, figcaption, figure, footer, header, hgroup, keygen, mark, menu, meter, nav, output, progress, rp, rt, ruby, section, summary, time, video, wbr'
 _elements_of_type = {
-    'block': dict(enumerate(sorted(_elements_of_type_block.replace(' ', '').split(',')))),
-    'inline': dict(enumerate(sorted(_elements_of_type_inline.replace(' ', '').split(',')))),
-    'table': dict(enumerate(sorted(_elements_of_type_table.replace(' ', '').split(',')))),
-    'list-item': dict(enumerate(sorted(_elements_of_type_list_item.replace(' ', '').split(',')))),
-    'table-row-group': dict(enumerate(sorted(_elements_of_type_table_row_group.replace(' ', '').split(',')))),
-    'table-header-group': dict(enumerate(sorted(_elements_of_type_table_header_group.replace(' ', '').split(',')))),
-    'table-footer-group': dict(enumerate(sorted(_elements_of_type_table_footer_group.replace(' ', '').split(',')))),
-    'table-row': dict(enumerate(sorted(_elements_of_type_table_footer_group.replace(' ', '').split(',')))),
-    'table-cell': dict(enumerate(sorted(_elements_of_type_table_footer_group.replace(' ', '').split(',')))),
-    'html5-block': dict(enumerate(sorted(_elements_of_type_html5_block.replace(' ', '').split(',')))),
-    'html5-inline': dict(enumerate(sorted(_elements_of_type_html5_inline.replace(' ', '').split(',')))),
-    'html5': dict(enumerate(sorted(_elements_of_type_html5.replace(' ', '').split(',')))),
+    'block': sorted(_elements_of_type_block.replace(' ', '').split(',')),
+    'inline': sorted(_elements_of_type_inline.replace(' ', '').split(',')),
+    'table': sorted(_elements_of_type_table.replace(' ', '').split(',')),
+    'list-item': sorted(_elements_of_type_list_item.replace(' ', '').split(',')),
+    'table-row-group': sorted(_elements_of_type_table_row_group.replace(' ', '').split(',')),
+    'table-header-group': sorted(_elements_of_type_table_header_group.replace(' ', '').split(',')),
+    'table-footer-group': sorted(_elements_of_type_table_footer_group.replace(' ', '').split(',')),
+    'table-row': sorted(_elements_of_type_table_footer_group.replace(' ', '').split(',')),
+    'table-cell': sorted(_elements_of_type_table_footer_group.replace(' ', '').split(',')),
+    'html5-block': sorted(_elements_of_type_html5_block.replace(' ', '').split(',')),
+    'html5-inline': sorted(_elements_of_type_html5_inline.replace(' ', '').split(',')),
+    'html5': sorted(_elements_of_type_html5.replace(' ', '').split(',')),
 }
 
 @register('elements-of-type', 1)
@@ -277,8 +269,7 @@ def elements_of_type(display):
     ret = _elements_of_type.get(d.value, None)
     if ret is None:
         raise Exception("Elements of type '%s' not found!" % d.value)
-    ret['_'] = ','
-    return ListValue(ret)
+    return List(ret, use_comma=True)
 
 
 @register('enumerate', 3)
@@ -306,7 +297,7 @@ def enumerate_(prefix, frm, through, separator='-'):
         else:
             ret.append(NumberValue(i))
 
-    return ListValue(ret, separator=',')
+    return List(ret, use_comma=True)
 
 
 @register('headers', 0)
@@ -343,14 +334,14 @@ def headers(frm=None, to=None):
 
 @register('nest')
 def nest(*arguments):
-    if isinstance(arguments[0], ListValue):
-        lst = arguments[0].values()
+    if isinstance(arguments[0], List):
+        lst = arguments[0].value
     else:
         lst = StringValue(arguments[0]).value.split(',')
     ret = [unicode(s).strip() for s in lst if unicode(s).strip()]
     for arg in arguments[1:]:
-        if isinstance(arg, ListValue):
-            lst = arg.values()
+        if isinstance(arg, List):
+            lst = arg.value
         else:
             lst = StringValue(arg).value.split(',')
         new_ret = []
@@ -366,10 +357,8 @@ def nest(*arguments):
                         else:
                             new_ret.append(r + ' ' + s)
         ret = new_ret
-    ret = sorted(set(ret))
-    ret = dict(enumerate(ret))
-    ret['_'] = ','
-    return ret
+
+    return List(sorted(set(ret)), use_comma=True)
 
 
 # This isn't actually from Compass, but it's just a shortcut for enumerate().
@@ -393,8 +382,8 @@ OPPOSITE_POSITIONS = dict(
 )
 
 def _position(opposite, positions):
-    if isinstance(positions, ListValue):
-        positions = positions.values()
+    if isinstance(positions, List):
+        positions = positions.value
     else:
         positions = [positions]
 
@@ -431,7 +420,7 @@ def _position(opposite, positions):
     if len(ret) == 1:
         return ret[0]
     else:
-        return ListValue(ret, separator='')
+        return List(ret, use_comma=False)
 
 
 @register('position')
@@ -495,12 +484,12 @@ def _font_url(path, only_path=False, cache_buster=True, inline=False):
 
 
 def _font_files(args, inline):
-    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
-        args = ListValue(args[0]).values()
+    if len(args) == 1 and isinstance(args[0], (list, tuple, List)):
+        args = list(args[0])
     n = 0
     params = [[], []]
     for arg in args:
-        if isinstance(arg, ListValue):
+        if isinstance(arg, List):
             if len(arg) == 2:
                 if n % 2 == 1:
                     params[1].append(None)
@@ -527,7 +516,7 @@ def _font_files(args, inline):
             fonts.append('%s format("%s")' % (_font_url(font, inline=inline), StringValue(format).value))
         else:
             fonts.append(_font_url(font, inline=inline))
-    return ListValue(fonts)
+    return List(fonts)
 
 
 @register('font-url', 1)

@@ -13,7 +13,7 @@ from six.moves import xrange
 
 from scss import config
 from scss.functions.library import FunctionLibrary
-from scss.types import ColorValue, NumberValue, StringValue, ListValue
+from scss.types import ColorValue, NumberValue, StringValue, List
 from scss.util import escape
 
 try:
@@ -273,25 +273,10 @@ def background_noise(density=None, opacity=None, size=None, monochrome=False, in
     if not Image:
         raise Exception("Images manipulation require PIL")
 
-    if isinstance(density, ListValue):
-        density = [NumberValue(v).value for n, v in density.items()]
-    else:
-        density = [NumberValue(density).value]
-
-    if isinstance(intensity, ListValue):
-        intensity = [NumberValue(v).value for n, v in intensity.items()]
-    else:
-        intensity = [NumberValue(intensity).value]
-
-    if isinstance(color, ListValue):
-        color = [ColorValue(v).value for n, v in color.items() if v]
-    else:
-        color = [ColorValue(color).value] if color else []
-
-    if isinstance(opacity, ListValue):
-        opacity = [NumberValue(v).value for n, v in opacity.items()]
-    else:
-        opacity = [NumberValue(opacity).value]
+    density = [NumberValue(v).value for v in List.from_maybe(density)]
+    intensity = [NumberValue(v).value for v in List.from_maybe(intensity)]
+    color = [ColorValue(v).value for v in List.from_maybe(color) if v]
+    opacity = [NumberValue(v).value for v in List.from_maybe(opacity)]
 
     size = int(NumberValue(size).value) if size else 0
     if size < 1 or size > 512:
@@ -347,25 +332,10 @@ def background_brushed(density=None, intensity=None, color=None, opacity=None, s
     if not Image:
         raise Exception("Images manipulation require PIL")
 
-    if isinstance(density, ListValue):
-        density = [NumberValue(v).value for n, v in density.items()]
-    else:
-        density = [NumberValue(density).value]
-
-    if isinstance(intensity, ListValue):
-        intensity = [NumberValue(v).value for n, v in intensity.items()]
-    else:
-        intensity = [NumberValue(intensity).value]
-
-    if isinstance(color, ListValue):
-        color = [ColorValue(v).value for n, v in color.items() if v]
-    else:
-        color = [ColorValue(color).value] if color else []
-
-    if isinstance(opacity, ListValue):
-        opacity = [NumberValue(v).value for n, v in opacity.items()]
-    else:
-        opacity = [NumberValue(opacity).value]
+    density = [NumberValue(v).value for v in List.from_maybe(density)]
+    intensity = [NumberValue(v).value for v in List.from_maybe(intensity)]
+    color = [ColorValue(v).value for v in List.from_maybe(color) if v]
+    opacity = [NumberValue(v).value for v in List.from_maybe(opacity)]
 
     size = int(NumberValue(size).value) if size else -1
     if size < 0 or size > 512:
@@ -373,15 +343,8 @@ def background_brushed(density=None, intensity=None, color=None, opacity=None, s
 
     monochrome = bool(monochrome)
 
-    if isinstance(direction, ListValue):
-        direction = [NumberValue(v).value for n, v in direction.items()]
-    else:
-        direction = [NumberValue(direction).value]
-
-    if isinstance(spread, ListValue):
-        spread = [NumberValue(v).value for n, v in spread.items()]
-    else:
-        spread = [NumberValue(spread).value]
+    direction = [NumberValue(v).value for v in List.from_maybe(direction)]
+    spread = [NumberValue(v).value for v in List.from_maybe(spread)]
 
     background = ColorValue(background).value if background else None
 

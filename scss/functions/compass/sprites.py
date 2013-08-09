@@ -33,7 +33,7 @@ from scss import config
 from scss.functions.compass import _image_size_cache
 from scss.functions.compass.layouts import PackedSpritesLayout, HorizontalSpritesLayout, VerticalSpritesLayout, DiagonalSpritesLayout
 from scss.functions.library import FunctionLibrary
-from scss.types import ColorValue, ListValue, NumberValue, QuotedStringValue, StringValue
+from scss.types import ColorValue, List, NumberValue, QuotedStringValue, StringValue
 from scss.util import escape
 
 log = logging.getLogger(__name__)
@@ -172,7 +172,7 @@ def sprite_map(g, **kwargs):
             direction = kwargs.get('direction', config.SPRTE_MAP_DIRECTION)
             repeat = StringValue(kwargs.get('repeat', 'no-repeat'))
             collapse = kwargs.get('collapse') or 0
-            if isinstance(collapse, ListValue):
+            if isinstance(collapse, List):
                 collapse_x = int(NumberValue(collapse[0]).value)
                 collapse_y = int(NumberValue(collapse[-1]).value)
             else:
@@ -194,22 +194,13 @@ def sprite_map(g, **kwargs):
                 position = 1.0
 
             padding = kwargs.get('padding', kwargs.get('spacing', 0))
-            if isinstance(padding, ListValue):
-                padding = [int(NumberValue(v).value) for n, v in padding.items()]
-            else:
-                padding = [int(NumberValue(padding).value)]
+            padding = [int(NumberValue(v).value) for v in List.from_maybe(padding)]
             padding = (padding * 4)[:4]
 
             dst_colors = kwargs.get('dst_color')
-            if isinstance(dst_colors, ListValue):
-                dst_colors = [list(ColorValue(v).value[:3]) for n, v in dst_colors.items() if v]
-            else:
-                dst_colors = [list(ColorValue(dst_colors).value[:3])] if dst_colors else []
+            dst_colors = [list(ColorValue(v).value[:3]) for v in List.from_maybe(dst_colors) if v]
             src_colors = kwargs.get('src_color')
-            if isinstance(src_colors, ListValue):
-                src_colors = [tuple(ColorValue(v).value[:3]) if v else (0, 0, 0) for n, v in src_colors.items()]
-            else:
-                src_colors = [tuple(ColorValue(src_colors).value[:3]) if src_colors else (0, 0, 0)]
+            src_colors = [tuple(ColorValue(v).value[:3]) if v else (0, 0, 0) for v in List.from_maybe(src_colors)]
             len_colors = max(len(dst_colors), len(src_colors))
             dst_colors = (dst_colors * len_colors)[:len_colors]
             src_colors = (src_colors * len_colors)[:len_colors]
@@ -253,10 +244,7 @@ def sprite_map(g, **kwargs):
                 if _padding is None:
                     _padding = padding
                 else:
-                    if isinstance(_padding, ListValue):
-                        _padding = [int(NumberValue(v).value) for n, v in _padding.items()]
-                    else:
-                        _padding = [int(NumberValue(_padding).value)]
+                    _padding = [int(NumberValue(v).value) for v in List.from_maybe(_padding)]
                     _padding = (_padding * 4)[:4]
                 all_paddings.append(_padding)
 
@@ -267,18 +255,12 @@ def sprite_map(g, **kwargs):
                         has_dst_colors = True
                 else:
                     has_dst_colors = True
-                    if isinstance(_dst_colors, ListValue):
-                        _dst_colors = [list(ColorValue(v).value[:3]) for n, v in _dst_colors.items() if v]
-                    else:
-                        _dst_colors = [list(ColorValue(_dst_colors).value[:3])] if _dst_colors else []
+                    _dst_colors = [list(ColorValue(v).value[:3]) for v in List.from_maybe(_dst_colors) if v]
                 _src_colors = kwargs.get(name + '_src_color')
                 if _src_colors is None:
                     _src_colors = src_colors
                 else:
-                    if isinstance(_src_colors, ListValue):
-                        _src_colors = [tuple(ColorValue(v).value[:3]) if v else (0, 0, 0) for n, v in _src_colors.items()]
-                    else:
-                        _src_colors = [tuple(ColorValue(_src_colors).value[:3]) if _src_colors else (0, 0, 0)]
+                    _src_colors = [tuple(ColorValue(v).value[:3]) if v else (0, 0, 0) for v in List.from_maybe(_src_colors)]
                 _len_colors = max(len(_dst_colors), len(_src_colors))
                 _dst_colors = (_dst_colors * _len_colors)[:_len_colors]
                 _src_colors = (_src_colors * _len_colors)[:_len_colors]
@@ -419,7 +401,7 @@ def sprite_file(map, sprite):
 def sprites(map):
     map = StringValue(map).value
     sprite_map = sprite_maps.get(map, {})
-    return ListValue(sorted(s for s in sprite_map if not s.startswith('*')))
+    return List(list(sorted(s for s in sprite_map if not s.startswith('*'))))
 
 
 @register('sprite', 2)

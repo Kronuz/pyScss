@@ -14,7 +14,7 @@ from six.moves import xrange
 
 from scss.cssdefs import _variable_re
 from scss.functions.library import FunctionLibrary
-from scss.types import BooleanValue, ColorValue, ListValue, NumberValue, QuotedStringValue, StringValue, String
+from scss.types import BooleanValue, ColorValue, List, NumberValue, QuotedStringValue, StringValue, String
 
 log = logging.getLogger(__name__)
 
@@ -428,16 +428,21 @@ CORE_LIBRARY.add(NumberValue.wrap_python_function(math.floor), 'floor', 1)
 
 # ------------------------------------------------------------------------------
 # List functions
-def __parse_separator(separator):
+def __parse_separator(separator, default_from=None):
     if separator is None:
         return None
     separator = StringValue(separator).value
     if separator == 'comma':
-        return ','
+        return True
     elif separator == 'space':
-        return ' '
+        return False
     elif separator == 'auto':
-        return None
+        if not default_from:
+            return True
+        elif len(default_from) < 2:
+            return True
+        else:
+            return default_from.use_comma
     else:
         raise ValueError('Separator must be auto, comma, or space')
 
@@ -446,9 +451,8 @@ def __parse_separator(separator):
 @register('-compass-list-size')
 @register('length')
 def _length(*lst):
-    if len(lst) == 1 and isinstance(lst[0], (list, tuple, ListValue)):
-        lst = ListValue(lst[0]).values()
-    lst = ListValue(lst)
+    if len(lst) == 1 and isinstance(lst[0], (list, tuple, List)):
+        lst = lst[0]
     return NumberValue(len(lst))
 
 
@@ -460,7 +464,7 @@ def nth(lst, n):
     Return the Nth item in the string
     """
     n = NumberValue(n).value
-    lst = ListValue(lst).value
+    lst = List(lst).value
     try:
         n = int(float(n)) - 1
         n = n % len(lst)
@@ -483,39 +487,37 @@ def nth(lst, n):
 @register('join', 2)
 @register('join', 3)
 def join(lst1, lst2, separator=None):
-    ret = ListValue(lst1)
-    lst2 = ListValue(lst2).value
-    lst_len = len(ret.value)
-    ret.value.update((k + lst_len if isinstance(k, int) else k, v) for k, v in lst2.items())
-    separator = __parse_separator(separator)
-    if separator is not None:
-        ret.value['_'] = separator
-    return ret
+    ret = []
+    ret.extend(List.from_maybe(lst1))
+    ret.extend(List.from_maybe(lst2))
+
+    use_comma = __parse_separator(separator, default_from=lst1)
+    return List(ret, use_comma=use_comma)
 
 
 @register('min')
 def min_(*lst):
-    if len(lst) == 1 and isinstance(lst[0], (list, tuple, ListValue)):
-        lst = ListValue(lst[0]).values()
-    lst = ListValue(lst).value
-    return min(lst.values())
+    if len(lst) == 1 and isinstance(lst[0], (list, tuple, List)):
+        lst = lst[0]
+    return min(lst)
 
 
 @register('max')
 def max_(*lst):
-    if len(lst) == 1 and isinstance(lst[0], (list, tuple, ListValue)):
-        lst = ListValue(lst[0]).values()
-    lst = ListValue(lst).value
-    return max(lst.values())
+    if len(lst) == 1 and isinstance(lst[0], (list, tuple, List)):
+        lst = lst[0]
+    return max(lst)
 
 
 @register('append', 2)
 @register('append', 3)
 def append(lst, val, separator=None):
-    separator = __parse_separator(separator)
-    ret = ListValue(lst, separator)
-    ret.value[len(ret)] = val
-    return ret
+    ret = []
+    ret.extend(List.from_maybe(lst))
+    ret.append(val)
+
+    use_comma = __parse_separator(separator, default_from=lst)
+    return List(ret, use_comma=use_comma)
 
 
 @register('index', 2)
@@ -535,9 +537,15 @@ def _type_of(obj):  # -> bool, number, string, color, list
 
 
 @register('unit', 1)
-def _unit(number):  # -> px, em, cm, etc.
-    unit = NumberValue(number).unit
-    return StringValue(unit)
+def unit(number):  # -> px, em, cm, etc.
+    numer = '*'.join(number.unit_numer)
+    denom = '*'.join(number.unit_denom)
+
+    if denom:
+        ret = numer + '/' + denom
+    else:
+        ret = numer
+    return StringValue(ret)
 
 
 @register('unitless', 1)

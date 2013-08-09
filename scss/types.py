@@ -391,10 +391,32 @@ class NumberValue(Value):
         return val + unit
 
 
-class ListValue(Value):
+class List(Value):
+    """A list of other values.  May be delimited by commas or spaces.
+
+    Lists of one item don't make much sense in CSS, but can exist in Sass.  Use ......
+
+    Lists may also contain zero items, but these are forbidden from appearing
+    in CSS output.
+    """
+
     sass_type_name = u'list'
 
-    def __init__(self, tokens, separator=None):
+    def __init__(self, tokens, separator=None, use_comma=True):
+        if isinstance(tokens, ListValue):
+            tokens = tokens.value
+
+        if not isinstance(tokens, (list, tuple)):
+            raise TypeError("Expected list, got %r" % (tokens,))
+
+        self.value = list(tokens)
+        # TODO...
+        self.use_comma = separator == ","
+        return
+
+
+
+
         self.tokens = tokens
         if tokens is None:
             self.value = {}
@@ -423,9 +445,64 @@ class ListValue(Value):
         if separator:
             self.value['_'] = separator
 
+    @classmethod
+    def maybe_new(cls, values, use_comma=True):
+        """If `values` contains only one item, return that item.  Otherwise,
+        return a List as normal.
+        """
+        if len(values) == 1:
+            return values[0]
+        else:
+            return cls(values, use_comma=use_comma)
+
+    def maybe(self):
+        """If this List contains only one item, return it.  Otherwise, return
+        the List.
+        """
+        if len(self.value) == 1:
+            return self.value[0]
+        else:
+            return self
+
+    @classmethod
+    def from_maybe(cls, values, use_comma=True):
+        """If `values` appears to not be a list, return a list containing it.
+        Otherwise, return a List as normal.
+        """
+        if not isinstance(values, (list, tuple, List)):
+            values = [values]
+
+        return cls(values, use_comma=use_comma)
+
+    @classmethod
+    def from_maybe_starargs(cls, args):
+        """If `args` has one element which appears to be a list, return it.
+        Otherwise, return a list as normal.
+
+        Mainly used by Sass function implementations that predate `...`
+        support, so they can accept both a list of arguments and a single list
+        stored in a variable.
+        """
+        if len(args) == 1:
+            if isinstance(args[0], cls):
+                return args[0]
+            elif isinstance(args[0], (list, tuple)):
+                return cls(args[0])
+
+        return cls(args)
+
     @property
     def separator(self):
         return self.value.get('_', '')
+
+    def delimiter(self, compress=False):
+        if self.use_comma:
+            if compress:
+                return ','
+            else:
+                return ', '
+        else:
+            return ' '
 
     @classmethod
     def _do_op(cls, first, second, op):
@@ -453,34 +530,32 @@ class ListValue(Value):
         return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
 
     def __len__(self):
-        return len(self.value) - (1 if '_' in self.value else 0)
+        return len(self.value)
 
     def __str__(self):
         return self.render()
 
     def __iter__(self):
-        return iter(self.values())
+        return iter(self.value)
 
     def values(self):
-        return list(zip(*self.items()))[1]
+        return self.value
 
     def keys(self):
-        return list(zip(*self.items()))[0]
+        return range(len(self.value))
 
     def items(self):
-        return sorted((k, v) for k, v in self.value.items() if k != '_')
+        return enumerate(self.value)
 
     def __getitem__(self, key):
         return self.value[key]
 
     def render(self, compress=False, short_colors=False):
-        delim = self.separator
-        if not compress or not delim:
-            delim += ' '
+        delim = self.delimiter(compress)
 
         return delim.join(
             item.render(compress=compress, short_colors=short_colors)
-            for item in self.values()
+            for item in self.value
         )
 
 
@@ -759,5 +834,7 @@ class String(Value):
         return self.__str__()
 
 
+# Backwards-compatibility.
+ListValue = List
 QuotedStringValue = String
 StringValue = String

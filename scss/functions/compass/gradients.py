@@ -11,7 +11,7 @@ import six
 
 from scss.functions.library import FunctionLibrary
 from scss.functions.compass.helpers import opposite_position, position
-from scss.types import ColorValue, ListValue, NumberValue, StringValue
+from scss.types import ColorValue, List, NumberValue, StringValue
 from scss.util import escape, split_params, to_float, to_str
 
 log = logging.getLogger(__name__)
@@ -23,8 +23,8 @@ register = COMPASS_GRADIENTS_LIBRARY.register
 
 def __color_stops(percentages, *args):
     if len(args) == 1:
-        if isinstance(args[0], (list, tuple, ListValue)):
-            return ListValue(args[0]).values()
+        if isinstance(args[0], (list, tuple, List)):
+            list(args[0])
         elif isinstance(args[0], (StringValue, six.string_types)):
             color_stops = []
             colors = split_params(args[0].value)
@@ -43,12 +43,7 @@ def __color_stops(percentages, *args):
     stops = []
     prev_color = False
     for c in args:
-        if isinstance(c, ListValue):
-            cs = c.values()
-        else:
-            cs = [c]
-
-        for c in cs:
+        for c in List.from_maybe(c):
             if isinstance(c, ColorValue):
                 if prev_color:
                     stops.append(None)
@@ -98,8 +93,7 @@ def __color_stops(percentages, *args):
 
 @register('grad-color-stops')
 def grad_color_stops(*args):
-    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
-        args = ListValue(args[0]).values()
+    args = List.from_maybe_starargs(args)
     color_stops = __color_stops(True, *args)
     ret = ', '.join(['color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops])
     return StringValue(ret)
@@ -123,7 +117,7 @@ def grad_point(*p):
         vrt = NumberValue(0, '%')
     elif 'bottom' in pos:
         vrt = NumberValue(1, '%')
-    return ListValue([v for v in (hrz, vrt) if v is not None])
+    return List([v for v in (hrz, vrt) if v is not None])
 
 
 def __grad_position(index, default, radial, color_stops):
@@ -144,8 +138,7 @@ def grad_end_position(*color_stops):
 
 @register('color-stops')
 def color_stops(*args):
-    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
-        args = ListValue(args[0]).values()
+    args = List.from_maybe_starargs(args)
     color_stops = __color_stops(False, *args)
     ret = ', '.join(['%s %s' % (c, to_str(s)) for s, c in color_stops])
     return StringValue(ret)
@@ -153,8 +146,7 @@ def color_stops(*args):
 
 @register('color-stops-in-percentages')
 def color_stops_in_percentages(*args):
-    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
-        args = ListValue(args[0]).values()
+    args = List.from_maybe_starargs(args)
     color_stops = __color_stops(True, *args)
     ret = ', '.join(['%s %s' % (c, to_str(s)) for s, c in color_stops])
     return StringValue(ret)
@@ -164,7 +156,7 @@ def _get_gradient_position_and_angle(args):
     for arg in args:
         if isinstance(arg, (StringValue, NumberValue, six.string_types)):
             _arg = [arg]
-        elif isinstance(arg, (list, tuple, ListValue)):
+        elif isinstance(arg, (list, tuple, List)):
             _arg = arg
         else:
             continue
@@ -194,7 +186,7 @@ def _get_gradient_shape_and_size(args):
     for arg in args:
         if isinstance(arg, (StringValue, NumberValue, six.string_types)):
             _arg = [arg]
-        elif isinstance(arg, (list, tuple, ListValue)):
+        elif isinstance(arg, (list, tuple, List)):
             _arg = arg
         else:
             continue
@@ -212,20 +204,16 @@ def _get_gradient_shape_and_size(args):
 def _get_gradient_color_stops(args):
     color_stops = []
     for arg in args:
-        if isinstance(arg, ColorValue):
-            color_stops.append(arg)
-        elif isinstance(arg, (list, tuple, ListValue)):
-            for a in arg:
-                if isinstance(a, ColorValue):
-                    color_stops.append(arg)
-                    break
+        for a in List.from_maybe(arg):
+            if isinstance(a, ColorValue):
+                color_stops.append(arg)
+                break
     return color_stops or None
 
 
 @register('radial-gradient')
 def radial_gradient(*args):
-    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
-        args = ListValue(args[0]).values()
+    args = List.from_maybe_starargs(args)
 
     position_and_angle = _get_gradient_position_and_angle(args)
     shape_and_size = _get_gradient_shape_and_size(args)
@@ -282,8 +270,7 @@ def radial_gradient(*args):
 
 @register('linear-gradient')
 def linear_gradient(*args):
-    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
-        args = ListValue(args[0]).values()
+    args = List.from_maybe_starargs(args)
 
     position_and_angle = _get_gradient_position_and_angle(args)
     color_stops = _get_gradient_color_stops(args)
@@ -343,8 +330,7 @@ def linear_gradient(*args):
 
 @register('radial-svg-gradient')
 def radial_svg_gradient(*args):
-    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
-        args = ListValue(args[0]).values()
+    args = List.from_maybe_starargs(args)
     color_stops = args
     center = None
     if isinstance(args[-1], (StringValue, NumberValue, six.string_types)):
@@ -361,8 +347,7 @@ def radial_svg_gradient(*args):
 
 @register('linear-svg-gradient')
 def linear_svg_gradient(*args):
-    if len(args) == 1 and isinstance(args[0], (list, tuple, ListValue)):
-        args = ListValue(args[0]).values()
+    args = List.from_maybe_starargs(args)
     color_stops = args
     start = None
     if isinstance(args[-1], (StringValue, NumberValue, six.string_types)):
