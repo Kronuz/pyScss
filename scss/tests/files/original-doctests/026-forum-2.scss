@@ -4,10 +4,10 @@
     $ie7 = *:first-child+html;
 }
 $ie6 {
-    .a  { color:white; }
-    .b  { color:black; }
+    .a  { color:#fff; }
+    .b  { color:#000; }
 }
 $ie7 {
-    .a  { color:white; }
-    .b  { color:black; }
+    .a  { color:#fff; }
+    .b  { color:#000; }
 }

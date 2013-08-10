@@ -1,5 +1,5 @@
 .error, .seriousError {
-  border: 1px red;
+  border: 1px #f00;
   background-color: #fdd;
 }
 .attention, .seriousError {

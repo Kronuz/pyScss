@@ -26,7 +26,7 @@ def test_extend_across_files():
     expected = """\
 .basicClass, .specialClass {
   padding: 20px;
-  background-color: red;
+  background-color: #FF0000;
 }
 .specialClass {
   padding: 10px;

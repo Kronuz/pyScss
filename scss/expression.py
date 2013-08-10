@@ -39,7 +39,7 @@ class Calculator(object):
         if better_expr_str is None:
             better_expr_str = self.apply_vars(_base_str)
         else:
-            better_expr_str = dequote(str(to_str(better_expr_str)))
+            better_expr_str = dequote(better_expr_str.render())
 
         return better_expr_str
 
@@ -65,7 +65,8 @@ class Calculator(object):
                 def _av(m):
                     v = self.namespace.variable(m.group(2))
                     if v:
-                        v = to_str(v)
+                        if not isinstance(v, six.string_types):
+                            v = v.render()
                         # TODO this used to test for _dequote
                         if m.group(1):
                             v = dequote(v)

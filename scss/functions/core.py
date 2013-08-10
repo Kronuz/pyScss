@@ -175,10 +175,7 @@ def mix(color1, color2, weight=None):
     q = [w1, w1, w1, p]
     r = [w2, w2, w2, 1 - p]
 
-    color = ColorValue(None).merge(c1).merge(c2)
-    color.value = [c1[i] * q[i] + c2[i] * r[i] for i in range(4)]
-
-    return color
+    return ColorValue([c1[i] * q[i] + c2[i] * r[i] for i in range(4)])
 
 
 # ------------------------------------------------------------------------------

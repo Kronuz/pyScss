@@ -71,7 +71,7 @@ def test_addition():
     assert calc('"abc" + "def"') == '"abcdef"'
 
     assert calc('#010305 + #050301') == '#060606'
-    assert calc('#ffffff + #ffffff') == '#ffffff'
+    assert calc('#ffffff + #ffffff') == 'white'
 
 def test_subtraction():
     calc = lambda expr: to_str(Calculator(Namespace()).calculate(expr))

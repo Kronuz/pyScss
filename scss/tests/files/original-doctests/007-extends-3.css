@@ -1,6 +1,6 @@
 .basicClass, .specialClass {
   padding: 20px;
-  background-color: red;
+  background-color: #FF0000;
 }
 .basicClass a, .specialClass a, .specialLink {
   text-decoration: none;

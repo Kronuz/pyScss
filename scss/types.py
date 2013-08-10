@@ -87,13 +87,6 @@ class Value(object):
     def __neg__(self):
         return String("-" + self.render())
 
-    def merge(self, obj):
-        if isinstance(obj, Value):
-            self.value = obj.value
-        else:
-            self.value = obj
-        return self
-
     def render(self, compress=False, short_colors=False):
         return self.__str__()
 
@@ -502,19 +495,19 @@ class ColorValue(Value):
         4: lambda c: (int(c[1] * 2, 16), int(c[2] * 2, 16), int(c[3] * 2, 16), 1.0),
     }
 
+    original_literal = None
+
     def __init__(self, tokens):
         self.tokens = tokens
         self.value = (0, 0, 0, 1)
-        self.types = {}
         if tokens is None:
             self.value = (0, 0, 0, 1)
         elif isinstance(tokens, ParserValue):
             hex = tokens.value
+            self.original_literal = hex
             self.value = self.HEX2RGBA[len(hex)](hex)
-            self.types = {'rgba': 1}
         elif isinstance(tokens, ColorValue):
             self.value = tokens.value
-            self.types = tokens.types.copy()
         elif isinstance(tokens, NumberValue):
             val = tokens.value
             self.value = (val, val, val, 1)
@@ -523,9 +516,6 @@ class ColorValue(Value):
             r = 255.0, 255.0, 255.0, 1.0
             c = [0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4)]
             self.value = tuple(c)
-            type = tokens[-1]
-            if type in ('rgb', 'rgba', 'hsl', 'hsla'):
-                self.types = {type: 1}
         elif isinstance(tokens, (int, float)):
             val = float(tokens)
             self.value = (val, val, val, 1)
@@ -551,7 +541,6 @@ class ColorValue(Value):
                                 col = [0.0 if c[i] < 0 else 255.0 if c[i] > 255 else c[i] for i in range(3)]
                                 col += [0.0 if c[3] < 0 else 1.0 if c[3] > 1 else c[3]]
                                 self.value = tuple(col)
-                                self.types = {type: 1}
                             except:
                                 raise ValueError("Value is not a Color! (%s)" % tokens)
                         elif type in ('hsl', 'hsla'):
@@ -561,7 +550,6 @@ class ColorValue(Value):
                                 col = [c[0] % 360.0] / 360.0
                                 col += [0.0 if c[i] < 0 else 1.0 if c[i] > 1 else c[i] for i in range(1, 4)]
                                 self.value = tuple([c * 255.0 for c in colorsys.hls_to_rgb(col[0], 0.999999 if col[2] == 1 else col[2], 0.999999 if col[1] == 1 else col[1])] + [col[3]])
-                                self.types = {type: 1}
                             except:
                                 raise ValueError("Value is not a Color! (%s)" % tokens)
                         else:
@@ -575,63 +563,24 @@ class ColorValue(Value):
         self.tokens = None
         # TODO really should store these things internally as 0-1
         self.value = (red * 255.0, green * 255.0, blue * 255.0, alpha)
-        if alpha == 1.0:
-            self.types = {'rgb': 1}
-        else:
-            self.types = {'rgba': 1}
-
         return self
 
     @classmethod
     def from_name(cls, name):
         """Build a Color from a CSS color name."""
         self = cls.__new__(cls)  # TODO
-        self.tokens = ParserValue(name)
+        self.original_literal = name
 
         r, g, b, a = COLOR_NAMES[name]
 
         self.value = r, g, b, a
-        if a == 1.0:
-            self.types = {'rgb': 1}
-        else:
-            self.types = {'rgba': 1}
-
         return self
 
     def __repr__(self):
-        return '<%s: %s, %s>' % (self.__class__.__name__, repr(self.value), repr(self.types))
+        return '<%s: %s>' % (self.__class__.__name__, repr(self.value))
 
     def __hash__(self):
         return hash(self.value)
-
-    def __str__(self):
-        # TODO bit of a hack?
-        if self.tokens is not None and isinstance(self.tokens, ParserValue):
-            return self.tokens.value
-
-        type = self.type
-        c = self.value
-        if type == 'hsl' or type == 'hsla' and c[3] == 1:
-            h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
-            return 'hsl(%s, %s%%, %s%%)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0))
-        if type == 'hsla':
-            h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
-            return 'hsla(%s, %s%%, %s%%, %s)' % (to_str(h * 360.0), to_str(s * 100.0), to_str(l * 100.0), to_str(c[3]))
-        r, g, b = to_str(c[0]), to_str(c[1]), to_str(c[2])
-        are_integral = True
-        for n in c[:3]:
-            # replicating old logic; perhaps needs rethinking
-            n2 = round(n * 100, 1)
-            if n2 != int(n2):
-                are_integral = False
-                break
-        if c[3] == 1:
-            if not are_integral:
-                return 'rgb(%s%%, %s%%, %s%%)' % (to_str(c[0] * 100.0 / 255.0), to_str(c[1] * 100.0 / 255.0), to_str(c[2] * 100.0 / 255.0))
-            return '#%02x%02x%02x' % (round(c[0]), round(c[1]), round(c[2]))
-        if not are_integral:
-            return 'rgba(%s%%, %s%%, %s%%, %s)' % (to_str(c[0] * 100.0 / 255.0), to_str(c[1] * 100.0 / 255.0), to_str(c[2] * 100.0 / 255.0), to_str(c[3]))
-        return 'rgba(%d, %d, %d, %s)' % (round(c[0]), round(c[1]), round(c[2]), to_str(c[3]))
 
     def __eq__(self, other):
         if not isinstance(other, ColorValue):
@@ -663,32 +612,17 @@ class ColorValue(Value):
         c = val
         r = 255.0, 255.0, 255.0, 1.0
         c = [0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4)]
-        ret = ColorValue(None).merge(first).merge(second)
-        ret.value = tuple(c)
-        return ret
-
-    def merge(self, obj):
-        obj = ColorValue(obj)
-        self.value = obj.value
-        for type, val in obj.types.items():
-            self.types.setdefault(type, 0)
-            self.types[type] += val
-        return self
-
-    @property
-    def type(self):
-        type = ''
-        if self.types:
-            types = sorted(self.types, key=self.types.get)
-            while len(types):
-                type = types.pop()
-                if type:
-                    break
-        return type
+        return ColorValue(c)
 
     def render(self, compress=False, short_colors=False):
-        if not compress and not short_colors:
-            return self.__str__()
+        """Return a rendered representation of the color.  If `compress` is
+        true, the shortest possible representation is used; otherwise, named
+        colors are rendered as names and all others are rendered as hex (or
+                with the rgba function).
+        """
+
+        if not compress and self.original_literal:
+            return self.original_literal
 
         candidates = []
 
@@ -696,6 +630,10 @@ class ColorValue(Value):
         # Ruby.
         r, g, b, a = self.value
         r, g, b = int(round(r)), int(round(g)), int(round(b))
+
+        # Build a candidate list in order of preference.  If `compress` is
+        # True, the shortest candidate is used; otherwise, the first candidate
+        # is used.
 
         # Try color name
         key = r, g, b, a
@@ -716,7 +654,10 @@ class ColorValue(Value):
                 sp = ' '
             candidates.append("rgba(%d,%s%d,%s%d,%s%.2g)" % (r, sp, g, sp, b, sp, a))
 
-        return min(candidates, key=len)
+        if compress:
+            return min(candidates, key=len)
+        else:
+            return candidates[0]
 
 
 class String(Value):

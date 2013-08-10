@@ -44,6 +44,13 @@ def depar(s):
 
 
 def to_str(num):
+    try:
+        render = num.render
+    except AttributeError:
+        pass
+    else:
+        return render()
+
     if isinstance(num, dict):
         s = sorted(num.items())
         sp = num.get('_', '')
