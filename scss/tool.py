@@ -67,7 +67,7 @@ def main():
                       help="Cache root path (Cache files will be created here)")
     parser.add_option_group(paths_group)
 
-    parser.add_option("--sass", action="store_false",
+    parser.add_option("--sass", action="store_true",
                       dest="is_sass", default=None,
                       help="Sass mode")
 
