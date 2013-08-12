@@ -452,9 +452,6 @@ class List(Value):
         else:
             return ' '
 
-    def _reorder_list(self, lst):
-        return dict((i if isinstance(k, int) else k, v) for i, (k, v) in enumerate(sorted(lst.items())))
-
     def __len__(self):
         return len(self.value)
 
@@ -463,15 +460,6 @@ class List(Value):
 
     def __iter__(self):
         return iter(self.value)
-
-    def values(self):
-        return self.value
-
-    def keys(self):
-        return range(len(self.value))
-
-    def items(self):
-        return enumerate(self.value)
 
     def __getitem__(self, key):
         return self.value[key]
@@ -516,6 +504,8 @@ class Color(Value):
         else:
             raise TypeError("Can't make Color from %r" % (tokens,))
 
+    ### Alternate constructors
+
     @classmethod
     def from_rgb(cls, red, green, blue, alpha=1.0):
         self = cls.__new__(cls)  # TODO
@@ -535,6 +525,8 @@ class Color(Value):
 
         self.value = r, g, b, a
         return self
+
+    ### Accessors
 
     @property
     def rgb(self):
