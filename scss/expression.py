@@ -9,7 +9,8 @@ import six
 
 import scss.config as config
 from scss.cssdefs import COLOR_NAMES, is_builtin_css_function, _expr_glob_re, _interpolate_re, _variable_re
-from scss.types import BooleanValue, ColorValue, ListValue, Null, Undefined, NumberValue, ParserValue, String
+from scss.rule import Namespace
+from scss.types import BooleanValue, ColorValue, ListValue, Null, NumberValue, ParserValue, String, Undefined
 from scss.util import dequote, normalize_var, to_str
 
 ################################################################################
@@ -28,8 +29,11 @@ ast_cache = {}
 class Calculator(object):
     """Expression evaluator."""
 
-    def __init__(self, namespace):
-        self.namespace = namespace
+    def __init__(self, namespace=None):
+        if namespace is None:
+            self.namespace = Namespace()
+        else:
+            self.namespace = namespace
 
     def _calculate_expr(self, result):
         _group0 = result.group(1)

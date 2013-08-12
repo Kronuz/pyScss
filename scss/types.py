@@ -146,7 +146,7 @@ class BooleanValue(Value):
 class Number(Value):
     sass_type_name = u'number'
 
-    def __init__(self, amount, unit_numer=(), unit_denom=(), unit=None):
+    def __init__(self, amount, unit=None, unit_numer=(), unit_denom=()):
         if isinstance(amount, NumberValue):
             assert not unit and not unit_numer and not unit_denom
             self.value = amount.value
@@ -222,7 +222,7 @@ class Number(Value):
         if left.unit_numer != right.unit_numer or left.unit_denom != right.unit_denom:
             raise ValueError("Can't reconcile units: %r and %r" % (self, other))
 
-        return op(left.value, right.value)
+        return op(round(left.value, 5), round(right.value, 5))
 
     def __mul__(self, other):
         if not isinstance(other, NumberValue):
@@ -235,7 +235,7 @@ class Number(Value):
 
         return NumberValue(amount, unit_numer=numer, unit_denom=denom)
 
-    def __truediv__(self, other):
+    def __div__(self, other):
         if not isinstance(other, NumberValue):
             return NotImplemented
 
@@ -274,8 +274,8 @@ class Number(Value):
         if self.is_unitless or other.is_unitless:
             return NumberValue(
                 op(self.value, other.value),
-                self.unit_numer or other.unit_numer,
-                self.unit_denom or other.unit_denom,
+                unit_numer=self.unit_numer or other.unit_numer,
+                unit_denom=self.unit_denom or other.unit_denom,
             )
 
         # Reduce both operands to the same units
@@ -291,7 +291,7 @@ class Number(Value):
         if left.value != 0:
             new_amount = new_amount * self.value / left.value
 
-        return NumberValue(new_amount, self.unit_numer, self.unit_denom)
+        return NumberValue(new_amount, unit_numer=self.unit_numer, unit_denom=self.unit_denom)
 
 
     ### Helper methods, mostly used internally
@@ -310,8 +310,8 @@ class Number(Value):
 
         return NumberValue(
             amount * numer_factor / denom_factor,
-            numer_units,
-            denom_units,
+            unit_numer=numer_units,
+            unit_denom=denom_units,
         )
 
 
@@ -518,6 +518,31 @@ class Color(Value):
         # until stuff stops examining .value directly
         self.value = (red * 255.0, green * 255.0, blue * 255.0, alpha)
         return self
+
+    @classmethod
+    def from_hex(cls, hex_string):
+        if not hex_string.startswith('#'):
+            raise ValueError("Expected #abcdef, got %r" % (hex_string,))
+
+        hex_string = hex_string[1:]
+
+        # Always include the alpha channel
+        if len(hex_string) == 3:
+            hex_string += 'f'
+        elif len(hex_string) == 6:
+            hex_string += 'ff'
+
+        # Now there should be only two possibilities.  Normalize to a list of
+        # two hex digits
+        if len(hex_string) == 4:
+            chunks = [ch * 2 for ch in hex_string]
+        elif len(hex_string) == 8:
+            chunks = [
+                hex_string[0:2], hex_string[2:4], hex_string[4:6], hex_string[6:8]
+            ]
+
+        rgba = [int(ch, 16) / 255. for ch in chunks]
+        return cls.from_rgb(*rgba)
 
     @classmethod
     def from_name(cls, name):
