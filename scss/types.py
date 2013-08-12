@@ -139,7 +139,7 @@ class BooleanValue(Value):
             return 'false'
 
 
-class NumberValue(Value):
+class Number(Value):
     sass_type_name = u'number'
 
     def __init__(self, amount, unit_numer=(), unit_denom=(), unit=None):
@@ -485,7 +485,7 @@ class List(Value):
         )
 
 
-class ColorValue(Value):
+class Color(Value):
     sass_type_name = u'color'
 
     HEX2RGBA = {
@@ -508,60 +508,20 @@ class ColorValue(Value):
             self.value = self.HEX2RGBA[len(hex)](hex)
         elif isinstance(tokens, ColorValue):
             self.value = tokens.value
-        elif isinstance(tokens, NumberValue):
-            val = tokens.value
-            self.value = (val, val, val, 1)
         elif isinstance(tokens, (list, tuple)):
             c = tokens[:4]
             r = 255.0, 255.0, 255.0, 1.0
             c = [0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4)]
             self.value = tuple(c)
-        elif isinstance(tokens, (int, float)):
-            val = float(tokens)
-            self.value = (val, val, val, 1)
         else:
-            if isinstance(tokens, StringValue):
-                tokens = tokens.value
-            tokens = to_str(tokens)
-            tokens.replace(' ', '').lower()
-            try:
-                self.value = self.HEX2RGBA[len(tokens)](tokens)
-            except:
-                try:
-                    val = to_float(tokens)
-                    self.value = (val, val, val, 1)
-                except ValueError:
-                    try:
-                        type, _, colors = tokens.partition('(')
-                        colors = colors.rstrip(')')
-                        if type in ('rgb', 'rgba'):
-                            c = tuple(colors.split(','))
-                            try:
-                                c = [to_float(c[i]) for i in range(4)]
-                                col = [0.0 if c[i] < 0 else 255.0 if c[i] > 255 else c[i] for i in range(3)]
-                                col += [0.0 if c[3] < 0 else 1.0 if c[3] > 1 else c[3]]
-                                self.value = tuple(col)
-                            except:
-                                raise ValueError("Value is not a Color! (%s)" % tokens)
-                        elif type in ('hsl', 'hsla'):
-                            c = colors.split(',')
-                            try:
-                                c = [to_float(c[i]) for i in range(4)]
-                                col = [c[0] % 360.0] / 360.0
-                                col += [0.0 if c[i] < 0 else 1.0 if c[i] > 1 else c[i] for i in range(1, 4)]
-                                self.value = tuple([c * 255.0 for c in colorsys.hls_to_rgb(col[0], 0.999999 if col[2] == 1 else col[2], 0.999999 if col[1] == 1 else col[1])] + [col[3]])
-                            except:
-                                raise ValueError("Value is not a Color! (%s)" % tokens)
-                        else:
-                            raise ValueError("Value is not a Color! (%s)" % tokens)
-                    except:
-                        raise ValueError("Value is not a Color! (%s)" % tokens)
+            raise TypeError("Can't make Color from %r" % (tokens,))
 
     @classmethod
     def from_rgb(cls, red, green, blue, alpha=1.0):
         self = cls.__new__(cls)  # TODO
         self.tokens = None
-        # TODO really should store these things internally as 0-1
+        # TODO really should store these things internally as 0-1, but can't
+        # until stuff stops examining .value directly
         self.value = (red * 255.0, green * 255.0, blue * 255.0, alpha)
         return self
 
@@ -575,6 +535,14 @@ class ColorValue(Value):
 
         self.value = r, g, b, a
         return self
+
+    @property
+    def rgb(self):
+        return tuple(self.value[:3])
+
+    @property
+    def alpha(self):
+        return self.value[3]
 
     def __repr__(self):
         return '<%s: %s>' % (self.__class__.__name__, repr(self.value))
@@ -594,31 +562,58 @@ class ColorValue(Value):
         return BooleanValue(left == right)
 
     def __add__(self, other):
-        return self._operate(other, operator.add)
+        if isinstance(other, (Color, Number)):
+            return self._operate(other, operator.add)
+        else:
+            return super(Color, self).__add__(other)
 
     def __sub__(self, other):
-        return self._operate(other, operator.sub)
+        if isinstance(other, (Color, Number)):
+            return self._operate(other, operator.sub)
+        else:
+            return super(Color, self).__sub__(other)
 
     def __mul__(self, other):
-        return self._operate(other, operator.mul)
+        if isinstance(other, (Color, Number)):
+            return self._operate(other, operator.mul)
+        else:
+            return super(Color, self).__mul__(other)
 
     def __div__(self, other):
-        return self._operate(other, operator.div)
+        if isinstance(other, (Color, Number)):
+            return self._operate(other, operator.div)
+        else:
+            return super(Color, self).__div__(other)
 
-    def _operate(first, second, op):
-        second = ColorValue(second)
-        val = [op(first.value[i], second.value[i]) for i in range(4)]
-        val[3] = (first.value[3] + second.value[3]) / 2
-        c = val
-        r = 255.0, 255.0, 255.0, 1.0
-        c = [0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4)]
-        return ColorValue(c)
+    def _operate(self, other, op):
+        if isinstance(other, Number):
+            if not other.is_unitless:
+                raise ValueError("Expected unitless Number, got %r" % (other,))
+
+            other_rgb = (other.value,) * 3
+        elif isinstance(other, Color):
+            if self.alpha != other.alpha:
+                raise ValueError("Alpha channels must match between %r and %r"
+                    % (self, other))
+
+            other_rgb = other.rgb
+        else:
+            raise TypeError("Expected Color or Number, got %r" % (other,))
+
+        new_rgb = [
+            min(255., max(0., op(left, right)))
+            # for from_rgb
+                / 255.
+            for (left, right) in zip(self.rgb, other_rgb)
+        ]
+
+        return Color.from_rgb(*new_rgb, alpha=self.alpha)
 
     def render(self, compress=False, short_colors=False):
         """Return a rendered representation of the color.  If `compress` is
         true, the shortest possible representation is used; otherwise, named
         colors are rendered as names and all others are rendered as hex (or
-                with the rgba function).
+        with the rgba function).
         """
 
         if not compress and self.original_literal:
@@ -725,6 +720,8 @@ class String(Value):
 
 
 # Backwards-compatibility.
+ColorValue = Color
 ListValue = List
+NumberValue = Number
 QuotedStringValue = String
 StringValue = String
