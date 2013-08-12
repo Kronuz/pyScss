@@ -87,7 +87,7 @@ class Value(object):
     def __neg__(self):
         return String("-" + self.render())
 
-    def render(self, compress=False, short_colors=False):
+    def render(self, compress=False):
         return self.__str__()
 
 
@@ -113,7 +113,7 @@ class Null(Value):
     def __eq__(self, other):
         return isinstance(other, Null)
 
-    def render(self, compress=False, short_colors=False):
+    def render(self, compress=False):
         return 'null'
 
 
@@ -132,7 +132,7 @@ class BooleanValue(Value):
     def __bool__(self):
         return self.value
 
-    def render(self, compress=False, short_colors=False):
+    def render(self, compress=False):
         if self.value:
             return 'true'
         else:
@@ -353,7 +353,7 @@ class Number(Value):
     def is_unitless(self):
         return not self.unit_numer and not self.unit_denom
 
-    def render(self, compress=False, short_colors=False):
+    def render(self, compress=False):
         if not self.has_simple_unit:
             raise ValueError("Can't express compound units in CSS: %r" % (self,))
 
@@ -476,11 +476,11 @@ class List(Value):
     def __getitem__(self, key):
         return self.value[key]
 
-    def render(self, compress=False, short_colors=False):
+    def render(self, compress=False):
         delim = self.delimiter(compress)
 
         return delim.join(
-            item.render(compress=compress, short_colors=short_colors)
+            item.render(compress=compress)
             for item in self.value
         )
 
@@ -609,7 +609,7 @@ class Color(Value):
 
         return Color.from_rgb(*new_rgb, alpha=self.alpha)
 
-    def render(self, compress=False, short_colors=False):
+    def render(self, compress=False):
         """Return a rendered representation of the color.  If `compress` is
         true, the shortest possible representation is used; otherwise, named
         colors are rendered as names and all others are rendered as hex (or
@@ -715,7 +715,7 @@ class String(Value):
             self.value + other_value,
             quotes='"' if self.quotes else None)
 
-    def render(self, compress=False, short_colors=False):
+    def render(self, compress=False):
         return self.__str__()
 
 

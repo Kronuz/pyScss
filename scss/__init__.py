@@ -126,7 +126,6 @@ _default_scss_vars = {
 _default_scss_opts = {
     'verbosity': config.VERBOSITY,
     'compress': 1,
-    'short_colors': 0,
 }
 
 _default_search_paths = ['.']
@@ -1096,10 +1095,7 @@ class Scss(object):
                 # TODO kill this branch
                 pass
             else:
-                value = value.render(
-                    compress=self.scss_opts.get('compress', True),
-                    short_colors=self.scss_opts.get('short_colors', False),
-                )
+                value = value.render(compress=self.scss_opts.get('compress', True))
             rule.properties.append((_prop, value))
 
     @print_timing(10)
