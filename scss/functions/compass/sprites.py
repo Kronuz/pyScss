@@ -169,8 +169,8 @@ def sprite_map(g, **kwargs):
                         break
 
         if sprite_map is None:
-            direction = kwargs.get('direction', config.SPRTE_MAP_DIRECTION)
-            repeat = StringValue(kwargs.get('repeat', 'no-repeat'))
+            direction = StringValue(kwargs.get('direction', config.SPRTE_MAP_DIRECTION)).value
+            repeat = StringValue(kwargs.get('repeat', 'no-repeat')).value
             collapse = kwargs.get('collapse') or 0
             if isinstance(collapse, List):
                 collapse_x = int(NumberValue(collapse[0]).value)
@@ -278,7 +278,7 @@ def sprite_map(g, **kwargs):
             elif direction == 'smart':
                 layout = PackedSpritesLayout(sizes, all_paddings)
             else:
-                raise Exception("Invalid direction %s" % direction)
+                raise Exception("Invalid direction %r" % (direction,))
             layout_positions = list(layout)
 
             new_image = Image.new(
@@ -468,21 +468,25 @@ def sprite_position(map, sprite, offset_x=None, offset_y=None):
     if sprite:
         x = None
         if offset_x is not None and not isinstance(offset_x, NumberValue):
-            x = str(offset_x)
+            x = offset_x
         if x not in ('left', 'right', 'center'):
             if x:
                 offset_x = None
             x = NumberValue(offset_x or 0, 'px')
-            if not x or (x <= -1 or x >= 1) and x.unit != '%':
+            u = x.unit
+            x = x.value
+            if not x or (x <= -1 or x >= 1) and u != '%':
                 x -= sprite[2]
         y = None
         if offset_y is not None and not isinstance(offset_y, NumberValue):
-            y = str(offset_y)
+            y = offset_y
         if y not in ('top', 'bottom', 'center'):
             if y:
                 offset_y = None
             y = NumberValue(offset_y or 0, 'px')
-            if not y or (y <= -1 or y >= 1) and y.unit != '%':
+            u = y.unit
+            y = y.value
+            if not y or (y <= -1 or y >= 1) and u != '%':
                 y -= sprite[3]
         pos = '%s %s' % (x, y)
         return StringValue(pos)
