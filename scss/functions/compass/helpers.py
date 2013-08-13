@@ -364,29 +364,31 @@ def range_(frm, through=None):
 # ------------------------------------------------------------------------------
 # Working with CSS constants
 
-OPPOSITE_POSITIONS = dict(
-    top='bottom',
-    bottom='top',
-    left='right',
-    right='left',
-    center='center',
-)
+OPPOSITE_POSITIONS = {
+    'top': StringValue('bottom', quotes=None),
+    'bottom': StringValue('top', quotes=None),
+    'left': StringValue('right', quotes=None),
+    'right': StringValue('left', quotes=None),
+    'center': StringValue('center', quotes=None),
+}
+DEFAULT_POSITION = [StringValue('center', quotes=None), StringValue('top', quotes=None)]
 
 
 def _position(opposite, positions):
-    positions = List.from_maybe(positions)
+    if positions is None:
+        positions = DEFAULT_POSITION
+    else:
+        positions = List.from_maybe(positions)
 
     ret = []
     for pos in positions:
         if isinstance(pos, (StringValue, six.string_types)):
-            _pos = getattr(pos, 'value', pos)
-            if _pos in OPPOSITE_POSITIONS:
+            pos_value = getattr(pos, 'value', pos)
+            if pos_value in OPPOSITE_POSITIONS:
                 if opposite:
-                    opp = OPPOSITE_POSITIONS[pos]
-                    ret.append(StringValue(opp, quotes=None))
+                    ret.append(OPPOSITE_POSITIONS[pos_value])
                 else:
                     ret.append(pos)
-
                 continue
 
         elif isinstance(pos, NumberValue):

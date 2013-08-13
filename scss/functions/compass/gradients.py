@@ -314,8 +314,8 @@ def linear_gradient(*args):
     def to__owg():
         args = [
             'linear',
-            position(position_and_angle or ['center', 'top']),
-            opposite_position(position_and_angle or ['center', 'top']),
+            position(position_and_angle or None),
+            opposite_position(position_and_angle or None),
         ]
         args.extend('color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops)
         ret = '-webkit-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
