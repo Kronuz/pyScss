@@ -85,12 +85,12 @@ class Calculator(object):
         cont = self.do_glob_math(cont)
         return cont
 
-    def calculate(self, _base_str):
+    def calculate(self, _base_str, divide=False):
         better_expr_str = _base_str
 
         better_expr_str = self.do_glob_math(better_expr_str)
 
-        better_expr_str = self.evaluate_expression(better_expr_str)
+        better_expr_str = self.evaluate_expression(better_expr_str, divide=divide)
 
         if better_expr_str is None:
             better_expr_str = self.apply_vars(_base_str)
@@ -106,7 +106,7 @@ class Calculator(object):
                 value = _vi
         return value
 
-    def evaluate_expression(self, expr):
+    def evaluate_expression(self, expr, divide=False):
         if not isinstance(expr, six.string_types):
             raise TypeError("Expected string, got %r" % (expr,))
 
@@ -135,7 +135,7 @@ class Calculator(object):
             else:
                 ast_cache[expr] = ast
 
-        return ast.evaluate(self)
+        return ast.evaluate(self, divide=divide)
 
     def parse_expression(self, expr, target='goal'):
         if expr in ast_cache:

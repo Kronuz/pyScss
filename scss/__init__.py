@@ -1052,7 +1052,7 @@ class Scss(object):
         """
         Implements properties and variables extraction and assignment
         """
-        prop, value = (_prop_split_re.split(block.prop, 1) + [None])[:2]
+        prop, raw_value = (_prop_split_re.split(block.prop, 1) + [None])[:2]
         try:
             is_var = (block.prop[len(prop)] == '=')
         except IndexError:
@@ -1065,17 +1065,15 @@ class Scss(object):
 
         # Parse the value and determine whether it's a default assignment
         is_default = False
-        if value is not None:
-            value = value.strip()
+        if raw_value is not None:
+            raw_value = raw_value.strip()
             if prop.startswith('$'):
-                value, subs = re.subn(r'(?i)\s+!default\Z', '', value)
+                raw_value, subs = re.subn(r'(?i)\s+!default\Z', '', raw_value)
                 if subs:
                     is_default = True
 
-            value = calculator.calculate(value)
-
         _prop = (scope or '') + prop
-        if is_var or prop.startswith('$') and value is not None:
+        if is_var or prop.startswith('$') and raw_value is not None:
             # Variable assignment
             _prop = normalize_var(_prop)
             try:
@@ -1090,10 +1088,14 @@ class Scss(object):
                 if is_defined and prop.startswith('$') and prop[1].isupper():
                     log.warn("Constant %r redefined", prop)
 
+                # Variable assignment is an expression, so it always performs
+                # real division
+                value = calculator.calculate(raw_value, divide=True)
                 rule.namespace.set_variable(_prop, value)
         else:
             # Regular property destined for output
             _prop = calculator.apply_vars(_prop)
+            value = calculator.calculate(raw_value)
             if value is None:
                 pass
             elif isinstance(value, six.string_types):
