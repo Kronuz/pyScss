@@ -606,20 +606,24 @@ class Scss(object):
         if not block.argument:
             raise SyntaxError("%s requires a function name (%s)" % (block.directive, rule.file_and_line))
 
-        funct, params, _ = block.argument.partition('(')
-        funct = normalize_var(funct.strip())
-        params = split_params(depar(params + _))
+        funct, lpar, argstr = block.argument.strip().partition('(')
         defaults = {}
         new_params = []
-        for param in params:
-            param, _, default = param.partition(':')
-            param = normalize_var(param.strip())
-            default = default.strip()
-            if param:
-                new_params.append(param)
-                if default:
-                    calculator = Calculator(rule.namespace)
-                    defaults[param] = calculator.parse_expression(default)
+
+        if lpar:
+            # Has arguments; parse them with the argspec rule
+            if not argstr.endswith(')'):
+                raise SyntaxError("Expected ')', found end of line: %r" % (block.argument,))
+            argstr = argstr[:-1]
+
+            calculator = Calculator(rule.namespace)
+            argspec_node = calculator.parse_expression(argstr, target='argspec')
+
+            for var_name, default in argspec_node.iter_def_argspec():
+                new_params.append(var_name)
+                if default is not None:
+                    defaults[var_name] = default
+
         mixin = [list(new_params), defaults, block.unparsed_contents]
         if block.directive == '@function':
             def _call(mixin):

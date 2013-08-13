@@ -148,15 +148,19 @@ class Calculator(object):
         # print >>sys.stderr, repr(expr),'==',results,'=='
         return results
 
-    def parse_expression(self, expr):
-        if expr not in ast_cache:
-            parser = SassExpression(SassExpressionScanner())
-            parser.reset(expr)
-            ast = parser.goal()
+    def parse_expression(self, expr, target='goal'):
+        if expr in ast_cache:
+            return ast_cache[expr]
 
+        parser = SassExpression(SassExpressionScanner())
+        parser.reset(expr)
+        ast = getattr(parser, target)()
+
+        if target == 'goal':
             ast_cache[expr] = ast
 
-        return ast_cache[expr]
+        return ast
+
 
 
 
@@ -334,8 +338,36 @@ class ListLiteral(Expression):
         return ListValue(items, separator="," if self.comma else "")
 
 class ArgspecLiteral(Expression):
+    """Contains pairs of argument names and values, as parsed from a function
+    definition or function call.
+
+    Note that the semantics are somewhat ambiguous.  Consider parsing:
+
+        $foo, $bar: 3
+
+    If this appeared in a function call, $foo would refer to a value; if it
+    appeared in a function definition, $foo would refer to an existing
+    variable.  This it's up to the caller to use the right iteration function.
+    """
     def __init__(self, argpairs):
+        # argpairs is a list of 2-tuples, parsed as though this were a function
+        # call, so (variable name as string or None, default value as AST
+        # node).
         self.argpairs = argpairs
+
+    def iter_def_argspec(self):
+        """Interpreting this literal as parsed a function call, yields pairs of
+        (variable name as a string, default value as an AST node or None).
+        """
+        for name, value in self.argpairs:
+            if name is None:
+                # value is actually the name
+                if not isinstance(value, Variable):
+                    raise SyntaxError("Function definition argspec contains an expression")
+                name = value.name
+                value = None
+
+            yield name, value
 
 
 def parse_bareword(word):
