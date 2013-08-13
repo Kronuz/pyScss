@@ -736,6 +736,17 @@ class String(Value):
             self.value + other_value,
             quotes='"' if self.quotes else None)
 
+    def __mul__(self, other):
+        # DEVIATION: Ruby Sass doesn't do this, because Ruby doesn't.  But
+        # Python does, and in Ruby Sass it's just fatal anyway.
+        if not isinstance(other, Number):
+            return super(String, self).__mul__(other)
+
+        if not other.is_unitless:
+            raise TypeError("Can only multiply strings by unitless numbers")
+
+        return String(self.value * other.value, quotes=self.quotes)
+
     def render(self, compress=False):
         return self.__str__()
 
