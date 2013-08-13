@@ -13,7 +13,6 @@ import math
 import mimetypes
 import os.path
 import time
-import warnings
 
 from scss import config
 from scss.functions.library import FunctionLibrary
@@ -392,7 +391,7 @@ def _position(opposite, positions):
                     ret.append(pos)
                 continue
 
-        warnings.warn("Can't find opposite for position %r" % (pos,))
+        log.warn("Can't find opposite for position %r" % (pos,))
         ret.append(pos)
 
     return List(ret, use_comma=False).maybe()
