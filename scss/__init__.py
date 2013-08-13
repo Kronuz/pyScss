@@ -616,13 +616,14 @@ class Scss(object):
                 raise SyntaxError("Expected ')', found end of line: %r" % (block.argument,))
             argstr = argstr[:-1]
 
-            calculator = Calculator(rule.namespace)
-            argspec_node = calculator.parse_expression(argstr, target='argspec')
+            if argstr:
+                calculator = Calculator(rule.namespace)
+                argspec_node = calculator.parse_expression(argstr, target='argspec')
 
-            for var_name, default in argspec_node.iter_def_argspec():
-                new_params.append(var_name)
-                if default is not None:
-                    defaults[var_name] = default
+                for var_name, default in argspec_node.iter_def_argspec():
+                    new_params.append(var_name)
+                    if default is not None:
+                        defaults[var_name] = default
 
         mixin = [list(new_params), defaults, block.unparsed_contents]
         if block.directive == '@function':
