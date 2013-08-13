@@ -7,10 +7,8 @@ import logging
 from scss.cssdefs import _has_placeholder_re
 from scss.types import Undefined
 
+
 log = logging.getLogger(__name__)
-
-
-FATAL_UNDEFINED = False
 
 
 def normalize_var(name):
@@ -36,11 +34,7 @@ class VariableScope(object):
             if key in map:
                 return map[key]
 
-        if FATAL_UNDEFINED:
-            raise KeyError(key)
-
-        log.error("Undefined variable '%s'", key)
-        return Undefined()
+        raise KeyError(key)
 
     def __setitem__(self, key, value):
         for map in self.maps:
@@ -88,10 +82,15 @@ class Namespace(object):
     def derive(self):
         return type(self).derive_from(self)
 
-
-    def variable(self, name):
+    def variable(self, name, throw=False):
         name = normalize_var(name)
-        return self._variables[name]
+        try:
+            return self._variables[name]
+        except KeyError:
+            if throw:
+                raise
+            log.error("Undefined variable '%s'", name)
+            return Undefined()
 
     def set_variable(self, name, value):
         name = normalize_var(name)

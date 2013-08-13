@@ -111,7 +111,7 @@ class Calculator(object):
 
         if results is None:
             try:
-                results = self.namespace.variable(expr)
+                results = self.namespace.variable(expr, throw=True)
             except KeyError:
                 pass
 
