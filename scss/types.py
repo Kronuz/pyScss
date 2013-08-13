@@ -745,7 +745,11 @@ class String(Value):
         if not other.is_unitless:
             raise TypeError("Can only multiply strings by unitless numbers")
 
-        return String(self.value * other.value, quotes=self.quotes)
+        n = other.value
+        if n != int(n):
+            raise ValueError("Can only multiply strings by integers")
+
+        return String(self.value * int(other.value), quotes=self.quotes)
 
     def render(self, compress=False):
         return self.__str__()
