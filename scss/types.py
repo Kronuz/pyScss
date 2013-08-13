@@ -1,13 +1,12 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
-import colorsys
 import operator
 
 import six
 
 from scss.cssdefs import COLOR_LOOKUP, COLOR_NAMES, ZEROABLE_UNITS, convert_units_to_base_units
-from scss.util import escape, to_float, to_str
+from scss.util import escape
 
 
 ################################################################################
@@ -293,7 +292,6 @@ class Number(Value):
 
         return NumberValue(new_amount, unit_numer=self.unit_numer, unit_denom=self.unit_denom)
 
-
     ### Helper methods, mostly used internally
 
     def to_base_units(self):
@@ -313,7 +311,6 @@ class Number(Value):
             unit_numer=numer_units,
             unit_denom=denom_units,
         )
-
 
     ### Utilities for public consumption
 

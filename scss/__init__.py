@@ -70,7 +70,7 @@ from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
 from scss.rule import UnparsedBlock, SassRule
 from scss.types import BooleanValue, List, Null, NumberValue, StringValue
-from scss.util import depar, dequote, normalize_var, split_params, to_str, profile, print_timing
+from scss.util import depar, dequote, normalize_var, split_params, profile, print_timing
 
 log = logging.getLogger(__name__)
 

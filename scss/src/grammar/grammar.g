@@ -114,6 +114,5 @@ parser SassExpression:
                             expr                    {{ v.append(expr) }}
                         )*                          {{ return ListLiteral(v, comma=False) if len(v) > 1 else v[0] }}
 %%
-
 ### Grammar ends.
 ################################################################################

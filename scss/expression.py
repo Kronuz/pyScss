@@ -11,7 +11,7 @@ import scss.config as config
 from scss.cssdefs import COLOR_NAMES, is_builtin_css_function, _expr_glob_re, _interpolate_re, _variable_re
 from scss.rule import Namespace
 from scss.types import BooleanValue, ColorValue, ListValue, Null, NumberValue, ParserValue, String, Undefined
-from scss.util import dequote, normalize_var, to_str
+from scss.util import dequote, normalize_var
 
 ################################################################################
 # Load C acceleration modules
@@ -97,7 +97,6 @@ class Calculator(object):
 
         return better_expr_str
 
-
     # TODO only used by magic-import...?
     def interpolate(self, var):
         value = self.namespace.variable(var)
@@ -106,7 +105,6 @@ class Calculator(object):
             if _vi is not None:
                 value = _vi
         return value
-
 
     def evaluate_expression(self, expr):
         if not isinstance(expr, six.string_types):
@@ -153,8 +151,6 @@ class Calculator(object):
         return ast
 
 
-
-
 # ------------------------------------------------------------------------------
 # Expression classes -- the AST resulting from a parse
 
@@ -171,6 +167,7 @@ class Expression(object):
         """
         raise NotImplementedError
 
+
 class Parentheses(object):
     """An expression of the form `(foo)`.
 
@@ -183,6 +180,7 @@ class Parentheses(object):
     def evaluate(self, calculator, divide=False):
         return self.contents.evaluate(calculator, divide=True)
 
+
 class UnaryOp(Expression):
     def __init__(self, op, operand):
         self.op = op
@@ -190,6 +188,7 @@ class UnaryOp(Expression):
 
     def evaluate(self, calculator, divide=False):
         return self.op(self.operand.evaluate(calculator, divide=True))
+
 
 class BinaryOp(Expression):
     def __init__(self, op, left, right):
@@ -208,14 +207,15 @@ class BinaryOp(Expression):
         # covered by the `divide` argument: other nodes that perform arithmetic
         # will pass in True, indicating that this should always be a division.
         if (
-                self.op is operator.truediv
-                and not divide
-                and isinstance(self.left, Literal)
-                and isinstance(self.right, Literal)
-            ):
+            self.op is operator.truediv
+            and not divide
+            and isinstance(self.left, Literal)
+            and isinstance(self.right, Literal)
+        ):
             return String(left.render() + ' / ' + right.render(), quotes=None)
 
         return self.op(left, right)
+
 
 class AnyOp(Expression):
     def __init__(self, *operands):
@@ -225,6 +225,7 @@ class AnyOp(Expression):
         operands = [operand.evaluate(calculator, divide=True) for operand in self.operands]
         return BooleanValue(any(operands))
 
+
 class AllOp(Expression):
     def __init__(self, *operands):
         self.operands = operands
@@ -233,6 +234,7 @@ class AllOp(Expression):
         operands = [operand.evaluate(calculator, divide=True) for operand in self.operands]
         return BooleanValue(all(operands))
 
+
 class NotOp(Expression):
     def __init__(self, operand):
         self.operand = operand
@@ -240,6 +242,7 @@ class NotOp(Expression):
     def evaluate(self, calculator, divide=False):
         operand = self.operand.evaluate(calculator, divide=True)
         return BooleanValue(not(operand))
+
 
 class CallOp(Expression):
     def __init__(self, func_name, argspec):
@@ -263,7 +266,7 @@ class CallOp(Expression):
             if var is None:
                 args.append(value)
             else:
-                kwargs[ var.lstrip('$').replace('-', '_') ] = value
+                kwargs[var.lstrip('$').replace('-', '_')] = value
 
         num_args = len(self.argspec.argpairs)
 
@@ -293,12 +296,14 @@ class CallOp(Expression):
         else:
             return func(*args, **kwargs)
 
+
 class Literal(Expression):
     def __init__(self, value):
         self.value = value
 
     def evaluate(self, calculator, divide=False):
         return self.value
+
 
 class Variable(Expression):
     def __init__(self, name):
@@ -320,6 +325,7 @@ class Variable(Expression):
                     return evald
             return value
 
+
 class ListLiteral(Expression):
     def __init__(self, items, comma=True):
         self.items = items
@@ -328,6 +334,7 @@ class ListLiteral(Expression):
     def evaluate(self, calculator, divide=False):
         items = [item.evaluate(calculator, divide=divide) for item in self.items]
         return ListValue(items, separator="," if self.comma else "")
+
 
 class ArgspecLiteral(Expression):
     """Contains pairs of argument names and values, as parsed from a function
@@ -375,8 +382,6 @@ def parse_bareword(word):
         return BooleanValue(False)
     else:
         return String(word, quotes=None)
-
-
 
 
 class Parser(object):
@@ -663,7 +668,6 @@ class SassExpression(Parser):
     a_expr_chks = set(['ADD', 'SUB'])
     a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR'])
     expr_slst_rsts = set(['LPAR', 'END', 'COLOR', 'QSTR', 'RPAR', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'SIGN', 'ID'])
-
 
 
 ### Grammar ends.

@@ -169,33 +169,41 @@ def prefix(prefix, *args):
 def dash_moz(*args):
     return prefix('_moz', *args)
 
+
 @register('-svg')
 def dash_svg(*args):
     return prefix('_svg', *args)
+
 
 @register('-css2')
 def dash_css2(*args):
     return prefix('_css2', *args)
 
+
 @register('-pie')
 def dash_pie(*args):
     return prefix('_pie', *args)
+
 
 @register('-webkit')
 def dash_webkit(*args):
     return prefix('_webkit', *args)
 
+
 @register('-owg')
 def dash_owg(*args):
     return prefix('_owg', *args)
+
 
 @register('-khtml')
 def dash_khtml(*args):
     return prefix('_khtml', *args)
 
+
 @register('-ms')
 def dash_ms(*args):
     return prefix('_ms', *args)
+
 
 @register('-o')
 def dash_o(*args):
@@ -244,6 +252,7 @@ _elements_of_type = {
     'html5-inline': sorted(_elements_of_type_html5_inline.replace(' ', '').split(',')),
     'html5': sorted(_elements_of_type_html5.replace(' ', '').split(',')),
 }
+
 
 @register('elements-of-type', 1)
 def elements_of_type(display):
@@ -360,6 +369,7 @@ OPPOSITE_POSITIONS = dict(
     right='left',
     center='center',
 )
+
 
 def _position(opposite, positions):
     positions = List.from_maybe(positions)

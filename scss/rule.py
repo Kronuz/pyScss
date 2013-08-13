@@ -16,6 +16,7 @@ def normalize_var(name):
     else:
         return name
 
+
 class VariableScope(object):
     """Implements Sass variable scoping.
 
