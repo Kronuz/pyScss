@@ -14,6 +14,8 @@ import mimetypes
 import os.path
 import time
 
+import six
+
 from scss import config
 from scss.functions.library import FunctionLibrary
 from scss.types import BooleanValue, List, Null, NumberValue, QuotedStringValue, StringValue
@@ -376,10 +378,11 @@ def _position(opposite, positions):
 
     ret = []
     for pos in positions:
-        if isinstance(pos, StringValue):
-            if pos.value in OPPOSITE_POSITIONS:
+        if isinstance(pos, (StringValue, six.string_types)):
+            _pos = getattr(pos, 'value', pos)
+            if _pos in OPPOSITE_POSITIONS:
                 if opposite:
-                    opp = OPPOSITE_POSITIONS[pos.value]
+                    opp = OPPOSITE_POSITIONS[pos]
                     ret.append(StringValue(opp, quotes=None))
                 else:
                     ret.append(pos)

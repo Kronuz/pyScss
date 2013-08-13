@@ -19,6 +19,7 @@ log = logging.getLogger(__name__)
 COMPASS_GRADIENTS_LIBRARY = FunctionLibrary()
 register = COMPASS_GRADIENTS_LIBRARY.register
 
+
 # ------------------------------------------------------------------------------
 
 def __color_stops(percentages, *args):
@@ -27,7 +28,7 @@ def __color_stops(percentages, *args):
             list(args[0])
         elif isinstance(args[0], (StringValue, six.string_types)):
             color_stops = []
-            colors = split_params(args[0].value)
+            colors = split_params(getattr(args[0], 'value', args[0]))
             for color in colors:
                 color = color.strip()
                 if color.startswith('color-stop('):
@@ -313,8 +314,8 @@ def linear_gradient(*args):
     def to__owg():
         args = [
             'linear',
-            position(position_and_angle or 'center top'),
-            opposite_position(position_and_angle or 'center top'),
+            position(position_and_angle or ['center', 'top']),
+            opposite_position(position_and_angle or ['center', 'top']),
         ]
         args.extend('color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops)
         ret = '-webkit-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
@@ -395,5 +396,3 @@ def __radial_svg(color_stops, cx, cy, r):
         __color_stops_svg(color_stops)
     )
     return __svg_template(gradient)
-
-
