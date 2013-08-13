@@ -292,8 +292,7 @@ class CallOp(Expression):
                 u"%s(%s)" % (self.func_name, u", ".join(rendered_args)),
                 quotes=None)
         else:
-            if func is not None and not func.is_null:
-                return func(*args, **kwargs)
+            return func(*args, **kwargs)
 
 class Literal(Expression):
     def __init__(self, value):
