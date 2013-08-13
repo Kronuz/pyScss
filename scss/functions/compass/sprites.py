@@ -92,7 +92,7 @@ def alpha_composite(im1, im2, offset=None, box=None, opacity=1):
     return im1
 
 
-@register('sprite-map', 1)
+@register('sprite-map')
 def sprite_map(g, **kwargs):
     """
     Generates a sprite map from the files matching the glob pattern.
