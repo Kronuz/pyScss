@@ -5,7 +5,6 @@ import six
 import logging
 
 from scss.cssdefs import _has_placeholder_re
-from scss.types import Undefined
 
 
 log = logging.getLogger(__name__)
@@ -84,13 +83,7 @@ class Namespace(object):
 
     def variable(self, name, throw=False):
         name = normalize_var(name)
-        try:
-            return self._variables[name]
-        except KeyError:
-            if throw:
-                raise
-            log.error("Undefined variable '%s'", name)
-            return Undefined()
+        return self._variables[name]
 
     def set_variable(self, name, value):
         name = normalize_var(name)

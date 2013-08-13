@@ -23,6 +23,7 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
+FATAL_UNDEFINED = True
 ast_cache = {}
 
 
@@ -108,45 +109,35 @@ class Calculator(object):
 
 
     def evaluate_expression(self, expr):
-        results = None
-
         if not isinstance(expr, six.string_types):
-            results = expr
+            raise TypeError("Expected string, got %r" % (expr,))
 
-        if results is None:
+        if expr in ast_cache:
+            ast = ast_cache[expr]
+
+        elif _variable_re.match(expr):
+            # Short-circuit for variable names
+            ast = Variable(expr)
+
+        else:
             try:
-                results = self.namespace.variable(expr, throw=True)
-            except KeyError:
-                pass
-
-            if not isinstance(expr, six.string_types):
-                results = expr
-
-        ast = None
-        if results is None:
-            if expr in ast_cache:
-                ast = ast_cache[expr]
-                results = ast.evaluate(self)
+                P = SassExpression(SassExpressionScanner())
+                P.reset(expr)
+                ast = P.goal()
+            except SyntaxError:
+                if config.DEBUG:
+                    raise
+                return None
+            except Exception:
+                # TODO hoist me up since the rule is gone
+                #log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule.file_and_line)
+                if config.DEBUG:
+                    raise
+                return None
             else:
-                try:
-                    P = SassExpression(SassExpressionScanner())
-                    P.reset(expr)
-                    ast = P.goal()
-                except SyntaxError:
-                    if config.DEBUG:
-                        raise
-                except Exception:
-                    # TODO hoist me up since the rule is gone
-                    #log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule.file_and_line)
-                    if config.DEBUG:
-                        raise
-                else:
-                    ast_cache[expr] = ast
+                ast_cache[expr] = ast
 
-                    results = ast.evaluate(self)
-
-        # print >>sys.stderr, repr(expr),'==',results,'=='
-        return results
+        return ast.evaluate(self)
 
     def parse_expression(self, expr, target='goal'):
         if expr in ast_cache:
@@ -317,10 +308,11 @@ class Variable(Expression):
         try:
             value = calculator.namespace.variable(self.name)
         except KeyError:
-            # TODO well, no.  should probably let this raise.
-            # TODO this should return an opaque anyway
-            raise
-            return self.name
+            if FATAL_UNDEFINED:
+                raise
+            else:
+                log.error("Undefined variable '%s'", self.name)
+                return Undefined()
         else:
             if isinstance(value, six.string_types):
                 evald = calculator.evaluate_expression(value)
