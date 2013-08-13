@@ -2,8 +2,15 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import six
+import logging
 
 from scss.cssdefs import _has_placeholder_re
+from scss.types import Undefined
+
+log = logging.getLogger(__name__)
+
+
+FATAL_UNDEFINED = False
 
 
 def normalize_var(name):
@@ -29,7 +36,11 @@ class VariableScope(object):
             if key in map:
                 return map[key]
 
-        raise KeyError(key)
+        if FATAL_UNDEFINED:
+            raise KeyError(key)
+
+        log.error("Undefined variable '%s'", key)
+        return Undefined()
 
     def __setitem__(self, key, value):
         for map in self.maps:

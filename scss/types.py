@@ -99,7 +99,7 @@ class Null(Value):
         pass
 
     def __str__(self):
-        return 'null'
+        return self.sass_type_name
 
     def __repr__(self):
         return "<%s>" % (type(self).__name__,)
@@ -114,7 +114,11 @@ class Null(Value):
         return isinstance(other, Null)
 
     def render(self, compress=False):
-        return 'null'
+        return self.sass_type_name
+
+
+class Undefined(Null):
+    sass_type_name = u'undefined'
 
 
 class BooleanValue(Value):

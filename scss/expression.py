@@ -9,7 +9,7 @@ import six
 
 import scss.config as config
 from scss.cssdefs import COLOR_NAMES, is_builtin_css_function, _expr_glob_re, _interpolate_re, _variable_re
-from scss.types import BooleanValue, ColorValue, ListValue, Null, NumberValue, ParserValue, String
+from scss.types import BooleanValue, ColorValue, ListValue, Null, Undefined, NumberValue, ParserValue, String
 from scss.util import dequote, normalize_var, to_str
 
 ################################################################################
@@ -292,7 +292,8 @@ class CallOp(Expression):
                 u"%s(%s)" % (self.func_name, u", ".join(rendered_args)),
                 quotes=None)
         else:
-            return func(*args, **kwargs)
+            if func is not None and not func.is_null:
+                return func(*args, **kwargs)
 
 class Literal(Expression):
     def __init__(self, value):
@@ -337,8 +338,10 @@ class ArgspecLiteral(Expression):
 def parse_bareword(word):
     if word in COLOR_NAMES:
         return ColorValue.from_name(word)
-    elif word in ('null', 'undefined'):
+    elif word == 'null':
         return Null()
+    elif word == 'undefined':
+        return Undefined()
     elif word == 'true':
         return BooleanValue(True)
     elif word == 'false':
