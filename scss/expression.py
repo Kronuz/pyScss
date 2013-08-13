@@ -251,7 +251,7 @@ class CallOp(Expression):
 
     def evaluate(self, calculator, divide=False):
         # TODO bake this into the context and options "dicts", plus library
-        name = normalize_var(self.func_name)
+        func_name = normalize_var(self.func_name)
 
         # Turn the pairs of arg tuples into *args and **kwargs
         # TODO unclear whether this is correct -- how does arg, kwarg, arg
@@ -272,15 +272,14 @@ class CallOp(Expression):
 
         # TODO merge this with the library
         try:
-            func = calculator.namespace.function(self.func_name, num_args)
+            func = calculator.namespace.function(func_name, num_args)
             # @functions take a ns as first arg.  TODO: Python functions possibly
             # should too
             if getattr(func, '__name__', None) == '__call':
                 func = partial(func, calculator.namespace)
         except KeyError:
-            if not is_builtin_css_function(self.func_name):
-                # TODO log.warn, log.error, warning, exception?
-                log.warn("no such function")
+            if not is_builtin_css_function(func_name):
+                log.error("Function not found: %s:%s", func_name, num_args, extra={'stack': True})
 
             rendered_args = []
             for var, value in evald_argpairs:
@@ -291,7 +290,7 @@ class CallOp(Expression):
                     rendered_args.append("%s: %s" % (var, rendered_value))
 
             return String(
-                u"%s(%s)" % (self.func_name, u", ".join(rendered_args)),
+                u"%s(%s)" % (func_name, u", ".join(rendered_args)),
                 quotes=None)
         else:
             return func(*args, **kwargs)
