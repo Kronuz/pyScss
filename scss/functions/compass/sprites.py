@@ -184,7 +184,7 @@ def sprite_map(g, **kwargs):
 
             position = kwargs.get('position', 0)
             position = NumberValue(position)
-            if position.units.get('_') != '%' and position.value > 1:
+            if position.unit != '%' and position.value > 1:
                 position = position.value / 100.0
             else:
                 position = position.value
@@ -230,7 +230,7 @@ def sprite_map(g, **kwargs):
                     _position = position
                 else:
                     _position = NumberValue(_position)
-                    if _position.units.get('_') != '%' and _position.value > 1:
+                    if _position.unit != '%' and _position.value > 1:
                         _position = _position.value / 100.0
                     else:
                         _position = _position.value
