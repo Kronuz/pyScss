@@ -396,12 +396,22 @@ def change_color(color, saturation=None, lightness=None, red=None, green=None, b
 @register('escape', 1)
 @register('unquote')
 def unquote(*args):
-    return StringValue(' '.join([StringValue(s).value for s in args]))
+    arg = List.from_maybe_starargs(args).maybe()
+
+    if isinstance(arg, StringValue):
+        return StringValue(arg.value, quotes=None)
+    else:
+        return StringValue(arg.render(), quotes=None)
 
 
 @register('quote')
 def quote(*args):
-    return QuotedStringValue(' '.join([StringValue(s).value for s in args]))
+    arg = List.from_maybe_starargs(args).maybe()
+
+    if isinstance(arg, StringValue):
+        return StringValue(arg.value, quotes='"')
+    else:
+        return StringValue(arg.render(), quotes='"')
 
 
 # ------------------------------------------------------------------------------

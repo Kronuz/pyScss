@@ -8,7 +8,7 @@ from __future__ import division
 from scss.expression import Calculator
 from scss.functions.core import CORE_LIBRARY
 from scss.rule import Namespace
-from scss.types import ColorValue, NumberValue
+from scss.types import ColorValue, NumberValue, String
 
 import pytest
 xfail = pytest.mark.xfail
@@ -200,13 +200,23 @@ def test_ie_hex_str(calc):
 
 def test_unquote(calc):
     # Examples from the Ruby docs
-    assert calc('unquote("foo")') == calc('foo')
-    assert calc('unquote(foo)') == calc('foo')
+    ret = calc('unquote("foo")')
+    assert ret == String('foo')
+    assert ret.quotes is None
+    ret = calc('unquote(foo)')
+    assert ret == String('foo')
+    assert ret.quotes is None
+
+    assert calc('unquote((one, two, three))') == String('one, two, three')
 
 def test_quote(calc):
     # Examples from the Ruby docs
-    assert calc('quote("foo")') == calc('"foo"')
-    assert calc('quote(foo)') == calc('"foo"')
+    ret = calc('quote("foo")')
+    assert ret == String('foo')
+    assert ret.quotes == '"'
+    ret = calc('quote(foo)')
+    assert ret == String('foo')
+    assert ret.quotes == '"'
 
 
 # ------------------------------------------------------------------------------
