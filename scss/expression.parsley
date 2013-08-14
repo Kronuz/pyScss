@@ -1,6 +1,4 @@
 # Character classes
-UNITS = < 'p' 'x' | 'c' 'm' | 'm' 'm' | 'h' 'z' | 'i' 'n' | '%' >
-
 ### NOTE: These definitions are implemented in Python as an optimization,
 ### because lots of | has the most parsley overhead.  The Python
 ### implementations are intended to match the behavior of the rules below.
@@ -19,7 +17,7 @@ escape = '\\' (
         | anything
     )
 
-#
+
 # Tokens
 identifier = < letterish (letterish | digit)* >
 number = < digit+ ('.' digit*)? | '.' digit+ >
@@ -70,7 +68,7 @@ add_expr = mult_expr:node (
 
 mult_expr = unary_expr:node (
         ows '*' ows unary_expr:operand (-> BinaryOp(operator.mul, node, operand)):node
-        | ows '/' ows unary_expr:operand (-> BinaryOp(operator.div, node, operand)):node
+        | ows '/' ows unary_expr:operand (-> BinaryOp(operator.truediv, node, operand)):node
     )* -> node
 
 unary_expr = (
@@ -81,11 +79,11 @@ unary_expr = (
 
 atom = (
         # Parenthesized expression
-        '(' comma_list:node ')' -> node
+        '(' comma_list:node ')' -> Parentheses(node)
 
         # Old xCSS-style parenthesized expression
         # TODO kill this off
-        | '[' comma_list:node ']' -> node
+        | '[' comma_list:node ']' -> Parentheses(node)
 
         # URL literal
         | 'u' 'r' 'l' '(' (string | uri):s ')' -> FunctionLiteral('url', s)
@@ -97,7 +95,7 @@ atom = (
         | < '!'? identifier >:word -> Literal(parse_bareword(word))
 
         # Number
-        | number:number < '%' | letter+ >?:unit -> Literal(NumberValue(float(number), type=unit))
+        | number:number < '%' | letter+ >?:unit -> Literal(NumberValue(float(number), unit=unit))
 
         # String
         | string
@@ -153,13 +151,18 @@ string_part :quote = <(
 
 
 ### Function definitions and arguments
-argspec = argspec_item:head (
+argspec = (
+        argspec_item:node
         ows ',' ows
-        argspec_item:tail -> tail
-    )*:tails -> ArgspecLiteral([head] + tails)
+        -> node
+    )*:nodes
+    ( argspec_item:tail ows !(nodes.append(tail)) )?
+    -> ArgspecLiteral(nodes)
 
 
-argspec_item = (
+argspec_item =
+    ows
+    (
         ( variable:name ows ':' ows -> name )?:name
         spaced_list:value
         -> (name, value)

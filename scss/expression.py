@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from __future__ import print_function
 
 from functools import partial
 import logging
@@ -28,7 +29,7 @@ log = logging.getLogger(__name__)
 FATAL_UNDEFINED = True
 
 
-from ometa.runtime import OMetaBase, expected
+from ometa.runtime import EOFError, OMetaBase, expected
 import string
 HEXDIGITS = frozenset(string.hexdigits)
 WHITESPACE = frozenset(' \n\r\t\f')
@@ -46,7 +47,8 @@ class GrammarBase(OMetaBase):
         while True:
             try:
                 c, e = self.input.head()
-            except EOFError:
+            except EOFError as exc:
+                e = exc
                 break
 
             if c in WHITESPACE:
@@ -81,7 +83,7 @@ def get_grammar():
     from ometa.grammar import loadGrammar
     grammar = loadGrammar(scss, 'expression', globals(), superclass=GrammarBase)
     _grammar = wrapGrammar(grammar)
-    return grammar
+    return _grammar
 
     import parsley
     import os.path
@@ -205,7 +207,7 @@ class Calculator(object):
             return self.ast_cache[key]
 
         grammar = get_grammar()
-        print("parsing:", repr(expr))
+        print("parsing", target, ":", repr(expr))
         try:
             if False:
                 print("got from original grammar:", end='')
@@ -422,7 +424,7 @@ class FunctionLiteral(Expression):
         self.name = name
         self.value_node = value_node
 
-    def evaluate(self, calculator):
+    def evaluate(self, calculator, divide=False):
         value = self.value_node.evaluate(calculator)
         return String(u"%s(%s)" % (self.name, value.render()), quotes=None)
 
@@ -545,7 +547,7 @@ class Interpolation(Expression):
         self.right = right
         self.quotes = quotes
 
-    def evaluate(self, calculator):
+    def evaluate(self, calculator, divide=False):
         left_scss = self.left.evaluate(calculator)
         if not isinstance(left_scss, String):
             raise TypeError("Expected left side of interpolation to be String, got %r" % (left,))
