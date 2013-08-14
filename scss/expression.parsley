@@ -86,7 +86,7 @@ atom = (
         | '[' comma_list:node ']' -> Parentheses(node)
 
         # URL literal
-        | 'u' 'r' 'l' '(' (string | uri):s ')' -> FunctionLiteral('url', s)
+        | 'u' 'r' 'l' '(' inside_url:s ')' -> FunctionLiteral('url', s)
 
         # Function call
         | identifier:name '(' argspec:args ')' -> CallOp(name, args)
@@ -118,36 +118,36 @@ atom = (
 # TODO I'm not entirely sure any of these character classes are correct
 # TODO ruby sass appears to preserve escapes
 
-uri = (
-        escape
-        | anything:ch ?(ord(ch) > 32 and ch not in ' !"$\'()') -> ch
-    )*:s -> Literal(String(''.join(s), quotes=None))
+inside_url = (
+        interpolation:node -> node
+        | variable:name -> Variable(name)
+        | (
+            escape
+            | '#' ~'{'
+            | anything:ch ?(ord(ch) > 32 and ch not in ' !"#$\'()') -> ch
+        )+:s -> Literal(String(''.join(s), quotes=None))
+        | string_part(')'):s -> Literal(String(s, quotes=None))
+    )*:nodes
+    -> Interpolation(nodes, quotes=None)
 
 string = (
-        '"' string_contents('"'):node '"' -> node
-        | '\'' string_contents('\''):node '\'' -> node
+        '"' string_contents('"' '"'):node '"' -> node
+        | '\'' string_contents('\'' '\''):node '\'' -> node
     )
 
 interpolation = '#' '{' expression:node '}' -> node
 
-string_contents :quote = (
-        (
-            string_part(quote):before
-            -> Literal(String(before, quotes=quote))
-        ):retval
-        (
-            (
-                interpolation:node
-                string_part(quote):after
-                -> Interpolation(retval, node, Literal(String(after, quotes=quote)), quotes=quote)
-            ):retval
-        )*
-    ) -> retval
+string_contents :end :quotes =
+    (
+        interpolation:node -> node
+        | string_part(end):s -> Literal(String(s, quotes=quotes))
+    )*:nodes
+    -> Interpolation(nodes, quotes=quotes)
 
-string_part :quote = <(
+string_part :end = <(
         '#' ~'{'
-        | anything:ch ?(ch not in ('#', quote))
-    )*>
+        | anything:ch ?(ch not in ('#', end))
+    )+>
 
 
 ### Function definitions and arguments

@@ -1,6 +1,6 @@
 @option compress:no, short_colors:yes, reverse_colors:yes;
 @variables {
-    $path = ../img/tmpl1/png;
+    $path = '../img/tmpl1/png';
     $color1 = #FF00FF;
     $border = border-top: 1px solid $color1;
 }

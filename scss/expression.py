@@ -82,6 +82,8 @@ def get_grammar():
     from parsley import wrapGrammar
     from ometa.grammar import loadGrammar
     grammar = loadGrammar(scss, 'expression', globals(), superclass=GrammarBase)
+    def tracer(rule, rule_offset, pos):
+        print("trace @", pos, ">", repr(rule))
     _grammar = wrapGrammar(grammar)
     return _grammar
 
@@ -541,30 +543,20 @@ class ArgspecLiteral(Expression):
 
 
 class Interpolation(Expression):
-    def __init__(self, left, expr, right, quotes):
-        self.left = left
-        self.expr = expr
-        self.right = right
+    def __init__(self, parts, quotes=None):
+        self.parts = parts
         self.quotes = quotes
 
     def evaluate(self, calculator, divide=False):
-        left_scss = self.left.evaluate(calculator)
-        if not isinstance(left_scss, String):
-            raise TypeError("Expected left side of interpolation to be String, got %r" % (left,))
-        left = left_scss.value
+        ret = []
+        for part in self.parts:
+            expr = part.evaluate(calculator)
+            if isinstance(expr, String):
+                ret.append(expr.value)
+            else:
+                ret.append(expr.render())
 
-        right_scss = self.right.evaluate(calculator)
-        if not isinstance(right_scss, String):
-            raise TypeError("Expected right side of interpolation to be String, got %r" % (left,))
-        right = right_scss.value
-
-        expr = self.expr.evaluate(calculator)
-        if isinstance(expr, String):
-            middle = expr.value
-        else:
-            middle = expr.render()
-
-        return String(left + middle + right, quotes=self.quotes)
+        return String(''.join(ret), quotes=self.quotes)
 
 
 def parse_bareword(word):
