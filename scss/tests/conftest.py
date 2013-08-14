@@ -4,7 +4,7 @@ import glob
 import os.path
 import re
 
-FILES_DIR = os.path.join(os.path.dirname(__file__), 'files')
+FILES_DIR = os.path.relpath(os.path.join(os.path.dirname(__file__), 'files'))
 
 test_file_pairs = None  # edited below
 def pytest_configure(config):
@@ -41,4 +41,5 @@ def pytest_generate_tests(metafunc):
     """
 
     if 'scss_file_pair' in metafunc.fixturenames:
-        metafunc.parametrize('scss_file_pair', test_file_pairs)
+        ids = [scss_fn for (scss_fn, css_fn) in test_file_pairs]
+        metafunc.parametrize('scss_file_pair', test_file_pairs, ids=ids)
