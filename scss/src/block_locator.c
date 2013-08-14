@@ -461,7 +461,7 @@ Block*
 BlockLocator_iternext(BlockLocator *self)
 {
 	_BlockLocator_Callback *fn;
-	char c = 0;
+	unsigned char c = 0;
 	char *codestr_end = self->codestr + self->codestr_sz;
 
 	#ifdef DEBUG
