@@ -315,7 +315,7 @@ class Variable(Expression):
             if FATAL_UNDEFINED:
                 raise
             else:
-                log.error("Undefined variable '%s'", self.name)
+                log.error("Undefined variable '%s'", self.name, extra={'stack': True})
                 return Undefined()
         else:
             if isinstance(value, six.string_types):
