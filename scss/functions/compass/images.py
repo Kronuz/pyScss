@@ -77,7 +77,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
         dst_colors = (dst_colors * len_colors)[:len_colors]
         src_colors = (src_colors * len_colors)[:len_colors]
 
-        spacing = [int(NumberValue(v).value) for v in List.from_maybe(spacing)]
+        spacing = [int(NumberValue(v).value) if v else 0 for v in List.from_maybe(spacing)]
         spacing = (spacing * 4)[:4]
 
         file_name, file_ext = os.path.splitext(os.path.normpath(filepath).replace('\\', '_').replace('/', '_'))
