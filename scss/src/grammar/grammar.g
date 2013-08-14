@@ -76,15 +76,12 @@ parser SassExpression:
                         | ADD u_expr                {{ return UnaryOp(operator.pos, u_expr) }}
                         | atom                      {{ return atom }}
 
-    rule atom:          LPAR expr_lst RPAR          {{ return Parentheses(expr_lst) }}
-                        | ID                        {{ return Literal(parse_bareword(ID)) }}
+    rule atom:          ID                          {{ return Literal(parse_bareword(ID)) }}
                         | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
-                        | FNCT                      {{ v = ArgspecLiteral([]) }}
-                            LPAR [
-                                expr_lst            {{ v = expr_lst }}
-                                [ COMMA
-                                ]
-                            ] RPAR                  {{ return CallOp(FNCT, v) }}
+                        | LPAR                      {{ expr_lst = ListLiteral([]) }}
+                            [ expr_lst ] RPAR       {{ return Parentheses(expr_lst) }}
+                        | FNCT LPAR                 {{ expr_lst = ArgspecLiteral([]) }}
+                            [ expr_lst ] RPAR       {{ return CallOp(FNCT, expr_lst) }}
                         | NUM [
                                 UNITS               {{ return Literal(NumberValue(float(NUM), unit=UNITS.lower())) }}
                             ]                       {{ return Literal(NumberValue(float(NUM))) }}
