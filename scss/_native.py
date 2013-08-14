@@ -136,6 +136,8 @@ def locate_blocks(codestr):
 
 ################################################################################
 # Parser
+DEBUG = False
+
 
 class NoMoreTokens(Exception):
     """
@@ -185,6 +187,7 @@ class Scanner(object):
         # Keep looking for a token, ignoring any in self.ignore
         token = None
         while True:
+            tok = None
             best_pat = None
             # Search the patterns for a match, with earlier
             # tokens in the list having preference
@@ -208,9 +211,9 @@ class Scanner(object):
 
             # If we didn't find anything, raise an error
             if best_pat is None:
-                msg = "Bad Token"
+                msg = "Bad token: %s" % ("???" if tok is None else repr(tok),)
                 if restrict:
-                    msg = "Trying to find one of " + ", ".join(restrict)
+                    msg = "%s found while trying to find one of the restricted tokens: %s" % ("???" if tok is None else repr(tok), ", ".join(repr(r) for r in restrict))
                 raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(self.pos), msg))
 
             # If we found something that isn't to be ignored, return it
@@ -246,9 +249,10 @@ class Scanner(object):
         tokens_len = len(self.tokens)
         if i == tokens_len:  # We are at the end, get the next...
             tokens_len += self._scan(restrict)
-        if i < tokens_len:
+        elif i >= 0 and i < tokens_len:
             if restrict and self.restrictions[i] and restrict > self.restrictions[i]:
                 raise NotImplementedError("Unimplemented: restriction set changed")
+        if i >= 0 and i < tokens_len:
             return self.tokens[i]
         raise NoMoreTokens
 

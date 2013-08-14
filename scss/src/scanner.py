@@ -41,7 +41,6 @@ def profile(fn):
     return wrapper
 
 
-DEBUG = False
 ################################################################################
 # Helpers
 
@@ -82,6 +81,9 @@ PATTERNS = [
 
 
 ################################################################################
+# Parser
+DEBUG = False
+
 
 class NoMoreTokens(Exception):
     """
@@ -131,6 +133,7 @@ class Scanner(object):
         # Keep looking for a token, ignoring any in self.ignore
         token = None
         while True:
+            tok = None
             best_pat = None
             # Search the patterns for a match, with earlier
             # tokens in the list having preference
@@ -154,9 +157,9 @@ class Scanner(object):
 
             # If we didn't find anything, raise an error
             if best_pat is None:
-                msg = "Bad Token"
+                msg = "Bad token: %s" % ("???" if tok is None else repr(tok),)
                 if restrict:
-                    msg = "Trying to find one of " + ", ".join(restrict)
+                    msg = "%s found while trying to find one of the restricted tokens: %s" % ("???" if tok is None else repr(tok), ", ".join(repr(r) for r in restrict))
                 raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(self.pos), msg))
 
             # If we found something that isn't to be ignored, return it
