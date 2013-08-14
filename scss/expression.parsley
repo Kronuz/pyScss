@@ -18,13 +18,13 @@ escape = '\\' (
     )
 
 
-# Tokens
+### Tokens
 identifier = < letterish (letterish | digit)* >
 number = < digit+ ('.' digit*)? | '.' digit+ >
 variable = < '$' identifier >
 
 
-# Components
+### Components
 expression = comma_list
 
 comma_list = spaced_list:head (
@@ -33,7 +33,7 @@ comma_list = spaced_list:head (
     )*:tails -> ListLiteral([head] + tails) if tails else head
 
 spaced_list = single_expression:head (
-        ws
+        ows
         single_expression:tail -> tail
     )*:tails -> ListLiteral([head] + tails, comma=False) if tails else head
 
