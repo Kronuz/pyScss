@@ -32,6 +32,7 @@ parser SassExpression:
     token VAR: "\$[-a-zA-Z0-9_]+"
     token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
     token ID: "[-a-zA-Z_][-a-zA-Z0-9_]*"
+    token BANG_IMPORTANT: "!important"
 
     rule goal:          expr_lst                    {{ v = expr_lst }}
                         END                         {{ return v }}
@@ -68,7 +69,7 @@ parser SassExpression:
     rule m_expr:        u_expr                      {{ v = u_expr }}
                         (
                             MUL u_expr              {{ v = BinaryOp(operator.mul, v, u_expr) }}
-                            | DIV u_expr            {{ v = BinaryOp(operator.div, v, u_expr) }}
+                            | DIV u_expr            {{ v = BinaryOp(operator.truediv, v, u_expr) }}
                         )*                          {{ return v }}
 
     rule u_expr:        SIGN u_expr                 {{ return UnaryOp(operator.neg, u_expr) }}
@@ -77,6 +78,7 @@ parser SassExpression:
 
     rule atom:          LPAR expr_lst RPAR          {{ return Parentheses(expr_lst) }}
                         | ID                        {{ return Literal(parse_bareword(ID)) }}
+                        | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
                         | FNCT                      {{ v = ArgspecLiteral([]) }}
                             LPAR [
                                 argspec             {{ v = argspec }}

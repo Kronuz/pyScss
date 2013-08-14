@@ -1,7 +1,7 @@
 from scss.expression import Calculator
 from scss.functions.core import CORE_LIBRARY
 from scss.rule import Namespace
-from scss.types import Color, Null, Number, String
+from scss.types import Color, List, Null, Number, String
 
 import pytest
 
@@ -143,6 +143,13 @@ def test_comparison_null(calc):
     with pytest.raises(TypeError):
         calc('null < null')
 
+
+def test_parse(calc):
+    # Tests for some general parsing.
+
+    assert calc('foo !important bar') == List([
+        String('foo'), String('!important'), String('bar'),
+    ])
 
 
 # TODO write more!  i'm lazy.
