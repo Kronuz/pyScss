@@ -184,6 +184,8 @@ BASE_UNIT_CONVERSIONS = {
     'dppx': (96, 'dpi'),
 }
 
+BASE_UNITS = list(BASE_UNIT_CONVERSIONS.keys()) + ['em', 'ex', '%']
+
 
 def get_conversion_factor(unit):
     """Look up the "base" unit for this unit and the factor for converting to
