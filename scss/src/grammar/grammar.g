@@ -81,7 +81,7 @@ parser SassExpression:
                         | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
                         | FNCT                      {{ v = ArgspecLiteral([]) }}
                             LPAR [
-                                argspec             {{ v = argspec }}
+                                expr_lst            {{ v = expr_lst }}
                             ] RPAR                  {{ return CallOp(FNCT, v) }}
                         | NUM [
                                 UNITS               {{ return Literal(NumberValue(float(NUM), unit=UNITS.lower())) }}
@@ -91,25 +91,19 @@ parser SassExpression:
                         | COLOR                     {{ return Literal(ColorValue(ParserValue(COLOR))) }}
                         | VAR                       {{ return Variable(VAR) }}
 
-    rule argspec:       argspec_item                {{ v = [argspec_item] }}
+    rule expr_lst:      expr_item                   {{ v = [expr_item] }}
                         (
                             COMMA
-                            argspec_item            {{ v.append(argspec_item) }}
-                        )*                          {{ return ArgspecLiteral(v) }}
+                            expr_item               {{ v.append(expr_item) }}
+                        )*                          {{ return ListLiteral(v) if len(v) > 1 else v[0] }}
 
-    rule argspec_item:                              {{ var = None }}
+    rule expr_item:                                 {{ var = None }}
                         [
                             VAR
                             [ ":"                   {{ var = VAR }}
                             ]                       {{ else: self._rewind() }}
                         ]
                         expr_slst                   {{ return (var, expr_slst) }}
-
-    rule expr_lst:      expr_slst                   {{ v = [expr_slst] }}
-                        (
-                            COMMA
-                            expr_slst               {{ v.append(expr_slst) }}
-                        )*                          {{ return ListLiteral(v) if len(v) > 1 else v[0] }}
 
     rule expr_slst:     expr                        {{ v = [expr] }}
                         (
