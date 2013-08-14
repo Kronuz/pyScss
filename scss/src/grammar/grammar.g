@@ -82,6 +82,8 @@ parser SassExpression:
                         | FNCT                      {{ v = ArgspecLiteral([]) }}
                             LPAR [
                                 expr_lst            {{ v = expr_lst }}
+                                [ COMMA
+                                ]
                             ] RPAR                  {{ return CallOp(FNCT, v) }}
                         | NUM [
                                 UNITS               {{ return Literal(NumberValue(float(NUM), unit=UNITS.lower())) }}
