@@ -92,7 +92,7 @@ def test_subtraction(calc):
 
 def test_division(calc):
     assert calc('(5px / 5px)') == Number(1)
-    assert calc('(5px / 5px)') == Number(1)
+    assert calc('(1in / 6pt)') == Number(12)
 
 def test_comparison_numeric(calc):
     assert calc('123 < 456')

@@ -5,7 +5,7 @@ import operator
 
 import six
 
-from scss.cssdefs import COLOR_LOOKUP, COLOR_NAMES, ZEROABLE_UNITS, convert_units_to_base_units
+from scss.cssdefs import COLOR_LOOKUP, COLOR_NAMES, ZEROABLE_UNITS, convert_units_to_base_units, cancel_base_units, count_base_units
 from scss.util import escape
 
 
@@ -156,13 +156,27 @@ class Number(Value):
         if not isinstance(amount, (int, float)):
             raise TypeError("Expected number, got %r" % (amount,))
 
-        self.value = amount
-
         if unit is not None:
             unit_numer = unit_numer + (unit,)
 
-        self.unit_numer = tuple(sorted(unit_numer))
-        self.unit_denom = tuple(sorted(unit_denom))
+        # Cancel out any convertable units on the top and bottom
+        numerator_base_units = count_base_units(unit_numer)
+        denominator_base_units = count_base_units(unit_denom)
+
+        # Count which base units appear both on top and bottom
+        cancelable_base_units = {}
+        for unit, count in numerator_base_units.items():
+            cancelable_base_units[unit] = min(
+                count, denominator_base_units.get(unit, 0))
+
+        # Actually remove the units
+        numer_factor, unit_numer = cancel_base_units(unit_numer, cancelable_base_units)
+        denom_factor, unit_denom = cancel_base_units(unit_denom, cancelable_base_units)
+
+        # And we're done
+        self.unit_numer = tuple(unit_numer)
+        self.unit_denom = tuple(unit_denom)
+        self.value = amount * (numer_factor / denom_factor)
 
     def __repr__(self):
         full_unit = ' * '.join(self.unit_numer)
@@ -229,7 +243,6 @@ class Number(Value):
             return NotImplemented
 
         amount = self.value * other.value
-        # TODO cancel out units if appropriate
         numer = self.unit_numer + other.unit_numer
         denom = self.unit_denom + other.unit_denom
 
@@ -240,19 +253,10 @@ class Number(Value):
             return NotImplemented
 
         amount = self.value / other.value
-        numer = list(self.unit_numer + other.unit_denom)
-        denom = list(self.unit_denom + other.unit_numer)
+        numer = self.unit_numer + other.unit_denom
+        denom = self.unit_denom + other.unit_numer
 
-        # Cancel out like units
-        # TODO cancel out relatable units too
-        numer2 = []
-        for unit in numer:
-            try:
-                denom.remove(unit)
-            except ValueError:
-                numer2.append(unit)
-
-        return NumberValue(amount, unit_numer=numer2, unit_denom=denom)
+        return NumberValue(amount, unit_numer=numer, unit_denom=denom)
 
     def __add__(self, other):
         # Numbers auto-cast to strings when added to other strings

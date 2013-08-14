@@ -184,6 +184,19 @@ BASE_UNIT_CONVERSIONS = {
     'dppx': (96, 'dpi'),
 }
 
+
+def get_conversion_factor(unit):
+    """Look up the "base" unit for this unit and the factor for converting to
+    it.
+
+    Returns a 2-tuple of `factor, base_unit`.
+    """
+    if unit in BASE_UNIT_CONVERSIONS:
+        return BASE_UNIT_CONVERSIONS[unit]
+    else:
+        return 1, unit
+
+
 def convert_units_to_base_units(units):
     """Convert a set of units into a set of "base" units.
 
@@ -201,6 +214,49 @@ def convert_units_to_base_units(units):
 
     new_units.sort()
     return total_factor, tuple(new_units)
+
+
+def count_base_units(units):
+    """Returns a dict mapping names of base units to how many times they
+    appear in the given iterable of units.  Effectively this counts how
+    many length units you have, how many time units, and so forth.
+    """
+    ret = {}
+    for unit in units:
+        factor, base_unit = get_conversion_factor(unit)
+
+        ret.setdefault(base_unit, 0)
+        ret[base_unit] += 1
+
+    return ret
+
+
+def cancel_base_units(units, to_remove):
+    """Given a list of units, remove a specified number of each base unit.
+
+    Arguments:
+        units: an iterable of units
+        to_remove: a mapping of base_unit => count, such as that returned from
+            count_base_units
+
+    Returns a 2-tuple of (factor, remaining_units).
+    """
+
+    # Copy the dict since we're about to mutate it
+    to_remove = to_remove.copy()
+    remaining_units = []
+    total_factor = 1
+
+    for unit in units:
+        factor, base_unit = get_conversion_factor(unit)
+        if not to_remove.get(base_unit, 0):
+            remaining_units.append(unit)
+            continue
+
+        total_factor *= factor
+        to_remove[base_unit] -= 1
+
+    return total_factor, remaining_units
 
 
 # A fixed set of units can be omitted when the value is 0

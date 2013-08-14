@@ -545,8 +545,8 @@ def _type_of(obj):  # -> bool, number, string, color, list
 
 @register('unit', 1)
 def unit(number):  # -> px, em, cm, etc.
-    numer = '*'.join(number.unit_numer)
-    denom = '*'.join(number.unit_denom)
+    numer = '*'.join(sorted(number.unit_numer))
+    denom = '*'.join(sorted(number.unit_denom))
 
     if denom:
         ret = numer + '/' + denom

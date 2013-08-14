@@ -315,7 +315,9 @@ def test_unit(calc):
     assert calc('unit(100px)') == calc('"px"')
     assert calc('unit(3em)') == calc('"em"')
     assert calc('unit(10px * 5em)') == calc('"em*px"')
-    assert calc('unit(10px * 5em / 30cm / 1rem)') == calc('"em*px/cm*rem"')
+    # NOTE: the docs say "em*px/cm*rem", but even Ruby sass doesn't actually
+    # return that
+    assert calc('unit(10px * 5em / 30cm / 1rem)') == calc('"em/rem"')
 
 def test_unitless(calc):
     # Examples from the Ruby docs
