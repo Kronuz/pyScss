@@ -11,7 +11,7 @@
 #ifndef BLOCK_LOCATOR_H
 #define BLOCK_LOCATOR_H
 
-#define MAX_EXC_STRING 200
+#define MAX_EXC_STRING 4096
 
 typedef struct {
     int error;

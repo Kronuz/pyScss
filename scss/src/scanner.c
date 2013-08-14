@@ -163,17 +163,20 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 	Restriction *p_restriction;
 	Pattern *regex;
 	int j, k, max, skip;
+	size_t len;
+	char *aux;
 
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
 
 	while (1) {
+		regex = NULL;
 		best_token.regex = NULL;
 		/* Search the patterns for a match, with earlier
 		   tokens in the list having preference */
 		for (j = 0; j < Pattern_patterns_sz; j++) {
-			Pattern *regex = &Pattern_patterns[j];
+			regex = &Pattern_patterns[j];
 			#ifdef DEBUG
 				fprintf(stderr, "\tTrying %s: %s at pos %d -> %s\n", repr(regex->tok), repr(regex->expr), self->pos, repr(self->input));
 			#endif
@@ -214,10 +217,21 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 		/* If we didn't find anything, raise an error */
 		if (best_token.regex == NULL) {
 			if (restrictions_sz) {
-				sprintf(self->exc, "SyntaxError[@ char %d: Trying to find one of the %d restricted tokens!]", self->pos, restrictions_sz);
+				sprintf(self->exc, "SyntaxError[@ char %d: %s found while trying to find one of the restricted tokens: ", self->pos, (regex == NULL) ? "???" : repr(regex->tok));
+				aux = self->exc + strlen(self->exc);
+				for (k=0; k<restrictions_sz; k++) {
+					len = strlen(restrictions[k].tok);
+					if (aux + len > self->exc + sizeof(self->exc) - 10) {
+						sprintf(aux, (k > 0) ? ", ..." : "...");
+						break;
+					}
+					sprintf(aux, (k > 0) ? ", %s" : "%s", repr(restrictions[k].tok));
+					aux += len + 2;
+				}
+				sprintf(aux, "]");
 				return SCANNER_EXC_RESTRICTED;
 			}
-			sprintf(self->exc, "SyntaxError[@ char %d: Bad Token!]", self->pos);
+			sprintf(self->exc, "SyntaxError[@ char %d: Bad token: %s]", self->pos, (regex == NULL) ? "???" : repr(regex->tok));
 			return SCANNER_EXC_BAD_TOKEN;
 		}
 		/* If we found something that isn't to be ignored, return it */
@@ -283,13 +297,16 @@ Scanner_reset(Scanner *self, char *input, int input_sz) {
 	#endif
 
 	for (i = 0; i < self->tokens_sz; i++) {
-		PyMem_Del(self->tokens[i].string);
 		PyMem_Del(self->restrictions[i].patterns);
+		self->restrictions[i].patterns = NULL;
+		self->restrictions[i].patterns_sz = 0;
 	}
 	self->tokens_sz = 0;
 
 	if (input_sz) {
-		if (self->input) PyMem_Del(self->input);
+		if (self->input != NULL) {
+			PyMem_Del(self->input);
+		}
 		self->input = PyMem_Strndup(input, input_sz);
 		self->input_sz = input_sz;
 		#ifdef DEBUG
