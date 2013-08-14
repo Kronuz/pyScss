@@ -168,24 +168,26 @@ scss_Scanner_token(scss_Scanner *self, PyObject *args)
 	Token *p_token;
 
 	int token_num;
-	PyObject *restrictions;
+	PyObject *restrictions = NULL;
 	Pattern *_restrictions = NULL;
 	int restrictions_sz = 0;
 	if (self->scanner != NULL) {
 		if (PyArg_ParseTuple(args, "i|O", &token_num, &restrictions)) {
-			size = PySequence_Size(restrictions);
-			if (size != -1) {
-				_restrictions = PyMem_New(Pattern, size);
-				iter = PyObject_GetIter(restrictions);
-				while ((item = PyIter_Next(iter))) {
-					if (PyString_Check(item)) {
-						_restrictions[restrictions_sz].tok = PyString_AsString(item);
-						_restrictions[restrictions_sz].expr = NULL;
-						restrictions_sz++;
+			if (restrictions != NULL) {
+				size = PySequence_Size(restrictions);
+				if (size != -1) {
+					_restrictions = PyMem_New(Pattern, size);
+					iter = PyObject_GetIter(restrictions);
+					while ((item = PyIter_Next(iter))) {
+						if (PyString_Check(item)) {
+							_restrictions[restrictions_sz].tok = PyString_AsString(item);
+							_restrictions[restrictions_sz].expr = NULL;
+							restrictions_sz++;
+						}
+						Py_DECREF(item);
 					}
-					Py_DECREF(item);
+					Py_DECREF(iter);
 				}
-				Py_DECREF(iter);
 			}
 			p_token = Scanner_token(self->scanner, token_num, _restrictions, restrictions_sz);
 
