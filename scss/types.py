@@ -218,8 +218,9 @@ class Number(Value):
         left = self.to_base_units()
         right = other.to_base_units()
 
-        if left.unit_numer != right.unit_numer or left.unit_denom != right.unit_denom:
-            raise ValueError("Can't reconcile units: %r and %r" % (self, other))
+        if (left.value != 0 or left.unit_numer or left.unit_denom) and (right.value != 0 or right.unit_numer or right.unit_denom):
+            if left.unit_numer != right.unit_numer or left.unit_denom != right.unit_denom:
+                raise ValueError("Can't reconcile units: %r and %r" % (self, other))
 
         return op(round(left.value, 5), round(right.value, 5))
 
@@ -281,8 +282,9 @@ class Number(Value):
         left = self.to_base_units()
         right = other.to_base_units()
 
-        if left.unit_numer != right.unit_numer or left.unit_denom != right.unit_denom:
-            raise ValueError("Can't reconcile units: %r and %r" % (self, other))
+        if (left.value != 0 or left.unit_numer or left.unit_denom) and (right.value != 0 or right.unit_numer or right.unit_denom):
+            if left.unit_numer != right.unit_numer or left.unit_denom != right.unit_denom:
+                raise ValueError("Can't reconcile units: %r and %r" % (self, other))
 
         new_amount = op(left.value, right.value)
 
