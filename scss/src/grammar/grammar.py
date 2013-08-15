@@ -61,32 +61,32 @@ class SassExpression(Parser):
         return v
 
     def expr(self):
-        and_test = self.and_test()
-        v = and_test
+        and_expr = self.and_expr()
+        v = and_expr
         while self._peek(self.expr_rsts) == 'OR':
             OR = self._scan('OR')
-            and_test = self.and_test()
-            v = AnyOp(v, and_test)
+            and_expr = self.and_expr()
+            v = AnyOp(v, and_expr)
         return v
 
-    def and_test(self):
-        not_test = self.not_test()
-        v = not_test
-        while self._peek(self.and_test_rsts) == 'AND':
+    def and_expr(self):
+        not_expr = self.not_expr()
+        v = not_expr
+        while self._peek(self.and_expr_rsts) == 'AND':
             AND = self._scan('AND')
-            not_test = self.not_test()
-            v = AllOp(v, not_test)
+            not_expr = self.not_expr()
+            v = AllOp(v, not_expr)
         return v
 
-    def not_test(self):
-        _token_ = self._peek(self.not_test_rsts)
+    def not_expr(self):
+        _token_ = self._peek(self.not_expr_rsts)
         if _token_ != 'NOT':
             comparison = self.comparison()
             return comparison
         else:  # == 'NOT'
             NOT = self._scan('NOT')
-            not_test = self.not_test()
-            return NotOp(not_test)
+            not_expr = self.not_expr()
+            return NotOp(not_expr)
 
     def comparison(self):
         a_expr = self.a_expr()
@@ -243,17 +243,17 @@ class SassExpression(Parser):
 
     m_expr_chks = set(['MUL', 'DIV'])
     comparison_rsts = set(['LPAR', 'QSTR', 'RPAR', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'ADD', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'GE', 'NOT', 'OR'])
+    atom_rsts = set(['LPAR', 'BANG_IMPORTANT', 'COLOR', 'QSTR', 'SIGN', 'NOT', 'ADD', 'NUM', 'FNCT', 'STR', 'VAR', 'RPAR', 'ID'])
     u_expr_chks = set(['LPAR', 'COLOR', 'QSTR', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
     m_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR'])
     argspec_item_rsts_ = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', '":"', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID', 'FNCT'])
     expr_lst_rsts = set(['END', 'COMMA', 'RPAR'])
-    and_test_rsts = set(['AND', 'LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'ID', 'RPAR', 'OR'])
-    atom_rsts = set(['LPAR', 'BANG_IMPORTANT', 'COLOR', 'QSTR', 'SIGN', 'NOT', 'ADD', 'NUM', 'FNCT', 'STR', 'VAR', 'RPAR', 'ID'])
+    argspec_rsts = set(['COMMA', 'RPAR'])
+    and_expr_rsts = set(['AND', 'LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'ID', 'RPAR', 'OR'])
     u_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'ADD', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
     expr_rsts = set(['LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'RPAR', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'ID', 'SIGN', 'OR'])
+    not_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
     argspec_item_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'NOT', 'ADD', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
-    argspec_rsts = set(['COMMA', 'RPAR'])
-    not_test_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
     atom_rsts_ = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'VAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR'])
     comparison_chks = set(['GT', 'GE', 'NE', 'LT', 'LE', 'EQ'])
     a_expr_chks = set(['ADD', 'SUB'])

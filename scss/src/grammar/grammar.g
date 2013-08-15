@@ -37,18 +37,18 @@ parser SassExpression:
     rule goal:          expr_lst                    {{ v = expr_lst }}
                         END                         {{ return v }}
 
-    rule expr:          and_test                    {{ v = and_test }}
+    rule expr:          and_expr                    {{ v = and_expr }}
                         (
-                            OR and_test             {{ v = AnyOp(v, and_test) }}
+                            OR and_expr             {{ v = AnyOp(v, and_expr) }}
                         )*                          {{ return v }}
 
-    rule and_test:      not_test                    {{ v = not_test }}
+    rule and_expr:      not_expr                    {{ v = not_expr }}
                         (
-                            AND not_test            {{ v = AllOp(v, not_test) }}
+                            AND not_expr            {{ v = AllOp(v, not_expr) }}
                         )*                          {{ return v }}
 
-    rule not_test:      comparison                  {{ return comparison }}
-                        | NOT not_test              {{ return NotOp(not_test) }}
+    rule not_expr:      comparison                  {{ return comparison }}
+                        | NOT not_expr              {{ return NotOp(not_expr) }}
 
     rule comparison:    a_expr                      {{ v = a_expr }}
                         (
