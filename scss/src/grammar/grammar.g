@@ -38,9 +38,8 @@ parser SassExpression:
 
     rule expr_lst:      expr_item                   {{ v = [expr_item] }}
                         (
-                            COMMA [
-                                expr_item           {{ v.append(expr_item) }}
-                            ]                       {{ else: v.append((None, Literal(Undefined()))) }}
+                            COMMA                   {{ expr_item = (None, Literal(Undefined())) }}
+                                [ expr_item ]       {{ v.append(expr_item) }}
                         )*                          {{ return ListLiteral(v) if len(v) > 1 else v[0][1] }}
 
     rule expr_item:                                 {{ VAR = None }}
