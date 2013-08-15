@@ -5,7 +5,6 @@
 %%
 parser SassExpression:
     ignore: "[ \r\t\n]+"
-    token COMMA: ","
     token LPAR: "\\(|\\["
     token RPAR: "\\)|\\]"
     token END: "$"
@@ -29,6 +28,7 @@ parser SassExpression:
     token UNITS: "(?<!\s)(?:[a-zA-Z]+|%)(?![-\w])"
     token NUM: "(?:\d+(?:\.\d*)?|\.\d+)"
     token COLOR: "#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])"
+    token KWVAR: "\$[-a-zA-Z0-9_]+(?=\s*:)"
     token VAR: "\$[-a-zA-Z0-9_]+"
     token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
     token ID: "[-a-zA-Z_][-a-zA-Z0-9_]*"
@@ -93,18 +93,17 @@ parser SassExpression:
 
     rule argspec:       argspec_item                {{ v = [argspec_item] }}
                         (
-                            COMMA
+                            ","
                             argspec_item            {{ v.append(argspec_item) }}
                         )*                          {{ return ArgspecLiteral(v) }}
 
-    rule argspec_item:  (
-                            KWVAR ":" expr_slst     {{ return (KWVAR, expr_slst) }}
-                            | expr_slst             {{ return (None, expr_slst) }}
-                        )
+    rule argspec_item:
+                        KWVAR ":" expr_slst         {{ return (KWVAR, expr_slst) }}
+                        | expr_slst                 {{ return (None, expr_slst) }}
 
     rule expr_lst:      expr_slst                   {{ v = [expr_slst] }}
                         (
-                            COMMA
+                            ","
                             expr_slst               {{ v.append(expr_slst) }}
                         )*                          {{ return ListLiteral(v) if len(v) > 1 else v[0] }}
 
