@@ -226,20 +226,20 @@ class Generator:
         self.write("from yappsrt import *\n")
         self.write("\n\n")
         self.write("class ", self.name, "Scanner(Scanner):\n")
-        self.write("    patterns = None\n")
-        self.write("    _patterns = [\n")
+        self.write(INDENT, "patterns = None\n")
+        self.write(INDENT, "_patterns = [\n")
         for p in self.terminals:
-            self.write("        (%s, %s),\n" % (
+            self.write(INDENT*2, "(%s, %s),\n" % (
                 repr(p), repr(self.tokens[p])))
-        self.write("    ]\n\n")
-        self.write("    def __init__(self, input=None):\n")
-        self.write("        if hasattr(self, 'setup_patterns'):\n")
-        self.write("            self.setup_patterns(self._patterns)\n")
-        self.write("        elif self.patterns is None:\n")
-        self.write("            self.__class__.patterns = []\n")
-        self.write("            for t, p in self._patterns:\n")
-        self.write("                self.patterns.append((t, re.compile(p)))\n")
-        self.write("        super(", self.name, "Scanner, self).__init__(None, %s, input)\n" %
+        self.write(INDENT, "]\n\n")
+        self.write(INDENT, "def __init__(self, input=None):\n")
+        self.write(INDENT*2, "if hasattr(self, 'setup_patterns'):\n")
+        self.write(INDENT*3, "self.setup_patterns(self._patterns)\n")
+        self.write(INDENT*2, "elif self.patterns is None:\n")
+        self.write(INDENT*3, "self.__class__.patterns = []\n")
+        self.write(INDENT*3, "for t, p in self._patterns:\n")
+        self.write(INDENT*4, "self.patterns.append((t, re.compile(p)))\n")
+        self.write(INDENT*2, "super(", self.name, "Scanner, self).__init__(None, %s, input)\n" %
                    repr(self.ignore))
         self.write("\n\n")
 

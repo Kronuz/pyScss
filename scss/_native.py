@@ -179,19 +179,19 @@ class Scanner(object):
             output = "%s\n  (@%s)  %s  =  %s" % (output, t[0], t[2], repr(t[3]))
         return output
 
-    def _scan(self, restrict):
+    def _scan(self, restrict, context=None):
         """
         Should scan another token and add it to the list, self.tokens,
         and add the restriction to self.restrictions
         """
         # Keep looking for a token, ignoring any in self.ignore
-        token = None
         while True:
             tok = None
-            best_pat = None
+
             # Search the patterns for a match, with earlier
             # tokens in the list having preference
-            best_pat_len = 0
+            best_match = -1
+            best_pat = None
             for tok, regex in self.patterns:
                 if DEBUG:
                     print("\tTrying %s: %s at pos %d -> %s" % (repr(tok), repr(regex.pattern), self.pos, repr(self.input)))
@@ -201,27 +201,27 @@ class Scanner(object):
                         print "\tSkipping %s!" % repr(tok)
                     continue
                 m = regex.match(self.input, self.pos)
-                if m:
-                    # We got a match
+                if m and m.end() - m.start() > best_match:
+                    # We got a match that's better than the previous one
                     best_pat = tok
-                    best_pat_len = len(m.group(0))
+                    best_match = m.end() - m.start()
                     if DEBUG:
                         print("Match OK! %s: %s at pos %d" % (repr(tok), repr(regex.pattern), self.pos))
                     break
 
             # If we didn't find anything, raise an error
-            if best_pat is None:
+            if best_pat is None or best_match < 0:
                 msg = "Bad token: %s" % ("???" if tok is None else repr(tok),)
                 if restrict:
                     msg = "%s found while trying to find one of the restricted tokens: %s" % ("???" if tok is None else repr(tok), ", ".join(repr(r) for r in restrict))
-                raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(self.pos), msg))
+                raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(self.pos), msg), context=context)
 
             # If we found something that isn't to be ignored, return it
             if best_pat in self.ignore:
                 # This token should be ignored...
-                self.pos += best_pat_len
+                self.pos += best_match
             else:
-                end_pos = self.pos + best_pat_len
+                end_pos = self.pos + best_match
                 # Create a token with this data
                 token = (
                     self.pos,
@@ -229,26 +229,25 @@ class Scanner(object):
                     best_pat,
                     self.input[self.pos:end_pos]
                 )
-                break
-        if token is not None:
-            self.pos = token[1]
-            # Only add this token if it's not in the list
-            # (to prevent looping)
-            if not self.tokens or token != self.tokens[-1]:
-                self.tokens.append(token)
-                self.restrictions.append(restrict)
-                return 1
-        return 0
+                self.pos = end_pos
+                # Only add this token if it's not in the list
+                # (to prevent looping)
+                if not self.tokens or token != self.tokens[-1]:
+                    self.tokens.append(token)
+                    self.restrictions.append(restrict)
+                    return 1
+                return 0
 
-    def token(self, i, restrict=None):
+    def token(self, i, restrict=None, **kwargs):
         """
         Get the i'th token, and if i is one past the end, then scan
         for another token; restrict is a list of tokens that
         are allowed, or 0 for any token.
         """
+        context = kwargs.get("context")
         tokens_len = len(self.tokens)
         if i == tokens_len:  # We are at the end, get the next...
-            tokens_len += self._scan(restrict)
+            tokens_len += self._scan(restrict, context)
         elif i >= 0 and i < tokens_len:
             if restrict and self.restrictions[i] and restrict > self.restrictions[i]:
                 raise NotImplementedError("Unimplemented: restriction set changed")
