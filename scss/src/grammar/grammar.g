@@ -114,13 +114,10 @@ parser SassExpression:
                             argspec_item            {{ v.append(argspec_item) }}
                         )*                          {{ return ArgspecLiteral(v) }}
 
-    rule argspec_item:                              {{ var = None }}
-                        [
-                            VAR
-                            [ ":"                   {{ var = VAR }}
-                            ]                       {{ else: self._rewind() }}
-                        ]
-                        expr_slst                   {{ return (var, expr_slst) }}
+    rule argspec_item:  (
+                            KWVAR ":" expr_slst     {{ return (KWVAR, expr_slst) }}
+                            | expr_slst             {{ return (None, expr_slst) }}
+                        )
 
     rule expr_lst:      expr_slst                   {{ v = [expr_slst] }}
                         (
