@@ -31,13 +31,32 @@ parser SassExpression:
     token COLOR: "#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])"
     token VAR: "\$[-a-zA-Z0-9_]+"
     token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
-    token ID: "[-a-zA-Z_][-a-zA-Z0-9_]*"
+    token ID: "!?[-a-zA-Z_][-a-zA-Z0-9_]*"
     token BANG_IMPORTANT: "!important"
 
-    rule goal:          expr_lst                    {{ v = expr_lst }}
-                        END                         {{ return v }}
+    rule goal:          expr_lst END                {{ return expr_lst }}
 
-    rule expr:          and_expr                    {{ v = and_expr }}
+    rule expr_lst:      expr_item                   {{ v = [expr_item] }}
+                        (
+                            COMMA [
+                                expr_item           {{ v.append(expr_item) }}
+                            ]                       {{ else: v.append((None, Literal(Undefined()))) }}
+                        )*                          {{ return ListLiteral(v) if len(v) > 1 else v[0][1] }}
+
+    rule expr_item:                                 {{ var = None }}
+                        [
+                            VAR [
+                                ":"                 {{ var = VAR }}
+                            ]                       {{ else: self._rewind() }}
+                        ]
+                        expr_slst                   {{ return (var, expr_slst) }}
+
+    rule expr_slst:     or_expr                     {{ v = [(None, or_expr)] }}
+                        (
+                            or_expr                 {{ v.append((None, or_expr)) }}
+                        )*                          {{ return ListLiteral(v, comma=False) if len(v) > 1 else v[0][1] }}
+
+    rule or_expr:       and_expr                    {{ v = and_expr }}
                         (
                             OR and_expr             {{ v = AnyOp(v, and_expr) }}
                         )*                          {{ return v }}
@@ -78,36 +97,16 @@ parser SassExpression:
 
     rule atom:          ID                          {{ return Literal(parse_bareword(ID)) }}
                         | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
-                        | LPAR                      {{ expr_lst = ListLiteral([]) }}
+                        | LPAR                      {{ expr_lst = ListLiteral() }}
                             [ expr_lst ] RPAR       {{ return Parentheses(expr_lst) }}
-                        | FNCT LPAR                 {{ expr_lst = ArgspecLiteral([]) }}
+                        | FNCT LPAR                 {{ expr_lst = ListLiteral() }}
                             [ expr_lst ] RPAR       {{ return CallOp(FNCT, expr_lst) }}
-                        | NUM [
-                                UNITS               {{ return Literal(NumberValue(float(NUM), unit=UNITS.lower())) }}
-                            ]                       {{ return Literal(NumberValue(float(NUM))) }}
+                        | NUM                       {{ UNITS = None }}
+                            [ UNITS ]               {{ return Literal(NumberValue(float(NUM), unit=UNITS)) }}
                         | STR                       {{ return Literal(String(STR[1:-1], quotes="'")) }}
                         | QSTR                      {{ return Literal(String(QSTR[1:-1], quotes='"')) }}
                         | COLOR                     {{ return Literal(ColorValue(ParserValue(COLOR))) }}
                         | VAR                       {{ return Variable(VAR) }}
-
-    rule expr_lst:      expr_item                   {{ v = [expr_item] }}
-                        (
-                            COMMA
-                            expr_item               {{ v.append(expr_item) }}
-                        )*                          {{ return ListLiteral(v) if len(v) > 1 else v[0] }}
-
-    rule expr_item:                                 {{ var = None }}
-                        [
-                            VAR
-                            [ ":"                   {{ var = VAR }}
-                            ]                       {{ else: self._rewind() }}
-                        ]
-                        expr_slst                   {{ return (var, expr_slst) }}
-
-    rule expr_slst:     expr                        {{ v = [expr] }}
-                        (
-                            expr                    {{ v.append(expr) }}
-                        )*                          {{ return ListLiteral(v, comma=False) if len(v) > 1 else v[0] }}
 %%
 ### Grammar ends.
 ################################################################################
