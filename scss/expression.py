@@ -168,7 +168,7 @@ class Expression(object):
         raise NotImplementedError
 
 
-class Parentheses(object):
+class Parentheses(Expression):
     """An expression of the form `(foo)`.
 
     Only exists to force a slash to be interpreted as division when contained
