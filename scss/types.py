@@ -657,9 +657,10 @@ class Color(Value):
     ### Alternate constructors
 
     @classmethod
-    def from_rgb(cls, red, green, blue, alpha=1.0):
+    def from_rgb(cls, red, green, blue, alpha=1.0, original_literal=None):
         self = cls.__new__(cls)  # TODO
         self.tokens = None
+        self.original_literal = original_literal
         # TODO really should store these things internally as 0-1, but can't
         # until stuff stops examining .value directly
         self.value = (red * 255.0, green * 255.0, blue * 255.0, alpha)

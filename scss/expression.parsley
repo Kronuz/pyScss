@@ -95,19 +95,30 @@ atom = (
         | < '!'? identifier >:word -> Literal(parse_bareword(word))
 
         # Number
-        | number:number < '%' | letter+ >?:unit -> Literal(NumberValue(float(number), unit=unit))
+        | number:number < '%' | letter+ >?:unit -> Literal(Number(float(number), unit=unit))
 
         # String
         | string
 
         # Color literal
-        # TODO: stop making ColorValue finish this parsing
-        | < '#' (
+        # DEVIATION: Sass doesn't support alpha in hex literals
+        | '#' (
             <hex{2}>:red <hex{2}>:green <hex{2}>:blue
-                #-> Literal(ColorValue.from_rgb(int(red, 16) / 255., int(green, 16) / 255., int(blue, 16) / 255.))
-            | hex:red hex:green hex:blue
-                #-> Literal(ColorValue.from_rgb(int(red, 16) / 15., int(green, 16) / 15., int(blue, 16) / 15.))
-        ) >:color -> Literal(ColorValue(ParserValue(color)))
+            <hex{2}>?:alpha
+                -> Literal(Color.from_rgb(
+                    int(red, 16) / 255.,
+                    int(green, 16) / 255.,
+                    int(blue, 16) / 255.,
+                    int(alpha or "ff", 16) / 255.,
+                    original_literal="#" + red + green + blue + (alpha or '')))
+            | hex:red hex:green hex:blue hex?:alpha
+                -> Literal(Color.from_rgb(
+                    int(red, 16) / 15.,
+                    int(green, 16) / 15.,
+                    int(blue, 16) / 15.,
+                    int(alpha or "f", 16) / 15.,
+                    original_literal="#" + red + green + blue + (alpha or '')))
+        )
 
         # Variable
         | variable:name -> Variable(name)
