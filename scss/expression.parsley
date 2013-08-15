@@ -53,22 +53,34 @@ and_test = not_test:head (
 not_test = comparison | ( 'n' 'o' 't' not_test:node -> NotOp(node) )
 
 comparison = add_expr:node (
-        ows '<' ows add_expr:operand (-> BinaryOp(operator.lt, node, operand)):node
-        | ows '>' ows add_expr:operand (-> BinaryOp(operator.gt, node, operand)):node
-        | ows '<' '=' ows add_expr:operand (-> BinaryOp(operator.le, node, operand)):node
-        | ows '>' '=' ows add_expr:operand (-> BinaryOp(operator.ge, node, operand)):node
-        | ows '=' '=' ows add_expr:operand (-> BinaryOp(operator.eq, node, operand)):node
-        | ows '!' '=' ows add_expr:operand (-> BinaryOp(operator.ne, node, operand)):node
+        ows (
+              '<' '='   !(operator.le):op
+            | '>' '='   !(operator.ge):op
+            | '<'       !(operator.lt):op
+            | '>'       !(operator.gt):op
+            | '=' '='   !(operator.eq):op
+            | '!' '='   !(operator.ne):op
+        ) ows
+        add_expr:operand
+        !(BinaryOp(op, node, operand)):node
     )* -> node
 
 add_expr = mult_expr:node (
-        ows '+' ows mult_expr:operand (-> BinaryOp(operator.add, node, operand)):node
-        | ows '-' ows mult_expr:operand (-> BinaryOp(operator.sub, node, operand)):node
+        ows (
+              '+'  !(operator.add):op
+            | '-'  !(operator.sub):op
+        ) ows
+        mult_expr:operand
+        !(BinaryOp(op, node, operand)):node
     )* -> node
 
 mult_expr = unary_expr:node (
-        ows '*' ows unary_expr:operand (-> BinaryOp(operator.mul, node, operand)):node
-        | ows '/' ows unary_expr:operand (-> BinaryOp(operator.truediv, node, operand)):node
+        ows (
+              '*'  !(operator.mul):op
+            | '/'  !(operator.truediv):op
+        ) ows
+        unary_expr:operand
+        !(BinaryOp(op, node, operand)):node
     )* -> node
 
 unary_expr = (
