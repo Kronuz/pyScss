@@ -216,23 +216,26 @@ class Scanner(object):
                     msg = "%s found while trying to find one of the restricted tokens: %s" % ("???" if tok is None else repr(tok), ", ".join(repr(r) for r in restrict))
                 raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(self.pos), msg), context=context)
 
-            # If we found something that isn't to be ignored, return it
-            if best_pat in self.ignore:
-                # This token should be ignored...
-                self.pos += best_match
-            else:
-                end_pos = self.pos + best_match
-                # Create a token with this data
+            ignore = best_pat in self.ignore
+            end_pos = self.pos + best_match
+            value = self.input[self.pos:end_pos]
+            if not ignore:
+                # token = Token(type=best_pat, value=value, pos=self.get_pos())
                 token = (
                     self.pos,
                     end_pos,
                     best_pat,
-                    self.input[self.pos:end_pos]
+                    value,
                 )
-                self.pos = end_pos
-                # Only add this token if it's not in the list
-                # (to prevent looping)
-                if not self.tokens or token != self.tokens[-1]:
+            self.pos = end_pos
+
+            # If we found something that isn't to be ignored, return it
+            if not ignore:
+                # print repr(token)
+                if not self.tokens or token != self.last_read_token:
+                    # Only add this token if it's not in the list
+                    # (to prevent looping)
+                    self.last_read_token = token
                     self.tokens.append(token)
                     self.restrictions.append(restrict)
                     return 1
