@@ -618,9 +618,9 @@ class Scss(object):
 
             if argstr:
                 calculator = Calculator(rule.namespace)
-                argspec_node = calculator.parse_expression(argstr, target='argspec')
+                expr_lst_node = calculator.parse_expression(argstr, target='expr_lst')
 
-                for var_name, default in argspec_node.iter_def_argspec():
+                for var_name, default in expr_lst_node.iter_def_argspec():
                     new_params.append(var_name)
                     if default is not None:
                         defaults[var_name] = default

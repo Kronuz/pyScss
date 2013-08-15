@@ -119,9 +119,8 @@ class Calculator(object):
 
         else:
             try:
-                P = SassExpression(SassExpressionScanner())
-                P.reset(expr)
-                ast = P.goal()
+                parser = SassExpression(SassExpressionScanner(expr))
+                ast = parser.goal()
             except SyntaxError:
                 if config.DEBUG:
                     raise
@@ -141,8 +140,7 @@ class Calculator(object):
         if expr in ast_cache:
             return ast_cache[expr]
 
-        parser = SassExpression(SassExpressionScanner())
-        parser.reset(expr)
+        parser = SassExpression(SassExpressionScanner(expr))
         ast = getattr(parser, target)()
 
         if target == 'goal':
@@ -245,9 +243,9 @@ class NotOp(Expression):
 
 
 class CallOp(Expression):
-    def __init__(self, func_name, argspec):
+    def __init__(self, func_name, expr_lst):
         self.func_name = func_name
-        self.argspec = argspec
+        self.expr_lst = expr_lst
 
     def evaluate(self, calculator, divide=False):
         # TODO bake this into the context and options "dicts", plus library
@@ -259,7 +257,7 @@ class CallOp(Expression):
         args = []
         kwargs = {}
         evald_argpairs = []
-        for var, expr in self.argspec.argpairs:
+        for var, expr in self.expr_lst.items:
             value = expr.evaluate(calculator, divide=True)
             evald_argpairs.append((var, value))
 
@@ -268,7 +266,7 @@ class CallOp(Expression):
             else:
                 kwargs[var.lstrip('$').replace('-', '_')] = value
 
-        num_args = len(self.argspec.argpairs)
+        num_args = len(self.expr_lst.items)
 
         # TODO merge this with the library
         try:
@@ -326,16 +324,6 @@ class Variable(Expression):
 
 
 class ListLiteral(Expression):
-    def __init__(self, items, comma=True):
-        self.items = items
-        self.comma = comma
-
-    def evaluate(self, calculator, divide=False):
-        items = [item.evaluate(calculator, divide=divide) for item in self.items]
-        return ListValue(items, separator="," if self.comma else "")
-
-
-class ArgspecLiteral(Expression):
     """Contains pairs of argument names and values, as parsed from a function
     definition or function call.
 
@@ -347,17 +335,19 @@ class ArgspecLiteral(Expression):
     appeared in a function definition, $foo would refer to an existing
     variable.  This it's up to the caller to use the right iteration function.
     """
-    def __init__(self, argpairs):
-        # argpairs is a list of 2-tuples, parsed as though this were a function
-        # call, so (variable name as string or None, default value as AST
-        # node).
-        self.argpairs = argpairs
+    def __init__(self, items=None, comma=True):
+        self.items = [] if items is None else items
+        self.comma = comma
+
+    def evaluate(self, calculator, divide=False):
+        items = [(name, item.evaluate(calculator, divide=divide)) for name, item in self.items]
+        return ListValue(items, separator="," if self.comma else "")
 
     def iter_def_argspec(self):
         """Interpreting this literal as parsed a function call, yields pairs of
         (variable name as a string, default value as an AST node or None).
         """
-        for name, value in self.argpairs:
+        for name, value in self.items:
             if name is None:
                 # value is actually the name
                 if not isinstance(value, Variable):
@@ -447,12 +437,12 @@ class SassExpressionScanner(Scanner):
         ('GT', '>'),
         ('STR', "'[^']*'"),
         ('QSTR', '"[^"]*"'),
-        ('UNITS', '(?<!\\s)(?:' + '|'.join(BASE_UNITS) + ')(?![-\\w])'),
+        ('UNITS', '(?<!\\s)(?:[a-zA-Z]+|%)(?![-\\w])'),
         ('NUM', '(?:\\d+(?:\\.\\d*)?|\\.\\d+)'),
         ('COLOR', '#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])'),
         ('VAR', '\\$[-a-zA-Z0-9_]+'),
         ('FNCT', '[-a-zA-Z_][-a-zA-Z0-9_]*(?=\\()'),
-        ('ID', '[-a-zA-Z_][-a-zA-Z0-9_]*'),
+        ('ID', '!?[-a-zA-Z_][-a-zA-Z0-9_]*'),
         ('BANG_IMPORTANT', '!important'),
     ]
 
@@ -469,14 +459,43 @@ class SassExpressionScanner(Scanner):
 class SassExpression(Parser):
     def goal(self):
         expr_lst = self.expr_lst()
-        v = expr_lst
         END = self._scan('END')
-        return v
+        return expr_lst
 
-    def expr(self):
+    def expr_lst(self):
+        expr_item = self.expr_item()
+        v = [expr_item]
+        while self._peek(self.expr_lst_rsts) == 'COMMA':
+            COMMA = self._scan('COMMA')
+            if self._peek(self.expr_lst_rsts_) not in self.expr_lst_rsts:
+                expr_item = self.expr_item()
+                v.append(expr_item)
+            else: v.append((None, Literal(Undefined())))
+        return ListLiteral(v) if len(v) > 1 else v[0][1]
+
+    def expr_item(self):
+        var = None
+        if self._peek(self.expr_item_rsts) == 'VAR':
+            VAR = self._scan('VAR')
+            if self._peek(self.expr_item_rsts_) == '":"':
+                self._scan('":"')
+                var = VAR
+            else: self._rewind()
+        expr_slst = self.expr_slst()
+        return (var, expr_slst)
+
+    def expr_slst(self):
+        or_expr = self.or_expr()
+        v = [(None, or_expr)]
+        while self._peek(self.expr_slst_rsts) not in self.expr_lst_rsts:
+            or_expr = self.or_expr()
+            v.append((None, or_expr))
+        return ListLiteral(v, comma=False) if len(v) > 1 else v[0][1]
+
+    def or_expr(self):
         and_expr = self.and_expr()
         v = and_expr
-        while self._peek(self.expr_rsts) == 'OR':
+        while self._peek(self.or_expr_rsts) == 'OR':
             OR = self._scan('OR')
             and_expr = self.and_expr()
             v = AnyOp(v, and_expr)
@@ -586,7 +605,7 @@ class SassExpression(Parser):
             return Literal(String(BANG_IMPORTANT, quotes=None))
         elif _token_ == 'LPAR':
             LPAR = self._scan('LPAR')
-            expr_lst = ListLiteral([])
+            expr_lst = ListLiteral()
             if self._peek(self.atom_rsts) not in self.atom_chks:
                 expr_lst = self.expr_lst()
             RPAR = self._scan('RPAR')
@@ -594,17 +613,17 @@ class SassExpression(Parser):
         elif _token_ == 'FNCT':
             FNCT = self._scan('FNCT')
             LPAR = self._scan('LPAR')
-            expr_lst = ArgspecLiteral([])
+            expr_lst = ListLiteral()
             if self._peek(self.atom_rsts) not in self.atom_chks:
                 expr_lst = self.expr_lst()
             RPAR = self._scan('RPAR')
             return CallOp(FNCT, expr_lst)
         elif _token_ == 'NUM':
             NUM = self._scan('NUM')
+            UNITS = None
             if self._peek(self.atom_rsts_) == 'UNITS':
                 UNITS = self._scan('UNITS')
-                return Literal(NumberValue(float(NUM), unit=UNITS.lower()))
-            return Literal(NumberValue(float(NUM)))
+            return Literal(NumberValue(float(NUM), unit=UNITS))
         elif _token_ == 'STR':
             STR = self._scan('STR')
             return Literal(String(STR[1:-1], quotes="'"))
@@ -618,50 +637,23 @@ class SassExpression(Parser):
             VAR = self._scan('VAR')
             return Variable(VAR)
 
-    def expr_lst(self):
-        expr_item = self.expr_item()
-        v = [expr_item]
-        while self._peek(self.expr_lst_rsts) == 'COMMA':
-            COMMA = self._scan('COMMA')
-            expr_item = self.expr_item()
-            v.append(expr_item)
-        return ListLiteral(v) if len(v) > 1 else v[0]
-
-    def expr_item(self):
-        var = None
-        if self._peek(self.expr_item_rsts) == 'VAR':
-            VAR = self._scan('VAR')
-            if self._peek(self.expr_item_rsts_) == '":"':
-                self._scan('":"')
-                var = VAR
-            else: self._rewind()
-        expr_slst = self.expr_slst()
-        return (var, expr_slst)
-
-    def expr_slst(self):
-        expr = self.expr()
-        v = [expr]
-        while self._peek(self.expr_slst_rsts) not in self.expr_lst_rsts:
-            expr = self.expr()
-            v.append(expr)
-        return ListLiteral(v, comma=False) if len(v) > 1 else v[0]
-
     m_expr_chks = set(['MUL', 'DIV'])
     comparison_rsts = set(['LPAR', 'QSTR', 'RPAR', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'ADD', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'GE', 'NOT', 'OR'])
     atom_rsts = set(['LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'NOT', 'ADD', 'NUM', 'FNCT', 'STR', 'VAR', 'RPAR', 'ID'])
     u_expr_chks = set(['LPAR', 'COLOR', 'QSTR', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
     m_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR'])
-    expr_lst_rsts = set(['END', 'COMMA', 'RPAR'])
-    and_expr_rsts = set(['AND', 'LPAR', 'RPAR', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'ID', 'BANG_IMPORTANT', 'OR'])
+    expr_lst_rsts_ = set(['LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'NOT', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'VAR', 'RPAR', 'ID'])
+    a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR'])
+    or_expr_rsts = set(['LPAR', 'RPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'ID', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'SIGN', 'OR'])
     u_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'ADD', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
-    expr_rsts = set(['LPAR', 'RPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'ID', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'SIGN', 'OR'])
-    atom_chks = set(['END', 'RPAR'])
+    expr_lst_rsts = set(['END', 'COMMA', 'RPAR'])
+    expr_item_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'NOT', 'ADD', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
     not_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
     atom_rsts_ = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'VAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR'])
-    expr_item_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'NOT', 'ADD', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
+    atom_chks = set(['END', 'RPAR'])
     comparison_chks = set(['GT', 'GE', 'NE', 'LT', 'LE', 'EQ'])
     a_expr_chks = set(['ADD', 'SUB'])
-    a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR'])
+    and_expr_rsts = set(['AND', 'LPAR', 'RPAR', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'ID', 'BANG_IMPORTANT', 'OR'])
     expr_item_rsts_ = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', '":"', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID', 'FNCT'])
     expr_slst_rsts = set(['LPAR', 'RPAR', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
 
