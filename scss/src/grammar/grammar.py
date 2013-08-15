@@ -12,8 +12,8 @@ class SassExpressionScanner(Scanner):
     patterns = None
     _patterns = [
         ('":"', ':'),
+        ('","', ','),
         ('[ \r\t\n]+', '[ \r\t\n]+'),
-        ('COMMA', ','),
         ('LPAR', '\\(|\\['),
         ('RPAR', '\\)|\\]'),
         ('END', '$'),
@@ -37,8 +37,10 @@ class SassExpressionScanner(Scanner):
         ('UNITS', '(?<!\\s)(?:[a-zA-Z]+|%)(?![-\\w])'),
         ('NUM', '(?:\\d+(?:\\.\\d*)?|\\.\\d+)'),
         ('COLOR', '#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])'),
+        ('KWVAR', '\\$[-a-zA-Z0-9_]+(?=\\s*:)'),
         ('VAR', '\\$[-a-zA-Z0-9_]+'),
         ('FNCT', '[-a-zA-Z_][-a-zA-Z0-9_]*(?=\\()'),
+        ('KWID', '[-a-zA-Z_][-a-zA-Z0-9_]*(?=\\s*:)'),
         ('ID', '[-a-zA-Z_][-a-zA-Z0-9_]*'),
         ('BANG_IMPORTANT', '!important'),
     ]
@@ -167,9 +169,15 @@ class SassExpression(Parser):
         _token_ = self._peek(self.u_expr_chks)
         if _token_ == 'LPAR':
             LPAR = self._scan('LPAR')
-            expr_lst = self.expr_lst()
+            _token_ = self._peek(self.atom_rsts)
+            if _token_ == 'KWID':
+                expr_map = self.expr_map()
+                v = expr_map
+            else:  # in self.not_expr_rsts
+                expr_lst = self.expr_lst()
+                v = Parentheses(expr_lst)
             RPAR = self._scan('RPAR')
-            return Parentheses(expr_lst)
+            return v
         elif _token_ == 'ID':
             ID = self._scan('ID')
             return Literal(parse_bareword(ID))
@@ -180,14 +188,14 @@ class SassExpression(Parser):
             FNCT = self._scan('FNCT')
             v = ArgspecLiteral([])
             LPAR = self._scan('LPAR')
-            if self._peek(self.atom_rsts) != 'RPAR':
+            if self._peek(self.atom_rsts_) != 'RPAR':
                 argspec = self.argspec()
                 v = argspec
             RPAR = self._scan('RPAR')
             return CallOp(FNCT, v)
         elif _token_ == 'NUM':
             NUM = self._scan('NUM')
-            if self._peek(self.atom_rsts_) == 'UNITS':
+            if self._peek(self.atom_rsts__) == 'UNITS':
                 UNITS = self._scan('UNITS')
                 return Literal(NumberValue(float(NUM), unit=UNITS.lower()))
             return Literal(NumberValue(float(NUM)))
@@ -204,11 +212,31 @@ class SassExpression(Parser):
             VAR = self._scan('VAR')
             return Variable(VAR)
 
+    def expr_map(self):
+        map_items = self.map_items()
+        return MapLiteral(map_items)
+
+    def map_items(self):
+        map_item = self.map_item()
+        pairs = [map_item]
+        if self._peek(self.map_items_rsts) == '","':
+            self._scan('","')
+            if self._peek(self.map_items_rsts_) == 'KWID':
+                map_items = self.map_items()
+                pairs.extend(map_items)
+        return pairs
+
+    def map_item(self):
+        KWID = self._scan('KWID')
+        self._scan('":"')
+        expr_slst = self.expr_slst()
+        return (KWID, expr_slst)
+
     def argspec(self):
         argspec_item = self.argspec_item()
         v = [argspec_item]
-        while self._peek(self.argspec_rsts) == 'COMMA':
-            COMMA = self._scan('COMMA')
+        while self._peek(self.map_items_rsts) == '","':
+            self._scan('","')
             argspec_item = self.argspec_item()
             v.append(argspec_item)
         return ArgspecLiteral(v)
@@ -227,8 +255,8 @@ class SassExpression(Parser):
     def expr_lst(self):
         expr_slst = self.expr_slst()
         v = [expr_slst]
-        while self._peek(self.expr_lst_rsts) == 'COMMA':
-            COMMA = self._scan('COMMA')
+        while self._peek(self.expr_lst_rsts) == '","':
+            self._scan('","')
             expr_slst = self.expr_slst()
             v.append(expr_slst)
         return ListLiteral(v) if len(v) > 1 else v[0]
@@ -242,23 +270,25 @@ class SassExpression(Parser):
         return ListLiteral(v, comma=False) if len(v) > 1 else v[0]
 
     m_expr_chks = set(['MUL', 'DIV'])
-    comparison_rsts = set(['LPAR', 'QSTR', 'RPAR', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'ADD', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'GE', 'NOT', 'OR'])
-    atom_rsts = set(['LPAR', 'BANG_IMPORTANT', 'COLOR', 'QSTR', 'SIGN', 'NOT', 'ADD', 'NUM', 'FNCT', 'STR', 'VAR', 'RPAR', 'ID'])
+    map_items_rsts_ = set(['KWID', 'RPAR'])
+    comparison_rsts = set(['LPAR', 'QSTR', 'RPAR', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'ADD', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'GE', 'NOT', 'OR', '","'])
+    atom_rsts = set(['KWID', 'LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
+    atom_rsts__ = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'VAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
     u_expr_chks = set(['LPAR', 'COLOR', 'QSTR', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
-    m_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR'])
-    argspec_item_rsts_ = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', '":"', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID', 'FNCT'])
-    expr_lst_rsts = set(['END', 'COMMA', 'RPAR'])
-    argspec_rsts = set(['COMMA', 'RPAR'])
-    and_expr_rsts = set(['AND', 'LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'ID', 'RPAR', 'OR'])
+    m_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
+    map_items_rsts = set(['RPAR', '","'])
+    expr_lst_rsts = set(['RPAR', 'END', '","'])
+    and_expr_rsts = set(['AND', 'LPAR', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', 'FNCT', 'STR', 'NOT', 'ID', 'BANG_IMPORTANT', 'OR', '","'])
     u_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'ADD', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
-    expr_rsts = set(['LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'RPAR', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'ID', 'SIGN', 'OR'])
+    expr_rsts = set(['LPAR', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', 'FNCT', 'STR', 'NOT', 'ID', 'BANG_IMPORTANT', 'OR', '","'])
     not_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
     argspec_item_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'NOT', 'ADD', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
-    atom_rsts_ = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'VAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR'])
+    atom_rsts_ = set(['LPAR', 'BANG_IMPORTANT', 'COLOR', 'QSTR', 'SIGN', 'NOT', 'ADD', 'NUM', 'FNCT', 'STR', 'VAR', 'RPAR', 'ID'])
     comparison_chks = set(['GT', 'GE', 'NE', 'LT', 'LE', 'EQ'])
     a_expr_chks = set(['ADD', 'SUB'])
-    a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'COMMA', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR'])
-    expr_slst_rsts = set(['LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'RPAR', 'VAR', 'ADD', 'NUM', 'COMMA', 'FNCT', 'STR', 'NOT', 'SIGN', 'ID'])
+    a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
+    argspec_item_rsts_ = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', '":"', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID', 'FNCT'])
+    expr_slst_rsts = set(['LPAR', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID', '","'])
 
 
 ### Grammar ends.

@@ -680,8 +680,6 @@ class Color(Value):
 
 
 class String(Value):
-    sass_type_name = u'string'
-
     """Represents both CSS quoted string values and CSS identifiers (such as
     `left`).
 
@@ -689,6 +687,8 @@ class String(Value):
     quotes are preserved on string literals that pass through unmodified.
     Otherwise, double quotes are used.
     """
+
+    sass_type_name = u'string'
 
     def __init__(self, value, quotes='"'):
         if isinstance(value, String):
@@ -757,6 +757,34 @@ class String(Value):
     def render(self, compress=False):
         return self.__str__()
 
+
+### XXX EXPERIMENTAL XXX
+class Map(Value):
+    sass_type_name = u'map'
+
+    def __init__(self, pairs):
+        self.pairs = pairs
+        self.index = {}
+        for key, value in pairs:
+            self.index[key] = value
+
+    def __hash__(self):
+        return hash(self.pairs)
+
+    def __len__(self):
+        return len(self.pairs)
+
+    def __iter__(self):
+        return iter(self.pairs)
+
+    def get_by_key(self, key):
+        return self.index[key]
+
+    def get_by_pos(self, key):
+        return self.pairs[key][1]
+
+    def render(self, compress=False):
+        raise TypeError("maps cannot be rendered as CSS")
 
 # Backwards-compatibility.
 ColorValue = Color

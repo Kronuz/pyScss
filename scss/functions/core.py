@@ -435,6 +435,7 @@ CORE_LIBRARY.add(NumberValue.wrap_python_function(math.floor), 'floor', 1)
 
 # ------------------------------------------------------------------------------
 # List functions
+
 def __parse_separator(separator, default_from=None):
     if separator is None:
         return None
@@ -533,6 +534,49 @@ def index(lst, val):
         if lst.value[i] == val:
             return NumberValue(i + 1)
     return BooleanValue(False)
+
+
+# ------------------------------------------------------------------------------
+# Map functions
+
+@register('map-get', 2)
+def map_get(map, key):
+    print(repr(map.index.keys()))
+    return map.index[key]
+
+
+@register('map-merge', 2)
+def map_merge(*maps):
+    pairs = []
+    index = {}
+    for map in maps:
+        for key, value in map.pairs:
+            if key in index:
+                continue
+
+            pairs.append((key, value))
+            index[key] = value
+
+    return Map(pairs)
+
+
+@register('map-keys', 1)
+def map_keys(map):
+    return List(
+        [k for (k, v) in map.pairs],
+        comma=True)
+
+
+@register('map-values', 1)
+def map_values(map):
+    return List(
+        [v for (k, v) in map.pairs],
+        comma=True)
+
+
+@register('map-has-key', 2)
+def map_values(map, key):
+    return BooleanValue(key in map.index)
 
 
 # ------------------------------------------------------------------------------

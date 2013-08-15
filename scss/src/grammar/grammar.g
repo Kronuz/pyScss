@@ -5,7 +5,6 @@
 %%
 parser SassExpression:
     ignore: "[ \r\t\n]+"
-    token COMMA: ","
     token LPAR: "\\(|\\["
     token RPAR: "\\)|\\]"
     token END: "$"
@@ -29,8 +28,10 @@ parser SassExpression:
     token UNITS: "(?<!\s)(?:[a-zA-Z]+|%)(?![-\w])"
     token NUM: "(?:\d+(?:\.\d*)?|\.\d+)"
     token COLOR: "#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])"
+    token KWVAR: "\$[-a-zA-Z0-9_]+(?=\s*:)"
     token VAR: "\$[-a-zA-Z0-9_]+"
     token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
+    token KWID: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\s*:)"
     token ID: "[-a-zA-Z_][-a-zA-Z0-9_]*"
     token BANG_IMPORTANT: "!important"
 
@@ -76,7 +77,10 @@ parser SassExpression:
                         | ADD u_expr                {{ return UnaryOp(operator.pos, u_expr) }}
                         | atom                      {{ return atom }}
 
-    rule atom:          LPAR expr_lst RPAR          {{ return Parentheses(expr_lst) }}
+    rule atom:          LPAR (
+                            expr_map                {{ v = expr_map }}
+                            | expr_lst              {{ v = Parentheses(expr_lst) }}
+                        ) RPAR                      {{ return v }}
                         | ID                        {{ return Literal(parse_bareword(ID)) }}
                         | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
                         | FNCT                      {{ v = ArgspecLiteral([]) }}
@@ -91,9 +95,22 @@ parser SassExpression:
                         | COLOR                     {{ return Literal(ColorValue(ParserValue(COLOR))) }}
                         | VAR                       {{ return Variable(VAR) }}
 
+
+    rule expr_map:      map_items                   {{ return MapLiteral(map_items) }}
+
+    rule map_items:     map_item                    {{ pairs = [map_item] }}
+                        [
+                            ","
+                            [ map_items             {{ pairs.extend(map_items) }}
+                            ]
+                        ]                           {{ return pairs }}
+
+    rule map_item:      KWID ":" expr_slst          {{ return (KWID, expr_slst) }}
+
+
     rule argspec:       argspec_item                {{ v = [argspec_item] }}
                         (
-                            COMMA
+                            ","
                             argspec_item            {{ v.append(argspec_item) }}
                         )*                          {{ return ArgspecLiteral(v) }}
 
@@ -107,7 +124,7 @@ parser SassExpression:
 
     rule expr_lst:      expr_slst                   {{ v = [expr_slst] }}
                         (
-                            COMMA
+                            ","
                             expr_slst               {{ v.append(expr_slst) }}
                         )*                          {{ return ListLiteral(v) if len(v) > 1 else v[0] }}
 
