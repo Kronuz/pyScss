@@ -30,6 +30,7 @@ parser SassExpression:
     token NUM: "(?:\d+(?:\.\d*)?|\.\d+)"
     token COLOR: "#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])"
     token VAR: "\$[-a-zA-Z0-9_]+"
+    token NAME: "\$?[-a-zA-Z0-9_]+"
     token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
     token ID: "!?[-a-zA-Z_][-a-zA-Z0-9_]*"
     token BANG_IMPORTANT: "!important"
@@ -42,8 +43,8 @@ parser SassExpression:
                                 [ expr_item ]       {{ v.append(expr_item) }}
                         )*                          {{ return ListLiteral(v) if len(v) > 1 else v[0][1] }}
 
-    rule expr_item:                                 {{ VAR = None }}
-                        [ VAR ":" ] expr_slst       {{ return (VAR, expr_slst) }}
+    rule expr_item:                                 {{ NAME = None }}
+                        [ NAME ":" ] expr_slst      {{ return (NAME, expr_slst) }}
 
     rule expr_slst:     or_expr                     {{ v = [(None, or_expr)] }}
                         (
