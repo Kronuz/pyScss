@@ -35,6 +35,21 @@ class Value(object):
     ### NOTE: From here on down, the operators are exposed to Sass code and
     ### thus should ONLY return Sass types
 
+    # All Sass scalars also act like one-element spaced lists
+    use_comma = False
+
+    def __iter__(self):
+        return iter((self,))
+
+    def __len__(self):
+        return 1
+
+    def __getitem__(self, key):
+        if key != 0:
+            raise IndexError(key)
+
+        return self
+
     # Reasonable default for equality
     def __eq__(self, other):
         return BooleanValue(
@@ -425,13 +440,7 @@ class List(Value):
         """If `values` appears to not be a list, return a list containing it.
         Otherwise, return a List as normal.
         """
-        if isinstance(values, (List, Map)):
-            return values
-
-        if not isinstance(values, (list, tuple)):
-            values = [values]
-
-        return cls(values, use_comma=use_comma)
+        return values
 
     @classmethod
     def from_maybe_starargs(cls, args, use_comma=True):

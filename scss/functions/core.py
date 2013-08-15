@@ -541,8 +541,7 @@ def index(lst, val):
 
 @register('map-get', 2)
 def map_get(map, key):
-    print(repr(map.index.keys()))
-    return map.index[key]
+    return map.get_by_key(key)
 
 
 @register('map-merge', 2)
