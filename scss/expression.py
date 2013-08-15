@@ -42,11 +42,11 @@ class Calculator(object):
         better_expr_str = self.evaluate_expression(_base_str)
 
         if better_expr_str is None:
-            better_expr_str = self.apply_vars(_base_str)
+            return self.apply_vars(_base_str)
+        elif better_expr_str.is_null:
+            return ""
         else:
-            better_expr_str = dequote(better_expr_str.render())
-
-        return better_expr_str
+            return dequote(better_expr_str.render())
 
     def do_glob_math(self, cont):
         """Performs #{}-interpolation.  The result is always treated as a fixed

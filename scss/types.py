@@ -425,7 +425,10 @@ class List(Value):
         """If `values` appears to not be a list, return a list containing it.
         Otherwise, return a List as normal.
         """
-        if not isinstance(values, (list, tuple, List)):
+        if isinstance(values, (List, Map)):
+            return values
+
+        if not isinstance(values, (list, tuple)):
             values = [values]
 
         return cls(values, use_comma=use_comma)
