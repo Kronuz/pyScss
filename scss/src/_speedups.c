@@ -6,7 +6,7 @@
 * https://github.com/Kronuz/pyScss
 *
 * MIT license (http://www.opensource.org/licenses/mit-license.php)
-* Copyright (c) 2011 German M. Bravo (Kronuz), All rights reserved.
+* Copyright (c) 2011, 2013 German M. Bravo (Kronuz), All rights reserved.
 */
 #include <Python.h>
 #include "block_locator.h"

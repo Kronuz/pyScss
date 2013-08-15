@@ -6,7 +6,7 @@
 * https://github.com/Kronuz/pyScss
 *
 * MIT license (http://www.opensource.org/licenses/mit-license.php)
-* Copyright (c) 2011 German M. Bravo (Kronuz), All rights reserved.
+* Copyright (c) 2011, 2013 German M. Bravo (Kronuz), All rights reserved.
 */
 #include <Python.h>
 
@@ -159,10 +159,10 @@ Pattern_finalize(void) {
 static long
 _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 {
-	Token best_token, *p_token;
+	Token best_pat, *last_read_token;
 	Restriction *p_restriction;
 	Pattern *regex;
-	int j, k, max, skip;
+	int j, k, max, ignore;
 	size_t len;
 	char *aux;
 
@@ -172,7 +172,7 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 
 	while (1) {
 		regex = NULL;
-		best_token.regex = NULL;
+		best_pat.regex = NULL;
 		/* Search the patterns for a match, with earlier
 		   tokens in the list having preference */
 		for (j = 0; j < Pattern_patterns_sz; j++) {
@@ -181,24 +181,24 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 				fprintf(stderr, "\tTrying %s: %s at pos %d -> %s\n", repr(regex->tok), repr(regex->expr), self->pos, repr(self->input));
 			#endif
 			/* First check to see if we're restricting to this token */
-			skip = restrictions_sz;
-			if (skip) {
+			ignore = restrictions_sz;
+			if (ignore) {
 				max = (restrictions_sz > self->ignore_sz) ? restrictions_sz : self->ignore_sz;
 				for (k = 0; k < max; k++) {
 					if (k < restrictions_sz && strcmp(regex->tok, restrictions[k].tok) == 0) {
-						skip = 0;
+						ignore = 0;
 						break;
 					}
 					if (k < self->ignore_sz && regex == self->ignore[k]) {
-						skip = 0;
+						ignore = 0;
 						break;
 					}
 				}
-				if (skip) {
-					continue;
+				if (ignore) {
 					#ifdef DEBUG
 						fprintf(stderr, "\tSkipping %s!\n", repr(regex->tok));
 					#endif
+					continue;
 				}
 			}
 			if (Pattern_match(
@@ -206,7 +206,7 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 				self->input,
 				self->input_sz,
 				self->pos,
-				&best_token
+				&best_pat
 			)) {
 				#ifdef DEBUG
 					fprintf(stderr, "Match OK! %s: %s at pos %d\n", repr(regex->tok), repr(regex->expr), self->pos);
@@ -215,7 +215,7 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 			}
 		}
 		/* If we didn't find anything, raise an error */
-		if (best_token.regex == NULL) {
+		if (best_pat.regex == NULL) {
 			if (restrictions_sz) {
 				sprintf(self->exc, "SyntaxError[@ char %d: %s found while trying to find one of the restricted tokens: ", self->pos, (regex == NULL) ? "???" : repr(regex->tok));
 				aux = self->exc + strlen(self->exc);
@@ -234,55 +234,52 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 			sprintf(self->exc, "SyntaxError[@ char %d: Bad token: %s]", self->pos, (regex == NULL) ? "???" : repr(regex->tok));
 			return SCANNER_EXC_BAD_TOKEN;
 		}
-		/* If we found something that isn't to be ignored, return it */
-		skip = 0;
+
+		ignore = 0;  /* Should this token be ignored? */
 		for (k = 0; k < self->ignore_sz; k++) {
-			if (best_token.regex == self->ignore[k]) {
-				/* This token should be ignored... */
-				self->pos += best_token.string_sz;
-				skip = 1;
+			if (best_pat.regex == self->ignore[k]) {
+				ignore = 1;
 				break;
 			}
 		}
-		if (!skip) {
-			break;
-		}
-	}
-	if (best_token.regex) {
-		self->pos = (int)(best_token.string - self->input + best_token.string_sz);
-		/* Only add this token if it's not in the list (to prevent looping) */
-		p_token = &self->tokens[self->tokens_sz - 1];
-		if (self->tokens_sz == 0 ||
-			p_token->regex != best_token.regex ||
-			p_token->string != best_token.string ||
-			p_token->string_sz != best_token.string_sz
-		) {
-			if (self->tokens_sz >= self->tokens_bsz) {
-				/* Needs to expand block */
-				self->tokens_bsz = self->tokens_bsz + BLOCK_SIZE_PATTERNS;
-				PyMem_Resize(self->tokens, Token, self->tokens_bsz);
-				PyMem_Resize(self->restrictions, Restriction, self->tokens_bsz);
-			}
-			memcpy(&self->tokens[self->tokens_sz], &best_token, sizeof(Token));
-			p_restriction = &self->restrictions[self->tokens_sz];
-			if (restrictions_sz) {
-				p_restriction->patterns = PyMem_New(Pattern *, restrictions_sz);
-				p_restriction->patterns_sz = 0;
-				for (j = 0; j < restrictions_sz; j++) {
-					regex = Pattern_regex(restrictions[j].tok, restrictions[j].expr);
-					if (regex) {
-						p_restriction->patterns[p_restriction->patterns_sz++] = regex;
-					}
+		self->pos += best_pat.string_sz;
+
+		/* If we found something that isn't to be ignored, return it */
+		if (!ignore) {			
+			/* Only add this token if it's not in the list (to prevent looping) */
+			last_read_token = &self->tokens[self->tokens_sz - 1];
+			if (self->tokens_sz == 0 ||
+				last_read_token->regex != best_pat.regex ||
+				last_read_token->string != best_pat.string ||
+				last_read_token->string_sz != best_pat.string_sz
+			) {
+				if (self->tokens_sz >= self->tokens_bsz) {
+					/* Needs to expand blocks */
+					self->tokens_bsz = self->tokens_bsz + BLOCK_SIZE_PATTERNS;
+					PyMem_Resize(self->tokens, Token, self->tokens_bsz);
+					PyMem_Resize(self->restrictions, Restriction, self->tokens_bsz);
 				}
-			} else {
-				p_restriction->patterns = NULL;
-				p_restriction->patterns_sz = 0;
+				memcpy(&self->tokens[self->tokens_sz], &best_pat, sizeof(Token));
+				p_restriction = &self->restrictions[self->tokens_sz];
+				if (restrictions_sz) {
+					p_restriction->patterns = PyMem_New(Pattern *, restrictions_sz);
+					p_restriction->patterns_sz = 0;
+					for (j = 0; j < restrictions_sz; j++) {
+						regex = Pattern_regex(restrictions[j].tok, restrictions[j].expr);
+						if (regex) {
+							p_restriction->patterns[p_restriction->patterns_sz++] = regex;
+						}
+					}
+				} else {
+					p_restriction->patterns = NULL;
+					p_restriction->patterns_sz = 0;
+				}
+				self->tokens_sz++;
+				return 1;
 			}
-			self->tokens_sz++;
-			return 1;
+			return 0;
 		}
 	}
-	return 0;
 }
 
 

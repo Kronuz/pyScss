@@ -21,7 +21,6 @@ import re
 import sys
 
 DEBUG = False
-MIN_WINDOW = 4096
 # File lookup window
 
 
@@ -71,9 +70,6 @@ class Token(object):
         return output
 
 
-in_name = 0
-
-
 class Scanner(object):
     """Yapps scanner.
 
@@ -85,9 +81,11 @@ class Scanner(object):
     restriction (the set is always the full set of tokens).
 
     """
+    MIN_WINDOW = 4096
+    in_name = 0
 
     def __init__(self, patterns, ignore, input="",
-            file=None, filename=None, stacked=False):
+            file=None, filename=None):
         """Initialize the scanner.
 
         Parameters:
@@ -106,13 +104,11 @@ class Scanner(object):
         """
 
         if not filename:
-            global in_name
-            filename = "<f.%d>" % in_name
-            in_name += 1
+            filename = "<f.%d>" % self.__class__.in_name
+            self.__class__.in_name += 1
 
         self.reset(input, file, filename)
         self.ignore = ignore
-        self.stacked = stacked
 
         if patterns is not None:
             # Compile the regex strings into regex objects
@@ -216,19 +212,19 @@ class Scanner(object):
         """Get more input if possible."""
         if not self.file:
             return
-        if len(self.input) - self.pos >= MIN_WINDOW:
+        if len(self.input) - self.pos >= self.MIN_WINDOW:
             return
 
-        data = self.file.read(MIN_WINDOW)
+        data = self.file.read(self.MIN_WINDOW)
         if data is None or data == "":
             self.file = None
 
         # Drop bytes from the start, if necessary.
-        if self.pos > 2 * MIN_WINDOW:
-            self.del_pos += MIN_WINDOW
-            self.del_line += self.input[:MIN_WINDOW].count("\n")
-            self.pos -= MIN_WINDOW
-            self.input = self.input[MIN_WINDOW:] + data
+        if self.pos > 2 * self.MIN_WINDOW:
+            self.del_pos += self.MIN_WINDOW
+            self.del_line += self.input[:self.MIN_WINDOW].count("\n")
+            self.pos -= self.MIN_WINDOW
+            self.input = self.input[self.MIN_WINDOW:] + data
         else:
             self.input = self.input + data
 
@@ -245,21 +241,17 @@ class Scanner(object):
         Should scan another token and add it to the list, self.tokens,
         and add the restriction to self.restrictions
         """
+        token = None
         # Keep looking for a token, ignoring any in self.ignore
         while True:
             tok = None
 
             self.grab_input()
 
-            # special handling for end-of-file
-            if self.stacked and self.pos == len(self.input):
-                raise StopIteration
-
             # Search the patterns for the longest match, with earlier
             # tokens in the list having preference
-            best_match = -1
+            best_pat_len = -1
             best_pat = None
-            best_m = None
             for tok, regex in self.patterns:
                 if DEBUG:
                     print("\tTrying %s: %s at pos %d -> %s" % (repr(tok), repr(regex.pattern), self.pos, repr(self.input)))
@@ -269,56 +261,44 @@ class Scanner(object):
                         print "\tSkipping %s!" % repr(tok)
                     continue
                 m = regex.match(self.input, self.pos)
-                if m and m.end() - m.start() > best_match:
+                if m and m.end() - m.start() > best_pat_len:
                     # We got a match that's better than the previous one
                     best_pat = tok
-                    best_match = m.end() - m.start()
-                    best_m = m
+                    best_pat_len = m.end() - m.start()
                     if DEBUG:
                         print("Match OK! %s: %s at pos %d" % (repr(tok), repr(regex.pattern), self.pos))
+                    break
 
             # If we didn't find anything, raise an error
-            if best_pat is None or best_match < 0:
+            if best_pat is None or best_pat_len < 0:
                 msg = "Bad token: %s" % ("???" if tok is None else repr(tok),)
                 if restrict:
                     msg = "%s found while trying to find one of the restricted tokens: %s" % ("???" if tok is None else repr(tok), ", ".join(repr(r) for r in restrict))
                 raise SyntaxError(self.get_pos(), msg, context=context)
 
-            ignore = best_pat in self.ignore
-            end_pos = self.pos + best_match
-            value = self.input[self.pos:end_pos]
+            ignore = best_pat in self.ignore  # Should this token be ignored?
+            start_pos = self.pos
+            end_pos = start_pos + best_pat_len
+            self.pos = end_pos
+
+            # If we found something that isn't to be ignored, return it
             if not ignore:
+                value = self.input[start_pos:end_pos]
                 # token = Token(type=best_pat, value=value, pos=self.get_pos())
                 token = (
-                    self.pos,
+                    start_pos,
                     end_pos,
                     best_pat,
                     value,
                 )
-            self.pos = end_pos
-
-            npos = value.rfind("\n")
-            if npos > -1:
-                self.col = best_match - npos
-                self.line += value.count('\n')
-            else:
-                self.col += best_match
-
-            # If we found something that isn't to be ignored, return it
-            if not ignore:
                 # print repr(token)
                 if not self.tokens or token != self.last_read_token:
-                    # Only add this token if it's not in the list
-                    # (to prevent looping)
+                    # Only add this token if it's not in the list (to prevent looping)
                     self.last_read_token = token
                     self.tokens.append(token)
                     self.restrictions.append(restrict)
                     return 1
                 return 0
-            else:
-                ignore = self.ignore[best_pat]
-                if ignore:
-                    ignore(self, best_m)
 
     def token(self, i, restrict=None, **kwargs):
         """
@@ -335,7 +315,15 @@ class Scanner(object):
                 raise NotImplementedError("Unimplemented: restriction set changed")
         if i >= 0 and i < tokens_len:
             return self.tokens[i]
-        raise NoMoreTokens
+        raise NoMoreTokens()
+
+    def rewind(self, i):
+        tokens_len = len(self.tokens)
+        if i <= tokens_len:
+            token = self.tokens[i]
+            self.tokens = self.tokens[:i]
+            self.restrictions = self.restrictions[:i]
+            self.pos = token[0]
 
 
 class Parser(object):
