@@ -9,6 +9,10 @@ import pytest
 def calc():
     return Calculator().evaluate_expression
 
+def assert_strict_string_eq(expected, actual):
+    assert expected.value == actual.value
+    assert expected.quotes == actual.quotes
+
 def test_reference_operations():
     """Test the example expressions in the reference document:
 
@@ -43,19 +47,19 @@ def test_reference_operations():
     assert calc('#010203 + #040506') == Color.from_hex('#050709')
     assert calc('#010203 * 2') == Color.from_hex('#020406')
     assert calc('rgba(255, 0, 0, 0.75) + rgba(0, 255, 0, 0.75)') == Color.from_rgb(1, 1, 0, 0.75)
-    assert calc('opacify($translucent-red, 0.3)') == Color.from_rgb(1, 0, 0, 0.9)
+    assert calc('opacify($translucent-red, 0.3)') == Color.from_rgb(1, 0, 0, 0.8)
     assert calc('transparentize($translucent-red, 0.25)') == Color.from_rgb(1, 0, 0, 0.25)
     assert calc("progid:DXImageTransform.Microsoft.gradient(enabled='false', startColorstr='#{ie-hex-str($green)}', endColorstr='#{ie-hex-str($translucent-red)}')"
-                ) == "progid:DXImageTransform.Microsoft.gradient(enabled='false', startColorstr=#FF00FF00, endColorstr=#80FF0000)"
+                ) == "progid:DXImageTransform.Microsoft.gradient(enabled='false', startColorstr='#FF00FF00', endColorstr='#80FF0000')"
 
     # String operations
     ns.set_variable('$value', Null())
-    assert calc('e + -resize') == 'e-resize'
-    assert calc('"Foo " + Bar') == '"Foo Bar"'
-    assert calc('sans- + "serif"') == 'sans-serif'
-    assert calc('3px + 4px auto') == '7px auto'
-    assert calc('"I ate #{5 + 10} pies!"') == '"I ate 15 pies!"'
-    assert calc('"I ate #{$value} pies!"') == '"I ate  pies!"'
+    assert_strict_string_eq(calc('e + -resize'), String('e-resize', quotes=None))
+    assert_strict_string_eq(calc('"Foo " + Bar'), String('Foo Bar', quotes='"'))
+    assert_strict_string_eq(calc('sans- + "serif"'), String('sans-serif', quotes=None))
+    assert calc('3px + 4px auto') == List([Number(7, "px"), String('auto', quotes=None)])
+    assert_strict_string_eq(calc('"I ate #{5 + 10} pies!"'), String('I ate 15 pies!', quotes='"'))
+    assert_strict_string_eq(calc('"I ate #{$value} pies!"'), String('I ate  pies!', quotes='"'))
 
 
 

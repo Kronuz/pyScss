@@ -36,17 +36,16 @@ class Calculator(object):
         else:
             self.namespace = namespace
 
-    def _calculate_expr(self, result):
-        _group0 = result.group(1)
-        _base_str = _group0
-        better_expr_str = self.evaluate_expression(_base_str)
+    def _pound_substitute(self, result):
+        expr = result.group(1)
+        value = self.evaluate_expression(expr)
 
-        if better_expr_str is None:
-            better_expr_str = self.apply_vars(_base_str)
+        if value is None:
+            return self.apply_vars(expr)
+        elif value.is_null:
+            return ""
         else:
-            better_expr_str = dequote(better_expr_str.render())
-
-        return better_expr_str
+            return dequote(value.render())
 
     def do_glob_math(self, cont):
         """Performs #{}-interpolation.  The result is always treated as a fixed
@@ -57,7 +56,7 @@ class Calculator(object):
         cont = str(cont)
         if '#{' not in cont:
             return cont
-        cont = _expr_glob_re.sub(self._calculate_expr, cont)
+        cont = _expr_glob_re.sub(self._pound_substitute, cont)
         return cont
 
     def apply_vars(self, cont):
