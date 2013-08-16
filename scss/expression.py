@@ -68,16 +68,26 @@ class Calculator(object):
             except KeyError:
                 # Interpolate variables:
                 def _av(m):
-                    v = self.namespace.variable(m.group(2))
-                    if v:
-                        if not isinstance(v, six.string_types):
-                            v = v.render()
-                        # TODO this used to test for _dequote
-                        if m.group(1):
-                            v = dequote(v)
+                    v = None
+                    n = m.group(2)
+                    try:
+                        v = self.namespace.variable(n)
+                    except KeyError:
+                        if FATAL_UNDEFINED:
+                            raise
+                        else:
+                            log.error("Undefined variable '%s'", n, extra={'stack': True})
+                            return n
                     else:
-                        v = m.group(0)
-                    return v
+                        if v:
+                            if not isinstance(v, six.string_types):
+                                v = v.render()
+                            # TODO this used to test for _dequote
+                            if m.group(1):
+                                v = dequote(v)
+                        else:
+                            v = m.group(0)
+                        return v
 
                 cont = _interpolate_re.sub(_av, cont)
         # XXX what?: if options is not None:
