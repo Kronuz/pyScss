@@ -266,7 +266,7 @@ class CallOp(Expression):
         args = []
         kwargs = {}
         evald_argpairs = []
-        for var, expr in self.argspec.argpairs:
+        for var, expr in self.argspec.iter_call_argspec():
             value = expr.evaluate(calculator, divide=True)
             evald_argpairs.append((var, value))
 
@@ -361,18 +361,31 @@ class ArgspecLiteral(Expression):
         self.argpairs = argpairs
 
     def iter_def_argspec(self):
-        """Interpreting this literal as parsed a function call, yields pairs of
+        """Interpreting this literal as a function definition, yields pairs of
         (variable name as a string, default value as an AST node or None).
         """
-        for name, value in self.argpairs:
-            if name is None:
+        for var, value in self.argpairs:
+            if var is None:
                 # value is actually the name
-                if not isinstance(value, Variable):
-                    raise SyntaxError("Function definition argspec contains an expression")
-                name = value.name
+                var = value
                 value = None
 
-            yield name, value
+            if not isinstance(var, Variable):
+                raise SyntaxError("Expected variable name, got %r" % (var,))
+
+            yield var.name, value
+
+    def iter_call_argspec(self):
+        """Interpreting this literal as a function call, yields pairs of
+        (variable name as a string, default value as an AST node or None).
+        """
+        for var, value in self.argpairs:
+            if var is None:
+                yield var, value
+            else:
+                if not isinstance(var, Variable):
+                    raise SyntaxError("Expected variable name, got %r" % (var,))
+                yield var.name, value
 
 
 def parse_bareword(word):
