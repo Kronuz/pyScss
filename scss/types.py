@@ -529,6 +529,15 @@ class List(Value):
     def __getitem__(self, key):
         return self.value[key]
 
+    def __mul__(self, other):
+        # DEVIATION: Ruby Sass doesn't do this, because Ruby doesn't.  But
+        # Python does, and in Ruby Sass it's just fatal anyway.
+        if not isinstance(other, Number):
+            return super(List, self).__mul__(other)
+
+        if not other.is_unitless:
+            raise TypeError("Can only multiply %s by %s" % (self.__class__.__name__, other.__class__.__name__))
+
     def render(self, compress=False):
         delim = self.delimiter(compress)
 
