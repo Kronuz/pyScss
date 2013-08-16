@@ -34,8 +34,7 @@ parser SassExpression:
     token ID: "[-a-zA-Z_][-a-zA-Z0-9_]*"
     token BANG_IMPORTANT: "!important"
 
-    rule goal:          expr_lst                    {{ v = expr_lst }}
-                        END                         {{ return v }}
+    rule goal:          expr_lst END                {{ return expr_lst }}
 
     rule argspec:       argspec_item                {{ v = [argspec_item] }}
                         (
@@ -100,13 +99,10 @@ parser SassExpression:
     rule atom:          LPAR expr_lst RPAR          {{ return Parentheses(expr_lst) }}
                         | ID                        {{ return Literal(parse_bareword(ID)) }}
                         | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
-                        | FNCT                      {{ v = ArgspecLiteral([]) }}
-                            LPAR [
-                                argspec             {{ v = argspec }}
-                            ] RPAR                  {{ return CallOp(FNCT, v) }}
-                        | NUM [
-                                UNITS               {{ return Literal(NumberValue(float(NUM), unit=UNITS.lower())) }}
-                            ]                       {{ return Literal(NumberValue(float(NUM))) }}
+                        | FNCT                      {{ argspec = ArgspecLiteral([]) }}
+                            LPAR [ argspec ] RPAR   {{ return CallOp(FNCT, argspec) }}
+                        | NUM                       {{ UNITS = None }}
+                            [ UNITS ]               {{ return Literal(NumberValue(float(NUM), unit=UNITS)) }}
                         | STR                       {{ return Literal(String(STR[1:-1], quotes="'")) }}
                         | QSTR                      {{ return Literal(String(QSTR[1:-1], quotes='"')) }}
                         | COLOR                     {{ return Literal(ColorValue(ParserValue(COLOR))) }}
