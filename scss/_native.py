@@ -1,4 +1,5 @@
 """Pure-Python scanner and parser, used if _speedups is not available."""
+from __future__ import print_function
 
 from scss.cssdefs import SEPARATOR
 import re
@@ -195,7 +196,7 @@ class Scanner(object):
                 # First check to see if we're restricting to this token
                 if restrict and tok not in restrict and tok not in self.ignore:
                     if DEBUG:
-                        print "\tSkipping %s!" % repr(tok)
+                        print("\tSkipping %r!" % (tok,))
                     continue
                 m = regex.match(self.input, self.pos)
                 if m:
