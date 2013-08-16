@@ -416,6 +416,7 @@ class Parser(object):
 
 ################################################################################
 ## Grammar compiled using Yapps:
+
 class SassExpressionScanner(Scanner):
     patterns = None
     _patterns = [
@@ -465,14 +466,54 @@ class SassExpressionScanner(Scanner):
 class SassExpression(Parser):
     def goal(self):
         expr_lst = self.expr_lst()
-        v = expr_lst
         END = self._scan('END')
-        return v
+        return expr_lst
 
-    def expr(self):
+    def argspec(self):
+        argspec_item = self.argspec_item()
+        v = [argspec_item]
+        while self._peek(self.argspec_rsts) == '","':
+            self._scan('","')
+            argspec_item = Literal(Undefined())
+            if self._peek(self.argspec_rsts_) not in self.argspec_rsts:
+                argspec_item = self.argspec_item()
+            v.append(argspec_item)
+        return ArgspecLiteral(v)
+
+    def argspec_item(self):
+        _token_ = self._peek(self.argspec_item_rsts)
+        if _token_ == 'KWVAR':
+            KWVAR = self._scan('KWVAR')
+            self._scan('":"')
+            expr_slst = self.expr_slst()
+            return (KWVAR, expr_slst)
+        else:  # in self.argspec_item_chks
+            expr_slst = self.expr_slst()
+            return (None, expr_slst)
+
+    def expr_lst(self):
+        expr_slst = self.expr_slst()
+        v = [expr_slst]
+        while self._peek(self.expr_lst_rsts) == '","':
+            self._scan('","')
+            expr_slst = Literal(Undefined())
+            if self._peek(self.expr_lst_rsts_) not in self.expr_lst_rsts:
+                expr_slst = self.expr_slst()
+            v.append(expr_slst)
+        return ListLiteral(v) if len(v) > 1 else v[0]
+
+    def expr_slst(self):
+        or_expr = self.or_expr()
+        v = [or_expr]
+        while self._peek(self.expr_slst_rsts) not in self.expr_lst_rsts:
+            or_expr = self.or_expr()
+            v.append(or_expr)
+        return ListLiteral(v, comma=False) if len(v) > 1 else v[0]
+
+    def or_expr(self):
         and_expr = self.and_expr()
         v = and_expr
-        while self._peek(self.expr_rsts) == 'OR':
+        while self._peek(self.or_expr_rsts) == 'OR':
             OR = self._scan('OR')
             and_expr = self.and_expr()
             v = AnyOp(v, and_expr)
@@ -488,7 +529,7 @@ class SassExpression(Parser):
         return v
 
     def not_expr(self):
-        _token_ = self._peek(self.not_expr_rsts)
+        _token_ = self._peek(self.argspec_item_chks)
         if _token_ != 'NOT':
             comparison = self.comparison()
             return comparison
@@ -587,19 +628,18 @@ class SassExpression(Parser):
             return Literal(String(BANG_IMPORTANT, quotes=None))
         elif _token_ == 'FNCT':
             FNCT = self._scan('FNCT')
-            v = ArgspecLiteral([])
+            argspec = ArgspecLiteral([])
             LPAR = self._scan('LPAR')
             if self._peek(self.atom_rsts) != 'RPAR':
                 argspec = self.argspec()
-                v = argspec
             RPAR = self._scan('RPAR')
-            return CallOp(FNCT, v)
+            return CallOp(FNCT, argspec)
         elif _token_ == 'NUM':
             NUM = self._scan('NUM')
+            UNITS = None
             if self._peek(self.atom_rsts_) == 'UNITS':
                 UNITS = self._scan('UNITS')
-                return Literal(NumberValue(float(NUM), unit=UNITS.lower()))
-            return Literal(NumberValue(float(NUM)))
+            return Literal(NumberValue(float(NUM), unit=UNITS))
         elif _token_ == 'STR':
             STR = self._scan('STR')
             return Literal(String(STR[1:-1], quotes="'"))
@@ -613,61 +653,25 @@ class SassExpression(Parser):
             VAR = self._scan('VAR')
             return Variable(VAR)
 
-    def argspec(self):
-        argspec_item = self.argspec_item()
-        v = [argspec_item]
-        while self._peek(self.argspec_rsts) == '","':
-            self._scan('","')
-            argspec_item = self.argspec_item()
-            v.append(argspec_item)
-        return ArgspecLiteral(v)
-
-    def argspec_item(self):
-        _token_ = self._peek(self.argspec_item_rsts)
-        if _token_ == 'KWVAR':
-            KWVAR = self._scan('KWVAR')
-            self._scan('":"')
-            expr_slst = self.expr_slst()
-            return (KWVAR, expr_slst)
-        else:  # in self.not_expr_rsts
-            expr_slst = self.expr_slst()
-            return (None, expr_slst)
-
-    def expr_lst(self):
-        expr_slst = self.expr_slst()
-        v = [expr_slst]
-        while self._peek(self.expr_lst_rsts) == '","':
-            self._scan('","')
-            expr_slst = self.expr_slst()
-            v.append(expr_slst)
-        return ListLiteral(v) if len(v) > 1 else v[0]
-
-    def expr_slst(self):
-        expr = self.expr()
-        v = [expr]
-        while self._peek(self.expr_slst_rsts) not in self.expr_lst_rsts:
-            expr = self.expr()
-            v.append(expr)
-        return ListLiteral(v, comma=False) if len(v) > 1 else v[0]
-
     m_expr_chks = set(['MUL', 'DIV'])
     comparison_rsts = set(['LPAR', 'QSTR', 'RPAR', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'ADD', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'GE', 'NOT', 'OR', '","'])
     atom_rsts = set(['KWVAR', 'LPAR', 'BANG_IMPORTANT', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'RPAR', 'ID'])
     u_expr_chks = set(['LPAR', 'COLOR', 'QSTR', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
     m_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
-    expr_lst_rsts = set(['RPAR', 'END', '","'])
+    expr_lst_rsts_ = set(['LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'RPAR', 'ID', '","'])
     argspec_rsts = set(['RPAR', '","'])
     and_expr_rsts = set(['AND', 'LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'ID', 'RPAR', 'OR', '","'])
+    or_expr_rsts = set(['LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'ID', 'RPAR', 'OR', '","'])
     u_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'ADD', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
-    expr_rsts = set(['LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'ID', 'RPAR', 'OR', '","'])
-    not_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
-    argspec_item_rsts = set(['KWVAR', 'LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
+    expr_lst_rsts = set(['RPAR', 'END', '","'])
+    argspec_rsts_ = set(['KWVAR', 'LPAR', 'BANG_IMPORTANT', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'RPAR', 'ID', '","'])
+    a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
     atom_rsts_ = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'VAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
     comparison_chks = set(['GT', 'GE', 'NE', 'LT', 'LE', 'EQ'])
+    argspec_item_chks = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
     a_expr_chks = set(['ADD', 'SUB'])
-    a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
+    argspec_item_rsts = set(['KWVAR', 'LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
     expr_slst_rsts = set(['LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'RPAR', 'ID', '","'])
-
 
 ### Grammar ends.
 ################################################################################
