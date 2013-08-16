@@ -152,6 +152,9 @@ class Undefined(Null):
     def __rfloordiv__(self, other):
         return self
 
+    def __mul__(self, other):
+        return self
+
     def __rmul__(self, other):
         return self
 
