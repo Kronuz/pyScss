@@ -197,7 +197,7 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 				if (skip) {
 					continue;
 					#ifdef DEBUG
-						fprintf(stderr, "\tSkipping!\n");
+						fprintf(stderr, "\tSkipping %s!\n", repr(regex->tok));
 					#endif
 				}
 			}
@@ -209,7 +209,7 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 				&best_token
 			)) {
 				#ifdef DEBUG
-					fprintf(stderr, "\tMatch OK! %s: %s at pos %d\n", repr(regex->tok), repr(regex->expr), self->pos);
+					fprintf(stderr, "Match OK! %s: %s at pos %d\n", repr(regex->tok), repr(regex->expr), self->pos);
 				#endif
 				break;
 			}

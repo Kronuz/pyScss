@@ -135,15 +135,21 @@ class Scanner(object):
             # Search the patterns for a match, with earlier
             # tokens in the list having preference
             best_pat_len = 0
-            for p, regexp in self.patterns:
+            for tok, regex in self.patterns:
+                if DEBUG:
+                    print("\tTrying %s: %s at pos %d -> %s" % (repr(tok), repr(regex.pattern), self.pos, repr(self.input)))
                 # First check to see if we're restricting to this token
-                if restrict and p not in restrict and p not in self.ignore:
+                if restrict and tok not in restrict and tok not in self.ignore:
+                    if DEBUG:
+                        print "\tSkipping %s!" % repr(tok)
                     continue
-                m = regexp.match(self.input, self.pos)
+                m = regex.match(self.input, self.pos)
                 if m:
                     # We got a match
-                    best_pat = p
+                    best_pat = tok
                     best_pat_len = len(m.group(0))
+                    if DEBUG:
+                        print("Match OK! %s: %s at pos %d" % (repr(tok), repr(regex.pattern), self.pos))
                     break
 
             # If we didn't find anything, raise an error
@@ -200,7 +206,6 @@ class Scanner(object):
             self.tokens = self.tokens[:i]
             self.restrictions = self.restrictions[:i]
             self.pos = token[0]
-
 
 
 class _Scanner_a(Scanner):
