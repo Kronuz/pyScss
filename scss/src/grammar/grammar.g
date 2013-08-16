@@ -37,6 +37,27 @@ parser SassExpression:
     rule goal:          expr_lst                    {{ v = expr_lst }}
                         END                         {{ return v }}
 
+    rule argspec:       argspec_item                {{ v = [argspec_item] }}
+                        (
+                            ","
+                            argspec_item            {{ v.append(argspec_item) }}
+                        )*                          {{ return ArgspecLiteral(v) }}
+
+    rule argspec_item:
+                        KWVAR ":" expr_slst         {{ return (KWVAR, expr_slst) }}
+                        | expr_slst                 {{ return (None, expr_slst) }}
+
+    rule expr_lst:      expr_slst                   {{ v = [expr_slst] }}
+                        (
+                            ","
+                            expr_slst               {{ v.append(expr_slst) }}
+                        )*                          {{ return ListLiteral(v) if len(v) > 1 else v[0] }}
+
+    rule expr_slst:     expr                        {{ v = [expr] }}
+                        (
+                            expr                    {{ v.append(expr) }}
+                        )*                          {{ return ListLiteral(v, comma=False) if len(v) > 1 else v[0] }}
+
     rule expr:          and_expr                    {{ v = and_expr }}
                         (
                             OR and_expr             {{ v = AnyOp(v, and_expr) }}
@@ -90,27 +111,6 @@ parser SassExpression:
                         | QSTR                      {{ return Literal(String(QSTR[1:-1], quotes='"')) }}
                         | COLOR                     {{ return Literal(ColorValue(ParserValue(COLOR))) }}
                         | VAR                       {{ return Variable(VAR) }}
-
-    rule argspec:       argspec_item                {{ v = [argspec_item] }}
-                        (
-                            ","
-                            argspec_item            {{ v.append(argspec_item) }}
-                        )*                          {{ return ArgspecLiteral(v) }}
-
-    rule argspec_item:
-                        KWVAR ":" expr_slst         {{ return (KWVAR, expr_slst) }}
-                        | expr_slst                 {{ return (None, expr_slst) }}
-
-    rule expr_lst:      expr_slst                   {{ v = [expr_slst] }}
-                        (
-                            ","
-                            expr_slst               {{ v.append(expr_slst) }}
-                        )*                          {{ return ListLiteral(v) if len(v) > 1 else v[0] }}
-
-    rule expr_slst:     expr                        {{ v = [expr] }}
-                        (
-                            expr                    {{ v.append(expr) }}
-                        )*                          {{ return ListLiteral(v, comma=False) if len(v) > 1 else v[0] }}
 %%
 ### Grammar ends.
 ################################################################################
