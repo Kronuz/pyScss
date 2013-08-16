@@ -1,4 +1,5 @@
 *~
+.coverage
 .*.swp
 *.pyc
 *.pyo
