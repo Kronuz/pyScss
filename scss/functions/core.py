@@ -578,5 +578,4 @@ def comparable(number1, number2):
 @register('if', 2)
 @register('if', 3)
 def if_(condition, if_true, if_false=''):
-    condition = bool(False if not condition or isinstance(condition, six.string_types) and (condition in ('0', 'false', 'undefined') or _variable_re.match(condition)) else condition)
-    return if_true.__class__(if_true) if condition else if_true.__class__(if_false)
+    return if_true.__class__(if_true) if condition else if_false.__class__(if_false)

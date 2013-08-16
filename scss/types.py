@@ -94,7 +94,7 @@ class Null(Value):
     is_null = True
     sass_type_name = u'null'
 
-    def __init__(self):
+    def __init__(self, value=None):
         pass
 
     def __str__(self):
@@ -121,6 +121,9 @@ class Null(Value):
 
 class Undefined(Null):
     sass_type_name = u'undefined'
+
+    def __init__(self, value=None):
+        pass
 
     def __add__(self, other):
         return self
