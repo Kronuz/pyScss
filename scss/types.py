@@ -432,7 +432,7 @@ class List(Value):
 
     sass_type_name = u'list'
 
-    def __init__(self, tokens, separator=None, use_comma=True):
+    def __init__(self, tokens, separator=None, use_comma=None):
         if isinstance(tokens, List):
             tokens = tokens.value
 
@@ -440,8 +440,12 @@ class List(Value):
             raise TypeError("Expected list, got %r" % (tokens,))
 
         self.value = list(tokens)
-        # TODO...
-        self.use_comma = separator == ","
+
+        # TODO remove separator argument entirely
+        if use_comma is None:
+            self.use_comma = separator == ","
+        else:
+            self.use_comma = use_comma
 
     @classmethod
     def maybe_new(cls, values, use_comma=True):
@@ -488,6 +492,12 @@ class List(Value):
                 return cls(args[0], use_comma=use_comma)
 
         return cls(args, use_comma=use_comma)
+
+    def __repr__(self):
+        return "<List(%s) %r>" % (
+            self.delimiter(compress=True),
+            self.value,
+        )
 
     def __hash__(self):
         return hash((self.value, self.use_comma))
