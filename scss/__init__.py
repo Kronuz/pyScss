@@ -527,14 +527,14 @@ class Scss(object):
                     log.warn(repr(value))
                 elif code == '@print':
                     value = calculator.calculate(block.argument)
-                    print >>sys.stderr, repr(value)
+                    sys.stderr.write("%s\n" % repr(value))
                 elif code == '@raw':
                     value = calculator.calculate(block.argument)
-                    print >>sys.stderr, repr(value)
+                    sys.stderr.write("%s\n" % repr(value))
                 elif code == '@dump_context':
-                    log.info(repr(rule.context))
+                    sys.stderr.write("%s\n" % repr(rule.context))
                 elif code == '@dump_options':
-                    log.info(repr(rule.options))
+                    sys.stderr.write("%s\n" % repr(rule.options))
                 elif code == '@debug':
                     setting = block.argument.strip()
                     if setting.lower() in ('1', 'true', 't', 'yes', 'y', 'on'):
