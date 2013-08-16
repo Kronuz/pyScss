@@ -9,17 +9,16 @@ import logging
 import math
 import operator
 
-import six
 from six.moves import xrange
 
-from scss.cssdefs import _variable_re
 from scss.functions.library import FunctionLibrary
-from scss.types import BooleanValue, ColorValue, List, NumberValue, QuotedStringValue, StringValue, String
+from scss.types import BooleanValue, ColorValue, List, NumberValue, StringValue, String
 
 log = logging.getLogger(__name__)
 
 CORE_LIBRARY = FunctionLibrary()
 register = CORE_LIBRARY.register
+
 
 # ------------------------------------------------------------------------------
 # Color creation
@@ -31,6 +30,7 @@ def _constrain(n, lb, ub):
         return ub
     else:
         return n
+
 
 def _apply_percentage(n, relto=1):
     """Given a unitless Number, returns its value.  Given a percentage Number,
@@ -48,6 +48,7 @@ def _apply_percentage(n, relto=1):
         return n.value * relto / 100.
     else:
         raise TypeError("Expected unitless number or percentage, got %r" % (n,))
+
 
 def _color_type(color, a, type):
     color = ColorValue(color).value
@@ -68,6 +69,7 @@ def rgba(r, g, b, a, type='rgba'):
     channels.append(type)
     return ColorValue(channels)
 
+
 @register('rgb', 3)
 def rgb(r, g, b, type='rgb'):
     return rgba(r, g, b, NumberValue(1.0), type)
@@ -77,6 +79,7 @@ def rgb(r, g, b, type='rgb'):
 @register('rgba', 2)
 def rgba2(color, a=None):
     return _color_type(color, a, 'rgba')
+
 
 @register('rgb', 1)
 def rgb1(color):
@@ -98,6 +101,7 @@ def hsla(h, s, l, a, type='hsla'):
     channels.append(type)
     return ColorValue(channels)
 
+
 @register('hsl', 3)
 def hsl(h, s, l, type='hsl'):
     return hsla(h, s, l, NumberValue(1), type)
@@ -107,6 +111,7 @@ def hsl(h, s, l, type='hsl'):
 @register('hsla', 2)
 def hsla2(color, a=None):
     return _color_type(color, a, 'hsla')
+
 
 @register('hsl', 1)
 def hsl1(color):
