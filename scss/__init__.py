@@ -1115,7 +1115,11 @@ class Scss(object):
         else:
             # Regular property destined for output
             _prop = calculator.apply_vars(_prop)
-            value = calculator.calculate(raw_value)
+            if raw_value is None:
+                value = None
+            else:
+                value = calculator.calculate(raw_value)
+
             if value is None:
                 pass
             elif isinstance(value, six.string_types):
@@ -1123,6 +1127,7 @@ class Scss(object):
                 pass
             else:
                 value = value.render(compress=self.scss_opts.get('compress', True))
+
             rule.properties.append((_prop, value))
 
     @print_timing(10)

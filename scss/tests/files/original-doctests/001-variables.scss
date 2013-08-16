@@ -2,10 +2,10 @@
 @variables {
     $path = ../img/tmpl1/png;
     $color1 = #FF00FF;
-    $border = 1px solid $color1;
+    $border = border-top: 1px solid $color1;
 }
 .selector {
     background-image: url($path/head_bg.png);
     background-color: $color1;
-    border-top: $border;
+    $border;
 }
