@@ -146,7 +146,7 @@ class Number(Value):
     sass_type_name = u'number'
 
     def __init__(self, amount, unit=None, unit_numer=(), unit_denom=()):
-        if isinstance(amount, NumberValue):
+        if isinstance(amount, Number):
             assert not unit and not unit_numer and not unit_denom
             self.value = amount.value
             self.unit_numer = amount.unit_numer
@@ -199,7 +199,7 @@ class Number(Value):
         return float(self.value)
 
     def __neg__(self):
-        return self * NumberValue(-1)
+        return self * Number(-1)
 
     def __pos__(self):
         return self
@@ -208,7 +208,7 @@ class Number(Value):
         return self.render()
 
     def __eq__(self, other):
-        if not isinstance(other, NumberValue):
+        if not isinstance(other, Number):
             return BooleanValue(False)
 
         return self._compare(other, operator.__eq__)
@@ -226,7 +226,7 @@ class Number(Value):
         return self._compare(other, operator.__ge__)
 
     def _compare(self, other, op):
-        if not isinstance(other, NumberValue):
+        if not isinstance(other, Number):
             raise TypeError("Can't compare %r and %r" % (self, other))
 
         left = self.to_base_units()
@@ -239,24 +239,24 @@ class Number(Value):
         return op(round(left.value, 5), round(right.value, 5))
 
     def __mul__(self, other):
-        if not isinstance(other, NumberValue):
+        if not isinstance(other, Number):
             return NotImplemented
 
         amount = self.value * other.value
         numer = self.unit_numer + other.unit_numer
         denom = self.unit_denom + other.unit_denom
 
-        return NumberValue(amount, unit_numer=numer, unit_denom=denom)
+        return Number(amount, unit_numer=numer, unit_denom=denom)
 
     def __div__(self, other):
-        if not isinstance(other, NumberValue):
+        if not isinstance(other, Number):
             return NotImplemented
 
         amount = self.value / other.value
         numer = self.unit_numer + other.unit_denom
         denom = self.unit_denom + other.unit_numer
 
-        return NumberValue(amount, unit_numer=numer, unit_denom=denom)
+        return Number(amount, unit_numer=numer, unit_denom=denom)
 
     def __add__(self, other):
         # Numbers auto-cast to strings when added to other strings
@@ -270,13 +270,13 @@ class Number(Value):
 
     def _add_sub(self, other, op):
         """Implements both addition and subtraction."""
-        if not isinstance(other, NumberValue):
+        if not isinstance(other, Number):
             return NotImplemented
 
         # If either side is unitless, inherit the other side's units.  Skip all
         # the rest of the conversion math, too.
         if self.is_unitless or other.is_unitless:
-            return NumberValue(
+            return Number(
                 op(self.value, other.value),
                 unit_numer=self.unit_numer or other.unit_numer,
                 unit_denom=self.unit_denom or other.unit_denom,
@@ -296,7 +296,7 @@ class Number(Value):
         if left.value != 0:
             new_amount = new_amount * self.value / left.value
 
-        return NumberValue(new_amount, unit_numer=self.unit_numer, unit_denom=self.unit_denom)
+        return Number(new_amount, unit_numer=self.unit_numer, unit_denom=self.unit_denom)
 
     ### Helper methods, mostly used internally
 
@@ -312,7 +312,7 @@ class Number(Value):
         numer_factor, numer_units = convert_units_to_base_units(self.unit_numer)
         denom_factor, denom_units = convert_units_to_base_units(self.unit_denom)
 
-        return NumberValue(
+        return Number(
             amount * numer_factor / denom_factor,
             unit_numer=numer_units,
             unit_denom=denom_units,
@@ -391,7 +391,7 @@ class List(Value):
     sass_type_name = u'list'
 
     def __init__(self, tokens, separator=None, use_comma=True):
-        if isinstance(tokens, ListValue):
+        if isinstance(tokens, List):
             tokens = tokens.value
 
         if not isinstance(tokens, (list, tuple)):
@@ -501,7 +501,7 @@ class Color(Value):
             hex = tokens.value
             self.original_literal = hex
             self.value = self.HEX2RGBA[len(hex)](hex)
-        elif isinstance(tokens, ColorValue):
+        elif isinstance(tokens, Color):
             self.value = tokens.value
         elif isinstance(tokens, (list, tuple)):
             c = tokens[:4]
@@ -575,7 +575,7 @@ class Color(Value):
         return hash(self.value)
 
     def __eq__(self, other):
-        if not isinstance(other, ColorValue):
+        if not isinstance(other, Color):
             return BooleanValue(False)
 
         # Round to the nearest 5 digits for comparisons; corresponds roughly to
@@ -695,7 +695,7 @@ class String(Value):
             # TODO unclear if this should be here, but many functions rely on
             # it
             value = value.value
-        elif isinstance(value, NumberValue):
+        elif isinstance(value, Number):
             # TODO this may only be necessary in the case of __radd__ and
             # number values
             value = str(value)
