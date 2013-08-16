@@ -40,7 +40,7 @@ parser SassExpression:
 
     rule argspec:       argspec_item                {{ v = [argspec_item] }}
                         (
-                            ","                     {{ argspec_item = (None, Literal(Undefined())) }}
+                            ","                     {{ argspec_item = (None, None) }}
                             [ argspec_item ]        {{ v.append(argspec_item) }}
                         )*                          {{ return ArgspecLiteral(v) }}
 

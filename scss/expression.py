@@ -358,7 +358,9 @@ class ArgspecLiteral(Expression):
         # argpairs is a list of 2-tuples, parsed as though this were a function
         # call, so (variable name as string or None, default value as AST
         # node).
-        self.argpairs = argpairs
+        while argpairs and argpairs[-1] == (None, None):
+            argpairs = argpairs[:-1]
+        self.argpairs = tuple((var, Literal(Undefined()) if value is None else value) for var, value in argpairs)
 
     def iter_def_argspec(self):
         """Interpreting this literal as a function definition, yields pairs of
@@ -499,7 +501,7 @@ class SassExpression(Parser):
         v = [argspec_item]
         while self._peek(self.argspec_rsts) == '","':
             self._scan('","')
-            argspec_item = (None, Literal(Undefined()))
+            argspec_item = (None, None)
             if self._peek(self.argspec_rsts_) not in self.argspec_rsts:
                 argspec_item = self.argspec_item()
             v.append(argspec_item)
