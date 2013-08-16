@@ -53,12 +53,12 @@ parser SassExpression:
                             expr_slst               {{ v.append(expr_slst) }}
                         )*                          {{ return ListLiteral(v) if len(v) > 1 else v[0] }}
 
-    rule expr_slst:     expr                        {{ v = [expr] }}
+    rule expr_slst:     or_expr                     {{ v = [or_expr] }}
                         (
-                            expr                    {{ v.append(expr) }}
+                            or_expr                 {{ v.append(or_expr) }}
                         )*                          {{ return ListLiteral(v, comma=False) if len(v) > 1 else v[0] }}
 
-    rule expr:          and_expr                    {{ v = and_expr }}
+    rule or_expr:       and_expr                    {{ v = and_expr }}
                         (
                             OR and_expr             {{ v = AnyOp(v, and_expr) }}
                         )*                          {{ return v }}
