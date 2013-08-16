@@ -36,14 +36,16 @@ parser SassExpression:
 
     rule goal:          expr_lst END                {{ return expr_lst }}
 
+    rule goal_argspec:  argspec END                 {{ return argspec }}
+
     rule argspec:       argspec_item                {{ v = [argspec_item] }}
                         (
-                            ","                     {{ argspec_item = Literal(Undefined()) }}
+                            ","                     {{ argspec_item = (None, Literal(Undefined())) }}
                             [ argspec_item ]        {{ v.append(argspec_item) }}
                         )*                          {{ return ArgspecLiteral(v) }}
 
     rule argspec_item:
-                        KWVAR ":" expr_slst         {{ return (KWVAR, expr_slst) }}
+                        KWVAR ":" expr_slst         {{ return (Variable(KWVAR), expr_slst) }}
                         | expr_slst                 {{ return (None, expr_slst) }}
 
     rule expr_lst:      expr_slst                   {{ v = [expr_slst] }}
