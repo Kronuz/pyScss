@@ -39,8 +39,8 @@ parser SassExpression:
 
     rule argspec:       argspec_item                {{ v = [argspec_item] }}
                         (
-                            ","
-                            argspec_item            {{ v.append(argspec_item) }}
+                            ","                     {{ argspec_item = Literal(Undefined()) }}
+                            [ argspec_item ]        {{ v.append(argspec_item) }}
                         )*                          {{ return ArgspecLiteral(v) }}
 
     rule argspec_item:
