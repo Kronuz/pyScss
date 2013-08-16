@@ -107,8 +107,11 @@ def main():
 
     # Execution modes
     if options.test:
-        import doctest
-        doctest.testfile('tests/tests.rst')
+        try:
+            import pytest
+        except ImportError:
+            raise ImportError("You need py.test installed to run the test suite.")
+        pytest.main("")  # don't let py.test re-consume our arguments
     elif options.version:
         print(BUILD_INFO)
     elif options.interactive:
