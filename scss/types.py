@@ -492,6 +492,8 @@ class List(Value):
         """If `values` appears to not be a list, return a list containing it.
         Otherwise, return a List as normal.
         """
+        if values is None:
+            values = []
         return values
 
     @classmethod
