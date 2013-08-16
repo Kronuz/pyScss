@@ -119,9 +119,8 @@ class Calculator(object):
 
         else:
             try:
-                P = SassExpression(SassExpressionScanner())
-                P.reset(expr)
-                ast = P.goal()
+                parser = SassExpression(SassExpressionScanner(expr))
+                ast = parser.goal()
             except SyntaxError:
                 if config.DEBUG:
                     raise
@@ -141,8 +140,7 @@ class Calculator(object):
         if expr in ast_cache:
             return ast_cache[expr]
 
-        parser = SassExpression(SassExpressionScanner())
-        parser.reset(expr)
+        parser = SassExpression(SassExpressionScanner(expr))
         ast = getattr(parser, target)()
 
         if target == 'goal':
