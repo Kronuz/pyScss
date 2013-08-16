@@ -14,7 +14,7 @@ xfail = pytest.mark.xfail
 # would be nice to check the output, though that's a little tedious.
 
 def test_background_noise():
-    libextra.background_noise(Number(0.5), Number(0.5), Number(100), BooleanValue(True))
+    libextra.background_noise(Number(0.5), Number(0.5), Number(100), BooleanValue(True), color=ColorValue.from_name('green'))
 
 
 def test_background_brushed():
