@@ -4,34 +4,54 @@ import glob
 import os.path
 import re
 
+import pytest
+
 FILES_DIR = os.path.relpath(os.path.join(os.path.dirname(__file__), 'files'))
 
-test_file_pairs = None  # edited below
+# Globals, yuck!  Populated below.
+test_file_tuples = None
+test_file_ids = None
 def pytest_configure(config):
     """Scan for test files.  Done here because other hooks tend to run once
     *per test*, and there's no reason to do this work more than once.
     """
-    global test_file_pairs
+    global test_file_tuples
+    global test_file_ids
 
-    scss_files = glob.glob(os.path.join(FILES_DIR, '*/*.scss'))
+    include_ruby = config.getoption('include_ruby')
     test_file_filter = config.getoption('test_file_filter')
     if test_file_filter:
         file_filters = [
             re.compile(filt)
             for filt in test_file_filter.split(',')
         ]
+    else:
+        file_filters = []
 
-        filtered_scss_files = []
-        for fn in scss_files:
-            relfn = os.path.relpath(fn, FILES_DIR)
-            for rx in file_filters:
-                if rx.search(relfn):
-                    filtered_scss_files.append(fn)
-                    break
+    # Tuples are 3-tuples of the form (scss filename, css filename, pytest
+    # marker).  That last one is used to carry xfail/skip, and is None for
+    # regular tests.
+    # "ids" are just names for the tests, in a parellel list.  We just use
+    # relative paths to the input file.
+    test_file_tuples = []
+    test_file_ids = []
+    for fn in glob.glob(os.path.join(FILES_DIR, '*/*.scss')):
+        relfn = os.path.relpath(fn, FILES_DIR)
+        pytest_trigger = None
 
-        scss_files = filtered_scss_files
+        if not include_ruby and (
+                relfn.startswith('from-sassc/')
+                or relfn.startswith('from-ruby/')):
+            pytest_trigger = pytest.skip
 
-    test_file_pairs = [(fn, fn[:-5] + '.css') for fn in scss_files]
+        elif relfn.startswith('xfail/'):
+            pytest_trigger = pytest.xfail
+
+        if file_filters and not any(rx.search(relfn) for rx in file_filters):
+            pytest_trigger = pytest.skip
+
+        test_file_tuples.append((fn, fn[:-5] + '.css', pytest_trigger))
+        test_file_ids.append(fn)
 
 def pytest_generate_tests(metafunc):
     """Inject the test files as parametrizations.
@@ -41,5 +61,4 @@ def pytest_generate_tests(metafunc):
     """
 
     if 'scss_file_pair' in metafunc.fixturenames:
-        ids = [scss_fn for (scss_fn, css_fn) in test_file_pairs]
-        metafunc.parametrize('scss_file_pair', test_file_pairs, ids=ids)
+        metafunc.parametrize('scss_file_pair', test_file_tuples, ids=test_file_ids)

@@ -24,7 +24,9 @@ logger.addHandler(console)
 
 
 def test_pair_programmatic(scss_file_pair):
-    scss_fn, css_fn = scss_file_pair
+    scss_fn, css_fn, pytest_trigger = scss_file_pair
+    if pytest_trigger:
+        pytest_trigger()
 
     with open(scss_fn) as fh:
         source = fh.read()
