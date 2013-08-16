@@ -91,17 +91,15 @@ def reject(lst, *values):
 
 
 @register('first-value-of')
-def first_value_of(lst):
-    if isinstance(lst, QuotedStringValue):
-        first = lst.value.split()[0]
-        return type(lst)(first)
-    elif isinstance(lst, List):
-        if len(lst):
-            return lst[0]
-        else:
-            return Null()
+def first_value_of(*args):
+    args = List.from_maybe_starargs(args)
+    if len(args) == 1 and isinstance(args[0], QuotedStringValue):
+        first = args[0].value.split()[0]
+        return type(args[0])(first)
+    elif len(args):
+        return args[0]
     else:
-        return lst
+        return Null()
 
 
 @register('-compass-list')
