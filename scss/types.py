@@ -157,7 +157,7 @@ class Number(Value):
             raise TypeError("Expected number, got %r" % (amount,))
 
         if unit is not None:
-            unit_numer = unit_numer + (unit,)
+            unit_numer = unit_numer + (unit.lower(),)
 
         # Cancel out any convertable units on the top and bottom
         numerator_base_units = count_base_units(unit_numer)
