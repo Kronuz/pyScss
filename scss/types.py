@@ -110,7 +110,10 @@ class Null(Value):
         return False
 
     def __eq__(self, other):
-        return isinstance(other, Null)
+        return BooleanValue(isinstance(other, Null))
+
+    def __ne__(self, other):
+        return BooleanValue(not self.__eq__(other))
 
     def render(self, compress=False):
         return self.sass_type_name
@@ -118,6 +121,45 @@ class Null(Value):
 
 class Undefined(Null):
     sass_type_name = u'undefined'
+
+    def __add__(self, other):
+        return self
+
+    def __radd__(self, other):
+        return self
+
+    def __sub__(self, other):
+        return self
+
+    def __rsub__(self, other):
+        return self
+
+    def __div__(self, other):
+        return self
+
+    def __rdiv__(self, other):
+        return self
+
+    def __truediv__(self, other):
+        return self
+
+    def __rtruediv__(self, other):
+        return self
+
+    def __floordiv__(self, other):
+        return self
+
+    def __rfloordiv__(self, other):
+        return self
+
+    def __rmul__(self, other):
+        return self
+
+    def __pos__(self):
+        return self
+
+    def __neg__(self):
+        return self
 
 
 class BooleanValue(Value):
