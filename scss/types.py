@@ -805,6 +805,11 @@ class String(Value):
             self.value = value.encode('ascii')
         self.quotes = quotes
 
+    @classmethod
+    def token(cls, value):
+        """Helper to create a string with no quotes."""
+        return cls(value, quotes=None)
+
     def __hash__(self):
         return hash(self.value)
 

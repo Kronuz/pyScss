@@ -69,7 +69,7 @@ from scss.expression import Calculator
 from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
 from scss.rule import UnparsedBlock, SassRule
-from scss.types import BooleanValue, List, Null, NumberValue, StringValue
+from scss.types import BooleanValue, List, Null, NumberValue, String
 from scss.util import depar, dequote, normalize_var, split_params, profile, print_timing
 
 log = logging.getLogger(__name__)
@@ -100,27 +100,27 @@ _safe_strings_re = re.compile('|'.join(map(re.escape, _safe_strings)))
 _reverse_safe_strings_re = re.compile('|'.join(map(re.escape, _reverse_safe_strings)))
 
 _default_scss_vars = {
-    '$BUILD-INFO': BUILD_INFO,
-    '$PROJECT': PROJECT,
-    '$VERSION': VERSION,
-    '$REVISION': REVISION,
-    '$URL': URL,
-    '$AUTHOR': AUTHOR,
-    '$AUTHOR-EMAIL': AUTHOR_EMAIL,
-    '$LICENSE': LICENSE,
+    '$BUILD-INFO': String.token(BUILD_INFO),
+    '$PROJECT': String.token(PROJECT),
+    '$VERSION': String.token(VERSION),
+    '$REVISION': String.token(REVISION),
+    '$URL': String.token(URL),
+    '$AUTHOR': String.token(AUTHOR),
+    '$AUTHOR-EMAIL': String.token(AUTHOR_EMAIL),
+    '$LICENSE': String.token(LICENSE),
 
     # unsafe chars will be hidden as vars
-    '$--doubleslash': '//',
-    '$--bigcopen': '/*',
-    '$--bigcclose': '*/',
-    '$--doubledot': ':',
-    '$--semicolon': ';',
-    '$--curlybracketopen': '{',
-    '$--curlybracketclosed': '}',
+    '$--doubleslash': String.token('//'),
+    '$--bigcopen': String.token('/*'),
+    '$--bigcclose': String.token('*/'),
+    '$--doubledot': String.token(':'),
+    '$--semicolon': String.token(';'),
+    '$--curlybracketopen': String.token('{'),
+    '$--curlybracketclosed': String.token('}'),
 
     # shortcuts (it's "a hidden feature" for now)
-    'bg:': 'background:',
-    'bgc:': 'background-color:',
+    'bg:': String.token('background:'),
+    'bgc:': String.token('background-color:'),
 }
 
 _default_scss_opts = {
@@ -292,7 +292,17 @@ class Scss(object):
             self.super_selector = super_selector + ' '
         else:
             self.super_selector = ''
-        self._scss_vars = scss_vars
+
+        self._scss_vars = {}
+        if scss_vars:
+            calculator = Calculator()
+            for var_name, value in scss_vars.items():
+                scss_value = calculator.evaluate_expression(value)
+                if scss_value is None:
+                    # TODO warning?
+                    scss_value = String.token(value)
+                self._scss_vars[var_name] = value
+
         self._scss_opts = scss_opts
         self._scss_files = scss_files
         # NOTE: func_registry is backwards-compatibility for only one user and
@@ -880,11 +890,11 @@ class Scss(object):
                 kwargs[var] = calculator.interpolate(val, rule, self._library)
             return rule.context[_var]
 
-        setdefault('sprite-base-class', StringValue('.' + map_name + '-sprite'))
+        setdefault('sprite-base-class', String('.' + map_name + '-sprite', quotes=None))
         setdefault('sprite-dimensions', BooleanValue(False))
         position = setdefault('position', NumberValue(0, '%'))
         spacing = setdefault('spacing', NumberValue(0))
-        repeat = setdefault('repeat', StringValue('no-repeat'))
+        repeat = setdefault('repeat', String('no-repeat', quotes=None))
         names = tuple(os.path.splitext(os.path.basename(file))[0] for file, storage in files)
         for n in names:
             setdefault(n + '-position', position)
