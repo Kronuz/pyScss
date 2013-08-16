@@ -69,8 +69,8 @@ from scss.expression import Calculator
 from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
 from scss.rule import UnparsedBlock, SassRule
-from scss.types import BooleanValue, List, Null, NumberValue, String
-from scss.util import depar, dequote, normalize_var, split_params, profile, print_timing
+from scss.types import Boolean, List, Null, Number, String
+from scss.util import depar, dequote, normalize_var, split_params, print_timing  # profile
 
 log = logging.getLogger(__name__)
 
@@ -100,27 +100,27 @@ _safe_strings_re = re.compile('|'.join(map(re.escape, _safe_strings)))
 _reverse_safe_strings_re = re.compile('|'.join(map(re.escape, _reverse_safe_strings)))
 
 _default_scss_vars = {
-    '$BUILD-INFO': String.token(BUILD_INFO),
-    '$PROJECT': String.token(PROJECT),
-    '$VERSION': String.token(VERSION),
-    '$REVISION': String.token(REVISION),
-    '$URL': String.token(URL),
-    '$AUTHOR': String.token(AUTHOR),
-    '$AUTHOR-EMAIL': String.token(AUTHOR_EMAIL),
-    '$LICENSE': String.token(LICENSE),
+    '$BUILD-INFO': String.unquoted(BUILD_INFO),
+    '$PROJECT': String.unquoted(PROJECT),
+    '$VERSION': String.unquoted(VERSION),
+    '$REVISION': String.unquoted(REVISION),
+    '$URL': String.unquoted(URL),
+    '$AUTHOR': String.unquoted(AUTHOR),
+    '$AUTHOR-EMAIL': String.unquoted(AUTHOR_EMAIL),
+    '$LICENSE': String.unquoted(LICENSE),
 
     # unsafe chars will be hidden as vars
-    '$--doubleslash': String.token('//'),
-    '$--bigcopen': String.token('/*'),
-    '$--bigcclose': String.token('*/'),
-    '$--doubledot': String.token(':'),
-    '$--semicolon': String.token(';'),
-    '$--curlybracketopen': String.token('{'),
-    '$--curlybracketclosed': String.token('}'),
+    '$--doubleslash': String.unquoted('//'),
+    '$--bigcopen': String.unquoted('/*'),
+    '$--bigcclose': String.unquoted('*/'),
+    '$--doubledot': String.unquoted(':'),
+    '$--semicolon': String.unquoted(';'),
+    '$--curlybracketopen': String.unquoted('{'),
+    '$--curlybracketclosed': String.unquoted('}'),
 
     # shortcuts (it's "a hidden feature" for now)
-    'bg:': String.token('background:'),
-    'bgc:': String.token('background-color:'),
+    'bg:': String.unquoted('background:'),
+    'bgc:': String.unquoted('background-color:'),
 }
 
 _default_scss_opts = {
@@ -300,7 +300,7 @@ class Scss(object):
                 scss_value = calculator.evaluate_expression(value)
                 if scss_value is None:
                     # TODO warning?
-                    scss_value = String.token(value)
+                    scss_value = String.unquoted(value)
                 self._scss_vars[var_name] = value
 
         self._scss_opts = scss_opts
@@ -891,9 +891,9 @@ class Scss(object):
             return rule.context[_var]
 
         setdefault('sprite-base-class', String('.' + map_name + '-sprite', quotes=None))
-        setdefault('sprite-dimensions', BooleanValue(False))
-        position = setdefault('position', NumberValue(0, '%'))
-        spacing = setdefault('spacing', NumberValue(0))
+        setdefault('sprite-dimensions', Boolean(False))
+        position = setdefault('position', Number(0, '%'))
+        spacing = setdefault('spacing', Number(0))
         repeat = setdefault('repeat', String('no-repeat', quotes=None))
         names = tuple(os.path.splitext(os.path.basename(file))[0] for file, storage in files)
         for n in names:

@@ -13,7 +13,7 @@ from six.moves import xrange
 
 from scss import config
 from scss.functions.library import FunctionLibrary
-from scss.types import ColorValue, NumberValue, StringValue, List
+from scss.types import Color, Number, String, List
 from scss.util import escape
 
 try:
@@ -273,18 +273,18 @@ def background_noise(density=None, opacity=None, size=None, monochrome=False, in
     if not Image:
         raise Exception("Images manipulation require PIL")
 
-    density = [NumberValue(v).value for v in List.from_maybe(density)]
-    intensity = [NumberValue(v).value for v in List.from_maybe(intensity)]
-    color = [ColorValue(v).value for v in List.from_maybe(color) if v]
-    opacity = [NumberValue(v).value for v in List.from_maybe(opacity)]
+    density = [Number(v).value for v in List.from_maybe(density)]
+    intensity = [Number(v).value for v in List.from_maybe(intensity)]
+    color = [Color(v).value for v in List.from_maybe(color) if v]
+    opacity = [Number(v).value for v in List.from_maybe(opacity)]
 
-    size = int(NumberValue(size).value) if size else 0
+    size = int(Number(size).value) if size else 0
     if size < 1 or size > 512:
         size = 200
 
     monochrome = bool(monochrome)
 
-    background = ColorValue(background).value if background else None
+    background = Color(background).value if background else None
 
     new_image = Image.new(
         mode='RGBA',
@@ -315,7 +315,7 @@ def background_noise(density=None, opacity=None, size=None, monochrome=False, in
         url = 'data:image/png;base64,' + base64.b64encode(contents)
 
     inline = 'url("%s")' % escape(url)
-    return StringValue(inline)
+    return String.unquoted(inline)
 
 
 @register('background-brushed', 0)
@@ -332,21 +332,21 @@ def background_brushed(density=None, intensity=None, color=None, opacity=None, s
     if not Image:
         raise Exception("Images manipulation require PIL")
 
-    density = [NumberValue(v).value for v in List.from_maybe(density)]
-    intensity = [NumberValue(v).value for v in List.from_maybe(intensity)]
-    color = [ColorValue(v).value for v in List.from_maybe(color) if v]
-    opacity = [NumberValue(v).value for v in List.from_maybe(opacity)]
+    density = [Number(v).value for v in List.from_maybe(density)]
+    intensity = [Number(v).value for v in List.from_maybe(intensity)]
+    color = [Color(v).value for v in List.from_maybe(color) if v]
+    opacity = [Number(v).value for v in List.from_maybe(opacity)]
 
-    size = int(NumberValue(size).value) if size else -1
+    size = int(Number(size).value) if size else -1
     if size < 0 or size > 512:
         size = 200
 
     monochrome = bool(monochrome)
 
-    direction = [NumberValue(v).value for v in List.from_maybe(direction)]
-    spread = [NumberValue(v).value for v in List.from_maybe(spread)]
+    direction = [Number(v).value for v in List.from_maybe(direction)]
+    spread = [Number(v).value for v in List.from_maybe(spread)]
 
-    background = ColorValue(background).value if background else None
+    background = Color(background).value if background else None
 
     new_image = Image.new(
         mode='RGBA',
@@ -377,7 +377,7 @@ def background_brushed(density=None, intensity=None, color=None, opacity=None, s
         url = 'data:image/png;base64,' + base64.b64encode(contents)
 
     inline = 'url("%s")' % escape(url)
-    return StringValue(inline)
+    return String.unquoted(inline)
 
 
 @register('grid-image', 4)
@@ -388,17 +388,17 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
     if grid_color is None:
         grid_color = (120, 170, 250, 15)
     else:
-        c = ColorValue(grid_color).value
+        c = Color(grid_color).value
         grid_color = (c[0], c[1], c[2], int(c[3] * 255.0))
     if baseline_color is None:
         baseline_color = (120, 170, 250, 30)
     else:
-        c = ColorValue(baseline_color).value
+        c = Color(baseline_color).value
         baseline_color = (c[0], c[1], c[2], int(c[3] * 255.0))
     if background_color is None:
         background_color = (0, 0, 0, 0)
     else:
-        c = ColorValue(background_color).value
+        c = Color(background_color).value
         background_color = (c[0], c[1], c[2], int(c[3] * 255.0))
     _height = int(height) if height >= 1 else int(height * 1000.0)
     _width = int(width) if width >= 1 else int(width * 1000.0)
@@ -443,7 +443,7 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
         output.close()
         url = 'data:image/png;base64,' + base64.b64encode(contents)
     inline = 'url("%s")' % escape(url)
-    return StringValue(inline)
+    return String.unquoted(inline)
 
 
 @register('image-color', 1)
@@ -452,8 +452,8 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
 def image_color(color, width=1, height=1):
     if not Image:
         raise Exception("Images manipulation require PIL")
-    w = int(NumberValue(width).value)
-    h = int(NumberValue(height).value)
+    w = int(Number(width).value)
+    h = int(Number(height).value)
     if w <= 0 or h <= 0:
         raise ValueError
     new_image = Image.new(
@@ -468,4 +468,4 @@ def image_color(color, width=1, height=1):
     mime_type = 'image/png'
     url = 'data:' + mime_type + ';base64,' + base64.b64encode(contents)
     inline = 'url("%s")' % escape(url)
-    return StringValue(inline)
+    return String.unquoted(inline)

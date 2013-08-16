@@ -17,7 +17,7 @@ from scss import config
 from scss.functions.compass import _image_size_cache
 from scss.functions.compass.helpers import add_cache_buster
 from scss.functions.library import FunctionLibrary
-from scss.types import ColorValue, List, NumberValue, StringValue
+from scss.types import Color, List, Number, String
 from scss.util import escape
 
 try:
@@ -46,8 +46,8 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
     if inline or dst_color or spacing:
         if not Image:
             raise Exception("Images manipulation require PIL")
-    filepath = StringValue(path).value
-    mime_type = inline and (StringValue(mime_type).value or mimetypes.guess_type(filepath)[0])
+    filepath = String.unquoted(path).value
+    mime_type = inline and (String.unquoted(mime_type).value or mimetypes.guess_type(filepath)[0])
     path = None
     if callable(config.STATIC_ROOT):
         try:
@@ -68,16 +68,16 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
             filetime = 'NA'
     BASE_URL = config.STATIC_URL
     if path:
-        dst_colors = [list(ColorValue(v).value[:3]) for v in List.from_maybe(dst_color) if v]
+        dst_colors = [list(Color(v).value[:3]) for v in List.from_maybe(dst_color) if v]
 
         src_colors = src_color
-        src_colors = [tuple(ColorValue(v).value[:3]) if v else (0, 0, 0) for v in List.from_maybe(src_color)]
+        src_colors = [tuple(Color(v).value[:3]) if v else (0, 0, 0) for v in List.from_maybe(src_color)]
 
         len_colors = max(len(dst_colors), len(src_colors))
         dst_colors = (dst_colors * len_colors)[:len_colors]
         src_colors = (src_colors * len_colors)[:len_colors]
 
-        spacing = [int(NumberValue(v).value) if v else 0 for v in List.from_maybe(spacing)]
+        spacing = [int(Number(v).value) if v else 0 for v in List.from_maybe(spacing)]
         spacing = (spacing * 4)[:4]
 
         file_name, file_ext = os.path.splitext(os.path.normpath(filepath).replace('\\', '_').replace('/', '_'))
@@ -153,7 +153,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
 
     if not only_path:
         url = 'url("%s")' % escape(url)
-    return StringValue(url)
+    return String.unquoted(url)
 
 
 @register('inline-image', 1)
@@ -191,7 +191,7 @@ def image_width(image):
     """
     if not Image:
         raise Exception("Images manipulation require PIL")
-    filepath = StringValue(image).value
+    filepath = String.unquoted(image).value
     path = None
     try:
         width = _image_size_cache[filepath][0]
@@ -212,7 +212,7 @@ def image_width(image):
             size = image.size
             width = size[0]
             _image_size_cache[filepath] = size
-    return NumberValue(width, 'px')
+    return Number(width, 'px')
 
 
 @register('image-height', 1)
@@ -223,7 +223,7 @@ def image_height(image):
     """
     if not Image:
         raise Exception("Images manipulation require PIL")
-    filepath = StringValue(image).value
+    filepath = String.unquoted(image).value
     path = None
     try:
         height = _image_size_cache[filepath][1]
@@ -244,4 +244,4 @@ def image_height(image):
             size = image.size
             height = size[1]
             _image_size_cache[filepath] = size
-    return NumberValue(height, 'px')
+    return Number(height, 'px')

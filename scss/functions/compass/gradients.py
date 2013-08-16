@@ -11,7 +11,7 @@ import six
 
 from scss.functions.library import FunctionLibrary
 from scss.functions.compass.helpers import opposite_position, position
-from scss.types import ColorValue, List, NumberValue, StringValue
+from scss.types import Color, List, Number, String
 from scss.util import escape, split_params, to_float, to_str
 
 log = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ def __color_stops(percentages, *args):
     if len(args) == 1:
         if isinstance(args[0], (list, tuple, List)):
             list(args[0])
-        elif isinstance(args[0], (StringValue, six.string_types)):
+        elif isinstance(args[0], (String, six.string_types)):
             color_stops = []
             colors = split_params(getattr(args[0], 'value', args[0]))
             for color in colors:
@@ -45,12 +45,12 @@ def __color_stops(percentages, *args):
     prev_color = False
     for c in args:
         for c in List.from_maybe(c):
-            if isinstance(c, ColorValue):
+            if isinstance(c, Color):
                 if prev_color:
                     stops.append(None)
                 colors.append(c)
                 prev_color = True
-            elif isinstance(c, NumberValue):
+            elif isinstance(c, Number):
                 stops.append(c)
                 prev_color = False
 
@@ -58,16 +58,16 @@ def __color_stops(percentages, *args):
         stops.append(None)
     stops = stops[:len(colors)]
     if stops[0] is None:
-        stops[0] = NumberValue(0, '%')
+        stops[0] = Number(0, '%')
     if stops[-1] is None:
-        stops[-1] = NumberValue(100, '%')
+        stops[-1] = Number(100, '%')
 
     if percentages:
         max_stops = max(s and (s.value if s.unit != '%' else None) or None for s in stops)
     else:
         max_stops = max(s if s and s.unit != '%' else None for s in stops)
 
-    stops = [s / max_stops if s and s.unit != '%' else s for s in stops]
+    stops = [_s / max_stops if _s and _s.unit != '%' else _s for _s in stops]
 
     init = 0
     start = None
@@ -79,9 +79,9 @@ def __color_stops(percentages, *args):
         else:
             final = s
             if start is not None:
-                stride = (final - init) / NumberValue(end - start + 1 + (1 if i < len(stops) else 0))
+                stride = (final - init) / Number(end - start + 1 + (1 if i < len(stops) else 0))
                 for j in range(start, end + 1):
-                    stops[j] = init + stride * NumberValue(j - start + 1)
+                    stops[j] = init + stride * Number(j - start + 1)
             init = final
             start = None
 
@@ -97,7 +97,7 @@ def grad_color_stops(*args):
     args = List.from_maybe_starargs(args)
     color_stops = __color_stops(True, *args)
     ret = ', '.join(['color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops])
-    return StringValue(ret)
+    return String.unquoted(ret)
 
 
 def __grad_end_position(radial, color_stops):
@@ -107,34 +107,34 @@ def __grad_end_position(radial, color_stops):
 @register('grad-point')
 def grad_point(*p):
     pos = set()
-    hrz = vrt = NumberValue(0.5, '%')
+    hrz = vrt = Number(0.5, '%')
     for _p in p:
-        pos.update(StringValue(_p).value.split())
+        pos.update(String.unquoted(_p).value.split())
     if 'left' in pos:
-        hrz = NumberValue(0, '%')
+        hrz = Number(0, '%')
     elif 'right' in pos:
-        hrz = NumberValue(1, '%')
+        hrz = Number(1, '%')
     if 'top' in pos:
-        vrt = NumberValue(0, '%')
+        vrt = Number(0, '%')
     elif 'bottom' in pos:
-        vrt = NumberValue(1, '%')
+        vrt = Number(1, '%')
     return List([v for v in (hrz, vrt) if v is not None])
 
 
 def __grad_position(index, default, radial, color_stops):
     try:
-        stops = NumberValue(color_stops[index][0])
+        stops = Number(color_stops[index][0])
         if radial and stops.unit != 'px' and (index == 0 or index == -1 or index == len(color_stops) - 1):
             log.warn("Webkit only supports pixels for the start and end stops for radial gradients. Got %s", stops)
     except IndexError:
-        stops = NumberValue(default)
+        stops = Number(default)
     return stops
 
 
 @register('grad-end-position')
 def grad_end_position(*color_stops):
     color_stops = __color_stops(False, *color_stops)
-    return NumberValue(__grad_end_position(False, color_stops))
+    return Number(__grad_end_position(False, color_stops))
 
 
 @register('color-stops')
@@ -142,7 +142,7 @@ def color_stops(*args):
     args = List.from_maybe_starargs(args)
     color_stops = __color_stops(False, *args)
     ret = ', '.join(['%s %s' % (c, to_str(s)) for s, c in color_stops])
-    return StringValue(ret)
+    return String.unquoted(ret)
 
 
 @register('color-stops-in-percentages')
@@ -150,12 +150,12 @@ def color_stops_in_percentages(*args):
     args = List.from_maybe_starargs(args)
     color_stops = __color_stops(True, *args)
     ret = ', '.join(['%s %s' % (c, to_str(s)) for s, c in color_stops])
-    return StringValue(ret)
+    return String.unquoted(ret)
 
 
 def _get_gradient_position_and_angle(args):
     for arg in args:
-        if isinstance(arg, (StringValue, NumberValue, six.string_types)):
+        if isinstance(arg, (String, Number, six.string_types)):
             _arg = [arg]
         elif isinstance(arg, (list, tuple, List)):
             _arg = arg
@@ -164,10 +164,10 @@ def _get_gradient_position_and_angle(args):
         ret = None
         skip = False
         for a in _arg:
-            if isinstance(a, ColorValue):
+            if isinstance(a, Color):
                 skip = True
                 break
-            elif isinstance(a, NumberValue):
+            elif isinstance(a, Number):
                 ret = arg
         if skip:
             continue
@@ -185,7 +185,7 @@ def _get_gradient_position_and_angle(args):
 
 def _get_gradient_shape_and_size(args):
     for arg in args:
-        if isinstance(arg, (StringValue, NumberValue, six.string_types)):
+        if isinstance(arg, (String, Number, six.string_types)):
             _arg = [arg]
         elif isinstance(arg, (list, tuple, List)):
             _arg = arg
@@ -206,7 +206,7 @@ def _get_gradient_color_stops(args):
     color_stops = []
     for arg in args:
         for a in List.from_maybe(arg):
-            if isinstance(a, ColorValue):
+            if isinstance(a, Color):
                 color_stops.append(arg)
                 break
     return color_stops or None
@@ -230,23 +230,23 @@ def radial_gradient(*args):
     args.extend('%s %s' % (c, to_str(s)) for s, c in color_stops)
 
     to__s = 'radial-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
-    ret = StringValue(to__s)
+    ret = String.unquoted(to__s)
 
     def to__css2():
-        return StringValue('')
+        return String.unquoted('')
     ret.to__css2 = to__css2
 
     def to__moz():
-        return StringValue('-moz-' + to__s)
+        return String.unquoted('-moz-' + to__s)
     ret.to__moz = to__moz
 
     def to__pie():
         log.warn("PIE does not support radial-gradient.")
-        return StringValue('-pie-radial-gradient(unsupported)')
+        return String.unquoted('-pie-radial-gradient(unsupported)')
     ret.to__pie = to__pie
 
     def to__webkit():
-        return StringValue('-webkit-' + to__s)
+        return String.unquoted('-webkit-' + to__s)
     ret.to__webkit = to__webkit
 
     def to__owg():
@@ -259,7 +259,7 @@ def radial_gradient(*args):
         ]
         args.extend('color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops)
         ret = '-webkit-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
-        return StringValue(ret)
+        return String.unquoted(ret)
     ret.to__owg = to__owg
 
     def to__svg():
@@ -285,30 +285,30 @@ def linear_gradient(*args):
     args.extend('%s %s' % (c, to_str(s)) for s, c in color_stops)
 
     to__s = 'linear-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
-    ret = StringValue(to__s, quotes=None)
+    ret = String.unquoted(to__s)
 
     def to__css2():
-        return StringValue('', quotes=None)
+        return String.unquoted('')
     ret.to__css2 = to__css2
 
     def to__moz():
-        return StringValue('-moz-' + to__s, quotes=None)
+        return String.unquoted('-moz-' + to__s)
     ret.to__moz = to__moz
 
     def to__pie():
-        return StringValue('-pie-' + to__s, quotes=None)
+        return String.unquoted('-pie-' + to__s)
     ret.to__pie = to__pie
 
     def to__ms():
-        return StringValue('-ms-' + to__s, quotes=None)
+        return String.unquoted('-ms-' + to__s)
     ret.to__ms = to__ms
 
     def to__o():
-        return StringValue('-o-' + to__s, quotes=None)
+        return String.unquoted('-o-' + to__s)
     ret.to__o = to__o
 
     def to__webkit():
-        return StringValue('-webkit-' + to__s, quotes=None)
+        return String.unquoted('-webkit-' + to__s)
     ret.to__webkit = to__webkit
 
     def to__owg():
@@ -319,7 +319,7 @@ def linear_gradient(*args):
         ]
         args.extend('color-stop(%s, %s)' % (to_str(s), c) for s, c in color_stops)
         ret = '-webkit-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
-        return StringValue(ret, quotes=None)
+        return String.unquoted(ret)
     ret.to__owg = to__owg
 
     def to__svg():
@@ -334,7 +334,7 @@ def radial_svg_gradient(*args):
     args = List.from_maybe_starargs(args)
     color_stops = args
     center = None
-    if isinstance(args[-1], (StringValue, NumberValue, six.string_types)):
+    if isinstance(args[-1], (String, Number, six.string_types)):
         center = args[-1]
         color_stops = args[:-1]
     color_stops = __color_stops(False, *color_stops)
@@ -343,7 +343,7 @@ def radial_svg_gradient(*args):
     svg = __radial_svg(color_stops, cx, cy, r)
     url = 'data:' + 'image/svg+xml' + ';base64,' + base64.b64encode(svg)
     inline = 'url("%s")' % escape(url)
-    return StringValue(inline)
+    return String.unquoted(inline)
 
 
 @register('linear-svg-gradient')
@@ -351,7 +351,7 @@ def linear_svg_gradient(*args):
     args = List.from_maybe_starargs(args)
     color_stops = args
     start = None
-    if isinstance(args[-1], (StringValue, NumberValue, six.string_types)):
+    if isinstance(args[-1], (String, Number, six.string_types)):
         start = args[-1]
         color_stops = args[:-1]
     color_stops = __color_stops(False, *color_stops)
@@ -360,7 +360,7 @@ def linear_svg_gradient(*args):
     svg = _linear_svg(color_stops, x1, y1, x2, y2)
     url = 'data:' + 'image/svg+xml' + ';base64,' + base64.b64encode(svg)
     inline = 'url("%s")' % escape(url)
-    return StringValue(inline)
+    return String.unquoted(inline)
 
 
 def __color_stops_svg(color_stops):
@@ -379,10 +379,10 @@ def __svg_template(gradient):
 
 def _linear_svg(color_stops, x1, y1, x2, y2):
     gradient = '<linearGradient id="grad" x1="%s" y1="%s" x2="%s" y2="%s">%s</linearGradient>' % (
-        to_str(NumberValue(x1)),
-        to_str(NumberValue(y1)),
-        to_str(NumberValue(x2)),
-        to_str(NumberValue(y2)),
+        to_str(Number(x1)),
+        to_str(Number(y1)),
+        to_str(Number(x2)),
+        to_str(Number(y2)),
         __color_stops_svg(color_stops)
     )
     return __svg_template(gradient)
@@ -390,9 +390,9 @@ def _linear_svg(color_stops, x1, y1, x2, y2):
 
 def __radial_svg(color_stops, cx, cy, r):
     gradient = '<radialGradient id="grad" gradientUnits="userSpaceOnUse" cx="%s" cy="%s" r="%s">%s</radialGradient>' % (
-        to_str(NumberValue(cx)),
-        to_str(NumberValue(cy)),
-        to_str(NumberValue(r)),
+        to_str(Number(cx)),
+        to_str(Number(cy)),
+        to_str(Number(r)),
         __color_stops_svg(color_stops)
     )
     return __svg_template(gradient)

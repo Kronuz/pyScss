@@ -45,18 +45,18 @@ class Value(object):
         return 1
 
     def __getitem__(self, key):
-        if key != 0:
+        if key not in (-1, 0):
             raise IndexError(key)
 
         return self
 
     # Reasonable default for equality
     def __eq__(self, other):
-        return BooleanValue(
+        return Boolean(
             type(self) == type(other) and self.value == other.value)
 
     def __ne__(self, other):
-        return BooleanValue(not self.__eq__(other))
+        return Boolean(not self.__eq__(other))
 
     # Only numbers support ordering
     def __lt__(self, other):
@@ -125,10 +125,10 @@ class Null(Value):
         return False
 
     def __eq__(self, other):
-        return BooleanValue(isinstance(other, Null))
+        return Boolean(isinstance(other, Null))
 
     def __ne__(self, other):
-        return BooleanValue(not self.__eq__(other))
+        return Boolean(not self.__eq__(other))
 
     def render(self, compress=False):
         return self.sass_type_name
@@ -183,7 +183,7 @@ class Undefined(Null):
         return self
 
 
-class BooleanValue(Value):
+class Boolean(Value):
     sass_type_name = u'bool'
 
     def __init__(self, value):
@@ -272,7 +272,7 @@ class Number(Value):
 
     def __eq__(self, other):
         if not isinstance(other, Number):
-            return BooleanValue(False)
+            return Boolean(False)
 
         return self._compare(other, operator.__eq__)
 
@@ -666,14 +666,14 @@ class Color(Value):
 
     def __eq__(self, other):
         if not isinstance(other, Color):
-            return BooleanValue(False)
+            return Boolean(False)
 
         # Round to the nearest 5 digits for comparisons; corresponds roughly to
         # 16 bits per channel, the most that generally matters.  Otherwise
         # float errors make equality fail for HSL colors.
         left = tuple(round(n, 5) for n in self.value)
         right = tuple(round(n, 5) for n in other.value)
-        return BooleanValue(left == right)
+        return Boolean(left == right)
 
     def __add__(self, other):
         if isinstance(other, (Color, Number)):
@@ -808,7 +808,7 @@ class String(Value):
         self.quotes = quotes
 
     @classmethod
-    def token(cls, value):
+    def unquoted(cls, value):
         """Helper to create a string with no quotes."""
         return cls(value, quotes=None)
 
@@ -822,7 +822,7 @@ class String(Value):
             return self.value
 
     def __eq__(self, other):
-        return BooleanValue(isinstance(other, String) and self.value == other.value)
+        return Boolean(isinstance(other, String) and self.value == other.value)
 
     def __add__(self, other):
         if isinstance(other, String):
@@ -880,10 +880,3 @@ class Map(Value):
 
     def render(self, compress=False):
         raise TypeError("maps cannot be rendered as CSS")
-
-# Backwards-compatibility.
-ColorValue = Color
-ListValue = List
-NumberValue = Number
-QuotedStringValue = String
-StringValue = String

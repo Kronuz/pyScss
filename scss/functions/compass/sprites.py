@@ -33,7 +33,7 @@ from scss import config
 from scss.functions.compass import _image_size_cache
 from scss.functions.compass.layouts import PackedSpritesLayout, HorizontalSpritesLayout, VerticalSpritesLayout, DiagonalSpritesLayout
 from scss.functions.library import FunctionLibrary
-from scss.types import ColorValue, List, NumberValue, QuotedStringValue, StringValue
+from scss.types import Color, List, Number, String
 from scss.util import escape
 
 log = logging.getLogger(__name__)
@@ -121,7 +121,7 @@ def sprite_map(g, **kwargs):
 
     now_time = time.time()
 
-    g = StringValue(g).value
+    g = String(g, quotes=None).value
 
     if g in sprite_maps:
         sprite_maps[glob]['*'] = now_time
@@ -137,7 +137,7 @@ def sprite_map(g, **kwargs):
 
         if not files:
             log.error("Nothing found at '%s'", glob_path)
-            return StringValue(None)
+            return String.unquoted('')
 
         map_name = os.path.normpath(os.path.dirname(g)).replace('\\', '_').replace('/', '_')
         key = list(zip(*files)[0]) + [repr(kwargs), config.ASSETS_URL]
@@ -169,21 +169,20 @@ def sprite_map(g, **kwargs):
                         break
 
         if sprite_map is None:
-            direction = StringValue(kwargs.get('direction', config.SPRTE_MAP_DIRECTION)).value
-            repeat = StringValue(kwargs.get('repeat', 'no-repeat')).value
-            collapse = kwargs.get('collapse') or 0
+            direction = String.unquoted(kwargs.get('direction', config.SPRTE_MAP_DIRECTION)).value
+            repeat = String.unquoted(kwargs.get('repeat', 'no-repeat')).value
+            collapse = kwargs.get('collapse', Number(0))
             if isinstance(collapse, List):
-                collapse_x = int(NumberValue(collapse[0]).value)
-                collapse_y = int(NumberValue(collapse[-1]).value)
+                collapse_x = int(Number(collapse[0]).value)
+                collapse_y = int(Number(collapse[-1]).value)
             else:
-                collapse_x = collapse_y = int(NumberValue(collapse).value)
+                collapse_x = collapse_y = int(Number(collapse).value)
             if 'collapse_x' in kwargs:
-                collapse_x = int(NumberValue(kwargs['collapse_x']).value)
+                collapse_x = int(Number(kwargs['collapse_x']).value)
             if 'collapse_y' in kwargs:
-                collapse_y = int(NumberValue(kwargs['collapse_y']).value)
+                collapse_y = int(Number(kwargs['collapse_y']).value)
 
-            position = kwargs.get('position', 0)
-            position = NumberValue(position)
+            position = Number(kwargs.get('position', 0))
             if position.unit != '%' and position.value > 1:
                 position = position.value / 100.0
             else:
@@ -193,14 +192,14 @@ def sprite_map(g, **kwargs):
             elif position > 1:
                 position = 1.0
 
-            padding = kwargs.get('padding', kwargs.get('spacing', 0))
-            padding = [int(NumberValue(v).value) for v in List.from_maybe(padding)]
+            padding = kwargs.get('padding', kwargs.get('spacing', Number(0)))
+            padding = [int(Number(v).value) for v in List.from_maybe(padding)]
             padding = (padding * 4)[:4]
 
             dst_colors = kwargs.get('dst_color')
-            dst_colors = [list(ColorValue(v).value[:3]) for v in List.from_maybe(dst_colors) if v]
-            src_colors = kwargs.get('src_color')
-            src_colors = [tuple(ColorValue(v).value[:3]) if v else (0, 0, 0) for v in List.from_maybe(src_colors)]
+            dst_colors = [list(Color(v).value[:3]) for v in List.from_maybe(dst_colors) if v]
+            src_colors = kwargs.get('src_color', Color.from_name('black'))
+            src_colors = [tuple(Color(v).value[:3]) for v in List.from_maybe(src_colors)]
             len_colors = max(len(dst_colors), len(src_colors))
             dst_colors = (dst_colors * len_colors)[:len_colors]
             src_colors = (src_colors * len_colors)[:len_colors]
@@ -229,7 +228,7 @@ def sprite_map(g, **kwargs):
                 if _position is None:
                     _position = position
                 else:
-                    _position = NumberValue(_position)
+                    _position = Number(_position)
                     if _position.unit != '%' and _position.value > 1:
                         _position = _position.value / 100.0
                     else:
@@ -244,7 +243,7 @@ def sprite_map(g, **kwargs):
                 if _padding is None:
                     _padding = padding
                 else:
-                    _padding = [int(NumberValue(v).value) for v in List.from_maybe(_padding)]
+                    _padding = [int(Number(v).value) for v in List.from_maybe(_padding)]
                     _padding = (_padding * 4)[:4]
                 all_paddings.append(_padding)
 
@@ -255,12 +254,12 @@ def sprite_map(g, **kwargs):
                         has_dst_colors = True
                 else:
                     has_dst_colors = True
-                    _dst_colors = [list(ColorValue(v).value[:3]) for v in List.from_maybe(_dst_colors) if v]
-                _src_colors = kwargs.get(name + '_src_color')
+                    _dst_colors = [list(Color(v).value[:3]) for v in List.from_maybe(_dst_colors) if v]
+                _src_colors = kwargs.get(name + '_src_color', Color.from_name('black'))
                 if _src_colors is None:
                     _src_colors = src_colors
                 else:
-                    _src_colors = [tuple(ColorValue(v).value[:3]) if v else (0, 0, 0) for v in List.from_maybe(_src_colors)]
+                    _src_colors = [tuple(Color(v).value[:3]) for v in List.from_maybe(_src_colors)]
                 _len_colors = max(len(_dst_colors), len(_src_colors))
                 _dst_colors = (_dst_colors * _len_colors)[:_len_colors]
                 _src_colors = (_src_colors * _len_colors)[:_len_colors]
@@ -357,7 +356,7 @@ def sprite_map(g, **kwargs):
             sprite_maps[asset] = sprite_map
         for file_, size in sizes:
             _image_size_cache[file_] = size
-    ret = StringValue(asset)
+    ret = String.unquoted(asset)
     return ret
 
 
@@ -367,13 +366,13 @@ def sprite_map_name(map):
     Returns the name of a sprite map The name is derived from the folder than
     contains the sprites.
     """
-    map = StringValue(map).value
+    map = String.unquoted(map).value
     sprite_map = sprite_maps.get(map)
     if not sprite_map:
         log.error("No sprite map found: %s", map, extra={'stack': True})
     if sprite_map:
-        return StringValue(sprite_map['*n*'])
-    return StringValue(None)
+        return String.unquoted(sprite_map['*n*'])
+    return String.unquoted('')
 
 
 @register('sprite-file', 2)
@@ -383,8 +382,8 @@ def sprite_file(map, sprite):
     used when construction the sprite. This is suitable for passing to the
     image_width and image_height helpers.
     """
-    map = StringValue(map).value
-    sprite_name = StringValue(sprite).value
+    map = String.unquoted(map).value
+    sprite_name = String.unquoted(sprite).value
     sprite_map = sprite_maps.get(map)
     sprite = sprite_map and sprite_map.get(sprite_name)
     if not sprite_map:
@@ -392,14 +391,14 @@ def sprite_file(map, sprite):
     elif not sprite:
         log.error("No sprite found: %s in %s", sprite_name, sprite_map['*n*'], extra={'stack': True})
     if sprite:
-        return QuotedStringValue(sprite[1][0])
-    return StringValue(None)
+        return String(sprite[1][0])
+    return String.unquoted('')
 
 
 @register('sprites', 1)
 @register('sprite-names', 1)
 def sprites(map):
-    map = StringValue(map).value
+    map = String.unquoted(map).value
     sprite_map = sprite_maps.get(map, {})
     return List(list(sorted(s for s in sprite_map if not s.startswith('*'))))
 
@@ -412,8 +411,8 @@ def sprite(map, sprite, offset_x=None, offset_y=None):
     Returns the image and background position for use in a single shorthand
     property
     """
-    map = StringValue(map).value
-    sprite_name = StringValue(sprite).value
+    map = String.unquoted(map).value
+    sprite_name = String.unquoted(sprite).value
     sprite_map = sprite_maps.get(map)
     sprite = sprite_map and sprite_map.get(sprite_name)
     if not sprite_map:
@@ -422,15 +421,15 @@ def sprite(map, sprite, offset_x=None, offset_y=None):
         log.error("No sprite found: %s in %s", sprite_name, sprite_map['*n*'], extra={'stack': True})
     if sprite:
         url = '%s%s?_=%s' % (config.ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
-        x = NumberValue(offset_x or 0, 'px')
-        y = NumberValue(offset_y or 0, 'px')
+        x = Number(offset_x or 0, 'px')
+        y = Number(offset_y or 0, 'px')
         if not x or (x <= -1 or x >= 1) and x.unit != '%':
             x -= sprite[2]
         if not y or (y <= -1 or y >= 1) and y.unit != '%':
             y -= sprite[3]
         pos = "url(%s) %s %s" % (escape(url), x, y)
-        return StringValue(pos)
-    return StringValue('0 0')
+        return String.unquoted(pos)
+    return String.unquoted('0 0')
 
 
 @register('sprite-url', 1)
@@ -438,15 +437,15 @@ def sprite_url(map):
     """
     Returns a url to the sprite image.
     """
-    map = StringValue(map).value
+    map = String.unquoted(map).value
     sprite_map = sprite_maps.get(map)
     if not sprite_map:
         log.error("No sprite map found: %s", map, extra={'stack': True})
     if sprite_map:
         url = '%s%s?_=%s' % (config.ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
         url = "url(%s)" % escape(url)
-        return StringValue(url)
-    return StringValue(None)
+        return String.unquoted(url)
+    return String.unquoted('')
 
 
 @register('sprite-position', 2)
@@ -457,8 +456,8 @@ def sprite_position(map, sprite, offset_x=None, offset_y=None):
     Returns the position for the original image in the sprite.
     This is suitable for use as a value to background-position.
     """
-    map = StringValue(map).value
-    sprite_name = StringValue(sprite).value
+    map = String.unquoted(map).value
+    sprite_name = String.unquoted(sprite).value
     sprite_map = sprite_maps.get(map)
     sprite = sprite_map and sprite_map.get(sprite_name)
     if not sprite_map:
@@ -467,27 +466,27 @@ def sprite_position(map, sprite, offset_x=None, offset_y=None):
         log.error("No sprite found: %s in %s", sprite_name, sprite_map['*n*'], extra={'stack': True})
     if sprite:
         x = None
-        if offset_x is not None and not isinstance(offset_x, NumberValue):
+        if offset_x is not None and not isinstance(offset_x, Number):
             x = offset_x
         if x not in ('left', 'right', 'center'):
             if x:
                 offset_x = None
-            x = NumberValue(offset_x or 0, 'px')
+            x = Number(offset_x or 0, 'px')
             u = x.unit
             x = x.value
             if not x or (x <= -1 or x >= 1) and u != '%':
                 x -= sprite[2]
         y = None
-        if offset_y is not None and not isinstance(offset_y, NumberValue):
+        if offset_y is not None and not isinstance(offset_y, Number):
             y = offset_y
         if y not in ('top', 'bottom', 'center'):
             if y:
                 offset_y = None
-            y = NumberValue(offset_y or 0, 'px')
+            y = Number(offset_y or 0, 'px')
             u = y.unit
             y = y.value
             if not y or (y <= -1 or y >= 1) and u != '%':
                 y -= sprite[3]
         pos = '%s %s' % (x, y)
-        return StringValue(pos)
-    return StringValue('0 0')
+        return String.unquoted(pos)
+    return String.unquoted('0 0')

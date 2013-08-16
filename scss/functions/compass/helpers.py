@@ -18,7 +18,7 @@ import six
 
 from scss import config
 from scss.functions.library import FunctionLibrary
-from scss.types import BooleanValue, List, Null, NumberValue, QuotedStringValue, StringValue
+from scss.types import Boolean, List, Null, Number, String
 from scss.util import escape, to_str
 
 log = logging.getLogger(__name__)
@@ -48,9 +48,9 @@ def add_cache_buster(url, mtime):
 def blank(*objs):
     """Returns true when the object is false, an empty string, or an empty list"""
     for o in objs:
-        if isinstance(o, BooleanValue):
+        if isinstance(o, Boolean):
             is_blank = not o
-        elif isinstance(o, QuotedStringValue):
+        elif isinstance(o, String):
             is_blank = not len(o.value.strip())
         elif isinstance(o, List):
             is_blank = all(blank(el) for el in o)
@@ -58,9 +58,9 @@ def blank(*objs):
             is_blank = False
 
         if not is_blank:
-            return BooleanValue(False)
+            return Boolean(False)
 
-    return BooleanValue(True)
+    return Boolean(True)
 
 
 @register('compact')
@@ -93,7 +93,7 @@ def reject(lst, *values):
 @register('first-value-of')
 def first_value_of(*args):
     args = List.from_maybe_starargs(args)
-    if len(args) == 1 and isinstance(args[0], QuotedStringValue):
+    if len(args) == 1 and isinstance(args[0], String):
         first = args[0].value.split()[0]
         return type(args[0])(first)
     elif len(args):
@@ -120,8 +120,8 @@ def dash_compass_space_list(*lst):
 
 @register('-compass-slice', 3)
 def dash_compass_slice(lst, start_index, end_index=None):
-    start_index = NumberValue(start_index).value
-    end_index = NumberValue(end_index).value if end_index is not None else None
+    start_index = Number(start_index).value
+    end_index = Number(end_index).value if end_index is not None else None
     ret = {}
     lst = List(lst)
     if end_index:
@@ -139,8 +139,8 @@ def prefixed(prefix, *args):
     to_fnct_str = 'to_' + to_str(prefix).replace('-', '_')
     for arg in List.from_maybe_starargs(args):
         if hasattr(arg, to_fnct_str):
-            return BooleanValue(True)
-    return BooleanValue(False)
+            return Boolean(True)
+    return Boolean(False)
 
 
 @register('prefix')
@@ -218,8 +218,8 @@ def append_selector(selector, to_append):
     if isinstance(selector, List):
         lst = selector.value
     else:
-        lst = StringValue(selector).value.split(',')
-    to_append = StringValue(to_append).value.strip()
+        lst = String.unquoted(selector).value.split(',')
+    to_append = String.unquoted(to_append).value.strip()
     ret = sorted(set(s.strip() + to_append for s in lst if s.strip()))
     ret = dict(enumerate(ret))
     ret['_'] = ','
@@ -256,7 +256,7 @@ _elements_of_type = {
 
 @register('elements-of-type', 1)
 def elements_of_type(display):
-    d = StringValue(display)
+    d = String.unquoted(display)
     ret = _elements_of_type.get(d.value, None)
     if ret is None:
         raise Exception("Elements of type '%s' not found!" % d.value)
@@ -266,7 +266,7 @@ def elements_of_type(display):
 @register('enumerate', 3)
 @register('enumerate', 4)
 def enumerate_(prefix, frm, through, separator='-'):
-    separator = StringValue(separator).value
+    separator = String.unquoted(separator).value
     try:
         frm = int(getattr(frm, 'value', frm))
     except ValueError:
@@ -284,9 +284,9 @@ def enumerate_(prefix, frm, through, separator='-'):
     ret = []
     for i in rev(range(frm, through + 1)):
         if prefix.value:
-            ret.append(StringValue(prefix.value + separator + str(i), quotes=None))
+            ret.append(String.unquoted(prefix.value + separator + str(i)))
         else:
-            ret.append(NumberValue(i))
+            ret.append(Number(i))
 
     return List(ret, use_comma=True)
 
@@ -299,7 +299,7 @@ def enumerate_(prefix, frm, through, separator='-'):
 @register('headings', 2)
 def headers(frm=None, to=None):
     if frm and to is None:
-        if isinstance(frm, StringValue) and frm.value.lower() == 'all':
+        if isinstance(frm, String) and frm.value.lower() == 'all':
             frm = 1
             to = 6
         else:
@@ -317,7 +317,7 @@ def headers(frm=None, to=None):
             to = 6 if to is None else int(getattr(to, 'value', to))
         except ValueError:
             to = 6
-    ret = [StringValue('h' + str(i)) for i in range(frm, to + 1)]
+    ret = [String.unquoted('h' + str(i)) for i in range(frm, to + 1)]
     return List(ret, use_comma=True)
 
 
@@ -326,13 +326,13 @@ def nest(*arguments):
     if isinstance(arguments[0], List):
         lst = arguments[0].value
     else:
-        lst = StringValue(arguments[0]).value.split(',')
+        lst = String.unquoted(arguments[0]).value.split(',')
     ret = [unicode(s).strip() for s in lst if unicode(s).strip()]
     for arg in arguments[1:]:
         if isinstance(arg, List):
             lst = arg.value
         else:
-            lst = StringValue(arg).value.split(',')
+            lst = String.unquoted(arg).value.split(',')
         new_ret = []
         for s in lst:
             s = unicode(s).strip()
@@ -363,13 +363,13 @@ def range_(frm, through=None):
 # Working with CSS constants
 
 OPPOSITE_POSITIONS = {
-    'top': StringValue('bottom', quotes=None),
-    'bottom': StringValue('top', quotes=None),
-    'left': StringValue('right', quotes=None),
-    'right': StringValue('left', quotes=None),
-    'center': StringValue('center', quotes=None),
+    'top': String.unquoted('bottom'),
+    'bottom': String.unquoted('top'),
+    'left': String.unquoted('right'),
+    'right': String.unquoted('left'),
+    'center': String.unquoted('center'),
 }
-DEFAULT_POSITION = [StringValue('center', quotes=None), StringValue('top', quotes=None)]
+DEFAULT_POSITION = [String.unquoted('center'), String.unquoted('top')]
 
 
 def _position(opposite, positions):
@@ -380,7 +380,7 @@ def _position(opposite, positions):
 
     ret = []
     for pos in positions:
-        if isinstance(pos, (StringValue, six.string_types)):
+        if isinstance(pos, (String, six.string_types)):
             pos_value = getattr(pos, 'value', pos)
             if pos_value in OPPOSITE_POSITIONS:
                 if opposite:
@@ -389,17 +389,17 @@ def _position(opposite, positions):
                     ret.append(pos)
                 continue
 
-        elif isinstance(pos, NumberValue):
+        elif isinstance(pos, Number):
             if pos.unit == '%':
                 if opposite:
-                    ret.append(NumberValue(100 - pos.value, '%'))
+                    ret.append(Number(100 - pos.value, '%'))
                 else:
                     ret.append(pos)
                 continue
             elif pos.unit == 'deg':
                 # TODO support other angle types?
                 if opposite:
-                    ret.append(NumberValue((pos.value + 180) % 360, 'deg'))
+                    ret.append(Number((pos.value + 180) % 360, 'deg'))
                 else:
                     ret.append(pos)
                 continue
@@ -425,18 +425,18 @@ def opposite_position(p):
 
 @register('pi', 0)
 def pi():
-    return NumberValue(math.pi)
+    return Number(math.pi)
 
-COMPASS_HELPERS_LIBRARY.add(NumberValue.wrap_python_function(math.sin), 'sin', 1)
-COMPASS_HELPERS_LIBRARY.add(NumberValue.wrap_python_function(math.cos), 'cos', 1)
-COMPASS_HELPERS_LIBRARY.add(NumberValue.wrap_python_function(math.tan), 'tan', 1)
+COMPASS_HELPERS_LIBRARY.add(Number.wrap_python_function(math.sin), 'sin', 1)
+COMPASS_HELPERS_LIBRARY.add(Number.wrap_python_function(math.cos), 'cos', 1)
+COMPASS_HELPERS_LIBRARY.add(Number.wrap_python_function(math.tan), 'tan', 1)
 
 
 # ------------------------------------------------------------------------------
 # Fonts
 
 def _font_url(path, only_path=False, cache_buster=True, inline=False):
-    filepath = StringValue(path).value
+    filepath = String.unquoted(path).value
     path = None
     if callable(config.STATIC_ROOT):
         try:
@@ -467,7 +467,7 @@ def _font_url(path, only_path=False, cache_buster=True, inline=False):
 
     if not only_path:
         url = 'url("%s")' % escape(url)
-    return StringValue(url)
+    return String.unquoted(url)
 
 
 def _font_files(args, inline):
@@ -499,7 +499,7 @@ def _font_files(args, inline):
     fonts = []
     for font, format in zip(params[0], params[1]):
         if format:
-            fonts.append('%s format("%s")' % (_font_url(font, inline=inline), StringValue(format).value))
+            fonts.append('%s format("%s")' % (_font_url(font, inline=inline), String.unquoted(format).value))
         else:
             fonts.append(_font_url(font, inline=inline))
     return List(fonts)
@@ -537,7 +537,7 @@ def stylesheet_url(path, only_path=False, cache_buster=True):
     Passing a true value as the second argument will cause the only the path to
     be returned instead of a `url()` function
     """
-    filepath = StringValue(path).value
+    filepath = String.unquoted(path).value
     if callable(config.STATIC_ROOT):
         try:
             _file, _storage = list(config.STATIC_ROOT(filepath))[0]
@@ -558,4 +558,4 @@ def stylesheet_url(path, only_path=False, cache_buster=True):
         url = add_cache_buster(url, filetime)
     if not only_path:
         url = 'url("%s")' % (url)
-    return StringValue(url)
+    return String.unquoted(url)

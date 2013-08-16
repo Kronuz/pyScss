@@ -10,7 +10,7 @@ import six
 import scss.config as config
 from scss.cssdefs import COLOR_NAMES, is_builtin_css_function, _expr_glob_re, _interpolate_re, _variable_re
 from scss.rule import Namespace
-from scss.types import BooleanValue, ColorValue, ListValue, Map, Null, NumberValue, ParserValue, String, Undefined
+from scss.types import Boolean, Color, List, Map, Null, Number, ParserValue, String, Undefined
 from scss.util import dequote, normalize_var
 
 ################################################################################
@@ -230,7 +230,7 @@ class AnyOp(Expression):
 
     def evaluate(self, calculator, divide=False):
         operands = [operand.evaluate(calculator, divide=True) for operand in self.operands]
-        return BooleanValue(any(operands))
+        return Boolean(any(operands))
 
 
 class AllOp(Expression):
@@ -239,7 +239,7 @@ class AllOp(Expression):
 
     def evaluate(self, calculator, divide=False):
         operands = [operand.evaluate(calculator, divide=True) for operand in self.operands]
-        return BooleanValue(all(operands))
+        return Boolean(all(operands))
 
 
 class NotOp(Expression):
@@ -248,7 +248,7 @@ class NotOp(Expression):
 
     def evaluate(self, calculator, divide=False):
         operand = self.operand.evaluate(calculator, divide=True)
-        return BooleanValue(not(operand))
+        return Boolean(not(operand))
 
 
 class CallOp(Expression):
@@ -339,7 +339,7 @@ class ListLiteral(Expression):
 
     def evaluate(self, calculator, divide=False):
         items = [item.evaluate(calculator, divide=divide) for item in self.items]
-        return ListValue(items, separator="," if self.comma else "")
+        return List(items, separator="," if self.comma else "")
 
 
 class MapLiteral(Expression):
@@ -409,15 +409,15 @@ class ArgspecLiteral(Expression):
 
 def parse_bareword(word):
     if word in COLOR_NAMES:
-        return ColorValue.from_name(word)
+        return Color.from_name(word)
     elif word == 'null':
         return Null()
     elif word == 'undefined':
         return Undefined()
     elif word == 'true':
-        return BooleanValue(True)
+        return Boolean(True)
     elif word == 'false':
-        return BooleanValue(False)
+        return Boolean(False)
     else:
         return String(word, quotes=None)
 
@@ -709,7 +709,7 @@ class SassExpression(Parser):
             UNITS = None
             if self._peek(self.atom_rsts__) == 'UNITS':
                 UNITS = self._scan('UNITS')
-            return Literal(NumberValue(float(NUM), unit=UNITS))
+            return Literal(Number(float(NUM), unit=UNITS))
         elif _token_ == 'STR':
             STR = self._scan('STR')
             return Literal(String(STR[1:-1], quotes="'"))
@@ -718,7 +718,7 @@ class SassExpression(Parser):
             return Literal(String(QSTR[1:-1], quotes='"'))
         elif _token_ == 'COLOR':
             COLOR = self._scan('COLOR')
-            return Literal(ColorValue(ParserValue(COLOR)))
+            return Literal(Color(ParserValue(COLOR)))
         else:  # == 'VAR'
             VAR = self._scan('VAR')
             return Variable(VAR)
@@ -735,7 +735,7 @@ class SassExpression(Parser):
             UNITS = None
             if self._peek(self.kwatom_rsts_) == 'UNITS':
                 UNITS = self._scan('UNITS')
-            return Literal(NumberValue(float(KWNUM), unit=UNITS))
+            return Literal(Number(float(KWNUM), unit=UNITS))
         elif _token_ == 'KWSTR':
             KWSTR = self._scan('KWSTR')
             return Literal(String(KWSTR[1:-1], quotes="'"))
@@ -744,7 +744,7 @@ class SassExpression(Parser):
             return Literal(String(KWQSTR[1:-1], quotes='"'))
         elif _token_ == 'KWCOLOR':
             KWCOLOR = self._scan('KWCOLOR')
-            return Literal(ColorValue(ParserValue(KWCOLOR)))
+            return Literal(Color(ParserValue(KWCOLOR)))
         else:  # == 'KWVAR'
             KWVAR = self._scan('KWVAR')
             return Variable(KWVAR)

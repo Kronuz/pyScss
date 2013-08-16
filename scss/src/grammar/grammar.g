@@ -125,19 +125,19 @@ parser SassExpression:
                         | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
                         | ID                        {{ return Literal(parse_bareword(ID)) }}
                         | NUM                       {{ UNITS = None }}
-                            [ UNITS ]               {{ return Literal(NumberValue(float(NUM), unit=UNITS)) }}
+                            [ UNITS ]               {{ return Literal(Number(float(NUM), unit=UNITS)) }}
                         | STR                       {{ return Literal(String(STR[1:-1], quotes="'")) }}
                         | QSTR                      {{ return Literal(String(QSTR[1:-1], quotes='"')) }}
-                        | COLOR                     {{ return Literal(ColorValue(ParserValue(COLOR))) }}
+                        | COLOR                     {{ return Literal(Color(ParserValue(COLOR))) }}
                         | VAR                       {{ return Variable(VAR) }}
 
     rule kwatom:
                         | KWID                      {{ return Literal(parse_bareword(KWID)) }}
                         | KWNUM                     {{ UNITS = None }}
-                            [ UNITS ]               {{ return Literal(NumberValue(float(KWNUM), unit=UNITS)) }}
+                            [ UNITS ]               {{ return Literal(Number(float(KWNUM), unit=UNITS)) }}
                         | KWSTR                     {{ return Literal(String(KWSTR[1:-1], quotes="'")) }}
                         | KWQSTR                    {{ return Literal(String(KWQSTR[1:-1], quotes='"')) }}
-                        | KWCOLOR                   {{ return Literal(ColorValue(ParserValue(KWCOLOR))) }}
+                        | KWCOLOR                   {{ return Literal(Color(ParserValue(KWCOLOR))) }}
                         | KWVAR                     {{ return Variable(KWVAR) }}
 %%
 ### Grammar ends.
