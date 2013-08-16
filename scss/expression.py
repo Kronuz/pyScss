@@ -10,7 +10,7 @@ import six
 import scss.config as config
 from scss.cssdefs import COLOR_NAMES, is_builtin_css_function, _expr_glob_re, _interpolate_re, _variable_re
 from scss.rule import Namespace
-from scss.types import BooleanValue, ColorValue, ListValue, Null, NumberValue, ParserValue, String, Undefined
+from scss.types import BooleanValue, ColorValue, ListValue, Map, Null, NumberValue, ParserValue, String, Undefined
 from scss.util import dequote, normalize_var
 
 ################################################################################
@@ -342,6 +342,23 @@ class ListLiteral(Expression):
         return ListValue(items, separator="," if self.comma else "")
 
 
+class MapLiteral(Expression):
+    def __init__(self, pairs):
+        self.pairs = pairs
+
+    def evaluate(self, calculator, divide=False):
+        # TODO unclear here whether the keys should be bare tokens or Literals;
+        # depends how the syntax works!
+        scss_pairs = []
+        for key, value in self.pairs:
+            scss_pairs.append((
+                String(key, quotes=None),
+                value.evaluate(calculator),
+            ))
+
+        return Map(scss_pairs)
+
+
 class ArgspecLiteral(Expression):
     """Contains pairs of argument names and values, as parsed from a function
     definition or function call.
@@ -438,7 +455,6 @@ class Parser(object):
 
 ################################################################################
 ## Grammar compiled using Yapps:
-
 class SassExpressionScanner(Scanner):
     patterns = None
     _patterns = [
@@ -471,6 +487,7 @@ class SassExpressionScanner(Scanner):
         ('KWVAR', '\\$[-a-zA-Z0-9_]+(?=\\s*:)'),
         ('VAR', '\\$[-a-zA-Z0-9_]+'),
         ('FNCT', '[-a-zA-Z_][-a-zA-Z0-9_]*(?=\\()'),
+        ('KWID', '[-a-zA-Z_][-a-zA-Z0-9_]*(?=\\s*:)'),
         ('ID', '[-a-zA-Z_][-a-zA-Z0-9_]*'),
         ('BANG_IMPORTANT', '!important'),
     ]
@@ -642,9 +659,15 @@ class SassExpression(Parser):
         _token_ = self._peek(self.u_expr_chks)
         if _token_ == 'LPAR':
             LPAR = self._scan('LPAR')
-            expr_lst = self.expr_lst()
+            _token_ = self._peek(self.atom_rsts)
+            if _token_ == 'KWID':
+                expr_map = self.expr_map()
+                v = expr_map
+            else:  # in self.argspec_item_chks
+                expr_lst = self.expr_lst()
+                v = Parentheses(expr_lst)
             RPAR = self._scan('RPAR')
-            return Parentheses(expr_lst)
+            return v
         elif _token_ == 'ID':
             ID = self._scan('ID')
             return Literal(parse_bareword(ID))
@@ -655,14 +678,14 @@ class SassExpression(Parser):
             FNCT = self._scan('FNCT')
             argspec = ArgspecLiteral([])
             LPAR = self._scan('LPAR')
-            if self._peek(self.atom_rsts) not in self.atom_chks:
+            if self._peek(self.atom_rsts_) not in self.atom_chks:
                 argspec = self.argspec()
             RPAR = self._scan('RPAR')
             return CallOp(FNCT, argspec)
         elif _token_ == 'NUM':
             NUM = self._scan('NUM')
             UNITS = None
-            if self._peek(self.atom_rsts_) == 'UNITS':
+            if self._peek(self.atom_rsts__) == 'UNITS':
                 UNITS = self._scan('UNITS')
             return Literal(NumberValue(float(NUM), unit=UNITS))
         elif _token_ == 'STR':
@@ -678,24 +701,48 @@ class SassExpression(Parser):
             VAR = self._scan('VAR')
             return Variable(VAR)
 
+    def expr_map(self):
+        map_items = self.map_items()
+        return MapLiteral(map_items)
+
+    def map_items(self):
+        map_item = self.map_item()
+        pairs = [map_item]
+        if self._peek(self.map_items_rsts) == '","':
+            self._scan('","')
+            if self._peek(self.map_items_rsts_) == 'KWID':
+                map_items = self.map_items()
+                pairs.extend(map_items)
+        return pairs
+
+    def map_item(self):
+        KWID = self._scan('KWID')
+        self._scan('":"')
+        expr_slst = self.expr_slst()
+        return (KWID, expr_slst)
+
     m_expr_chks = set(['MUL', 'DIV'])
+    map_items_rsts_ = set(['KWID', 'RPAR'])
     comparison_rsts = set(['LPAR', 'QSTR', 'RPAR', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'ADD', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'GE', 'NOT', 'OR', '","'])
-    atom_rsts = set(['KWVAR', 'LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'RPAR', 'ID'])
+    atom_rsts = set(['KWID', 'LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
+    atom_rsts__ = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'VAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
     u_expr_chks = set(['LPAR', 'COLOR', 'QSTR', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
     m_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
+    map_items_rsts = set(['RPAR', '","'])
     argspec_rsts = set(['RPAR', 'END', '","'])
     a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
-    or_expr_rsts = set(['LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'ID', 'RPAR', 'OR', '","'])
+    or_expr_rsts = set(['LPAR', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', 'FNCT', 'STR', 'NOT', 'ID', 'BANG_IMPORTANT', 'OR', '","'])
     u_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'ADD', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
     argspec_item_rsts = set(['KWVAR', 'LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
     argspec_rsts_ = set(['KWVAR', 'LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'RPAR', 'ID', '","'])
-    atom_rsts_ = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'VAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
+    atom_rsts_ = set(['KWVAR', 'LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'RPAR', 'ID'])
     comparison_chks = set(['GT', 'GE', 'NE', 'LT', 'LE', 'EQ'])
     atom_chks = set(['END', 'RPAR'])
     argspec_item_chks = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
     a_expr_chks = set(['ADD', 'SUB'])
-    and_expr_rsts = set(['AND', 'LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'ID', 'RPAR', 'OR', '","'])
-    expr_slst_rsts = set(['LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'RPAR', 'ID', '","'])
+    and_expr_rsts = set(['AND', 'LPAR', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', 'FNCT', 'STR', 'NOT', 'ID', 'BANG_IMPORTANT', 'OR', '","'])
+    expr_slst_rsts = set(['LPAR', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID', '","'])
+
 
 ### Grammar ends.
 ################################################################################

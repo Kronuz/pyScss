@@ -31,6 +31,7 @@ parser SassExpression:
     token KWVAR: "\$[-a-zA-Z0-9_]+(?=\s*:)"
     token VAR: "\$[-a-zA-Z0-9_]+"
     token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
+    token KWID: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\s*:)"
     token ID: "[-a-zA-Z_][-a-zA-Z0-9_]*"
     token BANG_IMPORTANT: "!important"
 
@@ -98,7 +99,10 @@ parser SassExpression:
                         | ADD u_expr                {{ return UnaryOp(operator.pos, u_expr) }}
                         | atom                      {{ return atom }}
 
-    rule atom:          LPAR expr_lst RPAR          {{ return Parentheses(expr_lst) }}
+    rule atom:          LPAR (
+                            expr_map                {{ v = expr_map }}
+                            | expr_lst              {{ v = Parentheses(expr_lst) }}
+                        ) RPAR                      {{ return v }}
                         | ID                        {{ return Literal(parse_bareword(ID)) }}
                         | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
                         | FNCT                      {{ argspec = ArgspecLiteral([]) }}
@@ -109,6 +113,19 @@ parser SassExpression:
                         | QSTR                      {{ return Literal(String(QSTR[1:-1], quotes='"')) }}
                         | COLOR                     {{ return Literal(ColorValue(ParserValue(COLOR))) }}
                         | VAR                       {{ return Variable(VAR) }}
+
+
+    rule expr_map:      map_items                   {{ return MapLiteral(map_items) }}
+
+    rule map_items:     map_item                    {{ pairs = [map_item] }}
+                        [
+                            ","
+                            [ map_items             {{ pairs.extend(map_items) }}
+                            ]
+                        ]                           {{ return pairs }}
+
+    rule map_item:      KWID ":" expr_slst          {{ return (KWID, expr_slst) }}
+
 %%
 ### Grammar ends.
 ################################################################################

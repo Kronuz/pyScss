@@ -999,21 +999,31 @@ class Scss(object):
         """
         Implements @each
         """
-        var, _, valuestring = block.argument.partition(' in ')
+        varstring, _, valuestring = block.argument.partition(' in ')
         calculator = Calculator(rule.namespace)
         values = calculator.calculate(valuestring)
         if not values:
             return
 
-        var = var.strip()
-        var = calculator.do_glob_math(var)
-        var = normalize_var(var)
+        varlist = varstring.split(",")
+        varlist = [
+            normalize_var(calculator.do_glob_math(var.strip()))
+            for var in varlist
+        ]
 
         for v in List.from_maybe(values):
             inner_rule = rule.copy()
-            inner_rule.namespace = inner_rule.namespace.derive()
             inner_rule.unparsed_contents = block.unparsed_contents
-            inner_rule.namespace.set_variable(var, v)
+            inner_rule.namespace = inner_rule.namespace.derive()
+
+            v = List.from_maybe(v)
+            for i, var in enumerate(varlist):
+                if i >= len(v):
+                    value = Null()
+                else:
+                    value = v[i]
+                inner_rule.namespace.set_variable(var, value)
+
             self.manage_children(inner_rule, p_children, scope)
 
     # @print_timing(10)
