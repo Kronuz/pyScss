@@ -269,7 +269,7 @@ def _image_brushed(pixdata, size, density=None, intensity=None, color=None, opac
 @register('background-noise', 5)
 @register('background-noise', 6)
 @register('background-noise', 7)
-def background_noise(density=None, opacity=None, size=None, monochrome=False, intensity=None, color=None, background=None, inline=False):
+def background_noise(density=None, opacity=None, size=None, monochrome=False, intensity=(), color=None, background=None, inline=False):
     if not Image:
         raise Exception("Images manipulation require PIL")
 
@@ -328,7 +328,7 @@ def background_noise(density=None, opacity=None, size=None, monochrome=False, in
 @register('background-brushed', 7)
 @register('background-brushed', 8)
 @register('background-brushed', 9)
-def background_brushed(density=None, intensity=None, color=None, opacity=None, size=None, monochrome=False, direction=None, spread=None, background=None, inline=False):
+def background_brushed(density=None, intensity=None, color=None, opacity=None, size=None, monochrome=False, direction=(), spread=(), background=None, inline=False):
     if not Image:
         raise Exception("Images manipulation require PIL")
 
@@ -452,15 +452,14 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
 def image_color(color, width=1, height=1):
     if not Image:
         raise Exception("Images manipulation require PIL")
-    c = ColorValue(color).value
     w = int(NumberValue(width).value)
     h = int(NumberValue(height).value)
     if w <= 0 or h <= 0:
         raise ValueError
     new_image = Image.new(
-        mode='RGB' if c[3] == 1 else 'RGBA',
+        mode='RGB' if color.alpha == 1 else 'RGBA',
         size=(w, h),
-        color=(c[0], c[1], c[2], int(c[3] * 255.0))
+        color=color.rgba255,
     )
     output = six.BytesIO()
     new_image.save(output, format='PNG')

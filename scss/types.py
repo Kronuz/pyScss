@@ -610,6 +610,15 @@ class Color(Value):
     def alpha(self):
         return self.value[3]
 
+    @property
+    def rgba255(self):
+        return (
+            int(self.value[0] * 1 + 0.5),
+            int(self.value[1] * 1 + 0.5),
+            int(self.value[2] * 1 + 0.5),
+            int(self.value[3] * 255 + 0.5),
+        )
+
     def __repr__(self):
         return '<%s: %s>' % (self.__class__.__name__, repr(self.value))
 
