@@ -78,7 +78,7 @@ class Value(object):
         return self.__div__(other)
 
     def __mul__(self, other):
-        raise NotImplementedError
+        raise NotImplementedError("__mul__(%s, %s)" % (type(self).__name__, type(other).__name__))
 
     def __pos__(self):
         return String("+" + self.render())
@@ -288,7 +288,7 @@ class Number(Value):
 
     def __mul__(self, other):
         if not isinstance(other, Number):
-            return NotImplemented
+            raise NotImplementedError("__mul__(%s, %s)" % (type(self).__name__, type(other).__name__))
 
         amount = self.value * other.value
         numer = self.unit_numer + other.unit_numer
@@ -298,7 +298,7 @@ class Number(Value):
 
     def __div__(self, other):
         if not isinstance(other, Number):
-            return NotImplemented
+            raise NotImplementedError("__div__(%s, %s)" % (type(self).__name__, type(other).__name__))
 
         amount = self.value / other.value
         numer = self.unit_numer + other.unit_denom
@@ -319,7 +319,7 @@ class Number(Value):
     def _add_sub(self, other, op):
         """Implements both addition and subtraction."""
         if not isinstance(other, Number):
-            return NotImplemented
+            raise NotImplementedError("%s(%s, %s)" % (op.name, type(self).__name__, type(other).__name__))
 
         # If either side is unitless, inherit the other side's units.  Skip all
         # the rest of the conversion math, too.
