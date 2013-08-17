@@ -351,9 +351,9 @@ class MapLiteral(Expression):
         # TODO unclear here whether the keys should be bare tokens or Literals;
         # depends how the syntax works!
         scss_pairs = []
-        for key, value in self.pairs:
+        for name, value in self.pairs:
             scss_pairs.append((
-                key.name if isinstance(key, Variable) else key.value,
+                name.name if isinstance(name, Variable) else name.value,
                 value.evaluate(calculator),
             ))
 
