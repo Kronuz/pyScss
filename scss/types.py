@@ -514,9 +514,9 @@ class List(Value):
         return cls(args, use_comma=use_comma)
 
     def __repr__(self):
-        return "<List(%s) %r>" % (
-            self.delimiter(compress=True),
+        return "<List(%r, %r)>" % (
             self.value,
+            self.delimiter(compress=True),
         )
 
     def __hash__(self):
