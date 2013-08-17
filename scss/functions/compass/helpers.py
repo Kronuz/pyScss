@@ -323,31 +323,41 @@ def headers(frm=None, to=None):
 
 @register('nest')
 def nest(*arguments):
-    if isinstance(arguments[0], List):
-        lst = arguments[0].value
-    else:
-        lst = String.unquoted(arguments[0]).value.split(',')
-    ret = [unicode(s).strip() for s in lst if unicode(s).strip()]
-    for arg in arguments[1:]:
+    ret = ['']  # Hackery for initial value
+
+    for arg in arguments:
         if isinstance(arg, List):
-            lst = arg.value
+            lst = arg
+        elif isinstance(arg, String):
+            lst = arg.value.split(',')
         else:
-            lst = String.unquoted(arg).value.split(',')
+            raise TypeError("Expected list or string, got %r" % (arg,))
+
         new_ret = []
         for s in lst:
-            s = unicode(s).strip()
-            if s:
-                for r in ret:
-                    if '&' in s:
-                        new_ret.append(s.replace('&', r))
+            if isinstance(s, String):
+                s = s.value
+            elif isinstance(s, six.string_types):
+                s = s
+            else:
+                raise TypeError("Expected string, got %r" % (s,))
+
+            s = s.strip()
+            if not s:
+                continue
+
+            for r in ret:
+                if '&' in s:
+                    new_ret.append(s.replace('&', r))
+                else:
+                    if not r or r[-1] in ('.', ':', '#'):
+                        new_ret.append(r + s)
                     else:
-                        if r[-1] in ('.', ':', '#'):
-                            new_ret.append(r + s)
-                        else:
-                            new_ret.append(r + ' ' + s)
+                        new_ret.append(r + ' ' + s)
         ret = new_ret
 
-    return List(sorted(set(ret)), use_comma=True)
+    ret = [String.unquoted(s) for s in sorted(set(ret))]
+    return List(ret, use_comma=True)
 
 
 # This isn't actually from Compass, but it's just a shortcut for enumerate().

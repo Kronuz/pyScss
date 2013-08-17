@@ -91,7 +91,13 @@ def test_headings(calc):
     assert calc('headings(2, 5)') == calc('h2, h3, h4, h5')
 
 
-# nest
+def test_nest(calc):
+    # Using .render() here because the structure is complicated and only the
+    # output matters
+    assert calc('nest(selector1, selector2, selector3)').render() == 'selector1 selector2 selector3'
+    assert calc('nest("a b", "c d")').render() == 'a b c d'
+    assert calc('nest((a, b), (c, d))').render() == 'a c, a d, b c, b d'
+
 
 # range
 
