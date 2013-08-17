@@ -366,7 +366,7 @@ def sprite_map_name(map):
     Returns the name of a sprite map The name is derived from the folder than
     contains the sprites.
     """
-    map = String.unquoted(map).value
+    map = map.render()
     sprite_map = sprite_maps.get(map)
     if not sprite_map:
         log.error("No sprite map found: %s", map, extra={'stack': True})
@@ -382,9 +382,9 @@ def sprite_file(map, sprite):
     used when construction the sprite. This is suitable for passing to the
     image_width and image_height helpers.
     """
-    map = String.unquoted(map).value
-    sprite_name = String.unquoted(sprite).value
+    map = map.render()
     sprite_map = sprite_maps.get(map)
+    sprite_name = String.unquoted(sprite).value
     sprite = sprite_map and sprite_map.get(sprite_name)
     if not sprite_map:
         log.error("No sprite map found: %s", map, extra={'stack': True})
@@ -398,7 +398,7 @@ def sprite_file(map, sprite):
 @register('sprites', 1)
 @register('sprite-names', 1)
 def sprites(map):
-    map = String.unquoted(map).value
+    map = map.render()
     sprite_map = sprite_maps.get(map, {})
     return List(list(String.unquoted(s) for s in sorted(s for s in sprite_map if not s.startswith('*'))))
 
@@ -411,9 +411,9 @@ def sprite(map, sprite, offset_x=None, offset_y=None):
     Returns the image and background position for use in a single shorthand
     property
     """
-    map = String.unquoted(map).value
-    sprite_name = String.unquoted(sprite).value
+    map = map.render()
     sprite_map = sprite_maps.get(map)
+    sprite_name = String.unquoted(sprite).value
     sprite = sprite_map and sprite_map.get(sprite_name)
     if not sprite_map:
         log.error("No sprite map found: %s", map, extra={'stack': True})
@@ -437,7 +437,7 @@ def sprite_url(map):
     """
     Returns a url to the sprite image.
     """
-    map = String.unquoted(map).value
+    map = map.render()
     sprite_map = sprite_maps.get(map)
     if not sprite_map:
         log.error("No sprite map found: %s", map, extra={'stack': True})
@@ -456,9 +456,9 @@ def sprite_position(map, sprite, offset_x=None, offset_y=None):
     Returns the position for the original image in the sprite.
     This is suitable for use as a value to background-position.
     """
-    map = String.unquoted(map).value
-    sprite_name = String.unquoted(sprite).value
+    map = map.render()
     sprite_map = sprite_maps.get(map)
+    sprite_name = String.unquoted(sprite).value
     sprite = sprite_map and sprite_map.get(sprite_name)
     if not sprite_map:
         log.error("No sprite map found: %s", map, extra={'stack': True})
