@@ -134,16 +134,17 @@ class Calculator(object):
                 if config.DEBUG:
                     raise
                 return None
-            except Exception:
-                # TODO hoist me up since the rule is gone
-                #log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule.file_and_line)
-                if config.DEBUG:
-                    raise
-                return None
             else:
                 ast_cache[expr] = ast
 
-        return ast.evaluate(self, divide=divide)
+        try:
+            return ast.evaluate(self, divide=divide)
+        except Exception:
+            # TODO hoist me up since the rule is gone
+            #log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule.file_and_line)
+            if config.DEBUG:
+                raise
+            return None
 
     def parse_expression(self, expr, target='goal'):
         if expr in ast_cache:
