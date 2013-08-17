@@ -90,7 +90,7 @@ class Namespace(object):
     def set_variable(self, name, value):
         name = normalize_var(name)
         if not isinstance(value, Value):
-            raise TypeError("Expected a Sass type, got %r" % (item,))
+            raise TypeError("Expected a Sass type, got %r" % (value,))
         self._variables[name] = value
 
     def _get_callable(self, chainmap, name, arity):
