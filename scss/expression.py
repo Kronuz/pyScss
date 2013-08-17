@@ -102,7 +102,7 @@ class Calculator(object):
         better_expr_str = self.evaluate_expression(better_expr_str, divide=divide)
 
         if better_expr_str is None:
-            better_expr_str = self.apply_vars(_base_str)
+            better_expr_str = String.unquoted(self.apply_vars(_base_str))
 
         return better_expr_str
 
