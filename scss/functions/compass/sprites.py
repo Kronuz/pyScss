@@ -151,7 +151,7 @@ def sprite_map(g, **kwargs):
         if os.path.exists(asset_path):
             try:
                 save_time, asset, sprite_map, sizes = pickle.load(open(cache_path))
-                sprite_maps[asset] = sprite_map
+                sprite_maps[asset.render()] = sprite_map
             except:
                 pass
 
@@ -333,7 +333,8 @@ def sprite_map(g, **kwargs):
 
             filetime = int(now_time)
             url = '%s%s?_=%s' % (config.ASSETS_URL, asset_file, filetime)
-            asset = 'url("%s") %s' % (escape(url), repeat)
+            url = 'url("%s")' % escape(url)
+            asset = List([String.unquoted(url), String.unquoted(repeat)])
 
             # Add the new object:
             sprite_map = dict(zip(names, zip(sizes, rfiles, offsets_x, offsets_y)))
@@ -353,7 +354,7 @@ def sprite_map(g, **kwargs):
                 for a in sorted(sprite_maps, key=lambda a: sprite_maps[a]['*'], reverse=True)[KEEP_SPRITE_MAPS:]:
                     del sprite_maps[a]
                 log.warning("Exceeded maximum number of sprite maps (%s)" % MAX_SPRITE_MAPS)
-            sprite_maps[asset] = sprite_map
+            sprite_maps[asset.render()] = sprite_map
         for file_, size in sizes:
             _image_size_cache[file_] = size
     ret = String.unquoted(asset)
@@ -423,13 +424,13 @@ def sprite(map, sprite, offset_x=None, offset_y=None):
         url = '%s%s?_=%s' % (config.ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
         x = Number(offset_x or 0, 'px')
         y = Number(offset_y or 0, 'px')
-        if not x or (x <= -1 or x >= 1) and x.unit != '%':
+        if not x or (x.value <= -1 or x.value >= 1) and x.unit != '%':
             x -= sprite[2]
-        if not y or (y <= -1 or y >= 1) and y.unit != '%':
+        if not y or (y.value <= -1 or y.value >= 1) and y.unit != '%':
             y -= sprite[3]
-        pos = "url(%s) %s %s" % (escape(url), x, y)
-        return String.unquoted(pos)
-    return String.unquoted('0 0')
+        url = "url(%s)" % escape(url)
+        return List([String.unquoted(url), x, y])
+    return List([Number(0), Number(0)])
 
 
 @register('sprite-url', 1)
@@ -472,9 +473,7 @@ def sprite_position(map, sprite, offset_x=None, offset_y=None):
             if x:
                 offset_x = None
             x = Number(offset_x or 0, 'px')
-            u = x.unit
-            x = x.value
-            if not x or (x <= -1 or x >= 1) and u != '%':
+            if not x or (x.value <= -1 or x.value >= 1) and x.unit != '%':
                 x -= sprite[2]
         y = None
         if offset_y is not None and not isinstance(offset_y, Number):
@@ -483,10 +482,7 @@ def sprite_position(map, sprite, offset_x=None, offset_y=None):
             if y:
                 offset_y = None
             y = Number(offset_y or 0, 'px')
-            u = y.unit
-            y = y.value
-            if not y or (y <= -1 or y >= 1) and u != '%':
+            if not y or (y.value <= -1 or y.value >= 1) and y.unit != '%':
                 y -= sprite[3]
-        pos = '%s %s' % (x, y)
-        return String.unquoted(pos)
-    return String.unquoted('0 0')
+        return List([x, y])
+    return List([Number(0), Number(0)])
