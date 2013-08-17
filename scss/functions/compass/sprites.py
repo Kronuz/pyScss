@@ -400,7 +400,7 @@ def sprite_file(map, sprite):
 def sprites(map):
     map = String.unquoted(map).value
     sprite_map = sprite_maps.get(map, {})
-    return List(list(sorted(s for s in sprite_map if not s.startswith('*'))))
+    return List(list(String.unquoted(s) for s in sorted(s for s in sprite_map if not s.startswith('*'))))
 
 
 @register('sprite', 2)

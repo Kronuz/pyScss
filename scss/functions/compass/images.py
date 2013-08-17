@@ -70,14 +70,15 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
     if path:
         dst_colors = [list(Color(v).value[:3]) for v in List.from_maybe(dst_color) if v]
 
-        src_colors = src_color
-        src_colors = [tuple(Color(v).value[:3]) if v else (0, 0, 0) for v in List.from_maybe(src_color)]
+        src_color = Color.from_name('black') if src_color is None else src_color
+        src_colors = [tuple(Color(v).value[:3]) for v in List.from_maybe(src_color)]
 
         len_colors = max(len(dst_colors), len(src_colors))
         dst_colors = (dst_colors * len_colors)[:len_colors]
         src_colors = (src_colors * len_colors)[:len_colors]
 
-        spacing = [int(Number(v).value) if v else 0 for v in List.from_maybe(spacing)]
+        spacing = Number(0) if spacing is None else spacing
+        spacing = [int(Number(v).value) for v in List.from_maybe(spacing)]
         spacing = (spacing * 4)[:4]
 
         file_name, file_ext = os.path.splitext(os.path.normpath(filepath).replace('\\', '_').replace('/', '_'))
