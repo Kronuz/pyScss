@@ -619,7 +619,9 @@ class Scss(object):
         if not block.argument:
             raise SyntaxError("%s requires a function name (%s)" % (block.directive, rule.file_and_line))
 
-        funct, lpar, argstr = block.argument.strip().partition('(')
+        funct, lpar, argstr = block.argument.partition('(')
+        funct = normalize_var(funct.strip())
+        argstr = argstr.strip()
         defaults = {}
         new_params = []
 
