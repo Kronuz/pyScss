@@ -357,8 +357,7 @@ def sprite_map(g, **kwargs):
             sprite_maps[asset.render()] = sprite_map
         for file_, size in sizes:
             _image_size_cache[file_] = size
-    ret = String.unquoted(asset)
-    return ret
+    return asset
 
 
 @register('sprite-map-name', 1)
@@ -424,10 +423,10 @@ def sprite(map, sprite, offset_x=None, offset_y=None):
         url = '%s%s?_=%s' % (config.ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
         x = Number(offset_x or 0, 'px')
         y = Number(offset_y or 0, 'px')
-        if not x or (x.value <= -1 or x.value >= 1) and x.unit != '%':
-            x -= sprite[2]
-        if not y or (y.value <= -1 or y.value >= 1) and y.unit != '%':
-            y -= sprite[3]
+        if not x.value or (x.value <= -1 or x.value >= 1) and x.unit != '%':
+            x -= Number(sprite[2], 'px')
+        if not y.value or (y.value <= -1 or y.value >= 1) and y.unit != '%':
+            y -= Number(sprite[3], 'px')
         url = "url(%s)" % escape(url)
         return List([String.unquoted(url), x, y])
     return List([Number(0), Number(0)])
@@ -473,8 +472,8 @@ def sprite_position(map, sprite, offset_x=None, offset_y=None):
             if x:
                 offset_x = None
             x = Number(offset_x or 0, 'px')
-            if not x or (x.value <= -1 or x.value >= 1) and x.unit != '%':
-                x -= sprite[2]
+            if not x.value or (x.value <= -1 or x.value >= 1) and x.unit != '%':
+                x -= Number(sprite[2], 'px')
         y = None
         if offset_y is not None and not isinstance(offset_y, Number):
             y = offset_y
@@ -482,7 +481,7 @@ def sprite_position(map, sprite, offset_x=None, offset_y=None):
             if y:
                 offset_y = None
             y = Number(offset_y or 0, 'px')
-            if not y or (y.value <= -1 or y.value >= 1) and y.unit != '%':
-                y -= sprite[3]
+            if not y.value or (y.value <= -1 or y.value >= 1) and y.unit != '%':
+                y -= Number(sprite[3], 'px')
         return List([x, y])
     return List([Number(0), Number(0)])
