@@ -297,11 +297,14 @@ class Scss(object):
         if scss_vars:
             calculator = Calculator()
             for var_name, value in scss_vars.items():
-                scss_value = calculator.evaluate_expression(value)
-                if scss_value is None:
-                    # TODO warning?
-                    scss_value = String.unquoted(value)
-                self._scss_vars[var_name] = value
+                if isinstance(value, six.string_types):
+                    scss_value = calculator.evaluate_expression(value)
+                    if scss_value is None:
+                        # TODO warning?
+                        scss_value = String.unquoted(value)
+                else:
+                    scss_value = value
+                self._scss_vars[var_name] = scss_value
 
         self._scss_opts = scss_opts
         self._scss_files = scss_files
