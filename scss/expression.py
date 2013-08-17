@@ -144,14 +144,7 @@ class Calculator(object):
             else:
                 ast_cache[expr] = ast
 
-        try:
-            return ast.evaluate(self, divide=divide)
-        except Exception:
-            # TODO hoist me up since the rule is gone
-            #log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule.file_and_line)
-            if config.DEBUG:
-                raise
-            return None
+        return ast.evaluate(self, divide=divide)
 
     def parse_expression(self, expr, target='goal'):
         ast_cache = self.get_ast_cache(target)
@@ -287,36 +280,44 @@ class CallOp(Expression):
                 kwargs[var.lstrip('$').replace('-', '_')] = value
 
         # TODO merge this with the library
+        funct = None
         try:
-            func = calculator.namespace.function(func_name, argspec_len)
+            funct = calculator.namespace.function(func_name, argspec_len)
             # @functions take a ns as first arg.  TODO: Python functions possibly
             # should too
-            if getattr(func, '__name__', None) == '__call':
-                func = partial(func, calculator.namespace)
+            if getattr(funct, '__name__', None) == '__call':
+                funct = partial(funct, calculator.namespace)
         except KeyError:
             try:
                 if kwargs:
                     raise KeyError
                 # Fallback to single parameter:
-                func = calculator.namespace.function(func_name, 1)
+                funct = calculator.namespace.function(func_name, 1)
                 args = [args]
             except KeyError:
                 if not is_builtin_css_function(func_name):
                     log.error("Function not found: %s:%s", func_name, argspec_len, extra={'stack': True})
+                    raise
+        if funct:
+            try:
+                return funct(*args, **kwargs)
+            except Exception:
+                # TODO hoist me up since the rule is gone
+                #log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule.file_and_line)
+                if not is_builtin_css_function(func_name):
+                    raise
 
-                rendered_args = []
-                for var, value in evald_argpairs:
-                    rendered_value = value.render()
-                    if var is None:
-                        rendered_args.append(rendered_value)
-                    else:
-                        rendered_args.append("%s: %s" % (var, rendered_value))
+        rendered_args = []
+        for var, value in evald_argpairs:
+            rendered_value = value.render()
+            if var is None:
+                rendered_args.append(rendered_value)
+            else:
+                rendered_args.append("%s: %s" % (var, rendered_value))
 
-                return String(
-                    u"%s(%s)" % (func_name, u", ".join(rendered_args)),
-                    quotes=None)
-
-        return func(*args, **kwargs)
+        return String(
+            u"%s(%s)" % (func_name, u", ".join(rendered_args)),
+            quotes=None)
 
 
 class Literal(Expression):
