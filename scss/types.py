@@ -273,20 +273,19 @@ class Number(Value):
     def __eq__(self, other):
         if not isinstance(other, Number):
             return Boolean(False)
-
-        return self._compare(other, operator.__eq__)
+        return Boolean(self._compare(other, operator.__eq__))
 
     def __lt__(self, other):
-        return self._compare(other, operator.__lt__)
+        return Boolean(self._compare(other, operator.__lt__))
 
     def __le__(self, other):
-        return self._compare(other, operator.__le__)
+        return Boolean(self._compare(other, operator.__le__))
 
     def __gt__(self, other):
-        return self._compare(other, operator.__gt__)
+        return Boolean(self._compare(other, operator.__gt__))
 
     def __ge__(self, other):
-        return self._compare(other, operator.__ge__)
+        return Boolean(self._compare(other, operator.__ge__))
 
     def _compare(self, other, op):
         if not isinstance(other, Number):
