@@ -24,7 +24,6 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 FATAL_UNDEFINED = True
-ast_cache = {}
 
 
 class Calculator(object):
@@ -115,10 +114,18 @@ class Calculator(object):
                 value = _vi
         return value
 
+    def get_ast_cache(self, target):
+        if not hasattr(self, 'ast_cache'):
+            self.__class__.ast_cache = {}
+        if target not in self.ast_cache:
+            self.ast_cache[target] = {}
+        return self.ast_cache[target]
+
     def evaluate_expression(self, expr, divide=False):
         if not isinstance(expr, six.string_types):
             raise TypeError("Expected string, got %r" % (expr,))
 
+        ast_cache = self.get_ast_cache('goal')
         if expr in ast_cache:
             ast = ast_cache[expr]
 
@@ -147,14 +154,14 @@ class Calculator(object):
             return None
 
     def parse_expression(self, expr, target='goal'):
+        ast_cache = self.get_ast_cache(target)
         if expr in ast_cache:
             return ast_cache[expr]
 
         parser = SassExpression(SassExpressionScanner(expr))
         ast = getattr(parser, target)()
 
-        if target == 'goal':
-            ast_cache[expr] = ast
+        ast_cache[expr] = ast
 
         return ast
 
