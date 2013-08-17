@@ -22,7 +22,7 @@ class Value(object):
     sass_type_name = u'unknown'
 
     def __repr__(self):
-        return '<%s: %s>' % (self.__class__.__name__, repr(self.value))
+        return '<%s(%s)>' % (self.__class__.__name__, repr(self.value))
 
     # Sass values are all true, except for booleans and nulls
     def __bool__(self):
@@ -116,7 +116,7 @@ class Null(Value):
         return self.sass_type_name
 
     def __repr__(self):
-        return "<%s>" % (self.__class__.__name__,)
+        return "<%s()>" % (self.__class__.__name__,)
 
     def __hash__(self):
         return hash(None)
@@ -250,7 +250,7 @@ class Number(Value):
             if full_unit:
                 full_unit = ' ' + full_unit
 
-        return '<%s: %r%s>' % (self.__class__.__name__, self.value, full_unit)
+        return '<%s(%r%s)>' % (self.__class__.__name__, self.value, full_unit)
 
     def __hash__(self):
         return hash((self.value, self.unit_numer, self.unit_denom))
@@ -662,7 +662,7 @@ class Color(Value):
         )
 
     def __repr__(self):
-        return '<%s: %s>' % (self.__class__.__name__, repr(self.value))
+        return '<%s(%s)>' % (self.__class__.__name__, repr(self.value))
 
     def __hash__(self):
         return hash(self.value)
@@ -823,6 +823,13 @@ class String(Value):
             return self.quotes + escape(self.value) + self.quotes
         else:
             return self.value
+
+    def __repr__(self):
+        if self.quotes != '"':
+            quotes = ', quotes=%r' % self.quotes
+        else:
+            quotes = ''
+        return '<%s(%s%s)>' % (self.__class__.__name__, repr(self.value), quotes)
 
     def __eq__(self, other):
         return Boolean(isinstance(other, String) and self.value == other.value)
