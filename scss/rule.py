@@ -5,6 +5,7 @@ import six
 import logging
 
 from scss.cssdefs import _has_placeholder_re
+from scss.types import Value
 
 
 log = logging.getLogger(__name__)
@@ -88,8 +89,8 @@ class Namespace(object):
 
     def set_variable(self, name, value):
         name = normalize_var(name)
-        assert not (isinstance(value, six.string_types) and value.startswith('$'))
-        #assert isinstance(value, Value)
+        if not isinstance(value, Value):
+            raise TypeError("Expected a Sass type, got %r" % (item,))
         self._variables[name] = value
 
     def _get_callable(self, chainmap, name, arity):

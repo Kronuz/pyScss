@@ -453,14 +453,18 @@ class List(Value):
 
     sass_type_name = u'list'
 
-    def __init__(self, tokens, separator=None, use_comma=None):
-        if isinstance(tokens, List):
-            tokens = tokens.value
+    def __init__(self, iterable, separator=None, use_comma=None):
+        if isinstance(iterable, List):
+            iterable = iterable.value
 
-        if not isinstance(tokens, (list, tuple)):
-            raise TypeError("Expected list, got %r" % (tokens,))
+        if not isinstance(iterable, (list, tuple)):
+            raise TypeError("Expected list, got %r" % (iterable,))
 
-        self.value = list(tokens)
+        self.value = list(iterable)
+
+        for item in self.value:
+            if not isinstance(item, Value):
+                raise TypeError("Expected a Sass type, got %r" % (item,))
 
         # TODO remove separator argument entirely
         if use_comma is None:
