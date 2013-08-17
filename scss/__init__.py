@@ -70,7 +70,7 @@ from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
 from scss.rule import UnparsedBlock, SassRule
 from scss.types import Boolean, List, Null, Number, String
-from scss.util import depar, dequote, normalize_var, split_params, print_timing  # profile
+from scss.util import dequote, normalize_var, print_timing  # profile
 
 log = logging.getLogger(__name__)
 
@@ -611,6 +611,22 @@ class Scss(object):
                     value = 0
                 rule.options[option.replace('-', '_')] = value
 
+    def _get_funct_def(self, calculator, argument):
+        funct, lpar, argstr = argument.partition('(')
+        funct = calculator.do_glob_math(funct)
+        funct = normalize_var(funct.strip())
+        argstr = argstr.strip()
+
+        if lpar:
+            # Has arguments; parse them with the argspec rule
+            if not argstr.endswith(')'):
+                raise SyntaxError("Expected ')', found end of line: %r" % (argument,))
+            argstr = argstr[:-1].strip()
+            argspec_node = calculator.parse_expression(argstr, target='goal_argspec') if argstr else None
+            return funct, argspec_node
+
+        return funct, None
+
     @print_timing(10)
     def _do_functions(self, rule, p_children, scope, block):
         """
@@ -619,41 +635,55 @@ class Scss(object):
         if not block.argument:
             raise SyntaxError("%s requires a function name (%s)" % (block.directive, rule.file_and_line))
 
-        funct, lpar, argstr = block.argument.partition('(')
-        funct = normalize_var(funct.strip())
-        argstr = argstr.strip()
+        calculator = Calculator(rule.namespace)
+        funct, argspec_node = self._get_funct_def(calculator, block.argument)
+
         defaults = {}
         new_params = []
 
-        if lpar:
-            # Has arguments; parse them with the argspec rule
-            if not argstr.endswith(')'):
-                raise SyntaxError("Expected ')', found end of line: %r" % (block.argument,))
-            argstr = argstr[:-1]
-
-            if argstr:
-                calculator = Calculator(rule.namespace)
-                argspec_node = calculator.parse_expression(argstr, target='goal_argspec')
-
-                for var_name, default in argspec_node.iter_def_argspec():
-                    new_params.append(var_name)
-                    if default is not None:
-                        defaults[var_name] = default
+        if argspec_node:
+            for var_name, default in argspec_node.iter_def_argspec():
+                new_params.append(var_name)
+                if default is not None:
+                    defaults[var_name] = default
 
         mixin = [list(new_params), defaults, block.unparsed_contents]
         if block.directive == '@function':
             def _call(mixin):
                 def __call(namespace, *args, **kwargs):
+                    calculator = Calculator(namespace.derive())
+
+                    m_vars = rule.namespace
                     m_params = mixin[0]
-                    m_vars = namespace.derive()
+                    m_defaults = mixin[1]
                     m_codestr = mixin[2]
-                    calculator = Calculator(m_vars)
-                    for key, value in mixin[1].items():
-                        m_vars.set_variable(key, value.evaluate(calculator))
-                    for i, a in enumerate(args):
-                        m_vars.set_variable(m_params[i], a)
-                    for k, v in kwargs.items():
-                        m_vars.set_variable('$' + k, v)
+
+                    params = []
+                    params_dict = {}
+                    for i, var_value in enumerate(args):
+                        try:
+                            var_name = m_params[i]
+                            params.append(var_name)
+                            params_dict[var_name] = var_value
+                        except IndexError:
+                            log.error("Function %s:%d receives more arguments than expected (%d)", funct, len(m_params), len(args), extra={'stack': True})
+                            break
+                    for var_name, var_value in kwargs.items():
+                        var_name = '$' + var_name
+                        params.append(var_name)
+                        params_dict[var_name] = var_value
+
+                    # Evaluate all parameters sent to the function in order:
+                    for var_name in params:
+                        value = params_dict[var_name]
+                        m_vars.set_variable(var_name, value)
+
+                    # Evaluate arguments not passed to the mixin/function (from the defaults):
+                    for var_name in m_params:
+                        if var_name not in params_dict and var_name in m_defaults:
+                            var_value = m_defaults[var_name]
+                            value = var_value.evaluate(calculator)
+                            m_vars.set_variable(var_name, value)
 
                     _rule = SassRule(
                         # TODO correct?  relevant?  seems the function should
@@ -702,54 +732,62 @@ class Scss(object):
         """
         Implements @include, for @mixins
         """
-        funct, params, _ = block.argument.partition('(')
-        calculator = Calculator(rule.namespace)
-        funct = calculator.do_glob_math(funct)
-        funct = normalize_var(funct.strip())
-        params = split_params(depar(params + _))
-        new_params = {}
-        num_args = 0
-        for param in params:
-            varname, _, param = param.partition(':')
-            if param:
-                param = param.strip()
-                varname = varname.strip()
-            else:
-                param = varname.strip()
-                varname = num_args
-                if param:
-                    num_args += 1
-            if param:
-                new_params[varname] = param
+        calculator = Calculator(rule.namespace.derive())
+        funct, argspec_node = self._get_funct_def(calculator, block.argument)
+
+        if argspec_node:
+            argspec = list(argspec_node.iter_call_argspec())
+            argspec_len = len(argspec)
+        else:
+            argspec = None
+            argspec_len = 0
         try:
-            mixin = rule.namespace.mixin(funct, num_args)
+            mixin = rule.namespace.mixin(funct, argspec_len)
         except KeyError:
             try:
-                # Fallback to single parameter
-                # TODO don't do this, once ... works
+                # TODO maybe? don't do this, once '...' works
+                # Fallback to single parameter:
                 mixin = rule.namespace.mixin(funct, 1)
-                if all(map(lambda o: isinstance(o, int), new_params.keys())):
-                    new_params = {0: ', '.join(new_params.values())}
             except KeyError:
-                log.error("Required mixin not found: %s:%d (%s)", funct, num_args, rule.file_and_line, extra={'stack': True})
+                log.error("Required mixin not found: %s:%d (%s)", funct, argspec_len, rule.file_and_line, extra={'stack': True})
                 return
 
+        m_vars = rule.namespace
         m_params = mixin[0]
-        m_vars = rule.namespace.derive()
-        for key, value in mixin[1].items():
-            m_vars.set_variable(key, value.evaluate(calculator))
+        m_defaults = mixin[1]
         m_codestr = mixin[2]
-        for varname, value in new_params.items():
-            try:
-                m_param = m_params[varname]
-            except (IndexError, KeyError, TypeError):
-                m_param = varname
-            value = calculator.calculate(value)
-            m_vars.set_variable(m_param, value)
-        for p in m_params:
-            if p not in new_params and isinstance(m_vars.variable(p), six.string_types):
-                value = calculator.calculate(m_vars.variable(p))
-                m_vars.set_variable(p, value)
+
+        if len(m_params) == 1 and argspec_len > 1:
+            argspec = list(argspec_node.iter_list_argspec())
+            argspec_len = len(argspec)
+
+        params = []
+        params_dict = {}
+        num_args = 0
+        if argspec:
+            for var_name, var_value in argspec:
+                if not var_name:
+                    try:
+                        var_name = m_params[num_args]
+                    except IndexError:
+                        log.error("Mixin %s:%d receives more arguments than expected (%d)", funct, len(m_params), argspec_len, extra={'stack': True})
+                        continue
+                    num_args += 1
+                params.append(var_name)
+                params_dict[var_name] = var_value
+
+        # Evaluate all parameters sent to the function in order:
+        for var_name in params:
+            var_value = params_dict[var_name]
+            value = var_value.evaluate(calculator)
+            m_vars.set_variable(var_name, value)
+
+        # Evaluate arguments not passed to the mixin/function (from the defaults):
+        for var_name in m_params:
+            if var_name not in params_dict and var_name in m_defaults:
+                var_value = m_defaults[var_name]
+                value = var_value.evaluate(calculator)
+                m_vars.set_variable(var_name, value)
 
         _rule = rule.copy()
         _rule.unparsed_contents = m_codestr

@@ -261,47 +261,55 @@ class CallOp(Expression):
         # TODO bake this into the context and options "dicts", plus library
         func_name = normalize_var(self.func_name)
 
+        argspec_node = self.argspec
+        argspec = list(argspec_node.iter_call_argspec())
+        argspec_len = len(argspec)
+
         # Turn the pairs of arg tuples into *args and **kwargs
         # TODO unclear whether this is correct -- how does arg, kwarg, arg
         # work?
         args = []
         kwargs = {}
         evald_argpairs = []
-        for var, expr in self.argspec.iter_call_argspec():
+        for var, expr in argspec_node.iter_call_argspec():
             value = expr.evaluate(calculator, divide=True)
             evald_argpairs.append((var, value))
-
             if var is None:
                 args.append(value)
             else:
                 kwargs[var.lstrip('$').replace('-', '_')] = value
 
-        num_args = len(self.argspec.argpairs)
-
         # TODO merge this with the library
         try:
-            func = calculator.namespace.function(func_name, num_args)
+            func = calculator.namespace.function(func_name, argspec_len)
             # @functions take a ns as first arg.  TODO: Python functions possibly
             # should too
             if getattr(func, '__name__', None) == '__call':
                 func = partial(func, calculator.namespace)
         except KeyError:
-            if not is_builtin_css_function(func_name):
-                log.error("Function not found: %s:%s", func_name, num_args, extra={'stack': True})
+            try:
+                if kwargs:
+                    raise KeyError
+                # Fallback to single parameter:
+                func = calculator.namespace.function(func_name, 1)
+                args = [args]
+            except KeyError:
+                if not is_builtin_css_function(func_name):
+                    log.error("Function not found: %s:%s", func_name, argspec_len, extra={'stack': True})
 
-            rendered_args = []
-            for var, value in evald_argpairs:
-                rendered_value = value.render()
-                if var is None:
-                    rendered_args.append(rendered_value)
-                else:
-                    rendered_args.append("%s: %s" % (var, rendered_value))
+                rendered_args = []
+                for var, value in evald_argpairs:
+                    rendered_value = value.render()
+                    if var is None:
+                        rendered_args.append(rendered_value)
+                    else:
+                        rendered_args.append("%s: %s" % (var, rendered_value))
 
-            return String(
-                u"%s(%s)" % (func_name, u", ".join(rendered_args)),
-                quotes=None)
-        else:
-            return func(*args, **kwargs)
+                return String(
+                    u"%s(%s)" % (func_name, u", ".join(rendered_args)),
+                    quotes=None)
+
+        return func(*args, **kwargs)
 
 
 class Literal(Expression):
@@ -379,6 +387,9 @@ class ArgspecLiteral(Expression):
         while argpairs and argpairs[-1] == (None, None):
             argpairs = argpairs[:-1]
         self.argpairs = tuple((var, Literal(Undefined()) if value is None else value) for var, value in argpairs)
+
+    def iter_list_argspec(self):
+        yield None, ListLiteral(zip(*self.argpairs)[1])
 
     def iter_def_argspec(self):
         """Interpreting this literal as a function definition, yields pairs of
