@@ -388,7 +388,7 @@ class ArgspecLiteral(Expression):
             if var is None:
                 # value is actually the name
                 var = value
-                value = None
+                value = Literal(Undefined())
 
             if not isinstance(var, Variable):
                 raise SyntaxError("Expected variable name, got %r" % (var,))
