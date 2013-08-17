@@ -1004,7 +1004,7 @@ class Scss(object):
 
         for i in rev(range(frm, through + 1)):
             rule.unparsed_contents = block.unparsed_contents
-            rule.namespace.set_variable(var, str(i))
+            rule.namespace.set_variable(var, Number(i))
             self.manage_children(rule, p_children, scope)
 
     @print_timing(10)
