@@ -6,6 +6,8 @@ http://compass-style.org/reference/compass/utilities/sprites/
 
 from __future__ import absolute_import
 
+import six
+
 import base64
 import glob
 import hashlib
@@ -147,11 +149,22 @@ def sprite_map(g, **kwargs):
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
         cache_path = os.path.join(config.CACHE_ROOT or ASSETS_ROOT, asset_file + '.cache')
 
+        inline = Boolean(kwargs.get('inline', False))
+
         sprite_map = None
-        if os.path.exists(asset_path):
+        file_asset = None
+        inline_asset = None
+        if os.path.exists(asset_path) or inline:
             try:
-                save_time, asset, sprite_map, sizes = pickle.load(open(cache_path))
-                sprite_maps[asset.render()] = sprite_map
+                save_time, file_asset, inline_asset, sprite_map, sizes = pickle.load(open(cache_path))
+                if file_asset:
+                    sprite_maps[file_asset.render()] = sprite_map
+                if inline_asset:
+                    sprite_maps[inline_asset.render()] = sprite_map
+                if inline:
+                    asset = inline_asset
+                else:
+                    asset = file_asset
             except:
                 pass
 
@@ -168,7 +181,7 @@ def sprite_map(g, **kwargs):
                         sprite_map = None  # Invalidate cached sprite map
                         break
 
-        if sprite_map is None:
+        if sprite_map is None or asset is None:
             cache_buster = Boolean(kwargs.get('cache_buster', True))
             direction = String.unquoted(kwargs.get('direction', config.SPRTE_MAP_DIRECTION)).value
             repeat = String.unquoted(kwargs.get('repeat', 'no-repeat')).value
@@ -327,18 +340,30 @@ def sprite_map(g, **kwargs):
             if useless_dst_color:
                 log.warning("Useless use of $dst-color in sprite map for files at '%s' (never used for)" % glob_path)
 
-            try:
-                new_image.save(asset_path)
-            except IOError:
-                log.exception("Error while saving image")
-
             filetime = int(now_time)
-            url = '%s%s' % (config.ASSETS_URL, asset_file)
-            if cache_buster:
-                url += '?_=%s' % filetime
+
+            if not inline:
+                try:
+                    new_image.save(asset_path)
+                    url = '%s%s' % (config.ASSETS_URL, asset_file)
+                    if cache_buster:
+                        url += '?_=%s' % filetime
+                except IOError:
+                    log.exception("Error while saving image")
+                    inline = True
+            if inline:
+                output = six.BytesIO()
+                new_image.save(output, format='PNG')
+                contents = output.getvalue()
+                output.close()
+                mime_type = 'image/png'
+                url = 'data:' + mime_type + ';base64,' + base64.b64encode(contents)
 
             url = 'url(%s)' % escape(url)
-            asset = List([String.unquoted(url), String.unquoted(repeat)])
+            if inline:
+                asset = inline_asset = List([String.unquoted(url), String.unquoted(repeat)])
+            else:
+                asset = file_asset = List([String.unquoted(url), String.unquoted(repeat)])
 
             # Add the new object:
             sprite_map = dict(zip(names, zip(sizes, rfiles, offsets_x, offsets_y)))
@@ -349,7 +374,7 @@ def sprite_map(g, **kwargs):
             sprite_map['*t*'] = filetime
 
             cache_tmp = tempfile.NamedTemporaryFile(delete=False, dir=ASSETS_ROOT)
-            pickle.dump((now_time, asset, sprite_map, zip(files, sizes)), cache_tmp)
+            pickle.dump((now_time, file_asset, inline_asset, sprite_map, zip(files, sizes)), cache_tmp)
             cache_tmp.close()
             os.rename(cache_tmp.name, cache_path)
 
