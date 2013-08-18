@@ -611,33 +611,7 @@ class Scss(object):
                     value = 0
                 rule.options[option.replace('-', '_')] = value
 
-    # def _get_funct_def(self, calculator, argument, definition=True):
-    #     # !!EXPERIMENTAL!! (for mixins-vars.scss test)
-    #     ID_RE = re.compile(r'[-a-zA-Z_][-a-zA-Z0-9_]*')
-    #     m = ID_RE.match(argument)
-    #     if not m:
-    #         raise SyntaxError("No function name found!" % (argument,))
-
-    #     funct = argument[:m.end()]
-    #     argstr = argument[m.end():].strip()
-    #     funct = calculator.do_glob_math(funct)
-    #     funct = normalize_var(funct.strip())
-
-    #     if argstr:
-    #         if definition:
-    #             if argstr[0] != '(':
-    #                 raise SyntaxError("Expected '(', after function name: %r" % (argument,))
-    #             if argstr[-1] != ')':
-    #                 raise SyntaxError("Expected ')', found end of line: %r" % (argument,))
-    #             argstr = argstr[1:-1]
-
-    #         # Has arguments; parse them with the argspec rule
-    #         argspec_node = calculator.parse_expression(argstr, target='goal_argspec') if argstr else None
-    #         # print(argstr, repr(argspec_node))
-    #         return funct, argspec_node
-    #     return funct, None
-
-    def _get_funct_def(self, calculator, argument, definition=True):
+    def _get_funct_def(self, rule, calculator, argument):
         funct, lpar, argstr = argument.partition('(')
         funct = calculator.do_glob_math(funct)
         funct = normalize_var(funct.strip())
@@ -646,7 +620,7 @@ class Scss(object):
         if lpar:
             # Has arguments; parse them with the argspec rule
             if not argstr.endswith(')'):
-                raise SyntaxError("Expected ')', found end of line: %r" % (argument,))
+                raise SyntaxError("Expected ')', found end of line for %s (%s)" % (funct, rule.file_and_line))
             argstr = argstr[:-1].strip()
             argspec_node = calculator.parse_expression(argstr, target='goal_argspec') if argstr else None
             # print(argstr, repr(argspec_node))
@@ -663,7 +637,7 @@ class Scss(object):
             raise SyntaxError("%s requires a function name (%s)" % (block.directive, rule.file_and_line))
 
         calculator = Calculator(rule.namespace)
-        funct, argspec_node = self._get_funct_def(calculator, block.argument, definition=False)
+        funct, argspec_node = self._get_funct_def(rule, calculator, block.argument)
 
         defaults = {}
         new_params = []
@@ -760,7 +734,7 @@ class Scss(object):
         Implements @include, for @mixins
         """
         calculator = Calculator(rule.namespace.derive())
-        funct, argspec_node = self._get_funct_def(calculator, block.argument)
+        funct, argspec_node = self._get_funct_def(rule, calculator, block.argument)
 
         if argspec_node:
             argspec = list(argspec_node.iter_call_argspec())
