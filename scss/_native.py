@@ -209,9 +209,9 @@ class Scanner(object):
 
             # If we didn't find anything, raise an error
             if best_pat is None:
-                msg = "Bad Token"
+                msg = "Bad token found"
                 if restrict:
-                    msg = "Trying to find one of " + ", ".join(restrict)
+                    msg = "Bad token found while trying to find one of the restricted tokens: %s" % (", ".join(repr(r) for r in restrict))
                 raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(self.pos), msg))
 
             # If we found something that isn't to be ignored, return it
