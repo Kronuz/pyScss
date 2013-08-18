@@ -33,7 +33,7 @@ from scss import config
 from scss.functions.compass import _image_size_cache
 from scss.functions.compass.layouts import PackedSpritesLayout, HorizontalSpritesLayout, VerticalSpritesLayout, DiagonalSpritesLayout
 from scss.functions.library import FunctionLibrary
-from scss.types import Color, List, Number, String
+from scss.types import Color, List, Number, String, Boolean
 from scss.util import escape
 
 log = logging.getLogger(__name__)
@@ -169,6 +169,7 @@ def sprite_map(g, **kwargs):
                         break
 
         if sprite_map is None:
+            cache_buster = Boolean(kwargs.get('cache_buster', True))
             direction = String.unquoted(kwargs.get('direction', config.SPRTE_MAP_DIRECTION)).value
             repeat = String.unquoted(kwargs.get('repeat', 'no-repeat')).value
             collapse = kwargs.get('collapse', Number(0))
@@ -332,7 +333,10 @@ def sprite_map(g, **kwargs):
                 log.exception("Error while saving image")
 
             filetime = int(now_time)
-            url = '%s%s?_=%s' % (config.ASSETS_URL, asset_file, filetime)
+            url = '%s%s' % (config.ASSETS_URL, asset_file)
+            if cache_buster:
+                url += '?_=%s' % filetime
+
             url = 'url(%s)' % escape(url)
             asset = List([String.unquoted(url), String.unquoted(repeat)])
 
@@ -406,7 +410,8 @@ def sprites(map):
 @register('sprite', 2)
 @register('sprite', 3)
 @register('sprite', 4)
-def sprite(map, sprite, offset_x=None, offset_y=None):
+@register('sprite', 5)
+def sprite(map, sprite, offset_x=None, offset_y=None, cache_buster=True):
     """
     Returns the image and background position for use in a single shorthand
     property
@@ -420,7 +425,9 @@ def sprite(map, sprite, offset_x=None, offset_y=None):
     elif not sprite:
         log.error("No sprite found: %s in %s", sprite_name, sprite_map['*n*'], extra={'stack': True})
     if sprite:
-        url = '%s%s?_=%s' % (config.ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
+        url = '%s%s' % (config.ASSETS_URL, sprite_map['*f*'])
+        if cache_buster:
+            url += '?_=%s' % sprite_map['*t*']
         x = Number(offset_x or 0, 'px')
         y = Number(offset_y or 0, 'px')
         if not x.value or (x.value <= -1 or x.value >= 1) and x.unit != '%':
@@ -433,7 +440,8 @@ def sprite(map, sprite, offset_x=None, offset_y=None):
 
 
 @register('sprite-url', 1)
-def sprite_url(map):
+@register('sprite-url', 2)
+def sprite_url(map, cache_buster=True):
     """
     Returns a url to the sprite image.
     """
@@ -442,7 +450,9 @@ def sprite_url(map):
     if not sprite_map:
         log.error("No sprite map found: %s", map, extra={'stack': True})
     if sprite_map:
-        url = '%s%s?_=%s' % (config.ASSETS_URL, sprite_map['*f*'], sprite_map['*t*'])
+        url = '%s%s' % (config.ASSETS_URL, sprite_map['*f*'])
+        if cache_buster:
+            url += '?_=%s' % sprite_map['*t*']
         url = "url(%s)" % escape(url)
         return String.unquoted(url)
     return String.unquoted('')
