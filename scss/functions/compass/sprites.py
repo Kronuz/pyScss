@@ -333,7 +333,7 @@ def sprite_map(g, **kwargs):
 
             filetime = int(now_time)
             url = '%s%s?_=%s' % (config.ASSETS_URL, asset_file, filetime)
-            url = 'url("%s")' % escape(url)
+            url = 'url(%s)' % escape(url)
             asset = List([String.unquoted(url), String.unquoted(repeat)])
 
             # Add the new object:

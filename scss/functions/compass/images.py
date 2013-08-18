@@ -153,7 +153,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
             url = add_cache_buster(url, filetime)
 
     if not only_path:
-        url = 'url("%s")' % escape(url)
+        url = 'url(%s)' % escape(url)
     return String.unquoted(url)
 
 
