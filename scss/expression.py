@@ -164,7 +164,7 @@ class Calculator(object):
 
 class Expression(object):
     def __repr__(self):
-        return repr(self.__dict__)
+        return '<%s()>' % (self.__class__.__name__)
 
     def evaluate(self, calculator, divide=False):
         """Evaluate this AST node, and return a Sass value.
@@ -182,6 +182,9 @@ class Parentheses(Expression):
     Only exists to force a slash to be interpreted as division when contained
     within parentheses.
     """
+    def __repr__(self):
+        return '<%s(%s)>' % (self.__class__.__name__, repr(self.contents))
+
     def __init__(self, contents):
         self.contents = contents
 
@@ -190,6 +193,9 @@ class Parentheses(Expression):
 
 
 class UnaryOp(Expression):
+    def __repr__(self):
+        return '<%s(%s, %s)>' % (self.__class__.__name__, repr(self.op), repr(self.operand))
+
     def __init__(self, op, operand):
         self.op = op
         self.operand = operand
@@ -199,6 +205,9 @@ class UnaryOp(Expression):
 
 
 class BinaryOp(Expression):
+    def __repr__(self):
+        return '<%s(%s, %s, %s)>' % (self.__class__.__name__, repr(self.op), repr(self.left), repr(self.right))
+
     def __init__(self, op, left, right):
         self.op = op
         self.left = left
@@ -226,6 +235,9 @@ class BinaryOp(Expression):
 
 
 class AnyOp(Expression):
+    def __repr__(self):
+        return '<%s(*%s)>' % (self.__class__.__name__, repr(self.op), repr(self.operands))
+
     def __init__(self, *operands):
         self.operands = operands
 
@@ -235,6 +247,9 @@ class AnyOp(Expression):
 
 
 class AllOp(Expression):
+    def __repr__(self):
+        return '<%s(*%s)>' % (self.__class__.__name__, repr(self.operands))
+
     def __init__(self, *operands):
         self.operands = operands
 
@@ -244,6 +259,9 @@ class AllOp(Expression):
 
 
 class NotOp(Expression):
+    def __repr__(self):
+        return '<%s(%s)>' % (self.__class__.__name__, repr(self.operand))
+
     def __init__(self, operand):
         self.operand = operand
 
@@ -253,6 +271,9 @@ class NotOp(Expression):
 
 
 class CallOp(Expression):
+    def __repr__(self):
+        return '<%s(%s, %s)>' % (self.__class__.__name__, repr(self.func_name), repr(self.argspec))
+
     def __init__(self, func_name, argspec):
         self.func_name = func_name
         self.argspec = argspec
@@ -321,6 +342,9 @@ class CallOp(Expression):
 
 
 class Literal(Expression):
+    def __repr__(self):
+        return '<%s(%s)>' % (self.__class__.__name__, repr(self.value))
+
     def __init__(self, value):
         self.value = value
 
@@ -329,6 +353,9 @@ class Literal(Expression):
 
 
 class Variable(Expression):
+    def __repr__(self):
+        return '<%s(%s)>' % (self.__class__.__name__, repr(self.name))
+
     def __init__(self, name):
         self.name = name
 
@@ -350,6 +377,9 @@ class Variable(Expression):
 
 
 class ListLiteral(Expression):
+    def __repr__(self):
+        return '<%s(%s, comma=%s)>' % (self.__class__.__name__, repr(self.items), repr(self.comma))
+
     def __init__(self, items, comma=True):
         self.items = items
         self.comma = comma
@@ -360,6 +390,9 @@ class ListLiteral(Expression):
 
 
 class MapLiteral(Expression):
+    def __repr__(self):
+        return '<%s(%s)>' % (self.__class__.__name__, repr(self.pairs))
+
     def __init__(self, pairs):
         self.pairs = tuple((var, value) for var, value in pairs if value is not None)
 
@@ -388,6 +421,9 @@ class ArgspecLiteral(Expression):
     appeared in a function definition, $foo would refer to an existing
     variable.  This it's up to the caller to use the right iteration function.
     """
+    def __repr__(self):
+        return '<%s(%s)>' % (self.__class__.__name__, repr(self.argpairs))
+
     def __init__(self, argpairs):
         # argpairs is a list of 2-tuples, parsed as though this were a function
         # call, so (variable name as string or None, default value as AST
