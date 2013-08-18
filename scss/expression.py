@@ -743,9 +743,9 @@ class SassExpression(Parser):
                 v = expr_map
             else:  # in self.argspec_item_chks
                 expr_lst = self.expr_lst()
-                v = Parentheses(expr_lst)
+                v = expr_lst
             RPAR = self._scan('RPAR')
-            return v
+            return Parentheses(v)
         elif _token_ == 'FNCT':
             FNCT = self._scan('FNCT')
             argspec = ArgspecLiteral([])

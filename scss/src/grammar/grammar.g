@@ -118,8 +118,8 @@ parser SassExpression:
 
     rule atom:          LPAR (
                             expr_map                {{ v = expr_map }}
-                            | expr_lst              {{ v = Parentheses(expr_lst) }}
-                        ) RPAR                      {{ return v }}
+                            | expr_lst              {{ v = expr_lst }}
+                        ) RPAR                      {{ return Parentheses(v) }}
                         | FNCT                      {{ argspec = ArgspecLiteral([]) }}
                             LPAR [ argspec ] RPAR   {{ return CallOp(FNCT, argspec) }}
                         | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
