@@ -47,7 +47,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
         if not Image:
             raise Exception("Images manipulation require PIL")
     filepath = String.unquoted(path).value
-    mime_type = inline and (String.unquoted(mime_type).value or mimetypes.guess_type(filepath)[0])
+    mime_type = inline and (String.unquoted(mime_type).value if mime_type else mimetypes.guess_type(filepath)[0])
     path = None
     if callable(config.STATIC_ROOT):
         try:
@@ -159,6 +159,9 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
 
 @register('inline-image', 1)
 @register('inline-image', 2)
+@register('inline-image', 3)
+@register('inline-image', 4)
+@register('inline-image', 5)
 def inline_image(image, mime_type=None, dst_color=None, src_color=None, spacing=None, collapse_x=None, collapse_y=None):
     """
     Embeds the contents of a file directly inside your stylesheet, eliminating
@@ -174,6 +177,7 @@ def inline_image(image, mime_type=None, dst_color=None, src_color=None, spacing=
 @register('image-url', 3)
 @register('image-url', 4)
 @register('image-url', 5)
+@register('image-url', 6)
 def image_url(path, only_path=False, cache_buster=True, dst_color=None, src_color=None, spacing=None, collapse_x=None, collapse_y=None):
     """
     Generates a path to an asset found relative to the project's images
