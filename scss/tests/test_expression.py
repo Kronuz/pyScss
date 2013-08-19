@@ -1,3 +1,6 @@
+"""Tests for expressions.  This test module is currently a bit ill-defined and
+contains a variety of expression-related tests.
+"""
 from scss.expression import Calculator
 from scss.functions.core import CORE_LIBRARY
 from scss.rule import Namespace
@@ -63,96 +66,6 @@ def test_reference_operations():
     assert calc('3px + 4px auto') == List([Number(7, "px"), String('auto', quotes=None)])
     assert_strict_string_eq(calc('"I ate #{5 + 10} pies!"'), String('I ate 15 pies!', quotes='"'))
     assert_strict_string_eq(calc('"I ate #{$value} pies!"'), String('I ate  pies!', quotes='"'))
-
-
-# Operators: arithmetic (+ - * / %), unary (+ -), comparison (== != < > <= >=), boolean
-# Types: numbers, colors, strings, booleans, lists
-# Test them all!
-
-def test_addition(calc):
-    assert calc('123 + 456') == Number(579)
-
-    assert calc('1px + 2px') == Number(3, "px")
-
-    assert calc('123 + abc') == String('123abc')
-    assert calc('abc + 123') == String('abc123')
-
-    assert calc('abc + def') == String('abcdef')
-    assert calc('abc + "def"') == String('abcdef')
-    ret = calc('"abc" + def')
-    assert ret == String('abcdef')
-    assert ret.quotes == '"'
-    ret = calc('"abc" + "def"')
-    assert ret == String('abcdef')
-    assert ret.quotes == '"'
-
-    assert calc('#010305 + #050301') == Color.from_hex('#060606')
-    assert calc('#ffffff + #ffffff') == Color.from_name('white')
-
-
-def test_subtraction(calc):
-    assert calc('123 - 456') == Number(-333)
-    assert calc('456 - 123') == Number(333)
-    # TODO test that subtracting e.g. strings doesn't work
-
-    assert calc('#0f0f0f - #050505') == Color.from_hex('#0a0a0a')
-
-
-def test_division(calc):
-    assert calc('(5px / 5px)') == Number(1)
-    assert calc('(1in / 6pt)') == Number(12)
-
-
-def test_comparison_numeric(calc):
-    assert calc('123 < 456')
-    assert calc('123 <= 456')
-    assert calc('123 <= 123')
-    assert calc('456 > 123')
-    assert calc('456 >= 123')
-    assert calc('456 >= 456')
-    assert calc('123 == 123')
-    assert calc('123 != 456')
-
-    # Same tests, negated
-    assert not calc('123 > 456')
-    assert not calc('123 >= 456')
-    assert not calc('456 < 123')
-    assert not calc('456 <= 123')
-    assert not calc('123 != 123')
-    assert not calc('123 == 456')
-
-
-def test_comparison_stringerific(calc):
-    assert calc('"abc" == "abc"')
-    assert calc('"abc" != "xyz"')
-
-    # Same tests, negated
-    assert not calc('"abc" != "abc"')
-    assert not calc('"abc" == "xyz"')
-
-    # Interaction with other types
-    assert calc('123 != "123"')
-
-    # Sass strings don't support ordering
-    for expression in (
-            '"abc" < "xyz"',
-            '"abc" <= "xyz"',
-            '"abc" <= "abc"',
-            '"xyz" > "abc"',
-            '"xyz" >= "abc"',
-            '"xyz" >= "xyz"',
-            '123 < "456"'):
-
-        with pytest.raises(TypeError):
-            calc(expression)
-
-
-def test_comparison_null(calc):
-    assert calc('null == null')
-    assert calc('null != 0')
-
-    with pytest.raises(TypeError):
-        calc('null < null')
 
 
 def test_parse(calc):
