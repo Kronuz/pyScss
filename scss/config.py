@@ -12,8 +12,8 @@ ASSETS_ROOT = None
 # Cache files path, where cache files are saved (defaults to ASSETS_ROOT):
 CACHE_ROOT = None
 # Urls for the static and assets:
-STATIC_URL = '/static/'
-ASSETS_URL = '/static/assets/'
+STATIC_URL = 'static/'
+ASSETS_URL = 'static/assets/'
 VERBOSITY = 1
 DEBUG = 0
 
