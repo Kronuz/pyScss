@@ -9,6 +9,7 @@ import six
 
 import scss.config as config
 from scss.cssdefs import COLOR_NAMES, is_builtin_css_function, _expr_glob_re, _interpolate_re, _variable_re
+from scss.errors import SassEvaluationError, SassParseError
 from scss.rule import Namespace
 from scss.types import Boolean, Color, List, Map, Null, Number, ParserValue, String, Undefined
 from scss.util import dequote, normalize_var
@@ -137,14 +138,18 @@ class Calculator(object):
             try:
                 parser = SassExpression(SassExpressionScanner(expr))
                 ast = parser.goal()
-            except SyntaxError:
+            except SyntaxError, e:
                 if config.DEBUG:
-                    raise
-                return None
+                    raise SassParseError(e, expression=expr)
+                else:
+                    return None
             else:
                 ast_cache[expr] = ast
 
-        return ast.evaluate(self, divide=divide)
+        try:
+            return ast.evaluate(self, divide=divide)
+        except Exception, e:
+            raise SassEvaluationError(e, expression=expr)
 
     def parse_expression(self, expr, target='goal'):
         ast_cache = self.get_ast_cache(target)

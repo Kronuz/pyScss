@@ -65,6 +65,7 @@ from scss.cssdefs import (
     _spaces_re, _expand_rules_space_re, _collapse_properties_space_re,
     _strings_re, _prop_split_re,
 )
+from scss.errors import SassError
 from scss.expression import Calculator
 from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
@@ -514,6 +515,16 @@ class Scss(object):
 
     @print_timing(4)
     def manage_children(self, rule, p_children, scope):
+        try:
+            return self._manage_children_impl(rule, p_children, scope)
+        except SassError, e:
+            e.set_rule(rule)
+            raise
+        except Exception, e:
+            raise SassError(e, rule=rule)
+
+
+    def _manage_children_impl(self, rule, p_children, scope):
         # A rule that has already returned should not end up here
         assert rule.retval is None
 
