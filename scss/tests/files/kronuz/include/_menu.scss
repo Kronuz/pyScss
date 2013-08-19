@@ -192,13 +192,13 @@ $default-menu-levels: 3 !default;
 					padding-right: 12px;
 					@if $i#{$l}-arrow-color-current != undefined {
 						@if $u#{$l + 1}-type == dropup {
-							background: image-url('images/menus/arrow_up.png', $dst-color: $i#{$l}-arrow-color-current) no-repeat right center;
+							background: image-url('menus/arrow_up.png', $dst-color: $i#{$l}-arrow-color-current, $cache-buster: false) no-repeat right center;
 						} @else if $u#{$l + 1}-type == dropright {
-							background: image-url('images/menus/arrow_right.png', $dst-color: $i#{$l}-arrow-color-current) no-repeat right center;
+							background: image-url('menus/arrow_right.png', $dst-color: $i#{$l}-arrow-color-current, $cache-buster: false) no-repeat right center;
 						} @else if $u#{$l + 1}-type == dropleft {
-							background: image-url('images/menus/arrow_left.png', $dst-color: $i#{$l}-arrow-color-current) no-repeat right center;
+							background: image-url('menus/arrow_left.png', $dst-color: $i#{$l}-arrow-color-current, $cache-buster: false) no-repeat right center;
 						} @else {
-							background: image-url('images/menus/arrow_down.png', $dst-color: $i#{$l}-arrow-color-current) no-repeat right center;
+							background: image-url('menus/arrow_down.png', $dst-color: $i#{$l}-arrow-color-current, $cache-buster: false) no-repeat right center;
 						}
 					}
 				}
@@ -303,13 +303,13 @@ $default-menu-levels: 3 !default;
 						padding-right: 12px;
 						@if $i#{$l}-arrow-color-hover != undefined {
 							@if $u#{$l + 1}-type == dropup {
-								background: image-url('images/menus/arrow_up.png', $dst-color: $i#{$l}-arrow-color-hover) no-repeat right center;
+								background: image-url('menus/arrow_up.png', $dst-color: $i#{$l}-arrow-color-hover, $cache-buster: false) no-repeat right center;
 							} @else if $u#{$l + 1}-type == dropright {
-								background: image-url('images/menus/arrow_right.png', $dst-color: $i#{$l}-arrow-color-hover) no-repeat right center;
+								background: image-url('menus/arrow_right.png', $dst-color: $i#{$l}-arrow-color-hover, $cache-buster: false) no-repeat right center;
 							} @else if $u#{$l + 1}-type == dropleft {
-								background: image-url('images/menus/arrow_left.png', $dst-color: $i#{$l}-arrow-color-hover) no-repeat right center;
+								background: image-url('menus/arrow_left.png', $dst-color: $i#{$l}-arrow-color-hover, $cache-buster: false) no-repeat right center;
 							} @else {
-								background: image-url('images/menus/arrow_down.png', $dst-color: $i#{$l}-arrow-color-hover) no-repeat right center;
+								background: image-url('menus/arrow_down.png', $dst-color: $i#{$l}-arrow-color-hover, $cache-buster: false) no-repeat right center;
 							}
 						}
 					}
@@ -505,13 +505,13 @@ $default-menu-levels: 3 !default;
 							padding-right: 12px;
 							@if $i#{$l}-arrow-color-natural != undefined {
 								@if $u#{$l + 1}-type == dropup {
-									background: image-url('images/menus/arrow_up.png', $dst-color: $i#{$l}-arrow-color-natural) no-repeat right center;
+									background: image-url('menus/arrow_up.png', $dst-color: $i#{$l}-arrow-color-natural, $cache-buster: false) no-repeat right center;
 								} @else if $u#{$l + 1}-type == dropright {
-									background: image-url('images/menus/arrow_right.png', $dst-color: $i#{$l}-arrow-color-natural) no-repeat right center;
+									background: image-url('menus/arrow_right.png', $dst-color: $i#{$l}-arrow-color-natural, $cache-buster: false) no-repeat right center;
 								} @else if $u#{$l + 1}-type == dropleft {
-									background: image-url('images/menus/arrow_left.png', $dst-color: $i#{$l}-arrow-color-natural) no-repeat right center;
+									background: image-url('menus/arrow_left.png', $dst-color: $i#{$l}-arrow-color-natural, $cache-buster: false) no-repeat right center;
 								} @else {
-									background: image-url('images/menus/arrow_down.png', $dst-color: $i#{$l}-arrow-color-natural) no-repeat right center;
+									background: image-url('menus/arrow_down.png', $dst-color: $i#{$l}-arrow-color-natural, $cache-buster: false) no-repeat right center;
 								}
 							}
 						}
