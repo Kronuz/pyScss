@@ -140,7 +140,7 @@ class Calculator(object):
                 ast = parser.goal()
             except SyntaxError, e:
                 if config.DEBUG:
-                    raise SassParseError(e, expression=expr)
+                    raise SassParseError(e, expression=expr, expression_pos=parser._char_pos)
                 else:
                     return None
             else:
@@ -316,8 +316,8 @@ class CallOp(Expression):
         except KeyError:
             try:
                 if kwargs:
-                    raise KeyError
-                # Fallback to single parameter:
+                    raise
+                # DEVIATION: Fall back to single parameter
                 funct = calculator.namespace.function(func_name, 1)
                 args = [args]
             except KeyError:
@@ -325,13 +325,7 @@ class CallOp(Expression):
                     log.error("Function not found: %s:%s", func_name, argspec_len, extra={'stack': True})
                     raise
         if funct:
-            try:
-                return funct(*args, **kwargs)
-            except Exception:
-                # TODO hoist me up since the rule is gone
-                #log.exception("Exception raised: %s in `%s' (%s)", e, expr, rule.file_and_line)
-                if not is_builtin_css_function(func_name):
-                    raise
+            return funct(*args, **kwargs)
 
         rendered_args = []
         for var, value in evald_argpairs:
@@ -487,10 +481,12 @@ class Parser(object):
     def __init__(self, scanner):
         self._scanner = scanner
         self._pos = 0
+        self._char_pos = 0
 
     def reset(self, input):
         self._scanner.reset(input)
         self._pos = 0
+        self._char_pos = 0
 
     def _peek(self, types):
         """
@@ -508,6 +504,7 @@ class Parser(object):
         Returns the matched text, and moves to the next token
         """
         tok = self._scanner.token(self._pos, set([type]))
+        self._char_pos = tok[0]
         if tok[2] != type:
             raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(tok[0]), "Trying to find " + type))
         self._pos += 1

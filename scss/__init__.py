@@ -518,7 +518,7 @@ class Scss(object):
         try:
             return self._manage_children_impl(rule, p_children, scope)
         except SassError, e:
-            e.set_rule(rule)
+            e.add_rule(rule)
             raise
         except Exception, e:
             raise SassError(e, rule=rule)
