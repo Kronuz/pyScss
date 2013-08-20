@@ -25,7 +25,7 @@ class VariableScope(object):
     Similar to `ChainMap`, except that assigning a new value will replace an
     existing value, not mask it.
     """
-    def __init__(self, *maps):
+    def __init__(self, maps=()):
         self.maps = [dict()] + list(maps)
 
     def __repr__(self):
@@ -39,6 +39,13 @@ class VariableScope(object):
         raise KeyError(key)
 
     def __setitem__(self, key, value):
+        self.set(key, value)
+
+    def set(self, key, value, force_local=False):
+        if force_local:
+            self.maps[0][key] = value
+            return
+
         for map in self.maps:
             if key in map:
                 map[key] = value
@@ -47,7 +54,7 @@ class VariableScope(object):
         self.maps[0][key] = value
 
     def new_child(self):
-        return VariableScope(*self.maps)
+        return VariableScope(self.maps)
 
 
 class Namespace(object):
@@ -59,12 +66,12 @@ class Namespace(object):
         else:
             # TODO parse into sass values once that's a thing, or require them
             # all to be
-            self._variables = VariableScope(variables)
+            self._variables = VariableScope([variables])
 
         if functions is None:
             self._functions = VariableScope()
         else:
-            self._functions = VariableScope(functions._functions)
+            self._functions = VariableScope([functions._functions])
 
         self._mixins = VariableScope()
 
@@ -76,23 +83,29 @@ class Namespace(object):
             self._functions = others[0]._functions.new_child()
             self._mixins = others[0]._mixins.new_child()
         else:
+            # Note that this will create a 2-dimensional scope where each of
+            # these scopes is checked first in order.  TODO is this right?
             self._variables = VariableScope(other._variables for other in others)
             self._functions = VariableScope(other._functions for other in others)
             self._mixins = VariableScope(other._mixins for other in others)
         return self
 
     def derive(self):
+        """Return a new child namespace.  All existing variables are still
+        readable and writeable, but any new variables will only exist within a
+        new scope.
+        """
         return type(self).derive_from(self)
 
     def variable(self, name, throw=False):
         name = normalize_var(name)
         return self._variables[name]
 
-    def set_variable(self, name, value):
+    def set_variable(self, name, value, local_only=False):
         name = normalize_var(name)
         if not isinstance(value, Value):
             raise TypeError("Expected a Sass type, while setting %s got %r" % (name, value,))
-        self._variables[name] = value
+        self._variables.set(name, value, force_local=local_only)
 
     def _get_callable(self, chainmap, name, arity):
         name = normalize_var(name)

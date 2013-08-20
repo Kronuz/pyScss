@@ -659,7 +659,7 @@ class Scss(object):
                 if default is not None:
                     defaults[var_name] = default
 
-        mixin = [list(new_params), defaults, block.unparsed_contents]
+        mixin = [list(new_params), defaults, block.unparsed_contents, rule.namespace]
         if block.directive == '@function':
             def _call(mixin):
                 def __call(namespace, *args, **kwargs):
@@ -744,8 +744,9 @@ class Scss(object):
         """
         Implements @include, for @mixins
         """
-        calculator = Calculator(rule.namespace.derive())
-        funct, argspec_node = self._get_funct_def(rule, calculator, block.argument)
+        caller_namespace = rule.namespace
+        caller_calculator = Calculator(caller_namespace)
+        funct, argspec_node = self._get_funct_def(rule, caller_calculator, block.argument)
 
         if argspec_node:
             argspec = list(argspec_node.iter_call_argspec())
@@ -754,59 +755,57 @@ class Scss(object):
             argspec = None
             argspec_len = 0
         try:
-            mixin = rule.namespace.mixin(funct, argspec_len)
+            mixin = caller_namespace.mixin(funct, argspec_len)
         except KeyError:
             try:
                 # TODO maybe? don't do this, once '...' works
                 # Fallback to single parameter:
-                mixin = rule.namespace.mixin(funct, 1)
+                mixin = caller_namespace.mixin(funct, 1)
+                argspec = list(argspec_node.iter_list_argspec())
+                argspec_len = len(argspec)
             except KeyError:
                 log.error("Required mixin not found: %s:%d (%s)", funct, argspec_len, rule.file_and_line, extra={'stack': True})
                 return
 
-        m_vars = rule.namespace
         m_params = mixin[0]
         m_defaults = mixin[1]
         m_codestr = mixin[2]
+        callee_namespace = mixin[3].derive()
+        callee_calculator = Calculator(callee_namespace)
 
-        if len(m_params) == 1 and argspec_len > 1:
-            argspec = list(argspec_node.iter_list_argspec())
-            argspec_len = len(argspec)
-
-        params = []
-        params_dict = {}
-        num_args = 0
+        seen_args = set()
+        arg_position = 0
         if argspec:
             for var_name, var_value in argspec:
-                if not var_name:
+                if var_name is None:
+                    # Positional argument; get the right name from the mixin
                     try:
-                        var_name = m_params[num_args]
+                        var_name = m_params[arg_position]
                     except IndexError:
-                        log.error("Mixin %s:%d receives more arguments than expected (%d)", funct, len(m_params), argspec_len, extra={'stack': True})
+                        # TODO i don't think this error message is right; still
+                        # confuses args and kwargs.  revisit after ... works
+                        log.error("Mixin %s:%d receives more positional arguments than expected (%d)", funct, len(m_params), argspec_len, extra={'stack': True})
                         continue
-                    num_args += 1
-                params.append(var_name)
-                params_dict[var_name] = var_value
 
-        # Evaluate all parameters sent to the function in order:
-        param_values = {}
-        for var_name in params:
-            var_value = params_dict[var_name]
-            value = var_value.evaluate(calculator)
-            param_values[var_name] = value
-        for var_name, value in param_values.items():
-            m_vars.set_variable(var_name, value)
+                    arg_position += 1
 
-        # Evaluate arguments not passed to the mixin/function (from the defaults):
+                value = var_value.evaluate(caller_calculator, divide=True)
+                callee_namespace.set_variable(var_name, value, local_only=True)
+
+                seen_args.add(var_name)
+
+        # Populate defaults in order, using the new scope; this is so defaults
+        # can refer to the values of other preceding arguments.  (DEVIATION)
         for var_name in m_params:
-            if var_name not in params_dict and var_name in m_defaults:
-                var_value = m_defaults[var_name]
-                value = var_value.evaluate(calculator)
-                m_vars.set_variable(var_name, value)
+            if var_name in seen_args or var_name not in m_defaults:
+                continue
+
+            value = m_defaults[var_name].evaluate(callee_calculator, divide=True)
+            callee_namespace.set_variable(var_name, value, local_only=True)
 
         _rule = rule.copy()
         _rule.unparsed_contents = m_codestr
-        _rule.namespace = m_vars
+        _rule.namespace = callee_namespace
         _rule.lineno = block.lineno
 
         _rule.options['@content'] = block.unparsed_contents
