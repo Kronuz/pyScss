@@ -30,6 +30,8 @@ FATAL_UNDEFINED = True
 class Calculator(object):
     """Expression evaluator."""
 
+    ast_cache = {}
+
     def __init__(self, namespace=None):
         if namespace is None:
             self.namespace = Namespace()
@@ -115,13 +117,6 @@ class Calculator(object):
                 value = _vi
         return value
 
-    def get_ast_cache(self, target):
-        if not hasattr(self, 'ast_cache'):
-            self.__class__.ast_cache = {}
-        if target not in self.ast_cache:
-            self.ast_cache[target] = {}
-        return self.ast_cache[target]
-
     def evaluate_expression(self, expr, divide=False):
         try:
             ast = self.parse_expression(expr)
@@ -140,9 +135,9 @@ class Calculator(object):
         if not isinstance(expr, six.string_types):
             raise TypeError("Expected string, got %r" % (expr,))
 
-        ast_cache = self.get_ast_cache(target)
-        if expr in ast_cache:
-            return ast_cache[expr]
+        key = (target, expr)
+        if key in self.ast_cache:
+            return self.ast_cache[key]
 
         try:
             parser = SassExpression(SassExpressionScanner(expr))
@@ -150,7 +145,7 @@ class Calculator(object):
         except SyntaxError, e:
             raise SassParseError(e, expression=expr, expression_pos=parser._char_pos)
 
-        ast_cache[expr] = ast
+        self.ast_cache[key] = ast
         return ast
 
 
