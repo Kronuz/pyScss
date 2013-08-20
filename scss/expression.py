@@ -128,7 +128,7 @@ class Calculator(object):
 
         try:
             return ast.evaluate(self, divide=divide)
-        except Exception, e:
+        except Exception as e:
             raise SassEvaluationError(e, expression=expr)
 
     def parse_expression(self, expr, target='goal'):
@@ -142,7 +142,7 @@ class Calculator(object):
         try:
             parser = SassExpression(SassExpressionScanner(expr))
             ast = getattr(parser, target)()
-        except SyntaxError, e:
+        except SyntaxError as e:
             raise SassParseError(e, expression=expr, expression_pos=parser._char_pos)
 
         self.ast_cache[key] = ast

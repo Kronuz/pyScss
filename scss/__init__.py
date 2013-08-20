@@ -517,10 +517,10 @@ class Scss(object):
     def manage_children(self, rule, p_children, scope):
         try:
             return self._manage_children_impl(rule, p_children, scope)
-        except SassError, e:
+        except SassError as e:
             e.add_rule(rule)
             raise
-        except Exception, e:
+        except Exception as e:
             raise SassError(e, rule=rule)
 
 
