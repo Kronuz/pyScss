@@ -301,6 +301,28 @@ class Number(Value):
 
         return op(round(left.value, 5), round(right.value, 5))
 
+    def __pow__(self, exp):
+        if not isinstance(exp, Number):
+            raise TypeError("Can't raise %r to power %r" % (self, exp))
+        if not exp.is_unitless:
+            raise TypeError("Exponent %r cannot have units" % (exp,))
+
+        if self.is_unitless:
+            return Number(self.value ** exp.value)
+
+        # Units can only be exponentiated to integral powers -- what's the
+        # square root of 'px'?  (Well, it's sqrt(px), but supporting that is
+        # a bit out of scope.)
+        if exp.value != int(exp.value):
+            raise ValueError("Can't raise units of %r to non-integral power %r" % (self, exp))
+
+        return Number(
+            self.value ** int(exp.value),
+            unit_numer=self.unit_numer * int(exp.value),
+            unit_denom=self.unit_denom * int(exp.value),
+        )
+
+
     def __mul__(self, other):
         if not isinstance(other, Number):
             return NotImplemented

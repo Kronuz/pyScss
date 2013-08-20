@@ -116,7 +116,26 @@ def test_opposite_position(calc):
 
 ## Math
 
-# pi
+def test_pi(calc):
+    assert calc('pi()') == calc('3.141592653589793')
+
+
+def test_e(calc):
+    assert calc('e()') == calc('2.718281828459045')
+
+
+def test_sqrt(calc):
+    assert calc('sqrt(9)') == calc('3')
+
+
+def test_log(calc):
+    assert calc('log(9, 3)') == calc('2')
+
+
+def test_pow(calc):
+    assert calc('pow(3, 2)') == calc('9')
+    assert calc('pow(10px, 2) / 1px') == calc('100px')
+
 
 # sin
 

@@ -437,6 +437,41 @@ def opposite_position(p):
 def pi():
     return Number(math.pi)
 
+
+@register('e', 0)
+def e():
+    return Number(math.e)
+
+
+@register('log', 1)
+@register('log', 2)
+def log(number, base=None):
+    if not isinstance(number, Number):
+        raise TypeError("Expected number, got %r" % (number,))
+    elif not number.is_unitless:
+        raise ValueError("Expected unitless number, got %r" % (number,))
+
+    if base is None:
+        pass
+    elif not isinstance(base, Number):
+        raise TypeError("Expected number, got %r" % (base,))
+    elif not base.is_unitless:
+        raise ValueError("Expected unitless number, got %r" % (base,))
+
+    if base is None:
+        ret = math.log(number.value)
+    else:
+        ret = math.log(number.value, base.value)
+
+    return Number(ret)
+
+
+@register('pow', 2)
+def pow(number, exponent):
+    return number ** exponent
+
+
+COMPASS_HELPERS_LIBRARY.add(Number.wrap_python_function(math.sqrt), 'sqrt', 1)
 COMPASS_HELPERS_LIBRARY.add(Number.wrap_python_function(math.sin), 'sin', 1)
 COMPASS_HELPERS_LIBRARY.add(Number.wrap_python_function(math.cos), 'cos', 1)
 COMPASS_HELPERS_LIBRARY.add(Number.wrap_python_function(math.tan), 'tan', 1)
