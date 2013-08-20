@@ -789,9 +789,12 @@ class Scss(object):
                 params_dict[var_name] = var_value
 
         # Evaluate all parameters sent to the function in order:
+        param_values = {}
         for var_name in params:
             var_value = params_dict[var_name]
             value = var_value.evaluate(calculator)
+            param_values[var_name] = value
+        for var_name, value in param_values.items():
             m_vars.set_variable(var_name, value)
 
         # Evaluate arguments not passed to the mixin/function (from the defaults):
