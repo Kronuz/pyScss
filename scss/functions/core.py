@@ -320,9 +320,18 @@ def desaturate(color, amount):
 
 
 @register('greyscale', 1)
+def greyscale(color):
+    return __hsl_op(operator.__sub__, color, 0, 100.0, 0)
+
+
 @register('grayscale', 1)
 def grayscale(color):
-    return __hsl_op(operator.__sub__, color, 0, 100.0, 0)
+    if isinstance(color, Number) and color.is_unitless:
+        # grayscale(n) is a CSS3 filter and should be left intact, but only
+        # when using the "a" spelling
+        return String.unquoted("grayscale(%d)" % (color.value,))
+    else:
+        return greyscale(color)
 
 
 @register('spin', 2)
