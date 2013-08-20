@@ -178,6 +178,12 @@ class SassRule(object):
         else:
             self.ancestry = ancestry
 
+    def __repr__(self):
+        return "<SassRule %s, %d props>" % (
+            self.ancestry,
+            len(self.properties),
+        )
+
     @property
     def selectors(self):
         # TEMPORARY

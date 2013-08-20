@@ -896,6 +896,9 @@ class Map(Value):
         for key, value in pairs:
             self.index[key] = value
 
+    def __repr__(self):
+        return "<Map: (%s)>" % (",".join("%s : %s" % pair for pair in self.pairs),)
+
     def __hash__(self):
         return hash(self.pairs)
 
