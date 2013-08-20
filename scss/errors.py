@@ -48,8 +48,8 @@ class SassError(Exception):
 
     def format_prefix(self):
         # TODO this contains NULs and line numbers; could be much prettier
-        if self.rule:
-            return "Error parsing block:\n" + "    " + self.rule.unparsed_contents
+        if self.rule_stack:
+            return "Error parsing block:\n" + "    " + self.rule_stack[0].unparsed_contents
         else:
             return "Unknown error"
 

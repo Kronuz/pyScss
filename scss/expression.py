@@ -9,7 +9,7 @@ import six
 
 import scss.config as config
 from scss.cssdefs import COLOR_NAMES, is_builtin_css_function, _expr_glob_re, _interpolate_re, _variable_re
-from scss.errors import SassEvaluationError, SassParseError
+from scss.errors import SassError, SassEvaluationError, SassParseError
 from scss.rule import Namespace
 from scss.types import Boolean, Color, List, Map, Null, Number, ParserValue, String, Undefined
 from scss.util import dequote, normalize_var
@@ -123,28 +123,13 @@ class Calculator(object):
         return self.ast_cache[target]
 
     def evaluate_expression(self, expr, divide=False):
-        if not isinstance(expr, six.string_types):
-            raise TypeError("Expected string, got %r" % (expr,))
-
-        ast_cache = self.get_ast_cache('goal')
-        if expr in ast_cache:
-            ast = ast_cache[expr]
-
-        elif _variable_re.match(expr):
-            # Short-circuit for variable names
-            ast = Variable(expr)
-
-        else:
-            try:
-                parser = SassExpression(SassExpressionScanner(expr))
-                ast = parser.goal()
-            except SyntaxError, e:
-                if config.DEBUG:
-                    raise SassParseError(e, expression=expr, expression_pos=parser._char_pos)
-                else:
-                    return None
+        try:
+            ast = self.parse_expression(expr)
+        except SassError:
+            if config.DEBUG:
+                raise
             else:
-                ast_cache[expr] = ast
+                return None
 
         try:
             return ast.evaluate(self, divide=divide)
@@ -152,15 +137,20 @@ class Calculator(object):
             raise SassEvaluationError(e, expression=expr)
 
     def parse_expression(self, expr, target='goal'):
+        if not isinstance(expr, six.string_types):
+            raise TypeError("Expected string, got %r" % (expr,))
+
         ast_cache = self.get_ast_cache(target)
         if expr in ast_cache:
             return ast_cache[expr]
 
-        parser = SassExpression(SassExpressionScanner(expr))
-        ast = getattr(parser, target)()
+        try:
+            parser = SassExpression(SassExpressionScanner(expr))
+            ast = getattr(parser, target)()
+        except SyntaxError, e:
+            raise SassParseError(e, expression=expr, expression_pos=parser._char_pos)
 
         ast_cache[expr] = ast
-
         return ast
 
 
