@@ -11,7 +11,7 @@ import scss.config as config
 from scss.cssdefs import COLOR_NAMES, is_builtin_css_function, _expr_glob_re, _interpolate_re, _variable_re
 from scss.errors import SassError, SassEvaluationError, SassParseError
 from scss.rule import Namespace
-from scss.types import Boolean, Color, List, Map, Null, Number, ParserValue, String, Undefined
+from scss.types import Boolean, Color, List, Map, Null, Number, ParserValue, String, Undefined, Value
 from scss.util import dequote, normalize_var
 
 ################################################################################
@@ -310,7 +310,10 @@ class CallOp(Expression):
                     log.error("Function not found: %s:%s", func_name, argspec_len, extra={'stack': True})
                     raise
         if funct:
-            return funct(*args, **kwargs)
+            ret = funct(*args, **kwargs)
+            if not isinstance(ret, Value):
+                raise TypeError("Expected Sass type as return value, got %r" % (ret,))
+            return ret
 
         rendered_args = []
         for var, value in evald_argpairs:
