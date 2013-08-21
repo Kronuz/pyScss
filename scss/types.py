@@ -436,7 +436,10 @@ class Number(Value):
             # TODO enforce no units for trig?
             python_arg = sass_arg.value
             python_ret = fn(python_arg)
-            sass_ret = cls(python_ret, unit=sass_arg.unit)
+            sass_ret = cls(
+                python_ret,
+                unit_numer=sass_arg.unit_numer,
+                unit_denom=sass_arg.unit_denom)
             return sass_ret
 
         return wrapped
