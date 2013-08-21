@@ -10,10 +10,23 @@ import pytest
 # Test them all!
 
 def test_addition():
+    # Numbers are a little complicated, what with all the units
+    # Simple case
     assert Number(123) + Number(456) == Number(579)
-
+    # Simple equal units
     assert Number(1, "px") + Number(2, "px") == Number(3, "px")
+    # Unitless values inherit units of the other operand
+    assert Number(5) + Number(6, "px") == Number(11, "px")
+    # Zero values can cast to any units
+    assert Number(0, "in") + Number(24, "deg") == Number(24, "deg")
+    # With different units, the left operand wins
+    assert Number(10, "cm") + Number(100, "mm") == Number(20, "cm")
+    assert Number(100, "mm") + Number(10, "cm") == Number(200, "mm")
+    # Unconvertible units raise an error
+    with pytest.raises(ValueError):
+        Number(1, "px") + Number(1, "em")
 
+    # Adding anything to a string makes a string
     assert Number(123) + String('abc') == String('123abc')
     assert String('abc') + Number(123) == String('abc123')
 
@@ -65,6 +78,16 @@ def test_comparison_numeric():
     assert not hi <= lo
     assert not lo != lo
     assert not lo == hi
+
+    # Numbers with units should also auto-cast numbers with units
+    units = Number(123, "px")
+    plain = Number(123)
+    assert units == plain
+    assert units <= plain
+    assert units >= plain
+    assert not units != plain
+    assert not units < plain
+    assert not units > plain
 
 
 def test_comparison_stringerific():

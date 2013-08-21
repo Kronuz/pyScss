@@ -292,14 +292,21 @@ class Number(Value):
         if not isinstance(other, Number):
             raise TypeError("Can't compare %r and %r" % (self, other))
 
-        left = self.to_base_units()
-        right = other.to_base_units()
+        # A unitless operand is treated as though it had the other operand's
+        # units, and zero values can cast to anything, so in both cases the
+        # units can be ignored
+        if (self.is_unitless or other.is_unitless or
+                self.value == 0 or other.value == 0):
+            left = self
+            right = other
+        else:
+            left = self.to_base_units()
+            right = other.to_base_units()
 
-        if (left.value != 0 or left.unit_numer or left.unit_denom) and (right.value != 0 or right.unit_numer or right.unit_denom):
             if left.unit_numer != right.unit_numer or left.unit_denom != right.unit_denom:
                 raise ValueError("Can't reconcile units: %r and %r" % (self, other))
 
-        return op(round(left.value, 5), round(right.value, 5))
+        return Boolean(op(round(left.value, 5), round(right.value, 5)))
 
     def __pow__(self, exp):
         if not isinstance(exp, Number):
@@ -367,13 +374,26 @@ class Number(Value):
                 unit_denom=self.unit_denom or other.unit_denom,
             )
 
+        # Likewise, if either side is zero, it can auto-cast to any units
+        if self.value == 0:
+            return Number(
+                op(self.value, other.value),
+                unit_numer=other.unit_numer,
+                unit_denom=other.unit_denom,
+            )
+        elif other.value == 0:
+            return Number(
+                op(self.value, other.value),
+                unit_numer=self.unit_numer,
+                unit_denom=self.unit_denom,
+            )
+
         # Reduce both operands to the same units
         left = self.to_base_units()
         right = other.to_base_units()
 
-        if (left.value != 0 or left.unit_numer or left.unit_denom) and (right.value != 0 or right.unit_numer or right.unit_denom):
-            if left.unit_numer != right.unit_numer or left.unit_denom != right.unit_denom:
-                raise ValueError("Can't reconcile units: %r and %r" % (self, other))
+        if left.unit_numer != right.unit_numer or left.unit_denom != right.unit_denom:
+            raise ValueError("Can't reconcile units: %r and %r" % (self, other))
 
         new_amount = op(left.value, right.value)
 
