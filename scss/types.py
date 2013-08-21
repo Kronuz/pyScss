@@ -818,6 +818,9 @@ class Color(Value):
             return candidates[0]
 
 
+# TODO be unicode-clean and delete this nonsense
+DEFAULT_STRING_ENCODING = "utf8"
+
 class String(Value):
     """Represents both CSS quoted string values and CSS identifiers (such as
     `left`).
@@ -840,8 +843,7 @@ class String(Value):
             value = str(value)
 
         if isinstance(value, six.binary_type):
-            # TODO this blows!  need to be unicode-clean so this never happens.
-            value = value.decode('ascii')
+            value = value.decode(DEFAULT_STRING_ENCODING)
 
         if not isinstance(value, six.text_type):
             raise TypeError("Expected string, got {0!r}".format(value))
@@ -852,8 +854,8 @@ class String(Value):
         if six.PY3:
             self.value = value
         else:
-            # TODO not unicode clean on 2 yet...
-            self.value = value.encode('ascii')
+            # TODO well, at least 3 uses unicode everywhere
+            self.value = value.encode(DEFAULT_STRING_ENCODING)
         self.quotes = quotes
 
     @classmethod
