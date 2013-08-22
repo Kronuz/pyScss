@@ -62,10 +62,11 @@ def __color_stops(percentages, *args):
     if stops[-1] is None:
         stops[-1] = Number(100, '%')
 
-    if percentages:
-        max_stops = max(s and (s.value if s.unit != '%' else None) or None for s in stops)
+    maxable_stops = [s for s in stops if s and s.unit != '%']
+    if maxable_stops:
+        max_stops = max(maxable_stops)
     else:
-        max_stops = max(s if s and s.unit != '%' else None for s in stops)
+        max_stops = None
 
     stops = [_s / max_stops if _s and _s.unit != '%' else _s for _s in stops]
 
@@ -88,8 +89,21 @@ def __color_stops(percentages, *args):
     if not max_stops or percentages:
         pass
     else:
-        stops = [s * max_stops for s in stops]
+        stops = [s if s.unit == '%' else s * max_stops for s in stops]
+
     return zip(stops, colors)
+
+
+def _render_standard_color_stops(color_stops):
+    pairs = []
+    for i, (stop, color) in enumerate(color_stops):
+        if ((i == 0 and stop == Number(0, '%')) or
+                (i == len(color_stops) - 1 and stop == Number(100, '%'))):
+            pairs.append(color)
+        else:
+            pairs.append(List([color, stop], use_comma=False))
+
+    return List(pairs, use_comma=True)
 
 
 @register('grad-color-stops')
@@ -155,15 +169,9 @@ def color_stops_in_percentages(*args):
 
 def _get_gradient_position_and_angle(args):
     for arg in args:
-        if isinstance(arg, (String, Number, six.string_types)):
-            _arg = [arg]
-        elif isinstance(arg, (list, tuple, List)):
-            _arg = arg
-        else:
-            continue
         ret = None
         skip = False
-        for a in _arg:
+        for a in arg:
             if isinstance(a, Color):
                 skip = True
                 break
@@ -178,26 +186,20 @@ def _get_gradient_position_and_angle(args):
             'top', 'bottom',
             'left', 'right',
         ):
-            if String(seek) in _arg:
+            if String(seek) in arg:
                 return arg
     return None
 
 
 def _get_gradient_shape_and_size(args):
     for arg in args:
-        if isinstance(arg, (String, Number, six.string_types)):
-            _arg = [arg]
-        elif isinstance(arg, (list, tuple, List)):
-            _arg = arg
-        else:
-            continue
         for seek in (
             'circle', 'ellipse',
             'closest-side', 'closest-corner',
             'farthest-side', 'farthest-corner',
             'contain', 'cover',
         ):
-            if seek in _arg:
+            if String(seek) in arg:
                 return arg
     return None
 
@@ -227,7 +229,7 @@ def radial_gradient(*args):
         position(position_and_angle) if position_and_angle is not None else None,
         shape_and_size if shape_and_size is not None else None,
     ]
-    args.extend('%s %s' % (c, to_str(s)) for s, c in color_stops)
+    args.extend(_render_standard_color_stops(color_stops))
 
     to__s = 'radial-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
     ret = String.unquoted(to__s)
@@ -282,7 +284,7 @@ def linear_gradient(*args):
     args = [
         position(position_and_angle) if position_and_angle is not None else None,
     ]
-    args.extend('%s %s' % (c.render(), s.render()) for s, c in color_stops)
+    args.extend(_render_standard_color_stops(color_stops))
 
     to__s = 'linear-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
     ret = String.unquoted(to__s)
