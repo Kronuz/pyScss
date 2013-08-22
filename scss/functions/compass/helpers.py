@@ -445,7 +445,7 @@ def e():
 
 @register('log', 1)
 @register('log', 2)
-def log(number, base=None):
+def log_(number, base=None):
     if not isinstance(number, Number):
         raise TypeError("Expected number, got %r" % (number,))
     elif not number.is_unitless:
