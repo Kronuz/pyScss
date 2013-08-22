@@ -309,6 +309,11 @@ BUILTIN_FUNCTIONS = frozenset([
     'grayscale', 'sepia', 'saturate', 'hue-rotate', 'invert', 'opacity',
     'brightness', 'contrast', 'blur', 'drop-shadow', 'custom',
 
+    # CSS4 image module:
+    # http://dev.w3.org/csswg/css-images/
+    'image-set', 'cross-fade',
+    'conic-gradient', 'repeating-conic-gradient',
+
     # Others
     'color-stop',           # Older version of CSS3 gradients
     'mask',                 # ???
