@@ -178,7 +178,7 @@ def _get_gradient_position_and_angle(args):
             'top', 'bottom',
             'left', 'right',
         ):
-            if seek in _arg:
+            if String(seek) in _arg:
                 return arg
     return None
 
@@ -282,7 +282,7 @@ def linear_gradient(*args):
     args = [
         position(position_and_angle) if position_and_angle is not None else None,
     ]
-    args.extend('%s %s' % (c, to_str(s)) for s, c in color_stops)
+    args.extend('%s %s' % (c.render(), s.render()) for s, c in color_stops)
 
     to__s = 'linear-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
     ret = String.unquoted(to__s)

@@ -33,9 +33,6 @@ class Value(object):
         # Py 2's name for __bool__
         return self.__bool__()
 
-    ### NOTE: From here on down, the operators are exposed to Sass code and
-    ### thus should ONLY return Sass types
-
     # All Sass scalars also act like one-element spaced lists
     use_comma = False
 
@@ -50,6 +47,12 @@ class Value(object):
             raise IndexError(key)
 
         return self
+
+    def __contains__(self, item):
+        return self == item
+
+    ### NOTE: From here on down, the operators are exposed to Sass code and
+    ### thus should ONLY return Sass types
 
     # Reasonable default for equality
     def __eq__(self, other):
