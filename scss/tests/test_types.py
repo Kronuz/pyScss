@@ -89,6 +89,22 @@ def test_comparison_numeric():
     assert not units < plain
     assert not units > plain
 
+    # Incompatible units have...  rules.
+    ems = Number(100, "em")
+    pxs = Number(100, "px")
+
+    with pytest.raises(ValueError):
+        ems < pxs
+    with pytest.raises(ValueError):
+        ems > pxs
+    with pytest.raises(ValueError):
+        ems <= pxs
+    with pytest.raises(ValueError):
+        ems >= pxs
+
+    assert not ems == pxs
+    assert ems != pxs
+
 
 def test_comparison_stringerific():
     abc = String('abc')

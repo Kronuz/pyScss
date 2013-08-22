@@ -277,21 +277,21 @@ class Number(Value):
     def __eq__(self, other):
         if not isinstance(other, Number):
             return Boolean(False)
-        return Boolean(self._compare(other, operator.__eq__))
+        return self._compare(other, operator.__eq__, soft_fail=True)
 
     def __lt__(self, other):
-        return Boolean(self._compare(other, operator.__lt__))
+        return self._compare(other, operator.__lt__)
 
     def __le__(self, other):
-        return Boolean(self._compare(other, operator.__le__))
+        return self._compare(other, operator.__le__)
 
     def __gt__(self, other):
-        return Boolean(self._compare(other, operator.__gt__))
+        return self._compare(other, operator.__gt__)
 
     def __ge__(self, other):
-        return Boolean(self._compare(other, operator.__ge__))
+        return self._compare(other, operator.__ge__)
 
-    def _compare(self, other, op):
+    def _compare(self, other, op, soft_fail=False):
         if not isinstance(other, Number):
             raise TypeError("Can't compare %r and %r" % (self, other))
 
@@ -307,7 +307,11 @@ class Number(Value):
             right = other.to_base_units()
 
             if left.unit_numer != right.unit_numer or left.unit_denom != right.unit_denom:
-                raise ValueError("Can't reconcile units: %r and %r" % (self, other))
+                if soft_fail:
+                    # Used for equality only, where == should never fail
+                    return Boolean(False)
+                else:
+                    raise ValueError("Can't reconcile units: %r and %r" % (self, other))
 
         return Boolean(op(round(left.value, 5), round(right.value, 5)))
 
