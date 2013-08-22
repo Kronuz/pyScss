@@ -401,6 +401,7 @@ def _position(opposite, positions):
             elif pos_value == 'to':
                 # Gradient syntax keyword; leave alone
                 ret.append(pos)
+                continue
 
         elif isinstance(pos, Number):
             if pos.unit == '%':
