@@ -596,6 +596,9 @@ class List(Value):
     def __iter__(self):
         return iter(self.value)
 
+    def __contains__(self, item):
+        return item in self.value
+
     def __getitem__(self, key):
         return self.value[key]
 
