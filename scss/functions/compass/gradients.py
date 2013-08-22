@@ -62,13 +62,13 @@ def __color_stops(percentages, *args):
     if stops[-1] is None:
         stops[-1] = Number(100, '%')
 
-    maxable_stops = [s for s in stops if s and s.unit != '%']
+    maxable_stops = [s for s in stops if s and not s.is_simple_unit('%')]
     if maxable_stops:
         max_stops = max(maxable_stops)
     else:
         max_stops = None
 
-    stops = [_s / max_stops if _s and _s.unit != '%' else _s for _s in stops]
+    stops = [_s / max_stops if _s and not _s.is_simple_unit('%') else _s for _s in stops]
 
     init = 0
     start = None
@@ -89,7 +89,7 @@ def __color_stops(percentages, *args):
     if not max_stops or percentages:
         pass
     else:
-        stops = [s if s.unit == '%' else s * max_stops for s in stops]
+        stops = [s if s.is_simple_unit('%') else s * max_stops for s in stops]
 
     return zip(stops, colors)
 

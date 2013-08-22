@@ -471,6 +471,19 @@ class Number(Value):
         """
         return len(self.unit_numer) <= 1 and not self.unit_denom
 
+    def is_simple_unit(self, unit):
+        """Return True iff the unit is simple (as above) and matches the given
+        unit.
+        """
+        if self.unit_denom or len(self.unit_numer) > 1:
+            return False
+
+        if not self.unit_numer:
+            # Empty string historically means no unit
+            return unit == ''
+
+        return self.unit_numer[0] == unit
+
     @property
     def is_unitless(self):
         return not self.unit_numer and not self.unit_denom
