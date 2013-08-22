@@ -398,6 +398,9 @@ def _position(opposite, positions):
                 else:
                     ret.append(pos)
                 continue
+            elif pos_value == 'to':
+                # Gradient syntax keyword; leave alone
+                ret.append(pos)
 
         elif isinstance(pos, Number):
             if pos.unit == '%':
@@ -414,7 +417,8 @@ def _position(opposite, positions):
                     ret.append(pos)
                 continue
 
-        log.warn("Can't find opposite for position %r" % (pos,))
+        if opposite:
+            log.warn("Can't find opposite for position %r" % (pos,))
         ret.append(pos)
 
     return List(ret, use_comma=False).maybe()
