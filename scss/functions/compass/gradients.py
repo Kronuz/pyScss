@@ -138,7 +138,7 @@ def grad_point(*p):
 def __grad_position(index, default, radial, color_stops):
     try:
         stops = Number(color_stops[index][0])
-        if radial and stops.unit != 'px' and (index == 0 or index == -1 or index == len(color_stops) - 1):
+        if radial and not stops.is_simple_unit('px') and (index == 0 or index == -1 or index == len(color_stops) - 1):
             log.warn("Webkit only supports pixels for the start and end stops for radial gradients. Got %s", stops)
     except IndexError:
         stops = Number(default)

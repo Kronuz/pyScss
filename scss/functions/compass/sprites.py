@@ -197,7 +197,7 @@ def sprite_map(g, **kwargs):
                 collapse_y = int(Number(kwargs['collapse_y']).value)
 
             position = Number(kwargs.get('position', 0))
-            if position.unit != '%' and position.value > 1:
+            if not position.is_simple_unit('%') and position.value > 1:
                 position = position.value / 100.0
             else:
                 position = position.value
@@ -243,7 +243,7 @@ def sprite_map(g, **kwargs):
                     _position = position
                 else:
                     _position = Number(_position)
-                    if _position.unit != '%' and _position.value > 1:
+                    if not _position.is_simple_unit('%') and _position.value > 1:
                         _position = _position.value / 100.0
                     else:
                         _position = _position.value
@@ -455,9 +455,9 @@ def sprite(map, sprite, offset_x=None, offset_y=None, cache_buster=True):
             url += '?_=%s' % sprite_map['*t*']
         x = Number(offset_x or 0, 'px')
         y = Number(offset_y or 0, 'px')
-        if not x.value or (x.value <= -1 or x.value >= 1) and x.unit != '%':
+        if not x.value or (x.value <= -1 or x.value >= 1) and not x.is_simple_unit('%'):
             x -= Number(sprite[2], 'px')
-        if not y.value or (y.value <= -1 or y.value >= 1) and y.unit != '%':
+        if not y.value or (y.value <= -1 or y.value >= 1) and not y.is_simple_unit('%'):
             y -= Number(sprite[3], 'px')
         url = "url(%s)" % escape(url)
         return List([String.unquoted(url), x, y])
@@ -507,7 +507,7 @@ def sprite_position(map, sprite, offset_x=None, offset_y=None):
             if x:
                 offset_x = None
             x = Number(offset_x or 0, 'px')
-            if not x.value or (x.value <= -1 or x.value >= 1) and x.unit != '%':
+            if not x.value or (x.value <= -1 or x.value >= 1) and not x.is_simple_unit('%'):
                 x -= Number(sprite[2], 'px')
         y = None
         if offset_y is not None and not isinstance(offset_y, Number):
@@ -516,7 +516,7 @@ def sprite_position(map, sprite, offset_x=None, offset_y=None):
             if y:
                 offset_y = None
             y = Number(offset_y or 0, 'px')
-            if not y.value or (y.value <= -1 or y.value >= 1) and y.unit != '%':
+            if not y.value or (y.value <= -1 or y.value >= 1) and not y.is_simple_unit('%'):
                 y -= Number(sprite[3], 'px')
         return List([x, y])
     return List([Number(0), Number(0)])

@@ -404,13 +404,13 @@ def _position(opposite, positions):
                 continue
 
         elif isinstance(pos, Number):
-            if pos.unit == '%':
+            if pos.is_simple_unit('%'):
                 if opposite:
                     ret.append(Number(100 - pos.value, '%'))
                 else:
                     ret.append(pos)
                 continue
-            elif pos.unit == 'deg':
+            elif pos.is_simple_unit('deg'):
                 # TODO support other angle types?
                 if opposite:
                     ret.append(Number((pos.value + 180) % 360, 'deg'))

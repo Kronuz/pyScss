@@ -452,19 +452,6 @@ class Number(Value):
         return wrapped
 
     @property
-    def unit(self):
-        if self.unit_denom:
-            raise TypeError
-
-        if not self.unit_numer:
-            return ''
-
-        if len(self.unit_numer) != 1:
-            raise TypeError
-
-        return self.unit_numer[0]
-
-    @property
     def has_simple_unit(self):
         """Returns True iff the unit is expressible in CSS, i.e., has no
         denominator and at most one unit in the numerator.
@@ -492,7 +479,10 @@ class Number(Value):
         if not self.has_simple_unit:
             raise ValueError("Can't express compound units in CSS: %r" % (self,))
 
-        unit = self.unit
+        if self.unit_numer:
+            unit = self.unit_numer[0]
+        else:
+            unit = ''
 
         if compress and unit in ZEROABLE_UNITS and self.value == 0:
             return '0'

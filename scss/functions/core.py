@@ -44,7 +44,7 @@ def _apply_percentage(n, relto=1):
 
     if n.is_unitless:
         return n.value
-    elif n.unit == '%':
+    elif n.is_simple_unit('%'):
         return n.value * relto / 100.
     else:
         raise TypeError("Expected unitless number or percentage, got %r" % (n,))
