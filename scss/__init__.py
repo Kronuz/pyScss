@@ -1379,6 +1379,82 @@ class Scss(object):
         """
         For each part, create the inheritance parts from the @extends
         """
+        # Boy I wish I hadn't lost whatever work I'd done on this so far.
+        # TODO: clean up variable names, method names (cross product?!), etc.
+        # TODO: make Rules always contain Selectors, not strings.
+        # TODO: fix the Selector rendering to put the right amount of space in
+        # the right places
+        # TODO: child/sibling/etc selectors aren't handled correctly
+        # TODO: %foo may not be handled correctly
+        # TODO: a whole bunch of unit tests for Selector parsing
+        # TODO: make sure this all works for kronuz
+        # TODO: steal a TONNNNNN of tests from ruby and sassc for this
+
+
+
+        # Game plan: for each rule that has an @extend, add its selectors to
+        # every rule that matches that @extend.
+        # First, rig a way to find arbitrary selectors quickly.  Most selectors
+        # revolve around elements, classes, and IDs, so parse those out and use
+        # them as a rough key.  Ignore order and duplication for now.
+        from scss.rule import Selector
+        key_to_selectors = defaultdict(set)
+        selector_to_rules = defaultdict(list)
+        pos = 0
+        for rule in self.rules:
+            rule.position = pos
+            pos += 1
+
+            for selector in rule.selectors:
+                selobj, = Selector.parse(selector)
+                for key in selobj.lookup_key():
+                    key_to_selectors[key].add(selector)
+                selector_to_rules[selector].append(rule)
+
+        # Now go through all the rules with an @extends and find their parent
+        # rules.
+        for rule in self.rules:
+            for selector in rule.extends_selectors:
+                extends_selectors = []
+
+                selobj, = Selector.parse(selector)
+                import operator
+                candidates = reduce(operator.and_, (key_to_selectors[key] for key in selobj.lookup_key()))
+                for cand in candidates:
+                    extend_selector_obj, = Selector.parse(cand)
+                    if extend_selector_obj.is_superset_of(selobj):
+                        print("looks like a match to me", selector, cand)
+                        extends_selectors.append(extend_selector_obj)
+
+                if not extends_selectors:
+                    log.warn("no match found")
+                    continue
+
+                # do magic here
+                for extend_selector_obj in extends_selectors:
+                    for parent_rule in selector_to_rules[extend_selector_obj.original_selector]:
+                        rule_selector, = rule.selectors  # TODO
+                        new_parents = extend_selector_obj.substitute(
+                            Selector.parse(selector)[0],
+                            Selector.parse(rule_selector)[0],
+                        )
+
+                        existing_parent_selectors = list(parent_rule.selectors)
+                        for parent in new_parents:
+                            existing_parent_selectors.append(parent.render())
+                        parent_rule.selectors = frozenset(existing_parent_selectors)
+                        parent_rule.dependent_rules.add(rule.position)
+
+                        # Update indices, in case any later rules try to extend
+                        # this one
+                        for parent in new_parents:
+                            key_to_selectors[parent.lookup_key()].add(parent.render())
+                            # TODO this could lead to duplicates?  maybe should
+                            # be a set too
+                            selector_to_rules[parent.render()].append(parent_rule)
+
+        return
+
         # First group rules by a tuple of (selectors, @extends)
         pos = 0
         grouped_rules = defaultdict(list)
@@ -1423,7 +1499,14 @@ class Scss(object):
                 new_key = selectors, frozenset()
                 grouped_rules[new_key].extend(rules)
 
+                print()
+                print("calling link_with_parents.")
+                print(grouped_rules)
+                print(parent)
+                print(selectors)
+                print(rules)
                 parents = self.link_with_parents(grouped_rules, parent, selectors, rules)
+                print("got back:", parents)
 
                 if parents is None:
                     log.warn("Parent rule not found: %s", parent)

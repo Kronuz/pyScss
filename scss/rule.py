@@ -247,6 +247,197 @@ class SassRule(object):
         )
 
 
+class Selector(object):
+    """A single CSS selector."""
+
+    def __init__(self, selector, tree):
+        """Private; please use parse()."""
+        self.original_selector = selector
+        self._tree = tree
+
+    @classmethod
+    def parse(cls, selector):
+        # Super dumb little selector parser
+
+        # Yes, yes, this is a regex tokenizer.  The actual meaning of the
+        # selector doesn't matter; the parts are just important for matching up
+        # during @extend.
+        import re
+        tokenizer = re.compile(
+        r'''
+            # Colons introduce pseudo-selectors, sometimes with parens
+            # TODO doesn't handle quoted )
+            [:]+ [-\w]+ (?: [(] .+? [)] )?
+
+            # Square brackets are attribute tests
+            # TODO: this doesn't handle ] within a string
+            | [[] .+? []]
+
+            # Dot and pound start class/id selectors.  Percent starts a Sass
+            # extend-target faux selector.
+            | [.#%] [-\w]+
+
+            # Plain identifiers, or single asterisks, are element names
+            | [-\w]+
+            | [*]
+
+            # These guys are combinators -- note that a single space counts too
+            | \s* [ +>~] \s*
+
+            # And as a last-ditch effort for something really outlandish (e.g.
+            # percentages as faux-selectors in @keyframes), just eat up to the
+            # next whitespace
+            | (\S+)
+        ''', re.VERBOSE | re.MULTILINE)
+
+        # Selectors have three levels: simple, combinator, comma-delimited.
+        # Each combinator can only appear once as a delimiter between simple
+        # selectors, so it can be thought of as a prefix.
+        # So this:
+        #     a.b + c, d#e
+        # parses into two Selectors with these structures:
+        #     [[' ', 'a', '.b'], ['+', 'c']]
+        #     [[' ', 'd', '#e']]
+        # Note that the first simple selector has an implied descendant
+        # combinator -- i.e., it is a descendant of the root element.
+        trees = [[[' ']]]
+        pos = 0
+        while pos < len(selector):
+            # TODO i don't think this deals with " + " correctly.  anywhere.
+            m = tokenizer.match(selector, pos)
+            if not m:
+                # TODO prettify me
+                raise SyntaxError("Couldn't parse selector: %r" % (selector,))
+
+            token = m.group(0)
+            if token == ',':
+                trees.append([[' ']])
+            elif token in ' +>~':
+                trees[-1].append([token])
+            else:
+                trees[-1][-1].append(token)
+
+            pos += len(token)
+
+        # TODO this passes the whole selector, not just the part
+        return [cls(selector, tree) for tree in trees]
+
+    def __repr__(self):
+        return "<%s: %r>" % (type(self).__name__, self._tree)
+
+    def lookup_key(self):
+        """Build a key from the "important" parts of a selector: elements,
+        classes, ids.
+        """
+        # TODO how does this work with multiple selectors
+        parts = set()
+        for node in self._tree:
+            for token in node[1:]:
+                if token[0] not in ':[':
+                    parts.add(token)
+
+        if not parts:
+            # Should always have at least ONE key; selectors with no elements,
+            # no classes, and no ids can be indexed as None to avoid a scan of
+            # every selector in the entire document
+            parts.add(None)
+
+        return frozenset(parts)
+
+    def is_superset_of(self, other):
+        assert isinstance(other, Selector)
+
+        idx = 0
+        for other_node in other._tree:
+            if idx >= len(self._tree):
+                return False
+
+            while idx < len(self._tree):
+                node = self._tree[idx]
+                idx += 1
+
+                if node[0] == other_node[0] and set(node[1:]) <= set(other_node[1:]):
+                    break
+
+        return True
+
+    def substitute(self, target, replacement):
+        """Return a list of selectors obtained by replacing the `target`
+        selector with `replacement`.
+
+        Herein lie the guts of the Sass @extend directive.
+
+        In general, for a selector ``a X b Y c``, a target ``X Y``, and a
+        replacement ``q Z``, return the selectors ``a q X b Z c`` and ``q a X b
+        Z c``.  Note in particular that no more than two selectors will be
+        returned, and the permutation of ancestors will never insert new simple
+        selectors "inside" the target selector.
+        """
+
+        # Find the hinge in the parent selector, and split it into before/after
+        p_before, p_extras, p_after = self.break_around(target._tree)
+
+        # The replacement has no hinge; it only has the most specific simple
+        # selector (which is the part that replaces "self" in the parent) and
+        # whatever preceding simple selectors there may be
+        r_trail = replacement._tree[:-1]
+        r_extras = replacement._tree[-1]
+
+        # TODO is this the right order?
+        # TODO what if the prefix doesn't match?  who wins?  should we even get
+        # this far?
+        focal_node = [p_extras[0]]
+        focal_node.extend(sorted(
+            p_extras[1:] + r_extras[1:],
+            key=lambda token: {'#':1,'.':2,':':3}.get(token[0], 0)))
+
+        if p_before and r_trail:
+            # Two conflicting "preceding" parts.  Rather than try to cross-join
+            # them, just generate two possibilities: P R and R P.
+            befores = [p_before + r_trail, r_trail + p_before]
+        else:
+            # At least one of them is empty, so just concatenate
+            befores = [p_before + r_trail]
+
+        ret = [before + focal_node for before in befores]
+
+        return [Selector(None, before + focal_node + p_after) for before in befores]
+
+    def break_around(self, hinge):
+        """Given a simple selector node contained within this one (a "hinge"),
+        break it in half and return a parent selector, extra specifiers for the
+        hinge, and a child selector.
+
+        That is, given a hinge X, break the selector A + X.y B into A, + .y,
+        and B.
+        """
+        hinge_start = hinge[0]
+        for i, node in enumerate(self._tree):
+            # TODO does first combinator have to match?  maybe only if the
+            # hinge has a non-descendant combinator?
+            if set(hinge_start[1:]) <= set(node[1:]):
+                start_idx = i
+                break
+        else:
+            raise ValueError("Couldn't find hinge %r in compound selector %r", (hinge_start, self._tree))
+
+        for i, hinge_node in enumerate(hinge):
+            self_node = self._tree[start_idx + i]
+            if hinge_node[0] == self_node[0] and set(hinge_node[1:]) <= set(self_node[1:]):
+                continue
+
+            # TODO this isn't true; consider finding `a b` in `a c a b`
+            raise TypeError("no match")
+
+        end_idx = start_idx + len(hinge) - 1
+        focal_node = self._tree[end_idx]
+        extras = [focal_node[0]] + [token for token in focal_node[1:] if token not in hinge[-1]]
+        return self._tree[:start_idx], extras, self._tree[end_idx + 1:]
+
+    def render(self):
+        return ''.join(''.join(node) for node in self._tree).lstrip()
+
+
 class BlockHeader(object):
     """..."""
     # TODO doc me depending on how UnparsedBlock is handled...

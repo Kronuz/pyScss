@@ -1,4 +1,3 @@
-.comment a.user:hover,
-.comment .hoverlink.user {
+.comment .user.hoverlink, .comment a.user:hover {
   font-weight: bold;
 }

@@ -1,4 +1,4 @@
-#admin .tabbar #demo .overview .fakelink, #admin .tabbar a,
-#demo .overview #admin .tabbar .fakelink {
+#admin .tabbar #demo .overview .fakelink, #admin .tabbar a, #demo
+.overview #admin .tabbar .fakelink {
   font-weight: bold;
 }
