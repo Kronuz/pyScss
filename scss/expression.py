@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 FATAL_UNDEFINED = True
 
 
-from ometa.runtime import EOFError, OMetaBase, expected
+from ometa.runtime import EOFError, OMetaBase, ParseError, expected
 import string
 HEXDIGITS = frozenset(string.hexdigits)
 WHITESPACE = frozenset(' \n\r\t\f')
@@ -224,7 +224,7 @@ class Calculator(object):
 
             ast = getattr(parser, target)()
             print(repr(ast))
-        except SyntaxError as e:
+        except (SyntaxError, ParseError) as e:
             raise SassParseError(e, expression=expr, expression_pos=parser._char_pos)
 
         self.ast_cache[key] = ast
@@ -551,7 +551,9 @@ class Interpolation(Expression):
         ret = []
         for part in self.parts:
             expr = part.evaluate(calculator)
-            if isinstance(expr, String):
+            if expr.is_null:
+                pass
+            elif isinstance(expr, String):
                 ret.append(expr.value)
             else:
                 ret.append(expr.render())

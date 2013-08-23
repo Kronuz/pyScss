@@ -38,7 +38,7 @@ spaced_list = single_expression:head (
     )*:tails -> ListLiteral([head] + tails, comma=False) if tails else head
 
 
-single_expression = or_test
+single_expression = or_test  ^(single expression)
 
 or_test = and_test:head (
         'o' 'r'
@@ -97,6 +97,9 @@ atom = (
         # TODO kill this off
         | '[' comma_list:node ']' -> Parentheses(node)
 
+        # Map literal
+        | map
+
         # URL literal
         | 'u' 'r' 'l' '(' inside_url:s ')' -> FunctionLiteral('url', s)
 
@@ -135,6 +138,21 @@ atom = (
         # Variable
         | variable:name -> Variable(name)
     )
+    ^(single value)
+
+
+### Map literals
+map = '(' ows
+    ( map_pair:pair ows ',' ows -> pair )*:pairs
+    ( map_pair:pair ows !(pairs.append(pair)) )?
+    ')'
+    -> MapLiteral(pairs)
+
+map_pair =
+    single_expression:key
+    ows ':' ows
+    spaced_list:value
+    -> (key, value)
 
 
 ### Strings, literals, and interpolation
@@ -174,6 +192,8 @@ string_part :end = <(
 
 
 ### Function definitions and arguments
+goal_argspec = argspec
+
 argspec = (
         argspec_item:node
         ows ',' ows
@@ -186,7 +206,7 @@ argspec = (
 argspec_item =
     ows
     (
-        ( variable:name ows ':' ows -> name )?:name
+        ( variable:name ows ':' ows -> Variable(name) )?:name
         spaced_list:value
         -> (name, value)
     )
