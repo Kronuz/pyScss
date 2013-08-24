@@ -628,16 +628,17 @@ class Scss(object):
         funct = normalize_var(funct.strip())
         argstr = argstr.strip()
 
+        # Parse arguments with the argspec rule
         if lpar:
-            # Has arguments; parse them with the argspec rule
             if not argstr.endswith(')'):
                 raise SyntaxError("Expected ')', found end of line for %s (%s)" % (funct, rule.file_and_line))
             argstr = argstr[:-1].strip()
-            argspec_node = calculator.parse_expression(argstr, target='goal_argspec') if argstr else None
-            # print(argstr, repr(argspec_node))
-            return funct, argspec_node
+        else:
+            # Whoops, no parens at all.  That's like calling with no arguments.
+            argstr = ''
 
-        return funct, None
+        argspec_node = calculator.parse_expression(argstr, target='goal_argspec')
+        return funct, argspec_node
 
     @print_timing(10)
     def _do_functions(self, rule, p_children, scope, block):
@@ -653,11 +654,10 @@ class Scss(object):
         defaults = {}
         new_params = []
 
-        if argspec_node:
-            for var_name, default in argspec_node.iter_def_argspec():
-                new_params.append(var_name)
-                if default is not None:
-                    defaults[var_name] = default
+        for var_name, default in argspec_node.iter_def_argspec():
+            new_params.append(var_name)
+            if default is not None:
+                defaults[var_name] = default
 
         mixin = [list(new_params), defaults, block.unparsed_contents, rule.namespace]
         if block.directive == '@function':

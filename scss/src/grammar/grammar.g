@@ -23,6 +23,7 @@ parser SassExpression:
     token GE: ">="
     token LT: "<"
     token GT: ">"
+    token DOTDOTDOT: '[.]{3}'
     token KWSTR: "'[^']*'(?=\s*:)"
     token STR: "'[^']*'"
     token KWQSTR: '"[^"]*"(?=\s*:)'
@@ -33,6 +34,7 @@ parser SassExpression:
     token KWCOLOR: "#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])(?=\s*:)"
     token COLOR: "#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])"
     token KWVAR: "\$[-a-zA-Z0-9_]+(?=\s*:)"
+    token SLURPYVAR: "\$[-a-zA-Z0-9_]+(?=[.][.][.])"
     token VAR: "\$[-a-zA-Z0-9_]+"
     token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
     token KWID: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\s*:)"
@@ -45,15 +47,25 @@ parser SassExpression:
     rule goal_argspec:  argspec END                 {{ return argspec }}
 
     # Arguments:
-    rule argspec:       argspec_item                {{ argpairs = [argspec_item] }}
-                        (
-                            ","                     {{ argspec_item = (None, None) }}
-                            [ argspec_item ]        {{ argpairs.append(argspec_item) }}
-                        )*                          {{ return ArgspecLiteral(argpairs) }}
+    # Note that at the moment, named arguments and slurpy arguments appear to
+    # be incompatible.
+    rule argspec:       [
+                            argspec_items           {{ args, slurpy = argspec_items }}
+                                                    {{ return ArgspecLiteral(args, slurp=slurpy) }}
+                        ]                           {{ return ArgspecLiteral([]) }}
+                        | SLURPYVAR DOTDOTDOT       {{ return ArgspecLiteral([], slurp=SLURPYVAR) }}
 
-    rule argspec_item:
-                        KWVAR ":" expr_slst         {{ return (Variable(KWVAR), expr_slst) }}
+    rule argspec_items:                             {{ slurpy = None }}
+                        argspec_item                {{ args = [argspec_item] }}
+                        [ "," [
+                            SLURPYVAR DOTDOTDOT     {{ slurpy = SLURPYVAR }}
+                            | argspec_items         {{ more_args, slurpy = argspec_items }}
+                                                    {{ args.extend(more_args) }}
+                        ] ]                         {{ return args, slurpy }}
+
+    rule argspec_item:  KWVAR ":" expr_slst         {{ return (Variable(KWVAR), expr_slst) }}
                         | expr_slst                 {{ return (None, expr_slst) }}
+
 
     # Maps:
     rule expr_map:      map_item                    {{ pairs = [map_item] }}
@@ -64,12 +76,14 @@ parser SassExpression:
 
     rule map_item:      kwatom ":" expr_slst        {{ return (kwatom, expr_slst) }}
 
+
     # Lists:
     rule expr_lst:      expr_slst                   {{ v = [expr_slst] }}
                         (
                             ","
                             expr_slst               {{ v.append(expr_slst) }}
                         )*                          {{ return ListLiteral(v) if len(v) > 1 else v[0] }}
+
 
     # Expressions:
     rule expr_slst:     or_expr                     {{ v = [or_expr] }}
@@ -120,8 +134,7 @@ parser SassExpression:
                             expr_map                {{ v = expr_map }}
                             | expr_lst              {{ v = expr_lst }}
                         ) RPAR                      {{ return Parentheses(v) }}
-                        | FNCT                      {{ argspec = ArgspecLiteral([]) }}
-                            LPAR [ argspec ] RPAR   {{ return CallOp(FNCT, argspec) }}
+                        | FNCT LPAR argspec RPAR    {{ return CallOp(FNCT, argspec) }}
                         | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
                         | ID                        {{ return Literal(parse_bareword(ID)) }}
                         | NUM                       {{ UNITS = None }}
