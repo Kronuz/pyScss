@@ -256,12 +256,13 @@ class BlockHeader(object):
     is_selector = False
 
     @classmethod
-    def parse(cls, prop):
+    def parse(cls, prop, has_contents=False):
         # Simple pre-processing
-        if prop.startswith('+'):
-            # Expand '+' at the beginning of a rule as @include
+        if prop.startswith('+') and not has_contents:
+            # Expand '+' at the beginning of a rule as @include.  But not if
+            # there's a block, because that's probably a CSS selector.
+            # DEVIATION: this is some semi hybrid of Sass and xCSS syntax
             prop = '@include ' + prop[1:]
-            # TODO what is this, partial sass syntax?
             try:
                 if '(' not in prop or prop.index(':') < prop.index('('):
                     prop = prop.replace(':', '(', 1)
@@ -366,7 +367,7 @@ class UnparsedBlock(object):
 
     def __init__(self, parent_rule, lineno, prop, unparsed_contents):
         self.parent_rule = parent_rule
-        self.header = BlockHeader.parse(prop)
+        self.header = BlockHeader.parse(prop, has_contents=bool(unparsed_contents))
 
         # Basic properties
         self.lineno = lineno
