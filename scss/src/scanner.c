@@ -303,16 +303,14 @@ Scanner_reset(Scanner *self, char *input, int input_sz) {
 	}
 	self->tokens_sz = 0;
 
-	if (input_sz) {
-		if (self->input != NULL) {
-			PyMem_Del(self->input);
-		}
-		self->input = PyMem_Strndup(input, input_sz);
-		self->input_sz = input_sz;
-		#ifdef DEBUG
-			fprintf(stderr, "Scanning in %s\n", repr(self->input));
-		#endif
+	if (self->input != NULL) {
+		PyMem_Del(self->input);
 	}
+	self->input = PyMem_Strndup(input, input_sz);
+	self->input_sz = input_sz;
+	#ifdef DEBUG
+		fprintf(stderr, "Scanning in %s\n", repr(self->input));
+	#endif
 
 	self->pos = 0;
 }
