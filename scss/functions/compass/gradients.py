@@ -91,7 +91,7 @@ def __color_stops(percentages, *args):
     else:
         stops = [s if s.is_simple_unit('%') else s * max_stops for s in stops]
 
-    return zip(stops, colors)
+    return list(zip(stops, colors))
 
 
 def _render_standard_color_stops(color_stops):
