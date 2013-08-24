@@ -417,7 +417,10 @@ class ArgspecLiteral(Expression):
         # node).
         # slurp is the name of a variable to receive slurpy arguments.
         self.argpairs = tuple(argpairs)
-        self.slurp = slurp
+        if slurp:
+            self.slurp = Variable(slurp)
+        else:
+            self.slurp = None
 
     def iter_list_argspec(self):
         yield None, ListLiteral(zip(*self.argpairs)[1])

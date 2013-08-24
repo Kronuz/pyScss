@@ -70,7 +70,7 @@ from scss.expression import Calculator
 from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
 from scss.rule import UnparsedBlock, SassRule
-from scss.types import Boolean, List, Null, Number, String
+from scss.types import Boolean, List, Null, Number, String, Undefined
 from scss.util import dequote, normalize_var, print_timing  # profile
 
 log = logging.getLogger(__name__)
@@ -659,7 +659,7 @@ class Scss(object):
             if default is not None:
                 defaults[var_name] = default
 
-        mixin = [list(new_params), defaults, block.unparsed_contents, rule.namespace]
+        mixin = [list(new_params), defaults, block.unparsed_contents, rule.namespace, argspec_node]
         if block.directive == '@function':
             def _call(mixin):
                 def __call(namespace, *args, **kwargs):
@@ -731,13 +731,16 @@ class Scss(object):
             add = rule.namespace.set_function
 
         # Register the mixin for every possible arity it takes
-        while len(new_params):
-            add(funct, len(new_params), mixin)
-            param = new_params.pop()
-            if param not in defaults:
-                break
-        if not new_params:
-            add(funct, 0, mixin)
+        if argspec_node.slurp:
+            add(funct, None, mixin)
+        else:
+            while len(new_params):
+                add(funct, len(new_params), mixin)
+                param = new_params.pop()
+                if param not in defaults:
+                    break
+            if not new_params:
+                add(funct, 0, mixin)
 
     @print_timing(10)
     def _do_include(self, rule, p_children, scope, block):
@@ -746,62 +749,78 @@ class Scss(object):
         """
         caller_namespace = rule.namespace
         caller_calculator = Calculator(caller_namespace)
-        funct, argspec_node = self._get_funct_def(rule, caller_calculator, block.argument)
+        funct, caller_argspec = self._get_funct_def(rule, caller_calculator, block.argument)
 
-        if argspec_node:
-            argspec = list(argspec_node.iter_call_argspec())
-            argspec_len = len(argspec)
-        else:
-            argspec = None
-            argspec_len = 0
+        # Render the passed arguments, using the caller's namespace
+        # TODO share this code with CallOp?
+        args = []
+        kwargs = {}
+        for var, node in caller_argspec.iter_call_argspec():
+            value = node.evaluate(caller_calculator, divide=True)
+            if var is None:
+                args.append(value)
+            else:
+                # TODO check for duplicate variables?
+                kwargs[var] = value
+
+        # TODO this might be the argspec's responsibility
+        if caller_argspec.slurp:
+            args.extend(caller_argspec.slurp.evaluate(caller_calculator, divide=True))
+
+        argc = len(args) + len(kwargs)
         try:
-            mixin = caller_namespace.mixin(funct, argspec_len)
+            mixin = caller_namespace.mixin(funct, argc)
         except KeyError:
             try:
                 # TODO maybe? don't do this, once '...' works
                 # Fallback to single parameter:
                 mixin = caller_namespace.mixin(funct, 1)
-                argspec = list(argspec_node.iter_list_argspec())
-                argspec_len = len(argspec)
             except KeyError:
-                log.error("Required mixin not found: %s:%d (%s)", funct, argspec_len, rule.file_and_line, extra={'stack': True})
+                log.error("Required mixin not found: %s:%d (%s)", funct, argc, rule.file_and_line, extra={'stack': True})
                 return
+            else:
+                args = [List(args, use_comma=True)]
+                # TODO what happens to kwargs?
 
+        # TODO share this code with the @function boilerplate above
         m_params = mixin[0]
         m_defaults = mixin[1]
         m_codestr = mixin[2]
         callee_namespace = mixin[3].derive()
         callee_calculator = Calculator(callee_namespace)
+        callee_argspec = mixin[4]
 
-        seen_args = set()
-        arg_position = 0
-        if argspec:
-            for var_name, var_value in argspec:
-                if var_name is None:
-                    # Positional argument; get the right name from the mixin
-                    try:
-                        var_name = m_params[arg_position]
-                    except IndexError:
-                        # TODO i don't think this error message is right; still
-                        # confuses args and kwargs.  revisit after ... works
-                        log.error("Mixin %s:%d receives more positional arguments than expected (%d)", funct, len(m_params), argspec_len, extra={'stack': True})
-                        continue
+        # Populate the mixin/function's namespace with its arguments
+        for var_name, node in callee_argspec.iter_def_argspec():
+            if args:
+                # If there are positional arguments left, use the first
+                value = args.pop(0)
+            elif var_name in kwargs:
+                # Try keyword arguments
+                value = kwargs.pop(var_name)
+            elif node:
+                # OK, there's a default argument; try that
+                # DEVIATION: this allows argument defaults to refer to earlier
+                # argument values
+                value = node.evaluate(callee_calculator, divide=True)
+            else:
+                # TODO this should raise
+                value = Undefined()
 
-                    arg_position += 1
-
-                value = var_value.evaluate(caller_calculator, divide=True)
-                callee_namespace.set_variable(var_name, value, local_only=True)
-
-                seen_args.add(var_name)
-
-        # Populate defaults in order, using the new scope; this is so defaults
-        # can refer to the values of other preceding arguments.  (DEVIATION)
-        for var_name in m_params:
-            if var_name in seen_args or var_name not in m_defaults:
-                continue
-
-            value = m_defaults[var_name].evaluate(callee_calculator, divide=True)
             callee_namespace.set_variable(var_name, value, local_only=True)
+
+        if callee_argspec.slurp:
+            # Slurpy var gets whatever is left
+            callee_namespace.set_variable(
+                callee_argspec.slurp.name,
+                List(args, use_comma=True))
+            args = []
+
+        if kwargs:
+            raise NameError("Mixin %s has no such argument %s" % (funct, kwargs.keys()[0]))
+
+        if args:
+            raise NameError("Mixin %s received extra arguments: %r" % (funct, args))
 
         _rule = rule.copy()
         _rule.unparsed_contents = m_codestr
