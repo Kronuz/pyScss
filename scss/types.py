@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import colorsys
 import operator
 
 import six
@@ -666,6 +667,11 @@ class Color(Value):
         return self
 
     @classmethod
+    def from_hsl(cls, hue, saturation, lightness, alpha=1.0):
+        r, g, b = colorsys.hls_to_rgb(hue, lightness, saturation)
+        return cls.from_rgb(r, g, b, alpha)
+
+    @classmethod
     def from_hex(cls, hex_string):
         if not hex_string.startswith('#'):
             raise ValueError("Expected #abcdef, got %r" % (hex_string,))
@@ -705,7 +711,23 @@ class Color(Value):
 
     @property
     def rgb(self):
+        # TODO: deprecate, relies on internals
         return tuple(self.value[:3])
+
+    @property
+    def rgba(self):
+        return (
+            self.value[0] / 255,
+            self.value[1] / 255,
+            self.value[2] / 255,
+            self.value[3],
+        )
+
+    @property
+    def hsl(self):
+        rgba = self.rgba
+        h, l, s = colorsys.rgb_to_hls(*rgba[:3])
+        return h, s, l
 
     @property
     def alpha(self):
@@ -730,11 +752,11 @@ class Color(Value):
         if not isinstance(other, Color):
             return Boolean(False)
 
-        # Round to the nearest 5 digits for comparisons; corresponds roughly to
-        # 16 bits per channel, the most that generally matters.  Otherwise
-        # float errors make equality fail for HSL colors.
-        left = tuple(round(n, 5) for n in self.value)
-        right = tuple(round(n, 5) for n in other.value)
+        # Scale channels to 255 and round to integers; this allows only 8-bit
+        # color, but Ruby sass makes the same assumption, and otherwise it's
+        # easy to get lots of float errors for HSL colors.
+        left = tuple(round(n) for n in self.value)
+        right = tuple(round(n) for n in other.value)
         return Boolean(left == right)
 
     def __add__(self, other):
@@ -954,3 +976,30 @@ class Map(Value):
 
     def render(self, compress=False):
         raise TypeError("maps cannot be rendered as CSS")
+
+
+def expect_type(value, types, unit=any):
+    if not isinstance(value, types):
+        if isinstance(types, type):
+            types = (type,)
+        sass_type_names = list(set(t.sass_type_name for t in types))
+        sass_type_names.sort()
+
+        # Join with commas in English fashion
+        if len(sass_type_names) == 1:
+            sass_type = sass_type_names[0]
+        elif len(sass_type_names) == 2:
+            sass_type = u' or '.join(sass_type_names)
+        else:
+            sass_type = u', '.join(sass_type_names[:-1])
+            sass_type += u', or ' + sass_type_names[-1]
+
+        raise TypeError("Expected %s, got %r" % (sass_type, value))
+
+    if unit is not any and isinstance(value, Number):
+        if unit is None and not value.is_unitless:
+            raise ValueError("Expected unitless number, got %r" % (value,))
+
+        elif unit == '%' and not (
+                value.is_unitless or value.is_simple_unit('%')):
+            raise ValueError("Expected unitless number or percentage, got %r" % (value,))

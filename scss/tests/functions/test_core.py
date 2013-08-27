@@ -198,7 +198,6 @@ def test_adjust_color(calc):
     assert calc('adjust-color(hsl(25, 100%, 80%), $lightness: -30%, $alpha: -0.4)') == calc('hsla(25, 100%, 50%, 0.6)')
 
 
-@xfail(reason="outright broken")
 def test_scale_color(calc):
     # Examples from the Ruby docs
     assert calc('scale-color(hsl(120, 70, 80), $lightness: 50%)') == calc('hsl(120, 70, 90)')
@@ -206,7 +205,6 @@ def test_scale_color(calc):
     assert calc('scale-color(hsl(200, 70, 80), $saturation: -90%, $alpha: -30%)') == calc('hsla(200, 7, 80, 0.7)')
 
 
-@xfail(reason="outright broken")
 def test_change_color(calc):
     # Examples from the Ruby docs
     assert calc('change-color(#102030, $blue: 5)') == calc('#102005')

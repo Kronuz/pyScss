@@ -3,6 +3,7 @@ Ruby implementation.
 """
 
 from __future__ import absolute_import
+from __future__ import division
 
 import colorsys
 import logging
@@ -12,7 +13,7 @@ import operator
 from six.moves import xrange
 
 from scss.functions.library import FunctionLibrary
-from scss.types import Boolean, Color, List, Number, String, Map
+from scss.types import Boolean, Color, List, Number, String, Map, expect_type
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +51,40 @@ def _apply_percentage(n, relto=1):
         raise TypeError("Expected unitless number or percentage, got %r" % (n,))
 
 
+def _interpret_percentage(n, relto=1.):
+    expect_type(n, Number, unit='%')
+
+    if n.is_unitless:
+        ret = n.value / relto
+    else:
+        ret = n.value / 100.
+
+    if ret < 0:
+        return 0.
+    elif ret > 1:
+        return 1.
+    else:
+        return ret
+
+
+def _interpret_rgb_args(r, g, b):
+    """Given arguments from Sass-land representing red, green, and blue
+    channels, return plain Python numbers appropriate for passing to `Color`
+    constructors.
+    """
+    ret = []
+    for channel in (r, g, b):
+        expect_type(channel, Number, unit='%')
+        if channel.is_simple_unit('%'):
+            value = channel.value / 100.
+        else:
+            value = channel.value / 255.
+
+        ret.append(_constrain(value, 0, 1))
+
+    return ret
+
+
 def _color_type(color, a, type):
     color = Color(color).value
     a = Number(a).value if a is not None else color[3]
@@ -61,13 +96,12 @@ def _color_type(color, a, type):
 
 @register('rgba', 4)
 def rgba(r, g, b, a, type='rgba'):
-    channels = []
-    for ch in (r, g, b):
-        channels.append(_constrain(_apply_percentage(ch, relto=255), 0, 255))
+    r = _interpret_percentage(r, relto=255.)
+    g = _interpret_percentage(g, relto=255.)
+    b = _interpret_percentage(b, relto=255.)
+    a = _interpret_percentage(a, relto=1.)
 
-    channels.append(_constrain(_apply_percentage(a), 0, 1))
-    channels.append(type)
-    return Color(channels)
+    return Color.from_rgb(r, g, b, a)
 
 
 @register('rgb', 3)
@@ -389,18 +423,90 @@ def _asc_color(op, color, saturation=None, lightness=None, red=None, green=None,
 
 
 @register('adjust-color')
-def adjust_color(color, saturation=None, lightness=None, red=None, green=None, blue=None, alpha=None):
+def adjust_color(color, red=None, green=None, blue=None, hue=None, saturation=None, lightness=None, alpha=None):
     return _asc_color(operator.__add__, color, saturation, lightness, red, green, blue, alpha)
 
 
+def _scale_channel(channel, scaleby):
+    if scaleby is None:
+        return channel
+
+    expect_type(scaleby, Number)
+    if not scaleby.is_simple_unit('%'):
+        raise ValueError("Expected percentage, got %r" % (scaleby,))
+
+    factor = scaleby.value / 100
+    if factor > 0:
+        # Add x% of the remaining range, up to 1
+        return channel + (1 - channel) * factor
+    else:
+        # Subtract x% of the existing channel.  We add here because the factor
+        # is already negative
+        return channel * (1 + factor)
+
+
 @register('scale-color')
-def scale_color(color, saturation=None, lightness=None, red=None, green=None, blue=None, alpha=None):
-    return _asc_color(operator.__mul__, color, saturation, lightness, red, green, blue, alpha)
+def scale_color(color, red=None, green=None, blue=None, saturation=None, lightness=None, alpha=None):
+    do_rgb = red or green or blue
+    do_hsl = saturation or lightness
+    if do_rgb and do_hsl:
+        raise ValueError("Can't scale both RGB and HSL channels at the same time")
+
+    scaled_alpha = _scale_channel(color.alpha, alpha)
+
+    if do_rgb:
+        channels = [
+            _scale_channel(channel, scaleby)
+            for channel, scaleby in zip(color.rgba, (red, green, blue))
+        ]
+
+        return Color.from_rgb(*channels, alpha=scaled_alpha)
+
+    else:
+        channels = [
+            _scale_channel(channel, scaleby)
+            for channel, scaleby in zip(color.hsl, (None, saturation, lightness))
+        ]
+
+        return Color.from_hsl(*channels, alpha=scaled_alpha)
 
 
 @register('change-color')
-def change_color(color, saturation=None, lightness=None, red=None, green=None, blue=None, alpha=None):
-    return _asc_color(None, color, saturation, lightness, red, green, blue, alpha)
+def change_color(color, red=None, green=None, blue=None, hue=None, saturation=None, lightness=None, alpha=None):
+    do_rgb = red or green or blue
+    do_hsl = hue or saturation or lightness
+    if do_rgb and do_hsl:
+        raise ValueError("Can't change both RGB and HSL channels at the same time")
+
+    if alpha is None:
+        alpha = color.alpha
+    else:
+        alpha = alpha.value
+
+    if do_rgb:
+        channels = list(color.rgba[:3])
+        if red is not None:
+            channels[0] = _interpret_percentage(red, relto=255.)
+        if green is not None:
+            channels[1] = _interpret_percentage(green, relto=255.)
+        if blue is not None:
+            channels[2] = _interpret_percentage(blue, relto=255.)
+
+        return Color.from_rgb(*channels, alpha=alpha)
+
+    else:
+        channels = list(color.hsl)
+        if hue is not None:
+            expect_type(hue, Number, unit=None)
+            channels[0] = _constrain(hue / 360., 0, 1)
+        # Ruby sass treats plain numbers for saturation and lightness as though
+        # they were percentages, just without the %
+        if saturation is not None:
+            channels[1] = _interpret_percentage(saturation, relto=100.)
+        if lightness is not None:
+            channels[2] = _interpret_percentage(lightness, relto=100.)
+
+        return Color.from_hsl(*channels, alpha=alpha)
 
 
 # ------------------------------------------------------------------------------
