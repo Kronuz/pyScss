@@ -24,34 +24,7 @@ register = CORE_LIBRARY.register
 # ------------------------------------------------------------------------------
 # Color creation
 
-def _constrain(n, lb, ub):
-    if n < lb:
-        return lb
-    elif n > ub:
-        return ub
-    else:
-        return n
-
-
-def _apply_percentage(n, relto=1):
-    """Given a unitless Number, returns its value.  Given a percentage Number,
-    returns its value divided by 100%.  Raises TypeError otherwise.
-
-    The optional `relto` gives a value for what "100%" means; percentages will
-    be scaled by this value before being returned.
-    """
-    if not isinstance(n, Number):
-        raise TypeError("Expected number, got %r" % (n,))
-
-    if n.is_unitless:
-        return n.value
-    elif n.is_simple_unit('%'):
-        return n.value * relto / 100.
-    else:
-        raise TypeError("Expected unitless number or percentage, got %r" % (n,))
-
-
-def _interpret_percentage(n, relto=1.):
+def _interpret_percentage(n, relto=1., cap=True):
     expect_type(n, Number, unit='%')
 
     if n.is_unitless:
@@ -59,97 +32,74 @@ def _interpret_percentage(n, relto=1.):
     else:
         ret = n.value / 100.
 
-    if ret < 0:
-        return 0.
-    elif ret > 1:
-        return 1.
-    else:
-        return ret
-
-
-def _interpret_rgb_args(r, g, b):
-    """Given arguments from Sass-land representing red, green, and blue
-    channels, return plain Python numbers appropriate for passing to `Color`
-    constructors.
-    """
-    ret = []
-    for channel in (r, g, b):
-        expect_type(channel, Number, unit='%')
-        if channel.is_simple_unit('%'):
-            value = channel.value / 100.
-        else:
-            value = channel.value / 255.
-
-        ret.append(_constrain(value, 0, 1))
+    if cap:
+        if ret < 0:
+            return 0.
+        elif ret > 1:
+            return 1.
 
     return ret
 
 
-def _color_type(color, a, type):
-    color = Color(color).value
-    a = Number(a).value if a is not None else color[3]
-    col = list(color[:3])
-    col += [0.0 if a < 0 else 1.0 if a > 1 else a]
-    col += [type]
-    return Color(col)
-
-
 @register('rgba', 4)
-def rgba(r, g, b, a, type='rgba'):
-    r = _interpret_percentage(r, relto=255.)
-    g = _interpret_percentage(g, relto=255.)
-    b = _interpret_percentage(b, relto=255.)
-    a = _interpret_percentage(a, relto=1.)
+def rgba(r, g, b, a):
+    r = _interpret_percentage(r, relto=255)
+    g = _interpret_percentage(g, relto=255)
+    b = _interpret_percentage(b, relto=255)
+    a = _interpret_percentage(a, relto=1)
 
     return Color.from_rgb(r, g, b, a)
 
 
 @register('rgb', 3)
 def rgb(r, g, b, type='rgb'):
-    return rgba(r, g, b, Number(1.0), type)
+    return rgba(r, g, b, Number(1.0))
 
 
 @register('rgba', 1)
 @register('rgba', 2)
 def rgba2(color, a=None):
-    return _color_type(color, a, 'rgba')
+    if a is None:
+        alpha = 1
+    else:
+        alpha = a.value
+
+    return Color.from_rgb(*color.rgba[:3], alpha=alpha)
 
 
 @register('rgb', 1)
 def rgb1(color):
-    return _color_type(color, 1.0, 'rgb')
+    return color
 
 
 @register('hsla', 4)
-def hsla(h, s, l, a, type='hsla'):
+def hsla(h, s, l, a):
     rgb = colorsys.hls_to_rgb(
-        _apply_percentage(h, relto=360) % 360 / 360,
+        (h.value / 360) % 1,
         # Ruby sass treats plain numbers for saturation and lightness as though
         # they were percentages, just without the %
-        _constrain(_apply_percentage(l, relto=100), 0, 100) / 100,
-        _constrain(_apply_percentage(s, relto=100), 0, 100) / 100,
+        _interpret_percentage(l, relto=100),
+        _interpret_percentage(s, relto=100),
     )
+    alpha = a.value
 
-    channels = list(ch * 255 for ch in rgb)
-    channels.append(_constrain(_apply_percentage(a), 0, 1))
-    channels.append(type)
-    return Color(channels)
+    return Color.from_rgb(*rgb, alpha=alpha)
 
 
 @register('hsl', 3)
-def hsl(h, s, l, type='hsl'):
-    return hsla(h, s, l, Number(1), type)
+def hsl(h, s, l):
+    return hsla(h, s, l, Number(1))
 
 
 @register('hsla', 1)
 @register('hsla', 2)
 def hsla2(color, a=None):
-    return _color_type(color, a, 'hsla')
+    return rgba2(color, a)
 
 
 @register('hsl', 1)
 def hsl1(color):
-    return _color_type(color, 1.0, 'hsl')
+    return color
 
 
 @register('mix', 2)
@@ -203,7 +153,10 @@ def mix(color1, color2, weight=None):
 
     c1 = Color(color1).value
     c2 = Color(color2).value
-    p = _constrain(_apply_percentage(weight), 0, 1) if weight is not None else 0.5
+    if weight is None:
+        p = 0.5
+    else:
+        p = _interpret_percentage(weight)
 
     w = p * 2 - 1
     a = c1[3] - c2[3]
@@ -307,55 +260,44 @@ def transparentize(color, amount):
     return __rgba_op(operator.__sub__, color, 0, 0, 0, amount)
 
 
-def __hsl_op(op, color, h, s, l):
+def __hsl_op(op, color, h=None, s=None, l=None):
     color = Color(color)
-    c = color.value
-    h = None if h is None else Number(h)
-    s = None if s is None else Number(s)
-    l = None if l is None else Number(l)
     a = [
         None if h is None else h.value / 360.0,
-        None if s is None else _apply_percentage(s),
-        None if l is None else _apply_percentage(l),
+        None if s is None else _interpret_percentage(s, cap=False),
+        None if l is None else _interpret_percentage(l, cap=False),
     ]
-    # Convert to HSL:
-    h, l, s = list(colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0))
-    c = h, s, l
     # Do the additions:
-    c = [0.0 if c[i] < 0 else 1.0 if c[i] > 1 else op(c[i], a[i]) if op is not None and a[i] is not None else a[i] if a[i] is not None else c[i] for i in range(3)]
-    # Validations:
-    c[0] = (c[0] * 360.0) % 360
-    r = 360.0, 1.0, 1.0
-    c = [0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(3)]
-    # Convert back to RGB:
-    c = colorsys.hls_to_rgb(c[0] / 360.0, 0.99999999 if c[2] == 1 else c[2], 0.99999999 if c[1] == 1 else c[1])
-    color.value = (c[0] * 255.0, c[1] * 255.0, c[2] * 255.0, color.value[3])
-    return color
+    channels = [
+        ch if operand is None else op(ch, operand)
+        for (ch, operand) in zip(color.hsl, a)
+    ]
+    return Color.from_hsl(*channels, alpha=color.alpha)
 
 
 @register('lighten', 2)
 def lighten(color, amount):
-    return __hsl_op(operator.__add__, color, 0, 0, amount)
+    return __hsl_op(operator.__add__, color, l=amount)
 
 
 @register('darken', 2)
 def darken(color, amount):
-    return __hsl_op(operator.__sub__, color, 0, 0, amount)
+    return __hsl_op(operator.__sub__, color, l=amount)
 
 
 @register('saturate', 2)
 def saturate(color, amount):
-    return __hsl_op(operator.__add__, color, 0, amount, 0)
+    return __hsl_op(operator.__add__, color, s=amount)
 
 
 @register('desaturate', 2)
 def desaturate(color, amount):
-    return __hsl_op(operator.__sub__, color, 0, amount, 0)
+    return __hsl_op(operator.__sub__, color, s=amount)
 
 
 @register('greyscale', 1)
 def greyscale(color):
-    return __hsl_op(operator.__sub__, color, 0, 100.0, 0)
+    return __hsl_op(operator.__sub__, color, s=Number(100, "%"))
 
 
 @register('grayscale', 1)
@@ -371,12 +313,12 @@ def grayscale(color):
 @register('spin', 2)
 @register('adjust-hue', 2)
 def adjust_hue(color, degrees):
-    return __hsl_op(operator.__add__, color, degrees, 0, 0)
+    return __hsl_op(operator.__add__, color, h=degrees)
 
 
 @register('complement', 1)
 def complement(color):
-    return __hsl_op(operator.__add__, color, 180.0, 0, 0)
+    return __hsl_op(operator.__add__, color, h=Number(180))
 
 
 @register('invert', 1)
@@ -385,38 +327,33 @@ def invert(color):
     Returns the inverse (negative) of a color.
     The red, green, and blue values are inverted, while the opacity is left alone.
     """
-    col = Color(color)
-    c = list(col.value)
-    c[0] = 255.0 - c[0]
-    c[1] = 255.0 - c[1]
-    c[2] = 255.0 - c[2]
-    col.value = tuple(c)
-    return col
+    r, g, b, a = color.rgba
+    return Color.from_rgb(1 - r, 1 - g, 1 - b, alpha=a)
 
 
 @register('adjust-lightness', 2)
 def adjust_lightness(color, amount):
-    return __hsl_op(operator.__add__, color, 0, 0, amount)
+    return __hsl_op(operator.__add__, color, l=amount)
 
 
 @register('adjust-saturation', 2)
 def adjust_saturation(color, amount):
-    return __hsl_op(operator.__add__, color, 0, amount, 0)
+    return __hsl_op(operator.__add__, color, s=amount)
 
 
 @register('scale-lightness', 2)
 def scale_lightness(color, amount):
-    return __hsl_op(operator.__mul__, color, 0, 0, amount)
+    return __hsl_op(operator.__mul__, color, l=amount)
 
 
 @register('scale-saturation', 2)
 def scale_saturation(color, amount):
-    return __hsl_op(operator.__mul__, color, 0, amount, 0)
+    return __hsl_op(operator.__mul__, color, s=amount)
 
 
 def _asc_color(op, color, saturation=None, lightness=None, red=None, green=None, blue=None, alpha=None):
     if lightness or saturation:
-        color = __hsl_op(op, color, 0, saturation, lightness)
+        color = __hsl_op(op, color, None, saturation, lightness)
     if red or green or blue or alpha:
         color = __rgba_op(op, color, red, green, blue, alpha)
     return color
@@ -486,11 +423,11 @@ def change_color(color, red=None, green=None, blue=None, hue=None, saturation=No
     if do_rgb:
         channels = list(color.rgba[:3])
         if red is not None:
-            channels[0] = _interpret_percentage(red, relto=255.)
+            channels[0] = _interpret_percentage(red, relto=255)
         if green is not None:
-            channels[1] = _interpret_percentage(green, relto=255.)
+            channels[1] = _interpret_percentage(green, relto=255)
         if blue is not None:
-            channels[2] = _interpret_percentage(blue, relto=255.)
+            channels[2] = _interpret_percentage(blue, relto=255)
 
         return Color.from_rgb(*channels, alpha=alpha)
 
@@ -498,13 +435,13 @@ def change_color(color, red=None, green=None, blue=None, hue=None, saturation=No
         channels = list(color.hsl)
         if hue is not None:
             expect_type(hue, Number, unit=None)
-            channels[0] = _constrain(hue / 360., 0, 1)
+            channels[0] = (hue / 360) % 1
         # Ruby sass treats plain numbers for saturation and lightness as though
         # they were percentages, just without the %
         if saturation is not None:
-            channels[1] = _interpret_percentage(saturation, relto=100.)
+            channels[1] = _interpret_percentage(saturation, relto=100)
         if lightness is not None:
-            channels[2] = _interpret_percentage(lightness, relto=100.)
+            channels[2] = _interpret_percentage(lightness, relto=100)
 
         return Color.from_hsl(*channels, alpha=alpha)
 
