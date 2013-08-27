@@ -586,6 +586,13 @@ def index(lst, val):
     return Boolean(False)
 
 
+@register('zip')
+def zip_(*lists):
+    return List(
+        [List(zipped) for zipped in zip(*lists)],
+        use_comma=True)
+
+
 # ------------------------------------------------------------------------------
 # Map functions
 

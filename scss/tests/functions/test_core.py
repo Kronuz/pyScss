@@ -321,7 +321,6 @@ def test_append(calc):
     assert calc('append((blue, red), green, space)') == calc('blue red green')
 
 
-@xfail(reason="not implemented (oops)")
 def test_zip(calc):
     # Examples from the Ruby docs
     assert calc('zip(1px 1px 3px, solid dashed solid, red green blue)') == calc('1px solid red, 1px dashed green, 3px solid blue')
