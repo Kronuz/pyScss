@@ -11,7 +11,7 @@ import scss.config as config
 from scss.cssdefs import COLOR_NAMES, is_builtin_css_function, _expr_glob_re, _interpolate_re, _variable_re
 from scss.errors import SassError, SassEvaluationError, SassParseError
 from scss.rule import Namespace
-from scss.types import Boolean, Color, List, Map, Null, Number, ParserValue, String, Undefined, Value
+from scss.types import Boolean, Color, List, Map, Null, Number, String, Undefined, Value
 from scss.util import dequote, normalize_var
 
 ################################################################################
@@ -802,7 +802,7 @@ class SassExpression(Parser):
             return Literal(String(QSTR[1:-1], quotes='"'))
         elif _token_ == 'COLOR':
             COLOR = self._scan('COLOR')
-            return Literal(Color(ParserValue(COLOR)))
+            return Literal(Color.from_hex(COLOR, literal=True))
         else:  # == 'VAR'
             VAR = self._scan('VAR')
             return Variable(VAR)
@@ -828,7 +828,7 @@ class SassExpression(Parser):
             return Literal(String(KWQSTR[1:-1], quotes='"'))
         elif _token_ == 'KWCOLOR':
             KWCOLOR = self._scan('KWCOLOR')
-            return Literal(Color(ParserValue(KWCOLOR)))
+            return Literal(Color.from_hex(COLOR, literal=True))
         else:  # == 'KWVAR'
             KWVAR = self._scan('KWVAR')
             return Variable(KWVAR)

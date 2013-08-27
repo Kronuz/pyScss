@@ -14,11 +14,6 @@ from scss.util import escape
 ################################################################################
 # pyScss data types:
 
-class ParserValue(object):
-    def __init__(self, value):
-        self.value = value
-
-
 class Value(object):
     is_null = False
     sass_type_name = u'unknown'
@@ -636,14 +631,6 @@ def _constrain(value, lb=0, ub=1):
 
 class Color(Value):
     sass_type_name = u'color'
-
-    HEX2RGBA = {
-        9: lambda c: (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), int(c[7:9], 16)),
-        7: lambda c: (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), 1.0),
-        5: lambda c: (int(c[1] * 2, 16), int(c[2] * 2, 16), int(c[3] * 2, 16), int(c[4] * 2, 16)),
-        4: lambda c: (int(c[1] * 2, 16), int(c[2] * 2, 16), int(c[3] * 2, 16), 1.0),
-    }
-
     original_literal = None
 
     def __init__(self, tokens):
@@ -651,24 +638,15 @@ class Color(Value):
         self.value = (0, 0, 0, 1)
         if tokens is None:
             self.value = (0, 0, 0, 1)
-        elif isinstance(tokens, ParserValue):
-            hex = tokens.value
-            self.original_literal = hex
-            self.value = self.HEX2RGBA[len(hex)](hex)
         elif isinstance(tokens, Color):
             self.value = tokens.value
-        elif isinstance(tokens, (list, tuple)):
-            c = tokens[:4]
-            r = 255.0, 255.0, 255.0, 1.0
-            c = [0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4)]
-            self.value = tuple(c)
         else:
             raise TypeError("Can't make Color from %r" % (tokens,))
 
     ### Alternate constructors
 
     @classmethod
-    def from_rgb(cls, red, green, blue, alpha=1.0):
+    def from_rgb(cls, red, green, blue, alpha=1.0, original_literal=None):
         red = _constrain(red)
         green = _constrain(green)
         blue = _constrain(blue)
@@ -679,6 +657,10 @@ class Color(Value):
         # TODO really should store these things internally as 0-1, but can't
         # until stuff stops examining .value directly
         self.value = (red * 255.0, green * 255.0, blue * 255.0, alpha)
+
+        if original_literal is not None:
+            self.original_literal = original_literal
+
         return self
 
     @classmethod
@@ -692,9 +674,14 @@ class Color(Value):
         return cls.from_rgb(r, g, b, alpha)
 
     @classmethod
-    def from_hex(cls, hex_string):
+    def from_hex(cls, hex_string, literal=False):
         if not hex_string.startswith('#'):
             raise ValueError("Expected #abcdef, got %r" % (hex_string,))
+
+        if literal:
+            original_literal = hex_string
+        else:
+            original_literal = None
 
         hex_string = hex_string[1:]
 
@@ -714,7 +701,7 @@ class Color(Value):
             ]
 
         rgba = [int(ch, 16) / 255 for ch in chunks]
-        return cls.from_rgb(*rgba)
+        return cls.from_rgb(*rgba, original_literal=original_literal)
 
     @classmethod
     def from_name(cls, name):

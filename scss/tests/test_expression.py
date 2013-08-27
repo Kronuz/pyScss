@@ -80,7 +80,7 @@ def test_functions(calc):
     ns = Namespace(functions=CORE_LIBRARY)
     calc = Calculator(ns).calculate
 
-    assert calc('grayscale(red)') == Color((127.5, 127.5, 127.5, 1))
+    assert calc('grayscale(red)') == Color.from_rgb(0.5, 0.5, 0.5)
     assert calc('grayscale(1)') == String('grayscale(1)', quotes=None)  # Misusing css built-in functions (with scss counterpart)
     assert calc('skew(1)') == String('skew(1)', quotes=None)  # Missing css-only built-in functions
     with pytest.raises(TypeError):

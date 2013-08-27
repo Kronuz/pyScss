@@ -141,7 +141,7 @@ parser SassExpression:
                             [ UNITS ]               {{ return Literal(Number(float(NUM), unit=UNITS)) }}
                         | STR                       {{ return Literal(String(STR[1:-1], quotes="'")) }}
                         | QSTR                      {{ return Literal(String(QSTR[1:-1], quotes='"')) }}
-                        | COLOR                     {{ return Literal(Color(ParserValue(COLOR))) }}
+                        | COLOR                     {{ return Literal(Color.from_hex(COLOR, literal=True)) }}
                         | VAR                       {{ return Variable(VAR) }}
 
     rule kwatom:
@@ -150,7 +150,7 @@ parser SassExpression:
                             [ UNITS ]               {{ return Literal(Number(float(KWNUM), unit=UNITS)) }}
                         | KWSTR                     {{ return Literal(String(KWSTR[1:-1], quotes="'")) }}
                         | KWQSTR                    {{ return Literal(String(KWQSTR[1:-1], quotes='"')) }}
-                        | KWCOLOR                   {{ return Literal(Color(ParserValue(KWCOLOR))) }}
+                        | KWCOLOR                   {{ return Literal(Color.from_hex(COLOR, literal=True)) }}
                         | KWVAR                     {{ return Variable(KWVAR) }}
 %%
 ### Grammar ends.
