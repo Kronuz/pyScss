@@ -5,10 +5,8 @@ Ruby implementation.
 from __future__ import absolute_import
 from __future__ import division
 
-import colorsys
 import logging
 import math
-import operator
 
 from six.moves import xrange
 
@@ -24,19 +22,19 @@ register = CORE_LIBRARY.register
 # ------------------------------------------------------------------------------
 # Color creation
 
-def _interpret_percentage(n, relto=1., cap=True):
+def _interpret_percentage(n, relto=1., clamp=True):
     expect_type(n, Number, unit='%')
 
     if n.is_unitless:
         ret = n.value / relto
     else:
-        ret = n.value / 100.
+        ret = n.value / 100
 
-    if cap:
+    if clamp:
         if ret < 0:
-            return 0.
+            return 0
         elif ret > 1:
-            return 1.
+            return 1
 
     return ret
 
@@ -74,16 +72,14 @@ def rgb1(color):
 
 @register('hsla', 4)
 def hsla(h, s, l, a):
-    rgb = colorsys.hls_to_rgb(
-        (h.value / 360) % 1,
+    return Color.from_hsl(
+        h.value / 360 % 1,
         # Ruby sass treats plain numbers for saturation and lightness as though
         # they were percentages, just without the %
-        _interpret_percentage(l, relto=100),
         _interpret_percentage(s, relto=100),
+        _interpret_percentage(l, relto=100),
+        alpha=a.value,
     )
-    alpha = a.value
-
-    return Color.from_rgb(*rgb, alpha=alpha)
 
 
 @register('hsl', 3)
@@ -104,7 +100,7 @@ def hsl1(color):
 
 @register('mix', 2)
 @register('mix', 3)
-def mix(color1, color2, weight=None):
+def mix(color1, color2, weight=Number(50, "%")):
     """
     Mixes together two colors. Specifically, takes the average of each of the
     RGB components, optionally weighted by the given percentage.
@@ -126,7 +122,6 @@ def mix(color1, color2, weight=None):
         mix(#f00, #00f) => #7f007f
         mix(#f00, #00f, 25%) => #3f00bf
         mix(rgba(255, 0, 0, 0.5), #00f) => rgba(63, 0, 191, 0.75)
-
     """
     # This algorithm factors in both the user-provided weight
     # and the difference between the alpha values of the two colors
@@ -151,23 +146,31 @@ def mix(color1, color2, weight=None):
     #
     # Algorithm from the Sass project: http://sass-lang.com/
 
-    c1 = Color(color1).value
-    c2 = Color(color2).value
-    if weight is None:
-        p = 0.5
-    else:
-        p = _interpret_percentage(weight)
+    p = _interpret_percentage(weight)
 
+    # Scale weight to [-1, 1]
     w = p * 2 - 1
-    a = c1[3] - c2[3]
+    # Compute difference in alpha channels
+    a = color1.alpha - color2.alpha
 
-    w1 = ((w if (w * a == -1) else (w + a) / (1 + w * a)) + 1) / 2.0
+    # Weight of first color
+    if w * a == -1:
+        # Avoid zero-div case
+        scaled_weight1 = w
+    else:
+        scaled_weight1 = (w + a) / (1 + w * a)
 
+    # Unscale back to [0, 1] and get the weight of the other color
+    w1 = (scaled_weight1 + 1) / 2
     w2 = 1 - w1
-    q = [w1, w1, w1, p]
-    r = [w2, w2, w2, 1 - p]
 
-    return Color([c1[i] * q[i] + c2[i] * r[i] for i in range(4)])
+    # Do the scaling.  Note that alpha isn't scaled by alpha, as that wouldn't
+    # make much sense; it uses the original untwiddled weight, p.
+    channels = [
+        ch1 * w1 + ch2 * w2
+        for (ch1, ch2) in zip(color1.rgba[:3], color2.rgba[:3])]
+    alpha = color1.alpha * p + color2.alpha * (1 - p)
+    return Color.from_rgb(*channels, alpha=alpha)
 
 
 # ------------------------------------------------------------------------------
@@ -175,48 +178,44 @@ def mix(color1, color2, weight=None):
 
 @register('red', 1)
 def red(color):
-    c = Color(color).value
-    return Number(c[0])
+    r, g, b, a = color.rgba
+    return Number(r * 255)
 
 
 @register('green', 1)
 def green(color):
-    c = Color(color).value
-    return Number(c[1])
+    r, g, b, a = color.rgba
+    return Number(g * 255)
 
 
 @register('blue', 1)
 def blue(color):
-    c = Color(color).value
-    return Number(c[2])
+    r, g, b, a = color.rgba
+    return Number(b * 255)
 
 
 @register('opacity', 1)
 @register('alpha', 1)
 def alpha(color):
-    c = Color(color).value
-    return Number(c[3])
+    return Number(color.alpha)
 
 
 @register('hue', 1)
 def hue(color):
-    c = Color(color).value
-    h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
-    return Number(h * 360, unit='deg')
+    h, s, l = color.hsl
+    return Number(h * 100, "deg")
 
 
 @register('saturation', 1)
 def saturation(color):
-    c = Color(color).value
-    h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
-    return Number(s * 100, unit='%')
+    h, s, l = color.hsl
+    return Number(s * 100, "%")
 
 
 @register('lightness', 1)
 def lightness(color):
-    c = Color(color).value
-    h, l, s = colorsys.rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0)
-    return Number(l * 100, unit='%')
+    h, s, l = color.hsl
+    return Number(l * 100, "%")
 
 
 @register('ie-hex-str', 1)
@@ -228,76 +227,50 @@ def ie_hex_str(color):
 # ------------------------------------------------------------------------------
 # Color modification
 
-def __rgba_op(op, color, r, g, b, a):
-    color = Color(color)
-    c = color.value
-    a = [
-        None if r is None else Number(r).value,
-        None if g is None else Number(g).value,
-        None if b is None else Number(b).value,
-        None if a is None else Number(a).value,
-    ]
-    # Do the additions:
-    c = [op(c[i], a[i]) if op is not None and a[i] is not None else a[i] if a[i] is not None else c[i] for i in range(4)]
-    # Validations:
-    r = 255.0, 255.0, 255.0, 1.0
-    c = [0.0 if c[i] < 0 else r[i] if c[i] > r[i] else c[i] for i in range(4)]
-    color.value = tuple(c)
-    return color
-
-
 @register('fade-in', 2)
 @register('fadein', 2)
 @register('opacify', 2)
 def opacify(color, amount):
-    return __rgba_op(operator.__add__, color, 0, 0, 0, amount)
+    r, g, b, a = color.rgba
+    return Color.from_rgb(
+        r, g, b,
+        alpha=color.alpha + amount.value)
 
 
 @register('fade-out', 2)
 @register('fadeout', 2)
 @register('transparentize', 2)
 def transparentize(color, amount):
-    return __rgba_op(operator.__sub__, color, 0, 0, 0, amount)
-
-
-def __hsl_op(op, color, h=None, s=None, l=None):
-    color = Color(color)
-    a = [
-        None if h is None else h.value / 360.0,
-        None if s is None else _interpret_percentage(s, cap=False),
-        None if l is None else _interpret_percentage(l, cap=False),
-    ]
-    # Do the additions:
-    channels = [
-        ch if operand is None else op(ch, operand)
-        for (ch, operand) in zip(color.hsl, a)
-    ]
-    return Color.from_hsl(*channels, alpha=color.alpha)
+    r, g, b, a = color.rgba
+    return Color.from_rgb(
+        r, g, b,
+        alpha=color.alpha - amount.value)
 
 
 @register('lighten', 2)
 def lighten(color, amount):
-    return __hsl_op(operator.__add__, color, l=amount)
+    return adjust_color(color, lightness=amount)
 
 
 @register('darken', 2)
 def darken(color, amount):
-    return __hsl_op(operator.__sub__, color, l=amount)
+    return adjust_color(color, lightness=-amount)
 
 
 @register('saturate', 2)
 def saturate(color, amount):
-    return __hsl_op(operator.__add__, color, s=amount)
+    return adjust_color(color, saturation=amount)
 
 
 @register('desaturate', 2)
 def desaturate(color, amount):
-    return __hsl_op(operator.__sub__, color, s=amount)
+    return adjust_color(color, saturation=-amount)
 
 
 @register('greyscale', 1)
 def greyscale(color):
-    return __hsl_op(operator.__sub__, color, s=Number(100, "%"))
+    h, s, l = color.hsl
+    return Color.from_hsl(h, 0, l, alpha=color.alpha)
 
 
 @register('grayscale', 1)
@@ -313,12 +286,15 @@ def grayscale(color):
 @register('spin', 2)
 @register('adjust-hue', 2)
 def adjust_hue(color, degrees):
-    return __hsl_op(operator.__add__, color, h=degrees)
+    h, s, l = color.hsl
+    delta = degrees.value / 360
+    return Color.from_hsl((h + delta) % 1, s, l, alpha=color.alpha)
 
 
 @register('complement', 1)
 def complement(color):
-    return __hsl_op(operator.__add__, color, h=Number(180))
+    h, s, l = color.hsl
+    return Color.from_hsl((h + 0.5) % 1, s, l, alpha=color.alpha)
 
 
 @register('invert', 1)
@@ -333,35 +309,56 @@ def invert(color):
 
 @register('adjust-lightness', 2)
 def adjust_lightness(color, amount):
-    return __hsl_op(operator.__add__, color, l=amount)
+    return adjust_color(color, lightness=amount)
 
 
 @register('adjust-saturation', 2)
 def adjust_saturation(color, amount):
-    return __hsl_op(operator.__add__, color, s=amount)
+    return adjust_color(color, saturation=amount)
 
 
 @register('scale-lightness', 2)
 def scale_lightness(color, amount):
-    return __hsl_op(operator.__mul__, color, l=amount)
+    return scale_color(color, lightness=amount)
 
 
 @register('scale-saturation', 2)
 def scale_saturation(color, amount):
-    return __hsl_op(operator.__mul__, color, s=amount)
-
-
-def _asc_color(op, color, saturation=None, lightness=None, red=None, green=None, blue=None, alpha=None):
-    if lightness or saturation:
-        color = __hsl_op(op, color, None, saturation, lightness)
-    if red or green or blue or alpha:
-        color = __rgba_op(op, color, red, green, blue, alpha)
-    return color
+    return scale_color(color, saturation=amount)
 
 
 @register('adjust-color')
 def adjust_color(color, red=None, green=None, blue=None, hue=None, saturation=None, lightness=None, alpha=None):
-    return _asc_color(operator.__add__, color, saturation, lightness, red, green, blue, alpha)
+    do_rgb = red or green or blue
+    do_hsl = hue or saturation or lightness
+    if do_rgb and do_hsl:
+        raise ValueError("Can't scale both RGB and HSL channels at the same time")
+
+    a = color.alpha
+    if alpha is not None:
+        a += alpha.value
+
+    if do_rgb:
+        r, g, b = color.rgba[:3]
+        if red is not None:
+            r += red.value / 255
+        if green is not None:
+            g += green.value / 255
+        if blue is not None:
+            b += blue.value / 255
+
+        return Color.from_rgb(r, g, b, a)
+
+    else:
+        h, s, l = color.hsl
+        if hue is not None:
+            h = (h + hue.value / 360) % 1
+        if saturation is not None:
+            s += _interpret_percentage(saturation, relto=100, clamp=False)
+        if lightness is not None:
+            l += _interpret_percentage(lightness, relto=100, clamp=False)
+
+        return Color.from_hsl(h, s, l, a)
 
 
 def _scale_channel(channel, scaleby):
@@ -394,17 +391,13 @@ def scale_color(color, red=None, green=None, blue=None, saturation=None, lightne
     if do_rgb:
         channels = [
             _scale_channel(channel, scaleby)
-            for channel, scaleby in zip(color.rgba, (red, green, blue))
-        ]
-
+            for channel, scaleby in zip(color.rgba, (red, green, blue))]
         return Color.from_rgb(*channels, alpha=scaled_alpha)
 
     else:
         channels = [
             _scale_channel(channel, scaleby)
-            for channel, scaleby in zip(color.hsl, (None, saturation, lightness))
-        ]
-
+            for channel, scaleby in zip(color.hsl, (None, saturation, lightness))]
         return Color.from_hsl(*channels, alpha=scaled_alpha)
 
 

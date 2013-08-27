@@ -624,6 +624,16 @@ class List(Value):
         )
 
 
+def _constrain(value, lb=0, ub=1):
+    """Helper for Color constructors.  Constrains a value to a range."""
+    if value < lb:
+        return lb
+    elif value > ub:
+        return ub
+    else:
+        return value
+
+
 class Color(Value):
     sass_type_name = u'color'
 
@@ -659,6 +669,11 @@ class Color(Value):
 
     @classmethod
     def from_rgb(cls, red, green, blue, alpha=1.0):
+        red = _constrain(red)
+        green = _constrain(green)
+        blue = _constrain(blue)
+        alpha = _constrain(alpha)
+
         self = cls.__new__(cls)  # TODO
         self.tokens = None
         # TODO really should store these things internally as 0-1, but can't
@@ -668,6 +683,11 @@ class Color(Value):
 
     @classmethod
     def from_hsl(cls, hue, saturation, lightness, alpha=1.0):
+        hue = _constrain(hue)
+        saturation = _constrain(saturation)
+        lightness = _constrain(lightness)
+        alpha = _constrain(alpha)
+
         r, g, b = colorsys.hls_to_rgb(hue, lightness, saturation)
         return cls.from_rgb(r, g, b, alpha)
 
@@ -693,7 +713,7 @@ class Color(Value):
                 hex_string[0:2], hex_string[2:4], hex_string[4:6], hex_string[6:8]
             ]
 
-        rgba = [int(ch, 16) / 255. for ch in chunks]
+        rgba = [int(ch, 16) / 255 for ch in chunks]
         return cls.from_rgb(*rgba)
 
     @classmethod

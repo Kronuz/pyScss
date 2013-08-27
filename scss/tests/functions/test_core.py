@@ -51,12 +51,13 @@ def test_blue(calc):
     assert calc('blue(orange)') == Number(0)
 
 
-@xfail(reason="difference in rounding; ruby floors, we round")
 def test_mix(calc):
     # Examples from the Ruby docs
-    assert calc('mix(#f00, #00f)') == calc('#7f007f')
-    assert calc('mix(#f00, #00f, 25%)') == calc('#3f00bf')
-    assert calc('mix(rgba(255, 0, 0, 0.5), #00f)') == calc('rgba(63, 0, 191, 0.75)')
+    # Note that the results have been adjusted slightly; Ruby floors the mixed
+    # channels, but we round
+    assert calc('mix(#f00, #00f)') == calc('#800080')
+    assert calc('mix(#f00, #00f, 25%)') == calc('#4000bf')
+    assert calc('mix(rgba(255, 0, 0, 0.5), #00f)') == calc('rgba(64, 0, 191, 0.75)')
 
 
 # ------------------------------------------------------------------------------
@@ -130,10 +131,9 @@ def test_grayscale(calc):
     assert calc('grayscale(yellow)') == Color.from_rgb(0.5, 0.5, 0.5)
 
 
-@xfail(reason="not implemented, issue #157")
 def test_grayscale_css_filter(calc):
     # grayscale(number) is a CSS filter and should be left alone
-    assert calc('grayscale(1)') == "grayscale(1)"
+    assert calc('grayscale(1)') == String("grayscale(1)")
 
 
 def test_complement(calc):
