@@ -11,7 +11,7 @@ import math
 from six.moves import xrange
 
 from scss.functions.library import FunctionLibrary
-from scss.types import Boolean, Color, List, Number, String, Map, expect_type
+from scss.types import Boolean, Color, List, Null, Number, String, Map, expect_type
 
 log = logging.getLogger(__name__)
 
@@ -332,32 +332,23 @@ def adjust_color(color, red=None, green=None, blue=None, hue=None, saturation=No
     do_rgb = red or green or blue
     do_hsl = hue or saturation or lightness
     if do_rgb and do_hsl:
-        raise ValueError("Can't scale both RGB and HSL channels at the same time")
+        raise ValueError("Can't adjust both RGB and HSL channels at the same time")
 
-    a = color.alpha
-    if alpha is not None:
-        a += alpha.value
+    zero = Number(0)
+    a = color.alpha + (alpha or zero).value
 
     if do_rgb:
         r, g, b = color.rgba[:3]
-        if red is not None:
-            r += red.value / 255
-        if green is not None:
-            g += green.value / 255
-        if blue is not None:
-            b += blue.value / 255
-
-        return Color.from_rgb(r, g, b, a)
+        channels = [
+            current + (adjustment or zero).value / 255
+            for (current, adjustment) in zip(color.rgba, (red, green, blue))]
+        return Color.from_rgb(*channels, alpha=a)
 
     else:
         h, s, l = color.hsl
-        if hue is not None:
-            h = (h + hue.value / 360) % 1
-        if saturation is not None:
-            s += _interpret_percentage(saturation, relto=100, clamp=False)
-        if lightness is not None:
-            l += _interpret_percentage(lightness, relto=100, clamp=False)
-
+        h = (h + (hue or zero).value / 360) % 1
+        s += _interpret_percentage(saturation or zero, relto=100, clamp=False)
+        l += _interpret_percentage(lightness or zero, relto=100, clamp=False)
         return Color.from_hsl(h, s, l, a)
 
 
@@ -415,25 +406,25 @@ def change_color(color, red=None, green=None, blue=None, hue=None, saturation=No
 
     if do_rgb:
         channels = list(color.rgba[:3])
-        if red is not None:
+        if red:
             channels[0] = _interpret_percentage(red, relto=255)
-        if green is not None:
+        if green:
             channels[1] = _interpret_percentage(green, relto=255)
-        if blue is not None:
+        if blue:
             channels[2] = _interpret_percentage(blue, relto=255)
 
         return Color.from_rgb(*channels, alpha=alpha)
 
     else:
         channels = list(color.hsl)
-        if hue is not None:
+        if hue:
             expect_type(hue, Number, unit=None)
             channels[0] = (hue / 360) % 1
         # Ruby sass treats plain numbers for saturation and lightness as though
         # they were percentages, just without the %
-        if saturation is not None:
+        if saturation:
             channels[1] = _interpret_percentage(saturation, relto=100)
-        if lightness is not None:
+        if lightness:
             channels[2] = _interpret_percentage(lightness, relto=100)
 
         return Color.from_hsl(*channels, alpha=alpha)
@@ -469,12 +460,7 @@ def quote(*args):
 
 @register('percentage', 1)
 def percentage(value):
-    if not isinstance(value, Number):
-        raise TypeError("Expected number, got %r" % (value,))
-
-    if not value.is_unitless:
-        raise TypeError("Expected unitless number, got %r" % (value,))
-
+    expect_type(value, Number, unit=None)
     return value * Number(100, unit='%')
 
 CORE_LIBRARY.add(Number.wrap_python_function(abs), 'abs', 1)
@@ -521,25 +507,19 @@ def nth(lst, n):
     """
     Return the Nth item in the string
     """
-    n = Number(n).value
-    lst = List(lst).value
-    try:
-        n = int(float(n)) - 1
-        n = n % len(lst)
-    except:
-        if n.lower() == 'first':
-            n = 0
-        elif n.lower() == 'last':
-            n = -1
-    try:
-        ret = lst[n]
-    except KeyError:
-        lst = [v for k, v in sorted(lst.items()) if isinstance(k, int)]
-        try:
-            ret = lst[n]
-        except:
-            ret = ''
-    return ret.__class__(ret)
+    expect_type(n, (String, Number), unit=None)
+
+    if isinstance(n, String):
+        if n.value.lower() == 'first':
+            i = 0
+        elif n.value.lower() == 'last':
+            i = -1
+        else:
+            raise ValueError("Invalid index %r" % (n,))
+    else:
+        i = (int(n.value) - 1) % len(lst)
+
+    return lst[i]
 
 
 @register('join', 2)
@@ -676,5 +656,5 @@ def comparable(number1, number2):
 
 @register('if', 2)
 @register('if', 3)
-def if_(condition, if_true, if_false=''):
-    return if_true.__class__(if_true) if condition else if_false.__class__(if_false)
+def if_(condition, if_true, if_false=Null()):
+    return if_true if condition else if_false
