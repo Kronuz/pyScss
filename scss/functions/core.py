@@ -203,7 +203,7 @@ def alpha(color):
 @register('hue', 1)
 def hue(color):
     h, s, l = color.hsl
-    return Number(h * 100, "deg")
+    return Number(h * 360, "deg")
 
 
 @register('saturation', 1)
