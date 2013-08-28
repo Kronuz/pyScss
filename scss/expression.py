@@ -232,8 +232,11 @@ class AnyOp(Expression):
         self.operands = operands
 
     def evaluate(self, calculator, divide=False):
-        operands = [operand.evaluate(calculator, divide=True) for operand in self.operands]
-        return Boolean(any(operands))
+        for operand in self.operands:
+            value = operand.evaluate(calculator, divide=True)
+            if value:
+                return value
+        return value
 
 
 class AllOp(Expression):
@@ -244,8 +247,11 @@ class AllOp(Expression):
         self.operands = operands
 
     def evaluate(self, calculator, divide=False):
-        operands = [operand.evaluate(calculator, divide=True) for operand in self.operands]
-        return Boolean(all(operands))
+        for operand in self.operands:
+            value = operand.evaluate(calculator, divide=True)
+            if not value:
+                return value
+        return value
 
 
 class NotOp(Expression):
