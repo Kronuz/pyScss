@@ -613,6 +613,9 @@ class List(Value):
         return List(self.value * int(other.value), use_comma=self.use_comma)
 
     def render(self, compress=False):
+        if not self.value:
+            raise ValueError("Can't render empty list as CSS")
+
         delim = self.delimiter(compress)
 
         return delim.join(
