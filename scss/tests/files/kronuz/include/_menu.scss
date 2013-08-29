@@ -1,6 +1,123 @@
 $default-menu-levels: 3 !default;
 
-@mixin _menu-horizontal($level) {
+@function _menu_get($config, $prefix, $level, $state, $key, $default: null) {
+	// TODO no state fallback for folders!
+	@return (
+		map-get-nested($config, $prefix $level $state $key, null)
+		or map-get-nested($config, $prefix $level $key, null)
+		or map-get-nested($config, $prefix 0 $state $key, null)
+		or map-get-nested($config, $prefix 0 $key, null)
+		or map-get-nested($DEFAULT-MENU-CONFIG, $prefix $level $state $key, null)
+		or map-get-nested($DEFAULT-MENU-CONFIG, $prefix $level $key, null)
+		or map-get-nested($DEFAULT-MENU-CONFIG, $prefix 0 $state $key, null)
+		or map-get-nested($DEFAULT-MENU-CONFIG, $prefix 0 $key, null)
+		or $default);
+}
+
+@mixin _menu__props($config, $prefix, $level, $state, $props) {
+	@each $prop in $props {
+		$value: _menu_get($config, $prefix, $level, $state, $prop);
+		@if $value != null {
+			@if type-of($value) == color and alpha($value) < 1 {
+				// Show an old-IE-friendly version of the color, with no alpha
+				#{$prop}: rgb($value);
+			}
+
+			#{$prop}: $value;
+
+			@if $prop == border-width {
+				border-style: solid;
+			}
+		}
+    }
+}
+
+@mixin _menu__props_map($config, $prefix, $level, $state, $props) {
+	@each $prop, $key in $props {
+		$value: _menu_get($config, $prefix, $level, $state, $key);
+		@if $value != null {
+			#{$prop}: $value;
+		}
+    }
+}
+
+@mixin _menu__separator($config, $level) {
+	$-width: _menu_get($config, i, $level, natural, separator-width);
+	$-color: _menu_get($config, i, $level, natural, separator-color);
+	@if $-width and $-color {
+		border-top: $-width solid $-color; // mimic separator
+	}
+}
+
+@mixin _menu__common_height_from_border($config, $level, $state, $default-delta: null) {
+	$-border-width: _menu_get($config, i, $level, $state, border-width);
+	@if $-border-width or $default-delta {
+		@if $-border-width {
+			$-delta: nth($-border-width, 1) + nth($-border-width, 3);
+		}
+		@else {
+			$-delta: $default-delta;
+		}
+
+		$-height: _menu_get($config, i, $level, natural, height);
+		@if $-height {
+			height: $-height - $-delta;
+		}
+
+		$-line-height: _menu_get($config, i, $level, natural, line-height);
+		@if $-line-height {
+			line-height: $-line-height - $-delta;
+		}
+	}
+}
+
+@mixin _menu__common_folder_icon($config, $level, $state) {
+	$arrow-color: _menu_get($config, i, $level, $state, arrow-color);
+	@if $arrow-color {
+		$-type: map-get-nested($config, u ($level + 1) type);
+		@if $-type == dropup {
+			$-dir: up;
+		} @else if $-type == dropright {
+			$-dir: right;
+		} @else if $-type == dropleft {
+			$-dir: left;
+		} @else {
+			$-dir: down;
+		}
+		background: image-url('menus/arrow_#{$-dir}.png', $dst-color: $arrow-color, $cache-buster: false) no-repeat right center;
+	}
+}
+
+@mixin _menu__common_state($config, $level, $state) {
+	&::before,
+	&::after {
+		background-clip: padding-box;
+		// NOTE: this is really not part of the structure (put here as optimization)
+		@include _menu__props($config, i, $level, $state, (background, background-color, background-image));
+	}
+	a.l#{$level}::before,
+	.a.l#{$level}::before,
+	a.l#{$level}::after,
+	.a.l#{$level}::after {
+		// NOTE: this is really not part of the structure (put here as optimization)
+		@include _menu__props_map($config, i, $level, $state, (background: roundness-background, background-image: roundness-background-image));
+	}
+	a.l#{$level},
+	.a.l#{$level} {
+		.label {
+			@include _menu__props($config, i, $level, $state, (color, text-shadow));
+
+			@include _menu__common_height_from_border($config, $level, $state);
+		}
+		&.folder .tag {
+			padding-right: 12px;
+			@include _menu__common_folder_icon($config, $level, $state);
+		}
+		@include _menu__props($config, i, $level, $state, (background, background-color, background-image, box-shadow, border-width, border-color, border-radius));
+	}
+}
+
+@mixin _menu-horizontal($config, $level) {
 	$l: $level;
 
 	ul.l#{$l} {
@@ -8,72 +125,20 @@ $default-menu-levels: 3 !default;
 		padding: 0;
 		list-style: none;
 
-		@if $u#{$l}-padding-natural != undefined {
-			padding: $u#{$l}-padding-natural;
-		}
-		@if $u#{$l}-margin-natural != undefined {
-			margin: $u#{$l}-margin-natural;
-		}
-
 		background-clip: padding-box;
-		@if $u#{$l}-background-natural != undefined {
-			@if $u#{$l}-background-natural != $u#{$l}-background-natural-rgb and $u#{$l}-background-natural-rgb != undefined {
-				background: $u#{$l}-background-natural-rgb;
-			}
-			background: $u#{$l}-background-natural;
-		}
-		@if $u#{$l}-background-color-natural != undefined {
-			@if $u#{$l}-background-color-natural != $u#{$l}-background-color-natural-rgb and $u#{$l}-background-color-natural-rgb != undefined {
-				background-color: $u#{$l}-background-color-natural-rgb;
-			}
-			background-color: $u#{$l}-background-color-natural;
-		}
-		@if $u#{$l}-background-image-natural != undefined {
-			background-image: $u#{$l}-background-image-natural;
-		}
 
-//		@if $u#{$l}-box-shadow-natural != undefined {
-//			box-shadow: $u#{$l}-box-shadow-natural;
-//		}
-
-		@if $u#{$l}-border-width-natural != undefined {
-			border-width: $u#{$l}-border-width-natural;
-			border-style: solid;
-		}
-		@if $u#{$l}-border-color-natural != undefined {
-			@if $u#{$l}-border-color-natural != $u#{$l}-border-color-natural-rgb and $u#{$l}-border-color-natural-rgb != undefined {
-				border-color: $u#{$l}-border-color-natural-rgb;
-			}
-			border-color: $u#{$l}-border-color-natural;
-		}
-
-		@if $u#{$l}-border-radius-natural != undefined {
-			border-radius: $u#{$l}-border-radius-natural;
-		}
+		@include _menu__props($config, u, $level, natural, (padding, margin, background, background-color, background-image, border-width, border-color, border-radius));
+		// ...box-shadow
 
 //		&.focused,
 		&.hover,
 		&:hover {
-			@if $u#{$l}-background-hover != undefined {
-				@if $u#{$l}-background-hover != $u#{$l}-background-hover-rgb and $u#{$l}-background-hover-rgb != undefined {
-					background: $u#{$l}-background-hover-rgb;
-				}
-				background: $u#{$l}-background-hover;
-			}
-			@if $u#{$l}-background-color-hover != undefined {
-				@if $u#{$l}-background-color-hover != $u#{$l}-background-color-hover-rgb and $u#{$l}-background-color-hover-rgb != undefined {
-					background-color: $u#{$l}-background-color-hover-rgb;
-				}
-				background-color: $u#{$l}-background-color-hover;
-			}
-			@if $u#{$l}-background-image-hover != undefined {
-				background-image: $u#{$l}-background-image-hover;
-			}
+			@include _menu__props($config, u, $level, hover, (background, background-color, background-image));
 		}
 
 		// Special case for nesting (depending on current behavior):
 
-		@if $u#{$l}-keep-current {
+		@if _menu_get($config, u, $level, null, keep-current) {
 			$_current: nest('&, &:hover', 'li.l#{$l}.current'); // Makes current remain selected on hover
 		} @else {
 			$_current: 'li.l#{$l}.current'; // Makes current get unselected on hover
@@ -82,30 +147,29 @@ $default-menu-levels: 3 !default;
 
 		#{$_selectors} {
 			/****** Structure Starts ******/
-			@if $i#{$l}-roundness-natural or $i#{$l}-roundness-folder {
-				$max-roundness: max($i#{$l}-roundness-natural, $i#{$l}-roundness-folder);
-				&::before,
-				a.l#{$l}::before,
-				.a.l#{$l}::before,
-				&::after,
-				a.l#{$l}::after,
-				.a.l#{$l}::after {
-					content: "";
-					display: block;
-					position: absolute;
-					top: 0;
-					bottom: 0;
-					width: $max-roundness;
-				}
-				&::before,
-				a.l#{$l}::before,
-				.a.l#{$l}::before {
-					left: -$max-roundness;
-				}
-				&::after,
-				a.l#{$l}::after,
-				.a.l#{$l}::after {
-					right: -$max-roundness;
+			$max-roundness: max(
+				_menu_get($config, i, $level, natural, roundness, 0),
+				_menu_get($config, i, $level, folder, roundness, 0),
+			);
+			@if $max-roundness > 0 {
+				&,
+				a,
+				.a {
+					&::before,
+					&::after {
+						content: "";
+						display: block;
+						position: absolute;
+						top: 0;
+						bottom: 0;
+						width: $max-roundness;
+					}
+					&::before {
+						left: -$max-roundness;
+					}
+					&::after {
+						right: -$max-roundness;
+					}
 				}
 				&::before,
 				&::after {
@@ -122,121 +186,20 @@ $default-menu-levels: 3 !default;
 
 			a.l#{$l},
 			.a.l#{$l} {
-				@if $i#{$l}-roundness-natural {
+				$roundness: _menu_get($config, i, $level, natural, roundness);
+				@if $roundness {
 					&::before {
-						border-top-right-radius: $i#{$l}-roundness-natural;
+						border-top-right-radius: $roundness;
 					}
 					&::after {
-						border-top-left-radius: $i#{$l}-roundness-natural;
+						border-top-left-radius: $roundness;
 					}
 				}
 			}
 		}
 
 		#{$_current} {
-			&::before,
-			&::after {
-				background-clip: padding-box;
-				@if $i#{$l}-background-current != undefined {
-					@if $i#{$l}-background-current != $i#{$l}-background-current-rgb and $i#{$l}-background-current-rgb != undefined {
-						background: $i#{$l}-background-current-rgb;
-					}
-					background: $i#{$l}-background-current; // NOTE: this is really not part of the structure (put here as optimization)
-				}
-				@if $i#{$l}-background-color-current != undefined {
-					@if $i#{$l}-background-color-current != $i#{$l}-background-color-current-rgb and $i#{$l}-background-color-current-rgb != undefined {
-						background-color: $i#{$l}-background-color-current-rgb;
-					}
-					background-color: $i#{$l}-background-color-current;
-				}
-				@if $i#{$l}-background-image-current != undefined {
-					background-image: $i#{$l}-background-image-current;
-				}
-			}
-			a.l#{$l}::before,
-			.a.l#{$l}::before,
-			a.l#{$l}::after,
-			.a.l#{$l}::after {
-				@if $i#{$l}-roundness-background-current != undefined {
-					background: $i#{$l}-roundness-background-current; // NOTE: this is really not part of the structure (put here as optimization)
-				}
-				@if $i#{$l}-roundness-background-image-current != undefined {
-					background-image: $i#{$l}-roundness-background-image-current;
-				}
-			}
-			a.l#{$l},
-			.a.l#{$l} {
-				.label {
-					@if $i#{$l}-color-current != undefined {
-						@if $i#{$l}-color-current != $i#{$l}-color-current-rgb and $i#{$l}-color-current-rgb != undefined {
-							color: $i#{$l}-color-current-rgb;
-						}
-						color: $i#{$l}-color-current;
-					}
-					@if $i#{$l}-text-shadow-current != undefined {
-						text-shadow: $i#{$l}-text-shadow-current;
-					}
-
-					@if $i#{$l}-height-natural != undefined {
-						@if $i#{$l}-border-width-current != undefined {
-							height: $i#{$l}-height-natural - nth($i#{$l}-border-width-current, 1) - nth($i#{$l}-border-width-current, 3);
-						}
-					}
-					@if $i#{$l}-line-height-natural != undefined {
-						@if $i#{$l}-border-width-current != undefined {
-							line-height: $i#{$l}-line-height-natural - nth($i#{$l}-border-width-current, 1) - nth($i#{$l}-border-width-current, 3);
-						}
-					}
-				}
-				&.folder .tag {
-					padding-right: 12px;
-					@if $i#{$l}-arrow-color-current != undefined {
-						@if $u#{$l + 1}-type == dropup {
-							background: image-url('menus/arrow_up.png', $dst-color: $i#{$l}-arrow-color-current, $cache-buster: false) no-repeat right center;
-						} @else if $u#{$l + 1}-type == dropright {
-							background: image-url('menus/arrow_right.png', $dst-color: $i#{$l}-arrow-color-current, $cache-buster: false) no-repeat right center;
-						} @else if $u#{$l + 1}-type == dropleft {
-							background: image-url('menus/arrow_left.png', $dst-color: $i#{$l}-arrow-color-current, $cache-buster: false) no-repeat right center;
-						} @else {
-							background: image-url('menus/arrow_down.png', $dst-color: $i#{$l}-arrow-color-current, $cache-buster: false) no-repeat right center;
-						}
-					}
-				}
-				@if $i#{$l}-background-current != undefined {
-					@if $i#{$l}-background-current != $i#{$l}-background-current-rgb and $i#{$l}-background-current-rgb != undefined {
-						background: $i#{$l}-background-current-rgb;
-					}
-					background: $i#{$l}-background-current;
-				}
-				@if $i#{$l}-background-color-current != undefined {
-					@if $i#{$l}-background-color-current != $i#{$l}-background-color-current-rgb and $i#{$l}-background-color-current-rgb != undefined {
-						background-color: $i#{$l}-background-color-current-rgb;
-					}
-					background-color: $i#{$l}-background-color-current;
-				}
-				@if $i#{$l}-background-image-current != undefined {
-					background-image: $i#{$l}-background-image-current;
-				}
-
-				@if $i#{$l}-box-shadow-current != undefined {
-					box-shadow: $i#{$l}-box-shadow-current;
-				}
-
-				@if $i#{$l}-border-width-current != undefined {
-					border-width: $i#{$l}-border-width-current;
-					border-style: solid;
-				}
-				@if $i#{$l}-border-color-current != undefined {
-					@if $i#{$l}-border-color-current != $i#{$l}-border-color-current-rgb and $i#{$l}-border-color-current-rgb != undefined {
-						border-color: $i#{$l}-border-color-current-rgb;
-					}
-					border-color: $i#{$l}-border-color-current;
-				}
-
-				@if $i#{$l}-border-radius-current {
-					border-radius: $i#{$l}-border-radius-current;
-				}
-			}
+			@include _menu__common_state($config, $l, current);
 		}
 
 //		&.focused,
@@ -246,108 +209,7 @@ $default-menu-levels: 3 !default;
 //			li.l#{$l}.focused,
 			li.l#{$l}.hover,
 			li.l#{$l}:hover {
-				&::before,
-				&::after {
-					@if $i#{$l}-background-hover != undefined {
-						@if $i#{$l}-background-hover != $i#{$l}-background-hover-rgb and $i#{$l}-background-hover-rgb != undefined {
-							background: $i#{$l}-background-hover-rgb;
-						}
-						background: $i#{$l}-background-hover; // NOTE: this is really not part of the structure (put here as optimization)
-					}
-					@if $i#{$l}-background-color-hover != undefined {
-						@if $i#{$l}-background-color-hover != $i#{$l}-background-color-hover-rgb and $i#{$l}-background-color-hover-rgb != undefined {
-							background-color: $i#{$l}-background-color-hover-rgb;
-						}
-						background-color: $i#{$l}-background-color-hover;
-					}
-					@if $i#{$l}-background-image-hover != undefined {
-						background-image: $i#{$l}-background-image-hover;
-					}
-				}
-				a.l#{$l}::before,
-				.a.l#{$l}::before,
-				a.l#{$l}::after,
-				.a.l#{$l}::after {
-					@if $i#{$l}-roundness-background-hover != undefined {
-						background: $i#{$l}-roundness-background-hover; // NOTE: this is really not part of the structure (put here as optimization)
-					}
-					@if $i#{$l}-roundness-background-image-hover != undefined {
-						background-image: $i#{$l}-roundness-background-image-hover;
-					}
-				}
-				a.l#{$l},
-				.a.l#{$l} {
-					.label {
-						@if $i#{$l}-color-hover != undefined {
-							@if $i#{$l}-color-hover != $i#{$l}-color-hover-rgb and $i#{$l}-color-hover-rgb != undefined {
-								color: $i#{$l}-color-hover-rgb;
-							}
-							color: $i#{$l}-color-hover;
-						}
-						@if $i#{$l}-text-shadow-hover != undefined {
-							text-shadow: $i#{$l}-text-shadow-hover;
-						}
-
-						@if $i#{$l}-height-natural != undefined {
-							@if $i#{$l}-border-width-hover != undefined {
-								height: $i#{$l}-height-natural - nth($i#{$l}-border-width-hover, 1) - nth($i#{$l}-border-width-hover, 3);
-							}
-						}
-						@if $i#{$l}-line-height-natural != undefined {
-							@if $i#{$l}-border-width-hover != undefined {
-								line-height: $i#{$l}-line-height-natural - nth($i#{$l}-border-width-hover, 1) - nth($i#{$l}-border-width-hover, 3);
-							}
-						}
-					}
-					&.folder .tag {
-						padding-right: 12px;
-						@if $i#{$l}-arrow-color-hover != undefined {
-							@if $u#{$l + 1}-type == dropup {
-								background: image-url('menus/arrow_up.png', $dst-color: $i#{$l}-arrow-color-hover, $cache-buster: false) no-repeat right center;
-							} @else if $u#{$l + 1}-type == dropright {
-								background: image-url('menus/arrow_right.png', $dst-color: $i#{$l}-arrow-color-hover, $cache-buster: false) no-repeat right center;
-							} @else if $u#{$l + 1}-type == dropleft {
-								background: image-url('menus/arrow_left.png', $dst-color: $i#{$l}-arrow-color-hover, $cache-buster: false) no-repeat right center;
-							} @else {
-								background: image-url('menus/arrow_down.png', $dst-color: $i#{$l}-arrow-color-hover, $cache-buster: false) no-repeat right center;
-							}
-						}
-					}
-					@if $i#{$l}-background-hover != undefined {
-						@if $i#{$l}-background-hover != $i#{$l}-background-hover-rgb and $i#{$l}-background-hover-rgb != undefined {
-							background: $i#{$l}-background-hover-rgb;
-						}
-						background: $i#{$l}-background-hover;
-					}
-					@if $i#{$l}-background-color-hover != undefined {
-						@if $i#{$l}-background-color-hover != $i#{$l}-background-color-hover-rgb and $i#{$l}-background-color-hover-rgb != undefined {
-							background-color: $i#{$l}-background-color-hover-rgb;
-						}
-						background-color: $i#{$l}-background-color-hover;
-					}
-					@if $i#{$l}-background-image-hover != undefined {
-						background-image: $i#{$l}-background-image-hover;
-					}
-
-					@if $i#{$l}-box-shadow-hover != undefined {
-						box-shadow: $i#{$l}-box-shadow-hover;
-					}
-
-					@if $i#{$l}-border-width-hover != undefined {
-						border-width: $i#{$l}-border-width-hover;
-						border-style: solid;
-					}
-					@if $i#{$l}-border-color-hover != undefined {
-						@if $i#{$l}-border-color-hover != $i#{$l}-border-color-hover-rgb and $i#{$l}-border-color-hover-rgb != undefined {
-							border-color: $i#{$l}-border-color-hover-rgb;
-						}
-						border-color: $i#{$l}-border-color-hover;
-					}
-
-					@if $i#{$l}-border-radius-hover {
-						border-radius: $i#{$l}-border-radius-hover;
-					}
-				}
+				@include _menu__common_state($config, $l, hover);
 			}
 
 			/* Natural state: */
@@ -381,9 +243,11 @@ $default-menu-levels: 3 !default;
 					display: inline-block;
 					img.icon {
 						vertical-align: middle;
-						@if $i#{$l}-icon-size-natural != undefined {
-							width: $i#{$l}-icon-size-natural;
-							height: $i#{$l}-icon-size-natural;
+
+						$icon-size: _menu_get($config, i, $level, natural, icon-size);
+						@if $icon-size {
+							width: $icon-size;
+							height: $icon-size;
 						}
 					}
 					.tag {
@@ -391,95 +255,35 @@ $default-menu-levels: 3 !default;
 					}
 					/****** Structure Ends ******/
 
+					// XXX this is basically copy/pasted from the top level??  no padding though (bug?)
 					background-clip: padding-box;
-					@if $i#{$l}-background-natural != undefined {
-						@if $i#{$l}-background-natural != $i#{$l}-background-natural-rgb and $i#{$l}-background-natural-rgb != undefined {
-							background: $i#{$l}-background-natural-rgb;
-						}
-						background: $i#{$l}-background-natural;
-					}
-					@if $i#{$l}-background-color-natural != undefined {
-						@if $i#{$l}-background-color-natural != $i#{$l}-background-color-natural-rgb and $i#{$l}-background-color-natural-rgb != undefined {
-							background-color: $i#{$l}-background-color-natural-rgb;
-						}
-						background-color: $i#{$l}-background-color-natural;
-					}
-					@if $i#{$l}-background-image-natural != undefined {
-						background-image: $i#{$l}-background-image-natural;
-					}
 
-					@if $i#{$l}-box-shadow-natural != undefined {
-						box-shadow: $i#{$l}-box-shadow-natural;
-					}
+					@include _menu__props($config, i, $level, natural, (margin, background, background-color, background-image, box-shadow, border-width, border-color, border-radius));
 
-					@if $i#{$l}-border-width-natural != undefined {
-						border-width: $i#{$l}-border-width-natural;
-						border-style: solid;
-					}
-					@if $i#{$l}-border-color-natural != undefined {
-						@if $i#{$l}-border-color-natural != $i#{$l}-border-color-natural-rgb and $i#{$l}-border-color-natural-rgb != undefined {
-							border-color: $i#{$l}-border-color-natural-rgb;
-						}
-						border-color: $i#{$l}-border-color-natural;
-					}
-
-					@if $i#{$l}-border-radius-natural != undefined {
-						border-radius: $i#{$l}-border-radius-natural;
-					}
-
-					@if $i#{$l}-margin-natural != undefined {
-						margin: $i#{$l}-margin-natural;
-					}
 					.label {
 						/****** Structure Starts ******/
-						@if not $i#{$l}-word-wrap {
+						@if not _menu_get($config, i, $level, null, word-wrap) {
 							white-space: nowrap;
 						}
 						display: inline-block;
 						/****** Structure Ends ******/
 
-						@if $i#{$l}-margin-natural != undefined {
-							@if $i#{$l}-border-width-natural != undefined {
-								margin: -($i#{$l}-margin-natural + $i#{$l}-border-width-natural);
-							} @else {
-								margin: -($i#{$l}-margin-natural);
-							}
-						} @else if $i#{$l}-border-width-natural != undefined {
-							margin: -($i#{$l}-border-width-natural);
+						$-margin: _menu_get($config, i, $level, natural, margin);
+						$-border-width: _menu_get($config, i, $level, natural, border-width);
+						@if $-margin and $-border-width {
+							margin: -($-margin + $-border-width);
+						}
+						@else if $-margin {
+							margin: -($margin);
+						}
+						@else if $-border-width {
+							margin: -($-border-width);
 						}
 
 						text-decoration: none;
-						@if $i#{$l}-font-size-natural != undefined {
-							font-size: $i#{$l}-font-size-natural;
-						}
-						@if $i#{$l}-color-natural != undefined {
-							@if $i#{$l}-color-natural != $i#{$l}-color-natural-rgb and $i#{$l}-color-natural-rgb != undefined {
-								color: $i#{$l}-color-natural-rgb;
-							}
-							color: $i#{$l}-color-natural;
-						}
-						@if $i#{$l}-text-shadow-natural != undefined {
-							text-shadow: $i#{$l}-text-shadow-natural;
-						}
+						@include _menu__props($config, i, $level, natural, (font-size, color, text-shadow, padding));
 
-						@if $i#{$l}-padding-natural != undefined {
-							padding: $i#{$l}-padding-natural;
-						}
-
-						@if $i#{$l}-height-natural != undefined {
-							@if $i#{$l}-border-width-natural != undefined {
-								height: $i#{$l}-height-natural - nth($i#{$l}-border-width-natural, 1) - nth($i#{$l}-border-width-natural, 3);
-							} @else {
-								height: $i#{$l}-height-natural;
-							}
-						}
-						@if $i#{$l}-line-height-natural != undefined {
-							@if $i#{$l}-border-width-natural != undefined {
-								line-height: $i#{$l}-line-height-natural - nth($i#{$l}-border-width-natural, 1) - nth($i#{$l}-border-width-natural, 3);
-							} @else {
-								line-height: $i#{$l}-line-height-natural;
-							}
-						}
+						@include _menu__common_height_from_border($config, $level, natural, $default-delta: 0);
 					}
 //					&:active .label,
 //					&:focus .label {
@@ -490,30 +294,11 @@ $default-menu-levels: 3 !default;
 					}
 					&.folder {
 						.label {
-							@if $i#{$l}-height-natural != undefined {
-								@if $i#{$l}-border-width-folder != undefined {
-									height: $i#{$l}-height-natural - nth($i#{$l}-border-width-folder, 1) - nth($i#{$l}-border-width-folder, 3);
-								}
-							}
-							@if $i#{$l}-line-height-natural != undefined {
-								@if $i#{$l}-border-width-folder != undefined {
-									line-height: $i#{$l}-line-height-natural - nth($i#{$l}-border-width-folder, 1) - nth($i#{$l}-border-width-folder, 3);
-								}
-							}
+							@include _menu__common_height_from_border($config, $level, folder);
 						}
 						.tag {
 							padding-right: 12px;
-							@if $i#{$l}-arrow-color-natural != undefined {
-								@if $u#{$l + 1}-type == dropup {
-									background: image-url('menus/arrow_up.png', $dst-color: $i#{$l}-arrow-color-natural, $cache-buster: false) no-repeat right center;
-								} @else if $u#{$l + 1}-type == dropright {
-									background: image-url('menus/arrow_right.png', $dst-color: $i#{$l}-arrow-color-natural, $cache-buster: false) no-repeat right center;
-								} @else if $u#{$l + 1}-type == dropleft {
-									background: image-url('menus/arrow_left.png', $dst-color: $i#{$l}-arrow-color-natural, $cache-buster: false) no-repeat right center;
-								} @else {
-									background: image-url('menus/arrow_down.png', $dst-color: $i#{$l}-arrow-color-natural, $cache-buster: false) no-repeat right center;
-								}
-							}
+							@include _menu__common_folder_icon($config, $level, natural);
 						}
 					}
 				}
@@ -522,59 +307,40 @@ $default-menu-levels: 3 !default;
 				&.folder:hover {
 					a.l#{$l},
 					.a.l#{$l} {
-						@if $i#{$l}-margin-folder != undefined {
-							margin: $i#{$l}-margin-folder; // Margin that sends the button downwards
-						}
+						@include _menu__props($config, i, $level, folder, margin);
+
+						$-margin: _menu_get($config, i, $level, folder, margin);
+						$-border-width: _menu_get($config, i, $level, folder, border-width);
 						.label {
-							@if $i#{$l}-margin-folder != undefined {
-								@if $i#{$l}-border-width-folder != undefined {
-									margin: -($i#{$l}-margin-folder + $i#{$l}-border-width-folder);
-								} @else if $i#{$l}-border-width-natural != undefined {
-									margin: -($i#{$l}-margin-folder + $i#{$l}-border-width-natural);
-								} @else {
-									margin: -($i#{$l}-margin-folder);
-								}
-							} @else if $i#{$l}-border-width-folder != undefined {
-								@if $i#{$l}-margin-natural != undefined {
-									margin: -($i#{$l}-margin-natural + $i#{$l}-border-width-folder);
-								} @else {
-									margin: -($i#{$l}-border-width-folder);
-								}
+							@if $-margin {
+								margin: -($-margin + (
+									$-border-width
+									or _menu_get($config, i, $level, natural, border-width);
+									or 0
+								));
+							}
+							@else if $-border-width {
+								margin: -($-border-width);
 							}
 						}
 
-						@if $i#{$l}-box-shadow-folder != undefined {
-							box-shadow: $i#{$l}-box-shadow-folder;
-						}
+						@include _menu__props($config, i, $level, folder, (box-shadow, border-width, border-color, border-radius));
 
-						@if $i#{$l}-border-width-folder != undefined {
-							border-width: $i#{$l}-border-width-folder;
-							border-style: solid;
-						}
-						@if $i#{$l}-border-color-folder != undefined {
-							@if $i#{$l}-border-color-folder != $i#{$l}-border-color-folder-rgb and $i#{$l}-border-coor-folder-rgb != undefined {
-								border-color: $i#{$l}-border-color-folder-rgb;
-							}
-							border-color: $i#{$l}-border-color-folder;
-						}
-
-						@if $i#{$l}-border-radius-folder != undefined {
-							border-radius: $i#{$l}-border-radius-folder;
-						}
-
-						@if $i#{$l}-roundness-folder {
+						$-roundness: _menu_get($config, i, $level, folder, roundness);
+						@if $-roundness {
+							$-border-radius: _menu_get($config, i, $level, folder, border-radius);
 							&::before {
-								@if $i#{$l}-border-radius-folder != undefined {
+								@if $-border-radius {
 									border-radius: 0;
 								}
-								border-bottom-right-radius: $i#{$l}-roundness-folder;
+								border-bottom-right-radius: $-roundness;
 								background-position: center 0;
 							}
 							&::after {
-								@if $i#{$l}-border-radius-folder != undefined {
+								@if $-border-radius {
 									border-radius: 0;
 								}
-								border-bottom-left-radius: $i#{$l}-roundness-folder;
+								border-bottom-left-radius: $-roundness;
 								background-position: center 0;
 							}
 						}
@@ -585,7 +351,7 @@ $default-menu-levels: 3 !default;
 	}
 }
 
-@mixin _menu-vertical($level) {
+@mixin _menu-vertical($config, $level) {
 	$l: $level;
 
 	ul.l#{$l} {
@@ -593,69 +359,20 @@ $default-menu-levels: 3 !default;
 		padding: 0;
 		list-style: none;
 
-		@if $u#{$l}-padding-natural != undefined {
-			padding: $u#{$l}-padding-natural;
-		}
-		@if $u#{$l}-margin-natural != undefined {
-			margin: $u#{$l}-margin-natural;
-		}
+		// XXX this is repeated again
+
+		@include _menu__props($config, u, $level, natural, (padding, margin));
 
 		background-clip: padding-box;
-		@if $u#{$l}-background-natural != undefined {
-			@if $u#{$l}-background-natural != $u#{$l}-background-natural-rgb and $u#{$l}-background-natural-rgb != undefined {
-				background: $u#{$l}-background-natural-rgb;
-			}
-			background: $u#{$l}-background-natural;
-		}
-		@if $u#{$l}-background-color-natural != undefined {
-			@if $u#{$l}-background-color-natural != $u#{$l}-background-color-natural-rgb and $u#{$l}-background-color-natural-rgb != undefined {
-				background-color: $u#{$l}-background-color-natural-rgb;
-			}
-			background-color: $u#{$l}-background-natural;
-		}
-		@if $u#{$l}-background-image-natural != undefined {
-			background-image: $u#{$l}-background-image-natural;
-		}
 
-		@if $u#{$l}-box-shadow-natural != undefined {
-			box-shadow: $u#{$l}-box-shadow-natural;
-		}
-
-		@if $u#{$l}-border-width-natural != undefined {
-			border-width: $u#{$l}-border-width-natural;
-			border-style: solid;
-		}
-		@if $u#{$l}-border-color-natural != undefined {
-			@if $u#{$l}-border-color-natural != $u#{$l}-border-color-natural-rgb and $u#{$l}-border-color-natural-rgb != undefined {
-				border-color: $u#{$l}-border-color-natural-rgb;
-			}
-			border-color: $u#{$l}-border-color-natural;
-		}
-
-		@if $u#{$l}-border-radius-natural != undefined {
-			border-radius: $u#{$l}-border-radius-natural;
-		}
+		@include _menu__props($config, u, $level, natural, (background, background-color, background-image, box-shadow, border-width, border-color, border-radius));
 
 		transition: background 1s;
 
 //		&.focused,
 		&.hover,
 		&:hover {
-			@if $u#{$l}-background-hover != undefined {
-				@if $u#{$l}-background-hover != $u#{$l}-background-hover-rgb and $u#{$l}-background-hover-rgb != undefined {
-					background: $u#{$l}-background-hover-rgb;
-				}
-				background: $u#{$l}-background-hover;
-			}
-			@if $u#{$l}-background-color-hover != undefined {
-				@if $u#{$l}-background-color-hover != $u#{$l}-background-color-hover-rgb and $u#{$l}-background-color-hover-rgb != undefined {
-					background-color: $u#{$l}-background-color-hover-rgb;
-				}
-				background-color: $u#{$l}-background-hover;
-			}
-			@if $u#{$l}-background-image-hover != undefined {
-				background-image: $u#{$l}-background-image-hover;
-			}
+			@include _menu__props($config, u, $level, hover, (background, background-color, background-image));
 		}
 
 //		&.focused,
@@ -668,102 +385,21 @@ $default-menu-levels: 3 !default;
 			li.l#{$l}:hover {
 				a.l#{$l},
 				.a.l#{$l} {
-					@if $i#{$l}-background-hover != undefined {
-						@if $i#{$l}-background-hover != $i#{$l}-background-hover-rgb and $i#{$l}-background-hover-rgb != undefined {
-							background: $i#{$l}-background-hover-rgb;
-						}
-						background: $i#{$l}-background-hover;
-					}
-					@if $i#{$l}-background-color-hover != undefined {
-						@if $i#{$l}-background-color-hover != $i#{$l}-background-color-hover-rgb and $i#{$l}-background-color-hover-rgb != undefined {
-							background-color: $i#{$l}-background-color-hover-rgb;
-						}
-						background-color: $i#{$l}-background-color-hover;
-					}
-					@if $i#{$l}-background-image-hover != undefined {
-						background-image: $i#{$l}-background-image-hover;
-					}
-
-					@if $i#{$l}-box-shadow-hover != undefined {
-						box-shadow: $i#{$l}-box-shadow-hover;
-					}
-
-					@if $i#{$l}-border-width-hover != undefined {
-						border-width: $i#{$l}-border-width-hover;
-						border-style: solid;
-					}
-					@if $i#{$l}-border-color-hover != undefined {
-						@if $i#{$l}-border-color-hover != $i#{$l}-border-color-hover-rgb and $i#{$l}-border-color-hover-rgb != undefined {
-							border-color: $i#{$l}-border-color-hover-rgb;
-						}
-						border-color: $i#{$l}-border-color-hover;
-					}
-
-					@if $i#{$l}-border-radius-hover != undefined {
-						border-radius: $i#{$l}-border-radius-hover;
-					}
+					@include _menu__props($config, i, $level, hover, (background, background-color, background-image, box-shadow, border-width, border-color, border-radius));
 
 					.label {
-						@if $i#{$l}-color-hover != undefined {
-							@if $i#{$l}-color-hover != $i#{$l}-color-hover-rgb and $i#{$l}-color-hover-rgb != undefined {
-								color: $i#{$l}-color-hover-rgb;
-							}
-							color: $i#{$l}-color-hover;
-						}
-						@if $i#{$l}-text-shadow-hover != undefined {
-							text-shadow: $i#{$l}-text-shadow-hover;
-						}
+						@include _menu__props($config, i, $level, hover, (color, text-shadow));
 					}
 				}
 			}
 			li.l#{$l}.current {
 				a.l#{$l},
 				.a.l#{$l} {
-					@if $i#{$l}-background-current != undefined {
-						@if $i#{$l}-background-current != $i#{$l}-background-current-rgb and $i#{$l}-background-current-rgb != undefined {
-							background: $i#{$l}-background-current-rgb;
-						}
-						background: $i#{$l}-background-current;
-					}
-					@if $i#{$l}-background-color-current != undefined {
-						@if $i#{$l}-background-color-current != $i#{$l}-background-color-current-rgb and $i#{$l}-background-color-current-rgb != undefined {
-							background-color: $i#{$l}-background-color-current-rgb;
-						}
-						background-color: $i#{$l}-background-color-current;
-					}
-					@if $i#{$l}-background-image-current != undefined {
-						background-image: $i#{$l}-background-image-current;
-					}
-
-					@if $i#{$l}-box-shadow-current != undefined {
-						box-shadow: $i#{$l}-box-shadow-current;
-					}
-
-					@if $i#{$l}-border-width-current != undefined {
-						border-width: $i#{$l}-border-width-current;
-						border-style: solid;
-					}
-					@if $i#{$l}-border-color-current != undefined {
-						@if $i#{$l}-border-color-current != $i#{$l}-border-color-current-rgb and $i#{$l}-border-color-current-rgb != undefined {
-							border-color: $i#{$l}-border-color-current-rgb;
-						}
-						border-color: $i#{$l}-border-color-current;
-					}
-
-					@if $i#{$l}-border-radius-current != undefined {
-						border-radius: $i#{$l}-border-radius-current;
-					}
+					// XXX identical to the above, but with current!
+					@include _menu__props($config, i, $level, current, (background, background-color, background-image, box-shadow, border-width, border-color, border-radius));
 
 					.label {
-						@if $i#{$l}-color-current != undefined {
-							@if $i#{$l}-color-current != $i#{$l}-color-current-rgb and $i#{$l}-color-current-rgb != undefined {
-								color: $i#{$l}-color-current-rgb;
-							}
-							color: $i#{$l}-color-current;
-						}
-						@if $i#{$l}-text-shadow-current != undefined {
-							text-shadow: $i#{$l}-text-shadow-current;
-						}
+						@include _menu__props($config, i, $level, current, (color, text-shadow));
 					}
 				}
 			}
@@ -793,11 +429,8 @@ $default-menu-levels: 3 !default;
 				&.separator {
 					padding: 0;
 					font-size: 1px; /* IE */
-					@if $i#{$l}-separator-width-natural != undefined {
-						@if $i#{$l}-separator-color-natural != undefined {
-							border-top: $i#{$l}-separator-width-natural solid $i#{$l}-separator-color-natural; // mimic separator
-						}
-					}
+
+					@include _menu__separator($config, $level);
 				}
 				a.l#{$l},
 				.a.l#{$l} {
@@ -805,9 +438,12 @@ $default-menu-levels: 3 !default;
 					display: inline-block;
 					img.icon {
 						vertical-align: middle;
-						@if $i#{$l}-icon-size-natural != undefined {
-							width: $i#{$l}-icon-size-natural;
-							height: $i#{$l}-icon-size-natural;
+
+						// XXX c/p
+						$icon-size: _menu_get($config, i, $level, natural, icon-size);
+						@if $icon-size {
+							width: $icon-size;
+							height: $icon-size;
 						}
 					}
 					.tag {
@@ -815,84 +451,24 @@ $default-menu-levels: 3 !default;
 					}
 					/****** Structure Ends ******/
 
+					// XXX HMMM
 					background-clip: padding-box;
-					@if $i#{$l}-background-natural != undefined {
-						@if $i#{$l}-background-natural != $i#{$l}-background-natural-rgb and $i#{$l}-background-natural-rgb != undefined {
-							background: $i#{$l}-background-natural-rgb;
-						}
-						background: $i#{$l}-background-natural;
-					}
-					@if $i#{$l}-background-color-natural != undefined {
-						@if $i#{$l}-background-color-natural != $i#{$l}-background-color-natural-rgb and $i#{$l}-background-color-natural-rgb != undefined {
-							background-color: $i#{$l}-background-color-natural-rgb;
-						}
-						background-color: $i#{$l}-background-color-natural;
-					}
-					@if $i#{$l}-background-image-natural != undefined {
-						background-image: $i#{$l}-background-image-natural;
-					}
-
-					@if $i#{$l}-box-shadow-natural != undefined {
-						box-shadow: $i#{$l}-box-shadow-natural;
-					}
-
-					@if $i#{$l}-border-width-natural != undefined {
-						border-width: $i#{$l}-border-width-natural;
-						border-style: solid;
-					}
-					@if $i#{$l}-border-color-natural != undefined {
-						@if $i#{$l}-border-color-natural != $i#{$l}-border-color-natural-rgb and $i#{$l}-border-color-natural-rgb != undefined {
-							border-color: $i#{$l}-border-color-natural-rgb;
-						}
-						border-color: $i#{$l}-border-color-natural;
-					}
-
-					@if $i#{$l}-border-radius-natural != undefined {
-						border-radius: $i#{$l}-border-radius-natural;
-					}
+					@include _menu__props($config, i, $level, natural, (background, background-color, background-image, box-shadow, border-width, border-color, border-radius));
 
 					width: 100%;
 
 					.label {
 						/****** Structure Starts ******/
-						@if not $i#{$l}-word-wrap {
+						@if not _menu_get($config, i, $level, null, word-wrap) {
 							white-space: nowrap;
 						}
 						display: inline-block;
 						/****** Structure Ends ******/
 
 						text-decoration: none;
-						@if $i#{$l}-font-size-natural != undefined {
-							font-size: $i#{$l}-font-size-natural;
-						}
-						@if $i#{$l}-color-natural != undefined {
-							@if $i#{$l}-color-natural != $i#{$l}-color-natural-rgb and $i#{$l}-color-natural-rgb != undefined {
-								color: $i#{$l}-color-natural-rgb;
-							}
-							color: $i#{$l}-color-natural;
-						}
-						@if $i#{$l}-text-shadow-natural != undefined {
-							text-shadow: $i#{$l}-text-shadow-natural;
-						}
+						@include _menu__props($config, i, $level, natural, (font-size, color, text-shadow, padding));
 
-						@if $i#{$l}-padding-natural != undefined {
-							padding: $i#{$l}-padding-natural;
-						}
-
-						@if $i#{$l}-height-natural != undefined {
-							@if $i#{$l}-border-width-natural != undefined {
-								height: $i#{$l}-height-natural - nth($i#{$l}-border-width-natural, 1) - nth($i#{$l}-border-width-natural, 3);
-							} @else {
-								height: $i#{$l}-height-natural;
-							}
-						}
-						@if $i#{$l}-line-height-natural != undefined {
-							@if $i#{$l}-border-width-natural != undefined {
-								line-height: $i#{$l}-line-height-natural - nth($i#{$l}-border-width-natural, 1) - nth($i#{$l}-border-width-natural, 3);
-							} @else {
-								line-height: $i#{$l}-line-height-natural;
-							}
-						}
+						@include _menu__common_height_from_border($config, $level, natural, $default-delta: 0);
 					}
 //					&:active .label,
 //					&:focus .label {
@@ -907,53 +483,57 @@ $default-menu-levels: 3 !default;
 	}
 }
 
-@mixin _menu-inplace($level) {
+@mixin _menu-inplace($config, $level) {
 	$l: $level;
 
-	$u#{$l}-padding-natural: 2px 10px !default;
-	$u#{$l}-margin-natural: 2px 0 0 0 !default;
+	$config: map-merge-deep(
+		( u: ( 0: ( natural: (
+			padding: 2px 10px,
+			margin: 2px 0 0 0,
+		)))),
+		$config);
 
-	@include _menu-vertical($l);
+	@include _menu-vertical($config, $level);
 
 	.built-menu.l#{$l} {
 		display: block;
 		ul.l#{$l} {
-			@if $i#{$l}-separator-width-natural != undefined {
-				@if $i#{$l}-separator-color-natural != undefined {
-					border-top: $i#{$l}-separator-width-natural solid $i#{$l}-separator-color-natural; // mimic separator
-				}
-			}
+			@include _menu__separator($config, $level);
 		}
 	}
 }
 
 
-@mixin _menu-accordion($level) {
+@mixin _menu-accordion($config, $level) {
 	$l: $level;
 
-	$u#{$l}-padding-natural: 0 0 !default;
-	$u#{$l}-margin-natural: 2px 10px 0 !default;
+	$config: map-merge-deep(
+		( u: ( $level: ( natural: (
+			padding: 0 0,
+			margin: 2px 10px 0,
+		)))),
+		$config);
 
-	@include _menu-vertical($l);
+	@include _menu-vertical($config, $level);
 
 	.built-menu.l#{$l} {
 		ul.l#{$l} {
-			@if $i#{$l}-separator-width-natural != undefined {
-				@if $i#{$l}-separator-color-natural != undefined {
-					border-top: $i#{$l}-separator-width-natural solid $i#{$l}-separator-color-natural; // mimic separator
-				}
-			}
+			@include _menu__separator($config, $level);
 		}
 	}
 }
 
-@mixin _menu-dropdown($level) {
+@mixin _menu-dropdown($config, $level) {
 	$l: $level;
 
-	$u#{$l}-box-shadow-natural: rgba(black, 12%) 0 2px 4px !default;
-	$u#{$l}-background-natural: white !default;
+	$config: map-merge-deep(
+		( u: ( $level: ( natural: (
+			box-shadow: rgba(black, 12%) 0 2px 4px,
+			background: white,
+		)))),
+		$config);
 
-	@include _menu-vertical($l);
+	@include _menu-vertical($config, $level);
 
 	.built-menu.l#{$l} {
 		position: absolute;
@@ -973,23 +553,23 @@ $default-menu-levels: 3 !default;
 	}
 }
 
-@mixin _menu-dropup($level) {
+@mixin _menu-dropup($config, $level) {
 	$l: $level;
 
-	$u#{$l}-box-shadow-natural: rgba(black, 12%) 0 2px 4px !default;
-	$u#{$l}-background-natural: white !default;
+	$config: map-merge-deep(
+		( u: ( 0: ( natural: (
+			box-shadow: rgba(black, 12%) 0 2px 4px,
+			background: white,
+		)))),
+		$config);
 
-	@include _menu-vertical($l);
+	@include _menu-vertical($config, $level);
 
 	.built-menu.l#{$l} {
 		position: absolute;
 		padding: 30px 30px 5px;
 		margin: -30px -30px -5px;
-		@if $i#{$l - 1}-height-natural != undefined {
-			bottom: $i#{$l - 1}-height-natural;
-		} @else {
-			bottom: 1em;
-		}
+		bottom: _menu_get($config, i, $level - 1, natural, height, $default: 1em);
 		ul.l#{$l} {
 			li.l#{$l}.first {
 				margin-top: 4px !important;
@@ -1001,13 +581,17 @@ $default-menu-levels: 3 !default;
 	}
 }
 
-@mixin _menu-dropright($level) {
+@mixin _menu-dropright($config, $level) {
 	$l: $level;
 
-	$u#{$l}-box-shadow-natural: rgba(black, 12%) 0 2px 4px !default;
-	$u#{$l}-background-natural: white !default;
+	$config: map-merge-deep(
+		( u: ( $level: ( natural: (
+			box-shadow: rgba(black, 12%) 0 2px 4px,
+			background: white,
+		)))),
+		$config);
 
-	@include _menu-vertical($l);
+	@include _menu-vertical($config, $level);
 
 	.built-menu.l#{$l} {
 		position: absolute;
@@ -1026,13 +610,17 @@ $default-menu-levels: 3 !default;
 	}
 }
 
-@mixin _menu-dropleft($level) {
+@mixin _menu-dropleft($config, $level) {
 	$l: $level;
 
-	$u#{$l}-box-shadow-natural: rgba(black, 12%) 0 2px 4px !default;
-	$u#{$l}-background-natural: white !default;
+	$config: map-merge-deep(
+		( u: ( $level: ( natural: (
+			box-shadow: rgba(black, 12%) 0 2px 4px,
+			background: white,
+		)))),
+		$config);
 
-	@include _menu-vertical($l);
+	@include _menu-vertical($config, $level);
 
 	.built-menu.l#{$l} {
 		position: absolute;
@@ -1051,7 +639,7 @@ $default-menu-levels: 3 !default;
 	}
 }
 
-@mixin menu() {
+@mixin menu($config) {
 	/****** Structure Starts ******/
 	// Multilevel menu show/hide:
 	.built-menu .built-menu {
@@ -1071,69 +659,62 @@ $default-menu-levels: 3 !default;
 	}
 	/****** Structure Ends ******/
 
-	// Get default parameters:
-	$params: 'color', 'text-shadow', 'font-size', 'background', 'background-color', 'background-image',
-			'border-width', 'border-color', 'border-radius',
-			'box-shadow',
-			'padding', 'margin', 'margin-folder',
-			'border-width-folder', 'border-color-folder', 'border-radius-folder',
-			'roundness', 'roundness-folder',
-			'roundness-background', 'roundness-background-image',
-			'height', 'line-height',
-			'separator-color', 'separator-width',
-			'arrow-color', 'icon-size', 'keep-current', 'word-wrap';
-	$sufixes: '', '-natural', '-hover', '-current';
-	$prefixes: 'u', 'i';
 	@for $l from 1 through $default-menu-levels {
-		@each $param in $params {
-			@each $s in $sufixes {
-				@each $p in $prefixes {
-					$final: undefined;
-					@each $n in $l, 0, -1 {
-						@if $final == undefined {
-							$final: first-value-of(
-								$#{$p}#{$n}-#{$param}#{$s},
-								$#{$p}#{$n}-#{$param},
-								$#{$param}#{$s},
-								$#{$param}
-							);
-						}
-					}
-					@if $final != undefined {
-						$#{$p}#{$l}-#{$param}#{$s}: $final !default;
-						@if type-of($final) == 'color' {
-							$#{$p}#{$l}-#{$param}#{$s}-rgb: rgb($final) !default;
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// Default values:
-	$u1-type: horizontal !default;
-	$u2-type: dropdown !default;
-	$u3-type: inplace !default;
-
-	$icon-size-natural: 20px !default;
-
-	$i1-padding-natural: 0 12px !default;
-	$i2-padding-natural: 2px 6px !default;
-	$i3-padding-natural: 2px 6px !default;
-
-	@for $l from 1 through $default-menu-levels {
-		$i#{$l}-separator-width-natural: 1px !default;
-		$i#{$l}-color-natural: blue !default;
-		$i#{$l}-color-hover: red !default;
-		$i#{$l}-color-current: red !default;
-		$i#{$l}-arrow-color-natural: $i#{$l}-color-natural !default;
-		$i#{$l}-arrow-color-hover: $i#{$l}-color-hover !default;
-		$i#{$l}-arrow-color-current: $i#{$l}-color-current !default;
-		$i#{$l}-word-wrap: false !default;
-	}
-
-	@for $l from 1 through $default-menu-levels {
-		$type: '_menu-' + $u#{$l}-type;
-		@include #{$type}($level: $l);
+		$type: '_menu-' + _menu_get($config, u, $l, null, type);
+		@include #{$type}($config, $level: $l);
 	}
 }
+
+// Default values:
+$DEFAULT-MENU-CONFIG: (
+	u: (
+		1: (
+			type: horizontal,
+		),
+		2: (
+			type: dropdown,
+		),
+		3: (
+			type: inplace,
+		),
+	),
+	i: (
+		0: (
+			natural: (
+				separator-width: 1px,
+				color: blue,
+				arrow-color: blue,
+				icon-size: 20px,
+			),
+			hover: (
+				color: red,
+				arrow-color: red,
+			),
+			current: (
+				color: red,
+				arrow-color: red,
+			),
+			folder: (
+				color: red,
+				arrow-color: red,
+				roundness: null,
+			),
+			word-wrap: false,
+		),
+		1: (
+			natural: (
+				padding: 0 12px,
+			),
+		),
+		2: (
+			natural: (
+				padding: 2px 6px,
+			),
+		),
+		3: (
+			natural: (
+				padding: 2px 6px,
+			),
+		),
+	),
+);

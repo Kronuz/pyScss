@@ -3,32 +3,49 @@
 @import "menu";
 
 $MENUS-RADIUS: 2px;
-$BASE-COLOR-HOVER: green;
-$BASE-COLOR-SHADE: darkgreen;
-$BOTTOMMENU-COLOR: #444;
-$BOTTOMMENU-COLOR-HOVER: #222;
+$BASE-COLOR-HOVER: #008000;
+$BASE-COLOR-SHADE: #006400;
+$BOTTOMMENU-COLOR: #444444;
+$BOTTOMMENU-COLOR-HOVER: #222222;
 $BOTTOMMENU-COLOR-HOVER-CURRENT: #468;
 $BOTTOMMENU-SUBMENU-BORDER-WIDTH: 2px;
-$BOTTOMMENU-SUBMENU-BACKGROUND: white;
+$BOTTOMMENU-SUBMENU-BACKGROUND: #ffffff;
 
 .bottommenu {
 	@include menu(
-		$i0-height: 20px,
-		$i0-line-height: 20px,
-		$i0-border-radius: $MENUS-RADIUS,
-		$i0-border-radius-folder: $MENUS-RADIUS,
-		$i0-color: $BOTTOMMENU-COLOR,
-		$i0-color-hover: $BOTTOMMENU-COLOR-HOVER,
-		$i0-color-current: $BOTTOMMENU-COLOR-CURRENT,
-		$i0-background: none,
-		$i0-background-hover: $BASE-COLOR-HOVER,
-		$i0-separator-color: $BASE-COLOR-HOVER,
-
-		$u2-type: 'dropup',
-		$u2-border-width: $BOTTOMMENU-SUBMENU-BORDER-WIDTH,
-		$u2-border-color: $BASE-COLOR-SHADE,
-		$u2-border-radius: $MENUS-RADIUS * 2,
-		$u2-background: rgba($BOTTOMMENU-SUBMENU-BACKGROUND, 30%),
-		$u2-background-hover: $BOTTOMMENU-SUBMENU-BACKGROUND,
+            (
+                i: (
+                    0: (
+                        height: 20px,
+                        line-height: 20px,
+                        border-radius: $MENUS-RADIUS,
+                        color: $BOTTOMMENU-COLOR,
+                        background: none,
+                        separator-color: $BASE-COLOR-HOVER,
+                        current: (
+                            color: $BOTTOMMENU-COLOR-HOVER-CURRENT,
+                        ),
+                        hover: (
+                            color: $BOTTOMMENU-COLOR-HOVER,
+                            background: $BASE-COLOR-HOVER,
+                        ),
+                        folder: (
+                            border-radius: $MENUS-RADIUS,
+                        ),
+                    ),
+                ),
+                u: (
+                    2: (
+                        type: dropup,
+                        border-width: $BOTTOMMENU-SUBMENU-BORDER-WIDTH,
+                        border-color: $BASE-COLOR-SHADE,
+                        border-radius: $MENUS-RADIUS * 2,
+                        background: rgba($BOTTOMMENU-SUBMENU-BACKGROUND, 30%),
+                        hover: (
+                            background: $BOTTOMMENU-SUBMENU-BACKGROUND,
+                        ),
+                    ),
+                ),
+            )
 	);
 }
