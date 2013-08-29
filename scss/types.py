@@ -954,6 +954,7 @@ class String(Value):
 
 
 ### XXX EXPERIMENTAL XXX
+missing = object()
 class Map(Value):
     sass_type_name = u'map'
 
@@ -964,7 +965,7 @@ class Map(Value):
             self.index[key] = value
 
     def __repr__(self):
-        return "<Map: (%s)>" % (",".join("%s : %s" % pair for pair in self.pairs),)
+        return "<Map: (%s)>" % (", ".join("%s: %s" % pair for pair in self.pairs),)
 
     def __hash__(self):
         return hash(self.pairs)
@@ -975,14 +976,17 @@ class Map(Value):
     def __iter__(self):
         return iter(self.pairs)
 
-    def get_by_key(self, key):
-        return self.index[key]
+    def get_by_key(self, key, default=missing):
+        if default is missing:
+            return self.index[key]
+        else:
+            return self.index.get(key, default)
 
     def get_by_pos(self, key):
         return self.pairs[key][1]
 
     def render(self, compress=False):
-        raise TypeError("maps cannot be rendered as CSS")
+        raise TypeError("Cannot render map %r as CSS" % (self,))
 
 
 def expect_type(value, types, unit=any):
