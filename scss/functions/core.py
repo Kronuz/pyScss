@@ -60,7 +60,7 @@ def rgba2(color, a=None):
     if a is None:
         alpha = 1
     else:
-        alpha = _interpret_percentage(a, relto=100)
+        alpha = _interpret_percentage(a)
 
     return Color.from_rgb(*color.rgba[:3], alpha=alpha)
 
