@@ -390,12 +390,10 @@ class MapLiteral(Expression):
         self.pairs = tuple((var, value) for var, value in pairs if value is not None)
 
     def evaluate(self, calculator, divide=False):
-        # TODO unclear here whether the keys should be bare tokens or Literals;
-        # depends how the syntax works!
         scss_pairs = []
-        for name, value in self.pairs:
+        for key, value in self.pairs:
             scss_pairs.append((
-                name.name if isinstance(name, Variable) else name.value,
+                key.evaluate(calculator),
                 value.evaluate(calculator),
             ))
 
