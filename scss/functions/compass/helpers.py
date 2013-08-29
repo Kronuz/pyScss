@@ -92,11 +92,12 @@ def reject(lst, *values):
 
 @register('first-value-of')
 def first_value_of(*args):
-    args = List.from_maybe_starargs(args)
     if len(args) == 1 and isinstance(args[0], String):
         first = args[0].value.split()[0]
         return type(args[0])(first)
-    elif len(args):
+
+    args = List.from_maybe_starargs(args)
+    if len(args):
         return args[0]
     else:
         return Null()
