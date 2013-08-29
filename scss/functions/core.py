@@ -614,6 +614,50 @@ def map_has_key(map, key):
     return Boolean(key in map.index)
 
 
+# DEVIATIONS: these do not exist in ruby sass
+
+@register('map-get', 3)
+def map_get3(map, key, default):
+    return map.get_by_key(key, default)
+
+
+@register('map-get-nested', 2)
+def map_get_nested(map, keys):
+    for key in keys:
+        map = map.get_by_key(key)
+
+    return map
+
+
+@register('map-get-nested', 3)
+def map_get_nested3(map, keys, default):
+    for key in keys:
+        map = map.get_by_key(key, None)
+        if map is None:
+            return default
+
+    return map
+
+
+@register('map-merge-deep', 2)
+def map_merge_deep(*maps):
+    pairs = []
+    keys = set()
+    for map in maps:
+        for key, value in map.pairs:
+            keys.add(key)
+
+    for key in keys:
+        values = [map.get_by_key(key, None) for map in maps]
+        values = [v for v in values if v is not None]
+        if all(isinstance(v, Map) for v in values):
+            pairs.append((key, map_merge_deep(*values)))
+        else:
+            pairs.append((key, values[-1]))
+
+    return Map(pairs)
+
+
 # ------------------------------------------------------------------------------
 # Meta functions
 
