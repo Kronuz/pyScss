@@ -1509,6 +1509,10 @@ class Scss(object):
 
             # Close blocks and outdent as necessary
             for i in range(len(old_ancestry), first_mismatch, -1):
+                # Possibly skip the last semicolon of the last inner statement
+                if not sc and result and result[-1] == ';':
+                    result = result[:-1]
+
                 result += tb * (i - 1) + '}' + nl
 
             # Open new blocks as necessary
@@ -1540,10 +1544,11 @@ class Scss(object):
             if not skip_selectors:
                 result += self._print_properties(rule.properties, sc, sp, tb * len(ancestry), nl, wrap)
 
+        # Close all remaining blocks
+        for i in reversed(range(len(old_ancestry))):
             if not sc and result and result[-1] == ';':
                 result = result[:-1]
 
-        for i in reversed(range(len(old_ancestry))):
             result += tb * i + '}' + nl
 
         return (result, total_rules, total_selectors)
