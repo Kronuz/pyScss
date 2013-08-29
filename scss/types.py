@@ -610,6 +610,8 @@ class List(Value):
         if not other.is_unitless:
             raise TypeError("Can only multiply %s by %s" % (self.__class__.__name__, other.__class__.__name__))
 
+        return List(self.value * int(other.value), use_comma=self.use_comma)
+
     def render(self, compress=False):
         delim = self.delimiter(compress)
 
