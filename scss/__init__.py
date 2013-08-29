@@ -546,7 +546,7 @@ class Scss(object):
                     value = calculator.calculate(block.argument)
                     sys.stderr.write("%s\n" % repr(value))
                 elif code == '@dump_context':
-                    sys.stderr.write("%s\n" % repr(rule.context))
+                    sys.stderr.write("%s\n" % repr(rule.namespace._variables))
                 elif code == '@dump_options':
                     sys.stderr.write("%s\n" % repr(rule.options))
                 elif code == '@debug':
