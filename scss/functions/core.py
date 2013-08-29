@@ -60,14 +60,14 @@ def rgba2(color, a=None):
     if a is None:
         alpha = 1
     else:
-        alpha = a.value
+        alpha = _interpret_percentage(a, relto=100)
 
     return Color.from_rgb(*color.rgba[:3], alpha=alpha)
 
 
 @register('rgb', 1)
 def rgb1(color):
-    return color
+    return rgba2(color, a=Number(1))
 
 
 @register('hsla', 4)
@@ -95,7 +95,7 @@ def hsla2(color, a=None):
 
 @register('hsl', 1)
 def hsl1(color):
-    return color
+    return rgba2(color, a=Number(1))
 
 
 @register('mix', 2)
