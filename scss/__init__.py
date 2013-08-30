@@ -1494,8 +1494,8 @@ class Scss(object):
         total_selectors = 0
 
         result = ''
+        dangling_property = False
         for rule in rules:
-            # TODO this is wrong; what about, say, @imports
             if rule.is_empty:
                 continue
 
@@ -1507,12 +1507,15 @@ class Scss(object):
                     first_mismatch = i
                     break
 
+            # When sc is False, sets of properties are printed without a
+            # trailing semicolon.  If the previous block isn't being closed,
+            # that trailing semicolon needs adding in to separate the last
+            # property from the next rule.
+            if not sc and dangling_property and first_mismatch >= len(old_ancestry):
+                result += ';'
+
             # Close blocks and outdent as necessary
             for i in range(len(old_ancestry), first_mismatch, -1):
-                # Possibly skip the last semicolon of the last inner statement
-                if not sc and result and result[-1] == ';':
-                    result = result[:-1]
-
                 result += tb * (i - 1) + '}' + nl
 
             # Open new blocks as necessary
@@ -1540,15 +1543,14 @@ class Scss(object):
                     total_selectors += 1
 
             old_ancestry = ancestry
+            dangling_property = False
 
             if not skip_selectors:
                 result += self._print_properties(rule.properties, sc, sp, tb * len(ancestry), nl, wrap)
+                dangling_property = True
 
         # Close all remaining blocks
         for i in reversed(range(len(old_ancestry))):
-            if not sc and result and result[-1] == ';':
-                result = result[:-1]
-
             result += tb * i + '}' + nl
 
         return (result, total_rules, total_selectors)
@@ -1563,7 +1565,8 @@ class Scss(object):
             wrap = wrap.wrap
 
         result = ''
-        for name, value in properties:
+        last_prop_index = len(properties) - 1
+        for i, (name, value) in enumerate(properties):
             if value is not None:
                 if nl:
                     value = (nl + _tb + _tb).join(wrap(value))
@@ -1571,5 +1574,8 @@ class Scss(object):
             else:
                 prop = name
 
-            result += _tb + prop + ';' + nl
+            if not sc and i == last_prop_index:
+                result += _tb + prop + nl
+            else:
+                result += _tb + prop + ';' + nl
         return result
