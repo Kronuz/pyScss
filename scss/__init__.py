@@ -590,7 +590,7 @@ class Scss(object):
                 elif block.unparsed_contents is None:
                     rule.properties.append((block.prop, None))
                 elif scope is None:  # needs to have no scope to crawl down the nested rules
-                    self._nest_rules(rule, p_children, scope, block)
+                    self._nest_at_rules(rule, p_children, scope, block)
             ####################################################################
             # Properties
             elif block.unparsed_contents is None:
@@ -1207,47 +1207,55 @@ class Scss(object):
             rule.properties.append((_prop, value))
 
     @print_timing(10)
+    def _nest_at_rules(self, rule, p_children, scope, block):
+        """
+        Implements @-blocks
+        """
+        # Interpolate the current block
+        # TODO this seems like it should be done in the block header.  and more
+        # generally?
+        calculator = Calculator(rule.namespace)
+        block.header.argument = calculator.apply_vars(block.header.argument)
+
+        new_ancestry = list(rule.ancestry)
+        if block.directive == '@media' and rule.ancestry:
+            for i, header in reversed(list(enumerate(new_ancestry))):
+                if header.is_selector:
+                    continue
+                elif header.directive == '@media':
+                    from scss.rule import BlockAtRuleHeader
+                    new_ancestry[i] = BlockAtRuleHeader(
+                        '@media',
+                        "%s and %s" % (header.argument, block.argument))
+                    break
+                else:
+                    new_ancestry.insert(i, block.header)
+            else:
+                new_ancestry.insert(0, block.header)
+        else:
+            new_ancestry.append(block.header)
+
+        new_rule = SassRule(
+            source_file=rule.source_file,
+            lineno=block.lineno,
+            unparsed_contents=block.unparsed_contents,
+
+            #dependent_rules
+            options=rule.options.copy(),
+            #properties
+            #extends_selectors
+            ancestry=new_ancestry,
+
+            namespace=rule.namespace.derive(),
+        )
+
+        p_children.appendleft(new_rule)
+
+    @print_timing(10)
     def _nest_rules(self, rule, p_children, scope, block):
         """
         Implements Nested CSS rules
         """
-        if block.is_atrule:
-            new_ancestry = list(rule.ancestry)
-            if block.directive == '@media' and rule.ancestry:
-                for i, header in reversed(list(enumerate(new_ancestry))):
-                    if header.is_selector:
-                        continue
-                    elif header.directive == '@media':
-                        from scss.rule import BlockAtRuleHeader
-                        new_ancestry[i] = BlockAtRuleHeader(
-                            '@media',
-                            "%s and %s" % (header.argument, block.argument))
-                        break
-                    else:
-                        new_ancestry.insert(i, block.header)
-                else:
-                    new_ancestry.insert(0, block.header)
-            else:
-                new_ancestry.append(block.header)
-
-            new_rule = SassRule(
-                source_file=rule.source_file,
-                lineno=block.lineno,
-                unparsed_contents=block.unparsed_contents,
-
-                #dependent_rules
-                options=rule.options.copy(),
-                #properties
-                #extends_selectors
-                ancestry=new_ancestry,
-
-                namespace=rule.namespace.derive(),
-            )
-
-            p_children.appendleft(new_rule)
-
-            return
-
         calculator = Calculator(rule.namespace)
         raw_selectors = calculator.apply_vars(block.prop)
         c_selectors, c_parents = self.parse_selectors(raw_selectors)
