@@ -391,15 +391,7 @@ class Selector(object):
             p_extras[1:] + r_extras[1:],
             key=lambda token: {'#':1,'.':2,':':3}.get(token[0], 0)))
 
-        if p_before and r_trail:
-            # Two conflicting "preceding" parts.  Rather than try to cross-join
-            # them, just generate two possibilities: P R and R P.
-            befores = [p_before + r_trail, r_trail + p_before]
-        else:
-            # At least one of them is empty, so just concatenate
-            befores = [p_before + r_trail]
-
-        ret = [before + focal_node for before in befores]
+        befores = self._merge_trails(p_before, r_trail)
 
         return [Selector(None, before + focal_node + p_after) for before in befores]
 
@@ -434,8 +426,115 @@ class Selector(object):
         extras = [focal_node[0]] + [token for token in focal_node[1:] if token not in hinge[-1]]
         return self._tree[:start_idx], extras, self._tree[end_idx + 1:]
 
+    @staticmethod
+    def _merge_trails(left, right):
+        # XXX docs docs docs
+
+        if not left or not right:
+            # At least one is empty, so there are no conflicts; just
+            # return whichever isn't empty
+            return [left or right]
+
+        sequencer = LeastCommonSubsequencer(left, right, eq=_merge_selector_nodes)
+        lcs = sequencer.find()
+
+        ret = [[]]
+        left_last = 0
+        right_last = 0
+        for left_next, right_next, merged in lcs:
+            left_prefix = left[left_last:left_next]
+            right_prefix = right[right_last:right_next]
+
+            new_ret = [
+                node + left_prefix + right_prefix + [merged]
+                for node in ret]
+            if left_prefix and right_prefix:
+                new_ret.extend(
+                    node + right_prefix + left_prefix + [merged]
+                    for node in ret)
+            ret = new_ret
+
+            left_last = left_next + 1
+            right_last = right_next + 1
+
+        left_prefix = left[left_last:]
+        right_prefix = right[right_last:]
+        # TODO factor this out
+        new_ret = [
+            node + left_prefix + right_prefix
+            for node in ret]
+        if left_prefix and right_prefix:
+            new_ret.extend(
+                node + right_prefix + left_prefix
+                for node in ret)
+        ret = new_ret
+
+        return ret
+
     def render(self):
         return ''.join(''.join(node) for node in self._tree).lstrip()
+
+
+def _merge_selector_nodes(a, b):
+    # TODO document, turn me into a method on something
+    # TODO what about combinators
+    aset = frozenset(a[1:])
+    bset = frozenset(b[1:])
+    if aset <= bset:
+        return a + [token for token in b[1:] if token not in aset]
+    elif bset <= aset:
+        return b + [token for token in a[1:] if token not in bset]
+    else:
+        return None
+
+
+
+class LeastCommonSubsequencer(object):
+    # http://en.wikipedia.org/wiki/Longest_common_subsequence_problem#Code_for_the_dynamic_programming_solution
+    def __init__(self, a, b, eq=lambda a, b: a if a == b else None):
+        self.a = a
+        self.b = b
+        self.eq_matrix = dict()
+        self.length_matrix = dict()
+
+        self.init_eq_matrix(eq)
+        self.init_length_matrix()
+
+    def init_eq_matrix(self, eq):
+        for ai, aval in enumerate(self.a):
+            for bi, bval in enumerate(self.b):
+                self.eq_matrix[ai, bi] = eq(aval, bval)
+
+    def init_length_matrix(self):
+        for ai in range(-1, len(self.a)):
+            for bi in range(-1, len(self.b)):
+                if ai == -1 or bi == -1:
+                    l = 0
+                elif self.eq_matrix[ai, bi]:
+                    l = self.length_matrix[ai - 1, bi - 1] + 1
+                else:
+                    l = max(
+                        self.length_matrix[ai, bi - 1],
+                        self.length_matrix[ai - 1, bi])
+
+                self.length_matrix[ai, bi] = l
+
+    def backtrack(self, ai, bi):
+        if ai < 0 or bi < 0:
+            # Base case: backtracked beyond the beginning with no match
+            return []
+
+        merged = self.eq_matrix[ai, bi]
+        if merged is not None:
+            return self.backtrack(ai - 1, bi - 1) + [(ai, bi, merged)]
+
+        if self.length_matrix[ai, bi - 1] > self.length_matrix[ai - 1, bi]:
+            return self.backtrack(ai, bi - 1)
+        else:
+            return self.backtrack(ai - 1, bi)
+
+    def find(self):
+        return self.backtrack(len(self.a) - 1, len(self.b) - 1)
 
 
 class BlockHeader(object):

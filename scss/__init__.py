@@ -1304,76 +1304,6 @@ class Scss(object):
 
         p_children.appendleft(_rule)
 
-    @print_timing(4)
-    def link_with_parents(self, grouped_rules, parent, c_selectors, c_rules):
-        """
-        Link with a parent for the current child rule.
-        If parents found, returns a list of parent rules to the child
-        """
-        parent_found = None
-        for (p_selectors, p_extends), p_rules in grouped_rules.items():
-            new_selectors = set()
-            found = False
-
-            # Finds all the parent selectors and parent selectors with another
-            # bind selectors behind. For example, if `.specialClass` extends `.baseClass`,
-            # and there is a `.baseClass` selector, the extension should create
-            # `.specialClass` for that rule, but if there's also a `.baseClass a`
-            # it also should create `.specialClass a`
-            for p_selector in p_selectors:
-                if parent not in p_selector:
-                    continue
-
-                # get the new child selector to add (same as the parent selector but with the child name)
-                # since selectors can be together, separated with # or . (i.e. something.parent) check that too:
-                for c_selector in c_selectors:
-                    # Get whatever is different between the two selectors:
-                    _c_selector, _parent = c_selector, parent
-                    lcp = self.longest_common_prefix(_c_selector, _parent)
-                    if lcp:
-                        _c_selector = _c_selector[lcp:]
-                        _parent = _parent[lcp:]
-                    lcs = self.longest_common_suffix(_c_selector, _parent)
-                    if lcs:
-                        _c_selector = _c_selector[:-lcs]
-                        _parent = _parent[:-lcs]
-                    if _c_selector and _parent:
-                        # Get the new selectors:
-                        prev_symbol = '(?<![%#.:])' if _parent[0] in ('%', '#', '.', ':') else r'(?<![-\w%#.:])'
-                        post_symbol = r'(?![-\w])'
-                        new_parent = re.sub(prev_symbol + _parent + post_symbol, _c_selector, p_selector)
-                        if p_selector != new_parent:
-                            new_selectors.add(new_parent)
-                            found = True
-
-            if found:
-                # add parent:
-                parent_found = parent_found or []
-                parent_found.extend(p_rules)
-
-            new_selectors = frozenset(new_selectors)
-            if new_selectors:
-                # Re-include parents
-                new_selectors |= p_selectors
-
-                # rename node:
-                if new_selectors != p_selectors:
-                    del grouped_rules[p_selectors, p_extends]
-                    new_key = new_selectors, p_extends
-                    grouped_rules[new_key].extend(p_rules)
-
-                deps = set()
-                # save child dependencies:
-                for c_rule in c_rules or []:
-                    assert c_rule.selectors == c_selectors
-                    deps.add(c_rule.position)
-
-                for p_rule in p_rules:
-                    p_rule.selectors = new_selectors  # re-set the SELECTORS for the rules
-                    p_rule.dependent_rules.update(deps)  # position is the "index" of the object
-
-        return parent_found
-
     @print_timing(3)
     def parse_extends(self):
         """
@@ -1423,7 +1353,6 @@ class Scss(object):
                 for cand in candidates:
                     extend_selector_obj, = Selector.parse(cand)
                     if extend_selector_obj.is_superset_of(selobj):
-                        print("looks like a match to me", selector, cand)
                         extends_selectors.append(extend_selector_obj)
 
                 if not extends_selectors:
@@ -1452,78 +1381,6 @@ class Scss(object):
                             # TODO this could lead to duplicates?  maybe should
                             # be a set too
                             selector_to_rules[parent.render()].append(parent_rule)
-
-        return
-
-        # First group rules by a tuple of (selectors, @extends)
-        pos = 0
-        grouped_rules = defaultdict(list)
-        for rule in self.rules:
-            pos += 1
-            rule.position = pos
-
-            key = rule.selectors, frozenset(rule.extends_selectors)
-            grouped_rules[key].append(rule)
-
-        # To be able to manage multiple extends, you need to
-        # destroy the actual node and create many nodes that have
-        # mono extend. The first one gets all the css rules
-        for (selectors, parents), rules in list(grouped_rules.items()):
-            if len(parents) <= 1:
-                continue
-
-            del grouped_rules[selectors, parents]
-            for parent in parents:
-                new_key = selectors, frozenset((parent,))
-                grouped_rules[new_key].extend(rules)
-                rules = []  # further rules extending other parents will be empty
-
-        cnt = 0
-        parents_left = True
-        while parents_left and cnt < 10:
-            cnt += 1
-            parents_left = False
-            for key in list(grouped_rules.keys()):
-                if key not in grouped_rules:
-                    # Nodes might have been renamed while linking parents...
-                    continue
-
-                selectors, orig_parents = key
-                if not orig_parents:
-                    continue
-
-                parent, = orig_parents
-                parents_left = True
-
-                rules = grouped_rules.pop(key)
-                new_key = selectors, frozenset()
-                grouped_rules[new_key].extend(rules)
-
-                print()
-                print("calling link_with_parents.")
-                print(grouped_rules)
-                print(parent)
-                print(selectors)
-                print(rules)
-                parents = self.link_with_parents(grouped_rules, parent, selectors, rules)
-                print("got back:", parents)
-
-                if parents is None:
-                    log.warn("Parent rule not found: %s", parent)
-                    continue
-
-                # from the parent, inherit the context and the options:
-                from scss.rule import Namespace
-                parent_namespaces = [parent.namespace for parent in parents]
-                new_options = {}
-                for parent in parents:
-                    new_options.update(parent.options)
-                for rule in rules:
-                    rule.namespace = Namespace.derive_from(
-                        rule.namespace, *parent_namespaces)
-                    _new_options = new_options.copy()
-                    _new_options.update(rule.options)
-                    rule.options = _new_options
 
     @print_timing(3)
     def manage_order(self):
