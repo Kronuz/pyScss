@@ -364,8 +364,7 @@ class Selector(object):
             # return whichever isn't empty
             return [left or right]
 
-        sequencer = LeastCommonSubsequencer(left, right, eq=_merge_selector_nodes)
-        lcs = sequencer.find()
+        lcs = longest_common_subsequence(left, right, _merge_selector_nodes)
 
         ret = [()]
         left_last = 0
@@ -415,49 +414,81 @@ def _merge_selector_nodes(a, b):
         return None
 
 
-class LeastCommonSubsequencer(object):
-    # http://en.wikipedia.org/wiki/Longest_common_subsequence_problem#Code_for_the_dynamic_programming_solution
-    def __init__(self, a, b, eq=lambda a, b: a if a == b else None):
-        self.a = a
-        self.b = b
-        self.eq_matrix = dict()
-        self.length_matrix = dict()
+def longest_common_subsequence(a, b, mergefunc=None):
+    """Find the longest common subsequence between two iterables.
 
-        self.init_eq_matrix(eq)
-        self.init_length_matrix()
+    The longest common subsequence is the core of any diff algorithm: it's the
+    longest sequence of elements that appears in both parent sequences in the
+    same order, but NOT necessarily consecutively.
 
-    def init_eq_matrix(self, eq):
-        for ai, aval in enumerate(self.a):
-            for bi, bval in enumerate(self.b):
-                self.eq_matrix[ai, bi] = eq(aval, bval)
+    Original algorithm borrowed from Wikipedia:
+    http://en.wikipedia.org/wiki/Longest_common_subsequence_problem#Code_for_the_dynamic_programming_solution
 
-    def init_length_matrix(self):
-        for ai in range(-1, len(self.a)):
-            for bi in range(-1, len(self.b)):
-                if ai == -1 or bi == -1:
-                    l = 0
-                elif self.eq_matrix[ai, bi]:
-                    l = self.length_matrix[ai - 1, bi - 1] + 1
-                else:
-                    l = max(
-                        self.length_matrix[ai, bi - 1],
-                        self.length_matrix[ai - 1, bi])
+    This function is used only to implement @extend, largely because that's
+    what the Ruby implementation does.  Thus it's been extended slightly from
+    the simple diff-friendly algorithm given above.
 
-                self.length_matrix[ai, bi] = l
+    What @extend wants to know is whether two simple selectors are compatible,
+    not just equal.  To that end, you must pass in a "merge" function to
+    compare a pair of elements manually.  It should return `None` if they are
+    incompatible, and a MERGED element if they are compatible -- in the case of
+    selectors, this is whichever one is more specific.
 
-    def backtrack(self, ai, bi):
-        if ai < 0 or bi < 0:
-            # Base case: backtracked beyond the beginning with no match
-            return []
+    Because of this fuzzier notion of equality, the return value is a list of
+    ``(a_index, b_index, value)`` tuples rather than items alone.
+    """
+    if mergefunc is None:
+        # Stupid default, just in case
+        def mergefunc(a, b):
+            if a == b:
+                return a
+            return None
 
-        merged = self.eq_matrix[ai, bi]
+    # Precalculate equality, since it can be a tad expensive and every pair is
+    # compared at least once
+    eq = {}
+    for ai, aval in enumerate(a):
+        for bi, bval in enumerate(b):
+            eq[ai, bi] = mergefunc(aval, bval)
+
+    # Build the "length" matrix, which provides the length of the LCS for
+    # arbitrary-length prefixes.  -1 exists only to support the base case
+    prefix_lcs_length = {}
+    for ai in range(-1, len(a)):
+        for bi in range(-1, len(b)):
+            if ai == -1 or bi == -1:
+                l = 0
+            elif eq[ai, bi]:
+                l = prefix_lcs_length[ai - 1, bi - 1] + 1
+            else:
+                l = max(
+                    prefix_lcs_length[ai, bi - 1],
+                    prefix_lcs_length[ai - 1, bi])
+
+            prefix_lcs_length[ai, bi] = l
+
+    # The interesting part.  The key insight is that the bottom-right value in
+    # the length matrix must be the length of the LCS because of how the matrix
+    # is defined, so all that's left to do is backtrack from the ends of both
+    # sequences in whatever way keeps the LCS as long as possible, and keep
+    # track of the equal pairs of elements we see along the way.
+    # Wikipedia does this with recursion, but the algorithm is trivial to
+    # rewrite as a loop, as below.
+    ai = len(a) - 1
+    bi = len(b) - 1
+
+    ret = []
+    while ai >= 0 and bi >= 0:
+        merged = eq[ai, bi]
         if merged is not None:
-            return self.backtrack(ai - 1, bi - 1) + [(ai, bi, merged)]
-
-        if self.length_matrix[ai, bi - 1] > self.length_matrix[ai - 1, bi]:
-            return self.backtrack(ai, bi - 1)
+            ret.append((ai, bi, merged))
+            ai -= 1
+            bi -= 1
+        elif prefix_lcs_length[ai, bi - 1] > prefix_lcs_length[ai - 1, bi]:
+            bi -= 1
         else:
-            return self.backtrack(ai - 1, bi)
+            ai -= 1
 
-    def find(self):
-        return self.backtrack(len(self.a) - 1, len(self.b) - 1)
+    # ret has the latest items first, which is backwards
+    ret.reverse()
+    return ret
