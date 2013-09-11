@@ -4,9 +4,9 @@
 *html .b {
   color: #000;
 }
-*:first-child+html .a {
+*:first-child + html .a {
   color: #fff;
 }
-*:first-child+html .b {
+*:first-child + html .b {
   color: #000;
 }

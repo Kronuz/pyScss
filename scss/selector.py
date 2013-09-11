@@ -1,80 +1,262 @@
+import re
+
+# Super dumb little selector parser.
+
+# Yes, yes, this is a regex tokenizer.  The actual meaning of the
+# selector doesn't matter; the parts are just important for matching up
+# during @extend.
+
+# Selectors have three levels: simple, combinator, comma-delimited.
+# Each combinator can only appear once as a delimiter between simple
+# selectors, so it can be thought of as a prefix.
+# So this:
+#     a.b + c, d#e
+# parses into two Selectors with these structures:
+#     [[' ', 'a', '.b'], ['+', 'c']]
+#     [[' ', 'd', '#e']]
+# Note that the first simple selector has an implied descendant
+# combinator -- i.e., it is a descendant of the root element.
+# TODO `*html` is incorrectly parsed as a single selector
+# TODO this oughta be touched up for css4 selectors
+SELECTOR_TOKENIZER = re.compile(
+r'''
+    # Colons introduce pseudo-selectors, sometimes with parens
+    # TODO doesn't handle quoted )
+    [:]+ [-\w]+ (?: [(] .+? [)] )?
+
+    # These guys are combinators -- note that a single space counts too
+    | \s* [ +>~] \s*
+
+    # Square brackets are attribute tests
+    # TODO: this doesn't handle ] within a string
+    | [[] .+? []]
+
+    # Dot and pound start class/id selectors.  Percent starts a Sass
+    # extend-target faux selector.
+    | [.#%] [-\w]+
+
+    # Percentages are used for @keyframes
+    | \d+ [%]
+
+    # Plain identifiers, or single asterisks, are element names
+    | [-\w]+
+    | [*]
+
+    # & is the sass replacement token
+    | [&]
+
+    # And as a last-ditch effort, just eat up to whitespace
+    | (\S+)
+''', re.VERBOSE | re.MULTILINE)
+
+
+# Maps the first character of a token to a rough ordering.  The default
+# (element names) is zero.
+TOKEN_TYPE_ORDER = {
+    '#': 2,
+    '.': 3,
+    ':': 4,
+    '[': 5,
+    '%': 6,
+}
+TOKEN_SORT_KEY = lambda token: TOKEN_TYPE_ORDER.get(token[0], 0)
+
+
+class SimpleSelector(object):
+    def __init__(self, combinator, tokens):
+        self.combinator = combinator
+        # TODO enforce that only one element name (including *) appears in a
+        # selector
+        # TODO remove duplicates
+        self.tokens = tuple(sorted(tokens, key=TOKEN_SORT_KEY))
+
+    def __repr__(self):
+        return "<%s: %r>" % (type(self).__name__, self.render())
+
+    def __hash__(self):
+        return hash((self.combinator, self.tokens))
+
+    def __eq__(self, other):
+        if not isinstance(other, SimpleSelector):
+            return NotImplemented
+
+        return self.combinator == other.combinator and self.tokens == other.tokens
+
+    @property
+    def has_parent_reference(self):
+        return '&' in self.tokens or 'self' in self.tokens
+
+    @property
+    def has_placeholder(self):
+        return any(
+            token[0] == '%'
+            for token in self.tokens)
+
+    def is_superset_of(self, other):
+        return (
+            self.combinator == other.combinator and
+            set(self.tokens) <= set(other.tokens))
+
+    def replace_parent(self, parent_simples):
+        assert parent_simples
+
+        ancestors = parent_simples[:-1]
+        parent = parent_simples[-1]
+
+        did_replace = False
+        new_tokens = []
+        for token in self.tokens:
+            if not did_replace and token in ('&', 'self'):
+                did_replace = True
+                new_tokens.extend(parent.tokens)
+            else:
+                new_tokens.append(token)
+
+        if did_replace:
+            # This simple selector was merged into the direct parent
+            merged_simple = type(self)(self.combinator, new_tokens)
+            return ancestors + (merged_simple,)
+        else:
+            # This simple selector is completely separate
+            return parent_simples + (self,)
+
+    # TODO just use set ops for these, once the constructor removes dupes
+    def merge_with(self, other):
+        new_tokens = self.tokens + tuple(token for token in other.tokens if token not in set(self.tokens))
+        return type(self)(self.combinator, new_tokens)
+
+    def difference(self, other):
+        new_tokens = tuple(token for token in self.tokens if token not in set(other.tokens))
+        return type(self)(self.combinator, new_tokens)
+
+    def render(self):
+        # TODO fail if there are no tokens, or if one is a placeholder?
+        rendered = ''.join(self.tokens)
+        if self.combinator != ' ':
+            rendered = ' '.join((self.combinator, rendered))
+
+        return rendered
+
+
 class Selector(object):
     """A single CSS selector."""
 
     def __init__(self, selector, tree):
         """Private; please use parse()."""
         self.original_selector = selector
-        self._tree = tree
+        # TODO rename this
+        # TODO enforce uniqueness
+        self._tree = tuple(tree)
 
     @classmethod
-    def parse(cls, selector):
-        # Super dumb little selector parser
+    def parse_many(cls, selector):
+        selector = selector.strip()
+        ret = []
+        pending_tree = []
+        pending_combinator = ' '
+        pending_tokens = []
 
-        # Yes, yes, this is a regex tokenizer.  The actual meaning of the
-        # selector doesn't matter; the parts are just important for matching up
-        # during @extend.
-        import re
-        tokenizer = re.compile(
-        r'''
-            # Colons introduce pseudo-selectors, sometimes with parens
-            # TODO doesn't handle quoted )
-            [:]+ [-\w]+ (?: [(] .+? [)] )?
-
-            # Square brackets are attribute tests
-            # TODO: this doesn't handle ] within a string
-            | [[] .+? []]
-
-            # Dot and pound start class/id selectors.  Percent starts a Sass
-            # extend-target faux selector.
-            | [.#%] [-\w]+
-
-            # Plain identifiers, or single asterisks, are element names
-            | [-\w]+
-            | [*]
-
-            # These guys are combinators -- note that a single space counts too
-            | \s* [ +>~] \s*
-
-            # And as a last-ditch effort for something really outlandish (e.g.
-            # percentages as faux-selectors in @keyframes), just eat up to the
-            # next whitespace
-            | (\S+)
-        ''', re.VERBOSE | re.MULTILINE)
-
-        # Selectors have three levels: simple, combinator, comma-delimited.
-        # Each combinator can only appear once as a delimiter between simple
-        # selectors, so it can be thought of as a prefix.
-        # So this:
-        #     a.b + c, d#e
-        # parses into two Selectors with these structures:
-        #     [[' ', 'a', '.b'], ['+', 'c']]
-        #     [[' ', 'd', '#e']]
-        # Note that the first simple selector has an implied descendant
-        # combinator -- i.e., it is a descendant of the root element.
-        trees = [[[' ']]]
         pos = 0
         while pos < len(selector):
             # TODO i don't think this deals with " + " correctly.  anywhere.
-            m = tokenizer.match(selector, pos)
+            m = SELECTOR_TOKENIZER.match(selector, pos)
             if not m:
                 # TODO prettify me
                 raise SyntaxError("Couldn't parse selector: %r" % (selector,))
 
             token = m.group(0)
-            if token == ',':
-                trees.append([[' ']])
-            elif token in ' +>~':
-                trees[-1].append([token])
-            else:
-                trees[-1][-1].append(token)
-
             pos += len(token)
 
-        # TODO this passes the whole selector, not just the part
-        return [cls(selector, tree) for tree in trees]
+            # Kill any extraneous space, BUT make sure not to turn a lone space
+            # into an empty string
+            token = token.strip() or ' '
+
+            if token == ',':
+                # End current selector
+                # TODO what about "+ ,"?  what do i even do with that
+                if pending_tokens:
+                    pending_tree.append(
+                        SimpleSelector(pending_combinator, pending_tokens))
+                if pending_tree:
+                    ret.append(cls(selector, pending_tree))
+                pending_tree = []
+                pending_combinator = ' '
+                pending_tokens = []
+            elif token in ' +>~':
+                # End current simple selector
+                if pending_tokens:
+                    pending_tree.append(
+                        SimpleSelector(pending_combinator, pending_tokens))
+                pending_combinator = token
+                pending_tokens = []
+            else:
+                # Add to pending simple selector
+                pending_tokens.append(token)
+
+
+        # Deal with any remaining pending bits
+        # TODO reduce copy-paste yikes
+        if pending_tokens:
+            pending_tree.append(
+                SimpleSelector(pending_combinator, pending_tokens))
+        if pending_tree:
+            ret.append(cls(selector, pending_tree))
+
+        return ret
+
+    @classmethod
+    def parse(cls, selector_string):
+        # TODO remove me
+        return cls.parse_many(selector_string)
+
+    @classmethod
+    def parse_one(cls, selector_string):
+        selectors = cls.parse_many(selector_string)
+        if len(selectors) != 1:
+            # TODO better error
+            raise ValueError
+
+        return selectors[0]
 
     def __repr__(self):
-        return "<%s: %r>" % (type(self).__name__, self._tree)
+        return "<%s: %r>" % (type(self).__name__, self.render())
+
+    def __hash__(self):
+        return hash(self._tree)
+
+    def __eq__(self, other):
+        if not isinstance(other, Selector):
+            return NotImplemented
+
+        return self._tree == other._tree
+
+    @property
+    def has_parent_reference(self):
+        return any(
+            simple.has_parent_reference
+            for simple in self._tree)
+
+    @property
+    def has_placeholder(self):
+        return any(
+            simple.has_placeholder
+            for simple in self._tree)
+
+    def with_parent(self, parent):
+        saw_parent_ref = False
+
+        new_tree = []
+        for simple in self._tree:
+            if simple.has_parent_reference:
+                new_tree.extend(simple.replace_parent(parent._tree))
+                saw_parent_ref = True
+            else:
+                new_tree.append(simple)
+
+        if not saw_parent_ref:
+            new_tree = parent._tree + tuple(new_tree)
+
+        return type(self)("", new_tree)
 
     def lookup_key(self):
         """Build a key from the "important" parts of a selector: elements,
@@ -83,7 +265,7 @@ class Selector(object):
         # TODO how does this work with multiple selectors
         parts = set()
         for node in self._tree:
-            for token in node[1:]:
+            for token in node.tokens:
                 if token[0] not in ':[':
                     parts.add(token)
 
@@ -107,7 +289,7 @@ class Selector(object):
                 node = self._tree[idx]
                 idx += 1
 
-                if node[0] == other_node[0] and set(node[1:]) <= set(other_node[1:]):
+                if node.is_superset_of(other_node):
                     break
 
         return True
@@ -134,17 +316,13 @@ class Selector(object):
         r_trail = replacement._tree[:-1]
         r_extras = replacement._tree[-1]
 
-        # TODO is this the right order?
         # TODO what if the prefix doesn't match?  who wins?  should we even get
         # this far?
-        focal_node = [p_extras[0]]
-        focal_node.extend(sorted(
-            p_extras[1:] + r_extras[1:],
-            key=lambda token: {'#':1,'.':2,':':3}.get(token[0], 0)))
+        focal_nodes = (p_extras.merge_with(r_extras),)
 
         befores = self._merge_trails(p_before, r_trail)
 
-        return [Selector(None, before + focal_node + p_after) for before in befores]
+        return [Selector(None, before + focal_nodes + p_after) for before in befores]
 
     def break_around(self, hinge):
         """Given a simple selector node contained within this one (a "hinge"),
@@ -158,7 +336,7 @@ class Selector(object):
         for i, node in enumerate(self._tree):
             # TODO does first combinator have to match?  maybe only if the
             # hinge has a non-descendant combinator?
-            if set(hinge_start[1:]) <= set(node[1:]):
+            if hinge_start.is_superset_of(node):
                 start_idx = i
                 break
         else:
@@ -166,7 +344,7 @@ class Selector(object):
 
         for i, hinge_node in enumerate(hinge):
             self_node = self._tree[start_idx + i]
-            if hinge_node[0] == self_node[0] and set(hinge_node[1:]) <= set(self_node[1:]):
+            if hinge_node.is_superset_of(self_node):
                 continue
 
             # TODO this isn't true; consider finding `a b` in `a c a b`
@@ -174,7 +352,7 @@ class Selector(object):
 
         end_idx = start_idx + len(hinge) - 1
         focal_node = self._tree[end_idx]
-        extras = [focal_node[0]] + [token for token in focal_node[1:] if token not in hinge[-1]]
+        extras = focal_node.difference(hinge[-1])
         return self._tree[:start_idx], extras, self._tree[end_idx + 1:]
 
     @staticmethod
@@ -189,7 +367,7 @@ class Selector(object):
         sequencer = LeastCommonSubsequencer(left, right, eq=_merge_selector_nodes)
         lcs = sequencer.find()
 
-        ret = [[]]
+        ret = [()]
         left_last = 0
         right_last = 0
         for left_next, right_next, merged in lcs:
@@ -197,11 +375,11 @@ class Selector(object):
             right_prefix = right[right_last:right_next]
 
             new_ret = [
-                node + left_prefix + right_prefix + [merged]
+                node + left_prefix + right_prefix + (merged,)
                 for node in ret]
             if left_prefix and right_prefix:
                 new_ret.extend(
-                    node + right_prefix + left_prefix + [merged]
+                    node + right_prefix + left_prefix + (merged,)
                     for node in ret)
             ret = new_ret
 
@@ -223,21 +401,18 @@ class Selector(object):
         return ret
 
     def render(self):
-        return ''.join(''.join(node) for node in self._tree).lstrip()
+        return ' '.join(simple.render() for simple in self._tree).lstrip()
 
 
 def _merge_selector_nodes(a, b):
     # TODO document, turn me into a method on something
     # TODO what about combinators
-    aset = frozenset(a[1:])
-    bset = frozenset(b[1:])
-    if aset <= bset:
-        return a + [token for token in b[1:] if token not in aset]
-    elif bset <= aset:
-        return b + [token for token in a[1:] if token not in bset]
+    if a.is_superset_of(b):
+        return a.merge_with(b)
+    elif b.is_superset_of(a):
+        return b.merge_with(a)
     else:
         return None
-
 
 
 class LeastCommonSubsequencer(object):
