@@ -4,7 +4,6 @@ from __future__ import print_function
 import six
 import logging
 
-from scss.cssdefs import _has_placeholder_re
 from scss.types import Value
 
 
@@ -142,7 +141,7 @@ class SassRule(object):
     metadata, like `@extend` rules and `@media` nesting.
     """
 
-    def __init__(self, source_file, unparsed_contents=None, dependent_rules=None,
+    def __init__(self, source_file, unparsed_contents=None,
             options=None, properties=None,
             namespace=None,
             lineno=0, extends_selectors=frozenset(),
@@ -161,11 +160,6 @@ class SassRule(object):
         else:
             self.namespace = namespace
 
-        if dependent_rules is None:
-            self.dependent_rules = set()
-        else:
-            self.dependent_rules = dependent_rules
-
         if properties is None:
             self.properties = []
         else:
@@ -174,7 +168,7 @@ class SassRule(object):
         self.retval = None
 
         if ancestry is None:
-            self.ancestry = []
+            self.ancestry = RuleAncestry()
         else:
             self.ancestry = ancestry
 
@@ -187,33 +181,21 @@ class SassRule(object):
     @property
     def selectors(self):
         # TEMPORARY
-        if self.ancestry and self.ancestry[-1].is_selector:
-            return frozenset(self.ancestry[-1].selectors)
+        if self.ancestry.headers and self.ancestry.headers[-1].is_selector:
+            return self.ancestry.headers[-1].selectors
         else:
-            return frozenset()
-
-    @selectors.setter
-    def selectors(self, value):
-        for header in reversed(self.ancestry):
-            if header.is_selector:
-                header.selectors |= value
-                return
-            else:
-                # TODO media
-                break
-
-        self.ancestry.append(BlockSelectorHeader(value))
+            return ()
 
     @property
     def file_and_line(self):
-        """Returns the filename and line number where this rule originally
+        """Return the filename and line number where this rule originally
         appears, in the form "foo.scss:3".  Used for error messages.
         """
         return "%s:%d" % (self.source_file.filename, self.lineno)
 
     @property
     def is_empty(self):
-        """Returns whether this rule is considered "empty" -- i.e., has no
+        """Return whether this rule is considered "empty" -- i.e., has no
         contents that should end up in the final CSS.
         """
         if self.properties:
@@ -245,6 +227,52 @@ class SassRule(object):
 
             namespace=self.namespace.derive(),
         )
+
+
+class RuleAncestry(object):
+    def __init__(self, headers=()):
+        self.headers = tuple(headers)
+
+    def __len__(self):
+        return len(self.headers)
+
+    def with_nested_selectors(self, c_selectors):
+        if self.headers and self.headers[-1].is_selector:
+            # Need to merge with parent selectors
+            p_selectors = self.headers[-1].selectors
+
+            new_selectors = []
+            for p_selector in p_selectors:
+                for c_selector in c_selectors:
+                    new_selectors.append(c_selector.with_parent(p_selector))
+
+            # Replace the last header with the new merged selectors
+            new_headers = self.headers[:-1] + (BlockSelectorHeader(new_selectors),)
+            return RuleAncestry(new_headers)
+
+        else:
+            # Whoops, no parent selectors.  Just need to double-check that
+            # there are no uses of `&`.
+            for c_selector in c_selectors:
+                if c_selector.has_parent_reference:
+                    raise ValueError("Can't use parent selector '&' in top-level rules")
+
+            # Add the children as a new header
+            new_headers = self.headers + (BlockSelectorHeader(c_selectors),)
+            return RuleAncestry(new_headers)
+
+    def with_more_selectors(self, selectors):
+        """Return a new ancestry that also matches the given selectors.  No
+        nesting is done.
+        """
+        if self.headers and self.headers[-1].is_selector:
+            new_selectors = self.headers[-1].selectors + tuple(selectors)
+            new_headers = self.headers[:-1] + (
+                BlockSelectorHeader(new_selectors),)
+            return RuleAncestry(new_headers)
+        else:
+            new_headers = self.headers + (BlockSelectorHeader(selectors),)
+            return RuleAncestry(new_headers)
 
 
 class BlockHeader(object):
@@ -321,16 +349,16 @@ class BlockSelectorHeader(BlockHeader):
     is_selector = True
 
     def __init__(self, selectors):
-        self.selectors = selectors
+        self.selectors = tuple(selectors)
 
     def __repr__(self):
         return "<%s %r>" % (self.__class__.__name__, self.selectors)
 
     def render(self, sep=', ', super_selector=''):
         return sep.join(sorted(
-            super_selector + s
+            super_selector + s.render()
             for s in self.selectors
-            if not _has_placeholder_re.search(s)))
+            if not s.has_placeholder))
 
 
 class BlockScopeHeader(BlockHeader):

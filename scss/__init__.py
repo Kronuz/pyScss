@@ -50,6 +50,7 @@ from collections import defaultdict, deque
 import glob
 from itertools import product
 import logging
+import operator
 import os.path
 import re
 import sys
@@ -403,10 +404,7 @@ class Scss(object):
         self.parse_children(children)
 
         # this will manage @extends
-        self.parse_extends()
-
-        # this will manage the order of the rules
-        self.manage_order()
+        self.apply_extends(self.rules)
 
         rules_by_file, css_files = self.parse_properties()
 
@@ -480,23 +478,24 @@ class Scss(object):
 
         Returns a 2-tuple: a set of selectors, and a set of extended selectors.
         """
-        # Fixe tabs and spaces in selectors
+        # Fix tabs and spaces in selectors
         raw_selectors = _spaces_re.sub(' ', raw_selectors)
 
-        parents = set()
-        if ' extends ' in raw_selectors:
-            selectors = set()
-            for key in raw_selectors.split(','):
-                child, _, parent = key.partition(' extends ')
-                child = child.strip()
-                parent = parent.strip()
-                selectors.add(child)
-                parents.update(s.strip() for s in parent.split('&'))
-        else:
-            selectors = set(s.strip() for s in raw_selectors.split(','))
+        import re
 
-        selectors.discard('')
-        parents.discard('')
+        from scss.selector import Selector
+
+        parts = re.split(r'\s+extends\s+', raw_selectors, 1)
+        if len(parts) > 1:
+            unparsed_selectors, unsplit_parents = parts
+            # Multiple `extends` are delimited by `&`
+            unparsed_parents = unsplit_parents.split('&')
+        else:
+            unparsed_selectors, = parts
+            unparsed_parents = ()
+
+        selectors = Selector.parse_many(unparsed_selectors)
+        parents = [Selector.parse_one(parent) for parent in unparsed_parents]
 
         return selectors, parents
 
@@ -564,9 +563,12 @@ class Scss(object):
                 elif code == '@import':
                     self._do_import(rule, p_children, scope, block)
                 elif code == '@extend':
+                    from scss.selector import Selector
                     selectors = calculator.apply_vars(block.argument)
-                    rule.extends_selectors.update(p.strip() for p in selectors.replace(',', '&').split('&'))
-                    rule.extends_selectors.discard('')
+                    # XXX this no longer handles `&`, which is from xcss
+                    rule.extends_selectors.extend(Selector.parse_many(selectors))
+                    #rule.extends_selectors.update(p.strip() for p in selectors.replace(',', '&').split('&'))
+                    #rule.extends_selectors.discard('')
                 elif code == '@return':
                     ret = calculator.calculate(block.argument)
                     rule.retval = ret
@@ -895,7 +897,6 @@ class Scss(object):
                 unparsed_contents=source_file.contents,
 
                 # rule
-                #dependent_rules
                 options=rule.options,
                 properties=rule.properties,
                 extends_selectors=rule.extends_selectors,
@@ -1217,8 +1218,9 @@ class Scss(object):
         calculator = Calculator(rule.namespace)
         block.header.argument = calculator.apply_vars(block.header.argument)
 
-        new_ancestry = list(rule.ancestry)
-        if block.directive == '@media' and rule.ancestry:
+        # TODO merge into RuleAncestry
+        new_ancestry = list(rule.ancestry.headers)
+        if block.directive == '@media' and new_ancestry:
             for i, header in reversed(list(enumerate(new_ancestry))):
                 if header.is_selector:
                     continue
@@ -1235,16 +1237,16 @@ class Scss(object):
         else:
             new_ancestry.append(block.header)
 
+        from scss.rule import RuleAncestry
         new_rule = SassRule(
             source_file=rule.source_file,
             lineno=block.lineno,
             unparsed_contents=block.unparsed_contents,
 
-            #dependent_rules
             options=rule.options.copy(),
             #properties
             #extends_selectors
-            ancestry=new_ancestry,
+            ancestry=RuleAncestry(new_ancestry),
 
             namespace=rule.namespace.derive(),
         )
@@ -1260,40 +1262,13 @@ class Scss(object):
         raw_selectors = calculator.apply_vars(block.prop)
         c_selectors, c_parents = self.parse_selectors(raw_selectors)
 
-        p_selectors = rule.selectors
-        if not p_selectors:
-            # If no parents, pretend there's a single dummy parent selector
-            # so the loop below runs once
-            # XXX this is grody man and leaks down through all over the place
-            p_selectors = frozenset(('',))
-
-        better_selectors = set()
-        for c_selector in c_selectors:
-            for p_selector in p_selectors:
-                if c_selector == 'self':
-                    # xCSS extension: "self" means to hoist to the parent
-                    better_selectors.add(p_selector)
-                elif '&' in c_selector:  # Parent References
-                    better_selectors.add(c_selector.replace('&', p_selector))
-                elif p_selector:
-                    better_selectors.add(p_selector + ' ' + c_selector)
-                else:
-                    better_selectors.add(c_selector)
-
-        # Merge ancestry
-        from scss.rule import BlockSelectorHeader
-        selector_header = BlockSelectorHeader(better_selectors)
-        if rule.ancestry and rule.ancestry[-1].is_selector:
-            new_ancestry = rule.ancestry[:-1] + [selector_header]
-        else:
-            new_ancestry = rule.ancestry + [selector_header]
+        new_ancestry = rule.ancestry.with_nested_selectors(c_selectors)
 
         _rule = SassRule(
             source_file=rule.source_file,
             lineno=block.lineno,
             unparsed_contents=block.unparsed_contents,
 
-            #dependent_rules
             options=rule.options.copy(),
             #properties
             extends_selectors=c_parents,
@@ -1304,154 +1279,82 @@ class Scss(object):
 
         p_children.appendleft(_rule)
 
-    @print_timing(4)
-    def link_with_parents(self, grouped_rules, parent, c_selectors, c_rules):
-        """
-        Link with a parent for the current child rule.
-        If parents found, returns a list of parent rules to the child
-        """
-        parent_found = None
-        for (p_selectors, p_extends), p_rules in grouped_rules.items():
-            new_selectors = set()
-            found = False
-
-            # Finds all the parent selectors and parent selectors with another
-            # bind selectors behind. For example, if `.specialClass` extends `.baseClass`,
-            # and there is a `.baseClass` selector, the extension should create
-            # `.specialClass` for that rule, but if there's also a `.baseClass a`
-            # it also should create `.specialClass a`
-            for p_selector in p_selectors:
-                if parent not in p_selector:
-                    continue
-
-                # get the new child selector to add (same as the parent selector but with the child name)
-                # since selectors can be together, separated with # or . (i.e. something.parent) check that too:
-                for c_selector in c_selectors:
-                    # Get whatever is different between the two selectors:
-                    _c_selector, _parent = c_selector, parent
-                    lcp = self.longest_common_prefix(_c_selector, _parent)
-                    if lcp:
-                        _c_selector = _c_selector[lcp:]
-                        _parent = _parent[lcp:]
-                    lcs = self.longest_common_suffix(_c_selector, _parent)
-                    if lcs:
-                        _c_selector = _c_selector[:-lcs]
-                        _parent = _parent[:-lcs]
-                    if _c_selector and _parent:
-                        # Get the new selectors:
-                        prev_symbol = '(?<![%#.:])' if _parent[0] in ('%', '#', '.', ':') else r'(?<![-\w%#.:])'
-                        post_symbol = r'(?![-\w])'
-                        new_parent = re.sub(prev_symbol + _parent + post_symbol, _c_selector, p_selector)
-                        if p_selector != new_parent:
-                            new_selectors.add(new_parent)
-                            found = True
-
-            if found:
-                # add parent:
-                parent_found = parent_found or []
-                parent_found.extend(p_rules)
-
-            new_selectors = frozenset(new_selectors)
-            if new_selectors:
-                # Re-include parents
-                new_selectors |= p_selectors
-
-                # rename node:
-                if new_selectors != p_selectors:
-                    del grouped_rules[p_selectors, p_extends]
-                    new_key = new_selectors, p_extends
-                    grouped_rules[new_key].extend(p_rules)
-
-                deps = set()
-                # save child dependencies:
-                for c_rule in c_rules or []:
-                    assert c_rule.selectors == c_selectors
-                    deps.add(c_rule.position)
-
-                for p_rule in p_rules:
-                    p_rule.selectors = new_selectors  # re-set the SELECTORS for the rules
-                    p_rule.dependent_rules.update(deps)  # position is the "index" of the object
-
-        return parent_found
-
     @print_timing(3)
-    def parse_extends(self):
+    def apply_extends(self, rules):
+        """Run through the given rules and translate all the pending @extends
+        declarations into real selectors on parent rules.
+
+        The list is modified in-place and also sorted in dependency order.
         """
-        For each part, create the inheritance parts from the @extends
-        """
-        # First group rules by a tuple of (selectors, @extends)
-        pos = 0
-        grouped_rules = defaultdict(list)
-        for rule in self.rules:
-            pos += 1
-            rule.position = pos
+        # Game plan: for each rule that has an @extend, add its selectors to
+        # every rule that matches that @extend.
+        # First, rig a way to find arbitrary selectors quickly.  Most selectors
+        # revolve around elements, classes, and IDs, so parse those out and use
+        # them as a rough key.  Ignore order and duplication for now.
+        key_to_selectors = defaultdict(set)
+        selector_to_rules = defaultdict(list)
+        # DEVIATION: These are used to rearrange rules in dependency order, so
+        # an @extended parent appears in the output before a child.  Sass does
+        # not do this, and the results may be unexpected.  Pending removal.
+        rule_order = dict()
+        rule_dependencies = dict()
+        order = 0
+        for rule in rules:
+            rule_order[rule] = order
+            # Rules are ultimately sorted by the earliest rule they must
+            # *precede*, so every rule should "depend" on the next one
+            rule_dependencies[rule] = [order + 1]
+            order += 1
 
-            key = rule.selectors, frozenset(rule.extends_selectors)
-            grouped_rules[key].append(rule)
+            for selector in rule.selectors:
+                for key in selector.lookup_key():
+                    key_to_selectors[key].add(selector)
+                selector_to_rules[selector].append(rule)
 
-        # To be able to manage multiple extends, you need to
-        # destroy the actual node and create many nodes that have
-        # mono extend. The first one gets all the css rules
-        for (selectors, parents), rules in list(grouped_rules.items()):
-            if len(parents) <= 1:
-                continue
+        # Now go through all the rules with an @extends and find their parent
+        # rules.
+        for rule in rules:
+            for selector in rule.extends_selectors:
+                # This is a little dirty.  intersection isn't a class method.
+                # Don't think about it too much.
+                candidates = set.intersection(*(
+                    key_to_selectors[key] for key in selector.lookup_key()))
+                extendable_selectors = [
+                    candidate for candidate in candidates
+                    if candidate.is_superset_of(selector)]
 
-            del grouped_rules[selectors, parents]
-            for parent in parents:
-                new_key = selectors, frozenset((parent,))
-                grouped_rules[new_key].extend(rules)
-                rules = []  # further rules extending other parents will be empty
-
-        cnt = 0
-        parents_left = True
-        while parents_left and cnt < 10:
-            cnt += 1
-            parents_left = False
-            for key in list(grouped_rules.keys()):
-                if key not in grouped_rules:
-                    # Nodes might have been renamed while linking parents...
+                if not extendable_selectors:
+                    log.warn(
+                        "Can't find any matching rules to extend: %s"
+                        % selector.render())
                     continue
 
-                selectors, orig_parents = key
-                if not orig_parents:
-                    continue
+                # Armed with a set of selectors that this rule can extend, do
+                # some substitution and modify the appropriate parent rules
+                for extendable_selector in extendable_selectors:
+                    for parent_rule in selector_to_rules[extendable_selector]:
+                        more_parent_selectors = []
 
-                parent, = orig_parents
-                parents_left = True
+                        for rule_selector in rule.selectors:
+                            more_parent_selectors.extend(
+                                extendable_selector.substitute(
+                                    selector, rule_selector))
 
-                rules = grouped_rules.pop(key)
-                new_key = selectors, frozenset()
-                grouped_rules[new_key].extend(rules)
+                        for parent in more_parent_selectors:
+                            # Update indices, in case any later rules try to
+                            # extend this one
+                            for key in parent.lookup_key():
+                                key_to_selectors[key].add(parent)
+                            # TODO this could lead to duplicates?  maybe should
+                            # be a set too
+                            selector_to_rules[parent].append(parent_rule)
 
-                parents = self.link_with_parents(grouped_rules, parent, selectors, rules)
+                        parent_rule.ancestry = (
+                            parent_rule.ancestry.with_more_selectors(
+                                more_parent_selectors))
+                        rule_dependencies[parent_rule].append(rule_order[rule])
 
-                if parents is None:
-                    log.warn("Parent rule not found: %s", parent)
-                    continue
-
-                # from the parent, inherit the context and the options:
-                from scss.rule import Namespace
-                parent_namespaces = [parent.namespace for parent in parents]
-                new_options = {}
-                for parent in parents:
-                    new_options.update(parent.options)
-                for rule in rules:
-                    rule.namespace = Namespace.derive_from(
-                        rule.namespace, *parent_namespaces)
-                    _new_options = new_options.copy()
-                    _new_options.update(rule.options)
-                    rule.options = _new_options
-
-    @print_timing(3)
-    def manage_order(self):
-        # order rules according with their dependencies
-        for rule in self.rules:
-            assert rule.position is not None
-
-            rule.dependent_rules.add(rule.position + 1)
-            # This moves the rules just above the topmost dependency during the sorted() below:
-            rule.position = min(rule.dependent_rules)
-        self.rules.sort(key=lambda o: o.position)
+        rules.sort(key=lambda rule: min(rule_dependencies[rule]))
 
     @print_timing(3)
     def parse_properties(self):
@@ -1460,7 +1363,6 @@ class Scss(object):
         rules_by_file = {}
 
         for rule in self.rules:
-            assert rule.position is not None
             if not rule.properties:
                 continue
 
@@ -1489,7 +1391,7 @@ class Scss(object):
     def _create_css(self, rules, sc=True, sp=' ', tb='  ', nl='\n', debug_info=False):
         skip_selectors = False
 
-        old_ancestry = []
+        prev_ancestry_headers = []
 
         textwrap.TextWrapper.wordsep_re = re.compile(r'(?<=,)(\s*)')
         if hasattr(textwrap.TextWrapper, 'wordsep_simple_re'):
@@ -1510,7 +1412,7 @@ class Scss(object):
             ancestry = rule.ancestry
 
             first_mismatch = 0
-            for i, (old_header, new_header) in enumerate(zip(old_ancestry, ancestry)):
+            for i, (old_header, new_header) in enumerate(zip(prev_ancestry_headers, ancestry.headers)):
                 if old_header != new_header:
                     first_mismatch = i
                     break
@@ -1519,15 +1421,17 @@ class Scss(object):
             # trailing semicolon.  If the previous block isn't being closed,
             # that trailing semicolon needs adding in to separate the last
             # property from the next rule.
-            if not sc and dangling_property and first_mismatch >= len(old_ancestry):
+            if not sc and dangling_property and first_mismatch >= len(prev_ancestry_headers):
                 result += ';'
 
             # Close blocks and outdent as necessary
-            for i in range(len(old_ancestry), first_mismatch, -1):
+            for i in range(len(prev_ancestry_headers), first_mismatch, -1):
                 result += tb * (i - 1) + '}' + nl
 
             # Open new blocks as necessary
             for i in range(first_mismatch, len(ancestry)):
+                header = ancestry.headers[i]
+
                 if debug_info:
                     if not rule.source_file.is_string:
                         filename = rule.source_file.filename
@@ -1538,19 +1442,19 @@ class Scss(object):
                             filename = _escape_chars_re.sub(r'\\\1', filename)
                             result += "@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}" % (filename, lineno) + nl
 
-                if ancestry[i].is_selector:
-                    header = ancestry[i].render(sep=',' + sp, super_selector=self.super_selector)
+                if header.is_selector:
+                    header_string = header.render(sep=',' + sp, super_selector=self.super_selector)
                     if nl:
-                        header = nl.join(wrap(header))
+                        header_string = nl.join(wrap(header_string))
                 else:
-                    header = ancestry[i].render()
-                result += tb * i + header + sp + '{' + nl
+                    header_string = header.render()
+                result += tb * i + header_string + sp + '{' + nl
 
                 total_rules += 1
-                if ancestry[i].is_selector:
+                if header.is_selector:
                     total_selectors += 1
 
-            old_ancestry = ancestry
+            prev_ancestry_headers = ancestry.headers
             dangling_property = False
 
             if not skip_selectors:
@@ -1558,7 +1462,7 @@ class Scss(object):
                 dangling_property = True
 
         # Close all remaining blocks
-        for i in reversed(range(len(old_ancestry))):
+        for i in reversed(range(len(prev_ancestry_headers))):
             result += tb * i + '}' + nl
 
         return (result, total_rules, total_selectors)
