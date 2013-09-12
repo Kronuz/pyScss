@@ -404,10 +404,7 @@ class Scss(object):
         self.parse_children(children)
 
         # this will manage @extends
-        self.parse_extends()
-
-        # this will manage the order of the rules
-        self.manage_order()
+        self.apply_extends(self.rules)
 
         rules_by_file, css_files = self.parse_properties()
 
@@ -900,7 +897,6 @@ class Scss(object):
                 unparsed_contents=source_file.contents,
 
                 # rule
-                #dependent_rules
                 options=rule.options,
                 properties=rule.properties,
                 extends_selectors=rule.extends_selectors,
@@ -1247,7 +1243,6 @@ class Scss(object):
             lineno=block.lineno,
             unparsed_contents=block.unparsed_contents,
 
-            #dependent_rules
             options=rule.options.copy(),
             #properties
             #extends_selectors
@@ -1274,7 +1269,6 @@ class Scss(object):
             lineno=block.lineno,
             unparsed_contents=block.unparsed_contents,
 
-            #dependent_rules
             options=rule.options.copy(),
             #properties
             extends_selectors=c_parents,
@@ -1286,11 +1280,12 @@ class Scss(object):
         p_children.appendleft(_rule)
 
     @print_timing(3)
-    def parse_extends(self):
+    def apply_extends(self, rules):
+        """Run through the given rules and translate all the pending @extends
+        declarations into real selectors on parent rules.
+
+        The list is modified in-place and also sorted in dependency order.
         """
-        For each part, create the inheritance parts from the @extends
-        """
-        # Boy I wish I hadn't lost whatever work I'd done on this so far.
         # TODO: child/sibling/etc selectors aren't handled correctly
         # TODO: %foo may not be handled correctly
         # TODO: a whole bunch of unit tests for Selector parsing
@@ -1307,10 +1302,18 @@ class Scss(object):
         # them as a rough key.  Ignore order and duplication for now.
         key_to_selectors = defaultdict(set)
         selector_to_rules = defaultdict(list)
-        pos = 0
-        for rule in self.rules:
-            rule.position = pos
-            pos += 1
+        # DEVIATION: These are used to rearrange rules in dependency order, so
+        # an @extended parent appears in the output before a child.  Sass does
+        # not do this, and the results may be unexpected.  Pending removal.
+        rule_order = dict()
+        rule_dependencies = dict()
+        order = 0
+        for rule in rules:
+            rule_order[rule] = order
+            # Rules are ultimately sorted by the earliest rule they must
+            # *precede*, so every rule should "depend" on the next one
+            rule_dependencies[rule] = [order + 1]
+            order += 1
 
             for selector in rule.selectors:
                 for key in selector.lookup_key():
@@ -1319,7 +1322,7 @@ class Scss(object):
 
         # Now go through all the rules with an @extends and find their parent
         # rules.
-        for rule in self.rules:
+        for rule in rules:
             for selector in rule.extends_selectors:
                 # This is a little dirty.  intersection isn't a class method.
                 # Don't think about it too much.
@@ -1358,18 +1361,9 @@ class Scss(object):
                         parent_rule.ancestry = (
                             parent_rule.ancestry.with_more_selectors(
                                 more_parent_selectors))
-                        parent_rule.dependent_rules.add(rule.position)
+                        rule_dependencies[parent_rule].append(rule_order[rule])
 
-    @print_timing(3)
-    def manage_order(self):
-        # order rules according with their dependencies
-        for rule in self.rules:
-            assert rule.position is not None
-
-            rule.dependent_rules.add(rule.position + 1)
-            # This moves the rules just above the topmost dependency during the sorted() below:
-            rule.position = min(rule.dependent_rules)
-        self.rules.sort(key=lambda o: o.position)
+        rules.sort(key=lambda rule: min(rule_dependencies[rule]))
 
     @print_timing(3)
     def parse_properties(self):
@@ -1378,7 +1372,6 @@ class Scss(object):
         rules_by_file = {}
 
         for rule in self.rules:
-            assert rule.position is not None
             if not rule.properties:
                 continue
 

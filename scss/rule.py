@@ -141,7 +141,7 @@ class SassRule(object):
     metadata, like `@extend` rules and `@media` nesting.
     """
 
-    def __init__(self, source_file, unparsed_contents=None, dependent_rules=None,
+    def __init__(self, source_file, unparsed_contents=None,
             options=None, properties=None,
             namespace=None,
             lineno=0, extends_selectors=frozenset(),
@@ -159,11 +159,6 @@ class SassRule(object):
             self.namespace = Namespace()
         else:
             self.namespace = namespace
-
-        if dependent_rules is None:
-            self.dependent_rules = set()
-        else:
-            self.dependent_rules = dependent_rules
 
         if properties is None:
             self.properties = []
