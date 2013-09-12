@@ -1286,15 +1286,6 @@ class Scss(object):
 
         The list is modified in-place and also sorted in dependency order.
         """
-        # TODO: child/sibling/etc selectors aren't handled correctly
-        # TODO: %foo may not be handled correctly
-        # TODO: a whole bunch of unit tests for Selector parsing
-        # TODO: make sure this all works for kronuz
-        # TODO: steal a TONNNNNN of tests from ruby and sassc for this
-
-        # TODO: does this correctly handle extending a rule with a different
-        # ancestry?
-
         # Game plan: for each rule that has an @extend, add its selectors to
         # every rule that matches that @extend.
         # First, rig a way to find arbitrary selectors quickly.  Most selectors

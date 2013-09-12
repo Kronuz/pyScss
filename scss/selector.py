@@ -352,7 +352,9 @@ class Selector(object):
                 start_idx = i
                 break
         else:
-            raise ValueError("Couldn't find hinge %r in compound selector %r", (hinge_start, self.simple_selectors))
+            raise ValueError(
+                "Couldn't find hinge %r in compound selector %r" %
+                (hinge_start, self.simple_selectors))
 
         for i, hinge_node in enumerate(hinge):
             self_node = self.simple_selectors[start_idx + i]
