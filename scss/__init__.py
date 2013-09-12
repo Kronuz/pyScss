@@ -50,6 +50,7 @@ from collections import defaultdict, deque
 import glob
 from itertools import product
 import logging
+import operator
 import os.path
 import re
 import sys
@@ -1266,7 +1267,7 @@ class Scss(object):
         raw_selectors = calculator.apply_vars(block.prop)
         c_selectors, c_parents = self.parse_selectors(raw_selectors)
 
-        new_ancestry = rule.ancestry.with_selectors(c_selectors)
+        new_ancestry = rule.ancestry.with_nested_selectors(c_selectors)
 
         _rule = SassRule(
             source_file=rule.source_file,
@@ -1290,29 +1291,20 @@ class Scss(object):
         For each part, create the inheritance parts from the @extends
         """
         # Boy I wish I hadn't lost whatever work I'd done on this so far.
-        # TODO: clean up variable names, method names (cross product?!), etc.
-        # TODO: make Rules always contain Selectors, not strings.
-        # TODO: fix the Selector rendering to put the right amount of space in
-        # the right places
         # TODO: child/sibling/etc selectors aren't handled correctly
-        # TODO: preserve selector order
         # TODO: %foo may not be handled correctly
         # TODO: a whole bunch of unit tests for Selector parsing
         # TODO: make sure this all works for kronuz
         # TODO: steal a TONNNNNN of tests from ruby and sassc for this
-        # TODO: can we skip all this woek if we've never seen an @extend?
 
         # TODO: does this correctly handle extending a rule with a different
         # ancestry?
-
-
 
         # Game plan: for each rule that has an @extend, add its selectors to
         # every rule that matches that @extend.
         # First, rig a way to find arbitrary selectors quickly.  Most selectors
         # revolve around elements, classes, and IDs, so parse those out and use
         # them as a rough key.  Ignore order and duplication for now.
-        from scss.selector import Selector
         key_to_selectors = defaultdict(set)
         selector_to_rules = defaultdict(list)
         pos = 0
@@ -1329,40 +1321,44 @@ class Scss(object):
         # rules.
         for rule in self.rules:
             for selector in rule.extends_selectors:
-                extends_selectors = []
+                # This is a little dirty.  intersection isn't a class method.
+                # Don't think about it too much.
+                candidates = set.intersection(*(
+                    key_to_selectors[key] for key in selector.lookup_key()))
+                extendable_selectors = [
+                    candidate for candidate in candidates
+                    if candidate.is_superset_of(selector)]
 
-                import operator
-                candidates = reduce(operator.and_, (key_to_selectors[key] for key in selector.lookup_key()))
-                for candidate in candidates:
-                    if candidate.is_superset_of(selector):
-                        extends_selectors.append(candidate)
-
-                if not extends_selectors:
-                    log.warn("no match found")
+                if not extendable_selectors:
+                    log.warn(
+                        "Can't find any matching rules to extend: %s"
+                        % selector.render())
                     continue
 
-                # do magic here
-                for extend_selector in extends_selectors:
-                    for parent_rule in selector_to_rules[extend_selector]:
-                        rule_selector, = rule.selectors  # TODO
-                        new_parents = extend_selector.substitute(
-                            selector,
-                            rule_selector,
-                        )
+                # Armed with a set of selectors that this rule can extend, do
+                # some substitution and modify the appropriate parent rules
+                for extendable_selector in extendable_selectors:
+                    for parent_rule in selector_to_rules[extendable_selector]:
+                        more_parent_selectors = []
 
-                        existing_parent_selectors = list(parent_rule.selectors)
-                        for parent in new_parents:
-                            existing_parent_selectors.append(parent)
-                        parent_rule.selectors = frozenset(existing_parent_selectors)
-                        parent_rule.dependent_rules.add(rule.position)
+                        for rule_selector in rule.selectors:
+                            more_parent_selectors.extend(
+                                extendable_selector.substitute(
+                                    selector, rule_selector))
 
-                        # Update indices, in case any later rules try to extend
-                        # this one
-                        for parent in new_parents:
-                            key_to_selectors[parent].add(parent)
+                        for parent in more_parent_selectors:
+                            # Update indices, in case any later rules try to
+                            # extend this one
+                            for key in parent.lookup_key():
+                                key_to_selectors[key].add(parent)
                             # TODO this could lead to duplicates?  maybe should
                             # be a set too
                             selector_to_rules[parent].append(parent_rule)
+
+                        parent_rule.ancestry = (
+                            parent_rule.ancestry.with_more_selectors(
+                                more_parent_selectors))
+                        parent_rule.dependent_rules.add(rule.position)
 
     @print_timing(3)
     def manage_order(self):
