@@ -104,7 +104,7 @@ def run_setup(with_binary):
             "Topic :: Text Processing :: Markup",
             "Topic :: Software Development :: Libraries :: Python Modules"
         ],
-        requires=[
+        install_requires=[
             'six',
         ],
         packages=[
