@@ -105,9 +105,30 @@ class SimpleSelector(object):
             token[0] == '%'
             for token in self.tokens)
 
-    def is_superset_of(self, other):
+    def is_superset_of(self, other, soft_combinator=False):
+        """Return True iff this selector matches the same elements as `other`,
+        and perhaps others.
+
+        That is, ``.foo`` is a superset of ``.foo.bar``, because the latter is
+        more specific.
+
+        Set `soft_combinator` true to ignore the specific case of this selector
+        having a descendent combinator and `other` having anything else.  This
+        is for superset checking for ``@extend``, where a space combinator
+        really means "none".
+        """
+        # Combinators must match, OR be compatible -- space is a superset of >,
+        # ~ is a superset of +
+        if soft_combinator and self.combinator == ' ':
+            combinator_superset = True
+        else:
+            combinator_superset = (
+                self.combinator == other.combinator or
+                (self.combinator == ' ' and other.combinator == '>') or
+                (self.combinator == '~' and other.combinator == '+'))
+
         return (
-            self.combinator == other.combinator and
+            combinator_superset and
             set(self.tokens) <= set(other.tokens))
 
     def replace_parent(self, parent_simples):
@@ -346,9 +367,9 @@ class Selector(object):
         """
         hinge_start = hinge[0]
         for i, node in enumerate(self.simple_selectors):
-            # TODO does first combinator have to match?  maybe only if the
-            # hinge has a non-descendant combinator?
-            if hinge_start.is_superset_of(node):
+            # In this particular case, a ' ' combinator actually means "no" (or
+            # any) combinator, so it should be ignored
+            if hinge_start.is_superset_of(node, soft_combinator=True):
                 start_idx = i
                 break
         else:
@@ -357,12 +378,18 @@ class Selector(object):
                 (hinge_start, self.simple_selectors))
 
         for i, hinge_node in enumerate(hinge):
+            if i == 0:
+                # We just did this
+                continue
+
             self_node = self.simple_selectors[start_idx + i]
             if hinge_node.is_superset_of(self_node):
                 continue
 
             # TODO this isn't true; consider finding `a b` in `a c a b`
-            raise TypeError("no match")
+            raise ValueError(
+                "Couldn't find hinge %r in compound selector %r" %
+                (hinge_node, self.simple_selectors))
 
         end_idx = start_idx + len(hinge) - 1
 
