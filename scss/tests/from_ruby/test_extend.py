@@ -5,14 +5,13 @@ from scss import Scss
 
 import pytest
 
+# py.test bug: unicode literals not allowed here, so cast to native str type
+pytestmark = pytest.mark.skipif(str("not config.getoption('include_ruby')"))
+
 # TODO undupe
 def assert_rendering(input, expected, **kwargs):
     compiler = Scss(scss_opts=dict(compress=False), **kwargs)
     css = compiler.compile(input)
-    print '-----'
-    print expected
-    print '-'
-    print css
 
     # TODO chumptastic hack; sass and pyscss have slightly different
     # "non-compressed" output
@@ -20,8 +19,6 @@ def assert_rendering(input, expected, **kwargs):
     css = re.sub(r'(?m)\n *[}]$', ' }\n', css).rstrip("\n") + "\n"
     #css = re.sub(r'; [}]', ';\n  }', css)
     #css = re.sub(r'\n *[}]$', ' }', css)
-    print '-'
-    print css
 
     assert expected == css
 
