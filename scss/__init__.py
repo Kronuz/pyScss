@@ -1332,7 +1332,14 @@ class Scss(object):
                 # Armed with a set of selectors that this rule can extend, do
                 # some substitution and modify the appropriate parent rules
                 for extendable_selector in extendable_selectors:
-                    for parent_rule in selector_to_rules[extendable_selector]:
+                    # list() shields us from problems mutating the list within
+                    # this loop, which can happen in the case of @extend loops
+                    parent_rules = list(selector_to_rules[extendable_selector])
+                    for parent_rule in parent_rules:
+                        if parent_rule is rule:
+                            # Don't extend oneself
+                            continue
+
                         more_parent_selectors = []
 
                         for rule_selector in rule.selectors:

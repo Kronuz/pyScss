@@ -18,6 +18,20 @@ def normalize_var(name):
         return name
 
 
+def extend_unique(seq, more):
+    """Return a new sequence containing the items in `seq` plus any items in
+    `more` that aren't already in `seq`, preserving the order of both.
+    """
+    seen = set(seq)
+    new = []
+    for item in more:
+        if item not in seen:
+            seen.add(item)
+            new.append(item)
+
+    return seq + type(seq)(new)
+
+
 class VariableScope(object):
     """Implements Sass variable scoping.
 
@@ -266,7 +280,9 @@ class RuleAncestry(object):
         nesting is done.
         """
         if self.headers and self.headers[-1].is_selector:
-            new_selectors = self.headers[-1].selectors + tuple(selectors)
+            new_selectors = extend_unique(
+                self.headers[-1].selectors,
+                selectors)
             new_headers = self.headers[:-1] + (
                 BlockSelectorHeader(new_selectors),)
             return RuleAncestry(new_headers)
@@ -355,7 +371,7 @@ class BlockSelectorHeader(BlockHeader):
         return "<%s %r>" % (self.__class__.__name__, self.selectors)
 
     def render(self, sep=', ', super_selector=''):
-        return sep.join(sorted(
+        return sep.join((
             super_selector + s.render()
             for s in self.selectors
             if not s.has_placeholder))
