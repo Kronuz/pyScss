@@ -2,9 +2,13 @@
 import os
 import sys
 from setuptools import setup, Extension, Feature
+from setuptools.dist import Distribution
 from distutils.command.build_ext import build_ext
 from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
+
+# Need to install `six` to be able to import from the scss namespace
+Distribution(dict(setup_requires='six'))
 
 from scss.scss_meta import PROJECT, URL, VERSION, AUTHOR, AUTHOR_EMAIL, LICENSE, DOWNLOAD_URL
 
