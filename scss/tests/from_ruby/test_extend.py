@@ -1753,14 +1753,14 @@ WARNING on line #{line} of #{filename_for_test syntax}: #{warn}
   This will be an error in future releases of Sass.
   Use "@extend #{target} !optional" if the extend should be able to fail.
 WARNING
+"""
 
 def assert_unification(selector, extension, unified):
     # Do some trickery so the first law of extend doesn't get in our way.
     assert_extends(
-      "%-a #{selector}",
+      "%-a {0}".format(selector),
       extension + " -a {@extend %-a}",
-      unified.split(', ').map {|s| "-a #{s}"}.join(', '))
-"""
+      ', '.join('-a ' + s for s in unified.split(', ')))
 
 def assert_extends(selector, extension, result):
     assert_rendering(
