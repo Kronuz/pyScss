@@ -1,6 +1,6 @@
 a, button {
   color: blue;
 }
-.some a, .some button, a:hover, button:hover {
+a:hover, .some a, button:hover, .some button {
   text-decoration: underline;
 }

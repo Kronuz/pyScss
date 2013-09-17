@@ -39,7 +39,7 @@ def test_linear_gradient():
     )
 
 
-@pytest.mark.xfail("rainbow still has intermediate values added")
+@pytest.mark.xfail('True', reason="rainbow still has intermediate values added")
 def test_linear_gradient_idempotent(calc):
     # linear-gradient should leave valid syntax alone.
     # Examples graciously stolen from MDN:

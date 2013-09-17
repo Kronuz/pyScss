@@ -1,7 +1,7 @@
-.parent, .some-selector {
+.some-selector, .parent {
   some: prop;
 }
-.parent .children, .some-selector-more {
+.some-selector-more, .parent .children {
   some: proop;
 }
 .parent {

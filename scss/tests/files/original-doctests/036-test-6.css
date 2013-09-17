@@ -1,3 +1,3 @@
-.hoverlink, a:hover {
+a:hover, .hoverlink {
   text-decoration: underline;
 }
