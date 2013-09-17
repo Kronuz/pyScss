@@ -5,6 +5,29 @@ own files, maybe.
 from scss import Scss
 
 
+def test_super_selector():
+    compiler = Scss(scss_opts=dict(compress=False))
+    input = """\
+foo, bar {
+  a: b;
+}
+baz {
+  c: d;
+}
+"""
+    expected = """\
+super foo, super bar {
+  a: b;
+}
+super baz {
+  c: d;
+}
+"""
+
+    output = compiler.compile(input, super_selector='super')
+    assert expected == output
+
+
 def test_extend_across_files():
     compiler = Scss(scss_opts=dict(compress=0))
     compiler._scss_files = {}
