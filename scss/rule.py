@@ -1,8 +1,9 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
-import six
 import logging
+from itertools import chain
+import six
 
 from scss.types import Value
 
@@ -53,6 +54,10 @@ class VariableScope(object):
 
     def __setitem__(self, key, value):
         self.set(key, value)
+
+    def keys(self):
+        # For mapping interface
+        return list(chain(*self.maps))
 
     def set(self, key, value, force_local=False):
         if force_local:

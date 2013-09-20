@@ -50,7 +50,6 @@ from collections import defaultdict, deque
 import glob
 from itertools import product
 import logging
-import operator
 import os.path
 import re
 import sys
@@ -70,7 +69,7 @@ from scss.errors import SassError
 from scss.expression import Calculator
 from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
-from scss.rule import UnparsedBlock, SassRule
+from scss.rule import Namespace, SassRule, UnparsedBlock
 from scss.types import Boolean, List, Null, Number, String, Undefined
 from scss.util import dequote, normalize_var, print_timing  # profile
 
@@ -325,6 +324,10 @@ class Scss(object):
         scss_vars = self.scss_vars or {}
         return dict((k, v) for k, v in scss_vars.items() if k and not (not k.startswith('$') or k.startswith('$') and k[1].isupper()))
 
+    @property
+    def root_namespace(self):
+        return Namespace(variables=self.scss_vars, functions=self._library)
+
     def reset(self, input_scss=None):
         # Initialize
         self.scss_vars = _default_scss_vars.copy()
@@ -386,8 +389,7 @@ class Scss(object):
             self.source_file_index[source_file.filename] = source_file
 
         # Compile
-        from scss.rule import Namespace
-        namespace = Namespace(variables=self.scss_vars, functions=self._library)
+        namespace = self.root_namespace
 
         children = []
         for source_file in self.source_files:
@@ -395,7 +397,7 @@ class Scss(object):
                 source_file=source_file,
 
                 unparsed_contents=source_file.contents,
-                namespace=namespace,
+                namespace=namespace.derive(),
                 options=self.scss_opts,
             )
             children.append(rule)
