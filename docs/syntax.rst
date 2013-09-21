@@ -7,7 +7,9 @@ pyScss syntax
 Supported Sass features
 =======================
 
-pyScss is mostly compatible with Sass 3.2.
+pyScss is mostly compatible with Sass 3.2.  The canonical syntax reference is
+in the Sass documentation:
+http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 
 
 Both syntaxes
