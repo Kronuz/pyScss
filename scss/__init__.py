@@ -756,20 +756,7 @@ class Scss(object):
         funct, caller_argspec = self._get_funct_def(rule, caller_calculator, block.argument)
 
         # Render the passed arguments, using the caller's namespace
-        # TODO share this code with CallOp?
-        args = []
-        kwargs = {}
-        for var, node in caller_argspec.iter_call_argspec():
-            value = node.evaluate(caller_calculator, divide=True)
-            if var is None:
-                args.append(value)
-            else:
-                # TODO check for duplicate variables?
-                kwargs[var] = value
-
-        # TODO this might be the argspec's responsibility
-        if caller_argspec.slurp:
-            args.extend(caller_argspec.slurp.evaluate(caller_calculator, divide=True))
+        args, kwargs = caller_argspec.evaluate_call_args(caller_calculator)
 
         argc = len(args) + len(kwargs)
         try:

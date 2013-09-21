@@ -279,22 +279,19 @@ class CallOp(Expression):
         func_name = normalize_var(self.func_name)
 
         argspec_node = self.argspec
-        argspec = list(argspec_node.iter_call_argspec())
-        argspec_len = len(argspec)
 
         # Turn the pairs of arg tuples into *args and **kwargs
         # TODO unclear whether this is correct -- how does arg, kwarg, arg
         # work?
-        args = []
-        kwargs = {}
-        evald_argpairs = []
-        for var, expr in argspec_node.iter_call_argspec():
-            value = expr.evaluate(calculator, divide=True)
-            evald_argpairs.append((var, value))
-            if var is None:
-                args.append(value)
-            else:
-                kwargs[var.lstrip('$').replace('-', '_')] = value
+        args, kwargs = argspec_node.evaluate_call_args(calculator)
+        argspec_len = len(args) + len(kwargs)
+
+        # Translate variable names to Python identifiers
+        # TODO what about duplicate kw names?  should this happen in argspec?
+        # how does that affect mixins?
+        kwargs = dict(
+            (key.lstrip('$').replace('-', '_'), value)
+            for key, value in kwargs.items())
 
         # TODO merge this with the library
         funct = None
@@ -306,28 +303,27 @@ class CallOp(Expression):
                 funct = partial(funct, calculator.namespace)
         except KeyError:
             try:
-                if kwargs:
-                    raise
                 # DEVIATION: Fall back to single parameter
                 funct = calculator.namespace.function(func_name, 1)
                 args = [args]
             except KeyError:
                 if not is_builtin_css_function(func_name):
-                    log.error("Function not found: %s:%s", func_name, argspec_len, extra={'stack': True})
-                    raise
+                    log.warn("Function not found: %s:%s", func_name, argspec_len, extra={'stack': True})
+
         if funct:
             ret = funct(*args, **kwargs)
             if not isinstance(ret, Value):
                 raise TypeError("Expected Sass type as return value, got %r" % (ret,))
             return ret
 
-        rendered_args = []
-        for var, value in evald_argpairs:
-            rendered_value = value.render()
-            if var is None:
-                rendered_args.append(rendered_value)
-            else:
-                rendered_args.append("%s: %s" % (var, rendered_value))
+        # No matching function found, so render the computed values as a CSS
+        # function call.  Slurpy arguments are expanded and named arguments are
+        # unsupported.
+        if kwargs:
+            raise TypeError("The CSS function %s doesn't support keyword arguments." % (func_name,))
+
+        # TODO another candidate for a "function call" sass type
+        rendered_args = [arg.render() for arg in args]
 
         return String(
             u"%s(%s)" % (func_name, u", ".join(rendered_args)),
@@ -459,17 +455,28 @@ class ArgspecLiteral(Expression):
 
             yield var.name, value
 
-    def iter_call_argspec(self):
-        """Interpreting this literal as a function call, yields pairs of
-        (variable name as a string, default value as an AST node or None).
+    def evaluate_call_args(self, calculator):
+        """Interpreting this literal as a function call, return a 2-tuple of
+        ``(args, kwargs)``.
         """
-        for var, value in self.argpairs:
-            if var is None:
-                yield var, value
+        args = []
+        kwargs = {}
+        for var_node, value_node in self.argpairs:
+            value = value_node.evaluate(calculator, divide=True)
+            if var_node is None:
+                # Positional
+                args.append(value)
             else:
-                if not isinstance(var, Variable):
-                    raise SyntaxError("Expected variable name, got %r" % (var,))
-                yield var.name, value
+                # Named
+                if not isinstance(var_node, Variable):
+                    raise SyntaxError("Expected variable name, got %r" % (var_node,))
+                kwargs[var_node.name] = value
+
+        # Slurpy arguments go on the end of the args
+        if self.slurp:
+            args.extend(self.slurp.evaluate(calculator, divide=True))
+
+        return args, kwargs
 
 
 def parse_bareword(word):
