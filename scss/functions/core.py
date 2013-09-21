@@ -419,7 +419,7 @@ def change_color(color, red=None, green=None, blue=None, hue=None, saturation=No
         channels = list(color.hsl)
         if hue:
             expect_type(hue, Number, unit=None)
-            channels[0] = (hue / 360) % 1
+            channels[0] = (hue.value / 360) % 1
         # Ruby sass treats plain numbers for saturation and lightness as though
         # they were percentages, just without the %
         if saturation:

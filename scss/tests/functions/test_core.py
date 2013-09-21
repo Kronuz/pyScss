@@ -211,6 +211,8 @@ def test_change_color(calc):
     assert calc('change-color(#102030, $red: 120, $blue: 5)') == calc('#782005')
     assert calc('change-color(hsl(25, 100%, 80%), $lightness: 40%, $alpha: 0.8)') == calc('hsla(25, 100%, 40%, 0.8)')
 
+    assert calc('change-color(red, $hue: 240)') == calc('blue')
+
 
 def test_ie_hex_str(calc):
     # Examples from the Ruby docs
