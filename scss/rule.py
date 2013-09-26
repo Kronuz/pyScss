@@ -5,7 +5,7 @@ import logging
 from itertools import chain
 import six
 
-from scss.types import Value
+from scss.types import Value, Undefined
 
 
 log = logging.getLogger(__name__)
@@ -60,14 +60,13 @@ class VariableScope(object):
         return list(chain(*self.maps))
 
     def set(self, key, value, force_local=False):
-        if force_local:
-            self.maps[0][key] = value
-            return
-
-        for map in self.maps:
-            if key in map:
-                map[key] = value
-                return
+        if not force_local:
+            for map in self.maps:
+                if key in map:
+                    if isinstance(map[key], Undefined):
+                        break
+                    map[key] = value
+                    return
 
         self.maps[0][key] = value
 
