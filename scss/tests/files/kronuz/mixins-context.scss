@@ -1,0 +1,8 @@
+@option compress:no;
+
+@import "mixins-context";
+
+div {
+	$second-color: blue;
+	@include mymixin(yellow);
+}
