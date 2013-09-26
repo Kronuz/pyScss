@@ -1,0 +1,8 @@
+@option compress:no;
+
+@import "functions-context";
+
+#sidebar {
+	$gutter-width: 20px;
+	width: grid-width(5);
+}
