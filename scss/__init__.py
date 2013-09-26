@@ -81,7 +81,11 @@ locate_blocks = None
 try:
     from scss._speedups import locate_blocks
 except ImportError:
-    sys.stderr.write("Scanning acceleration disabled (_speedups not found)!\n")
+    import warnings
+    warnings.warn(
+        "Scanning acceleration disabled (_speedups not found)!",
+        RuntimeWarning
+        )
     from scss._native import locate_blocks
 
 ################################################################################
