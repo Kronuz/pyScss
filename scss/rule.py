@@ -77,8 +77,11 @@ class VariableScope(object):
 
 class Namespace(object):
     """..."""
+    _mutable = True
 
-    def __init__(self, variables=None, functions=None, mixins=None):
+    def __init__(self, variables=None, functions=None, mixins=None, mutable=True):
+        self._mutable = mutable
+
         if variables is None:
             self._variables = VariableScope()
         else:
@@ -92,6 +95,10 @@ class Namespace(object):
             self._functions = VariableScope([functions._functions])
 
         self._mixins = VariableScope()
+
+    def _assert_mutable(self):
+        if not self._mutable:
+            raise AttributeError("This Namespace instance is immutable")
 
     @classmethod
     def derive_from(cls, *others):
@@ -120,6 +127,7 @@ class Namespace(object):
         return self._variables[name]
 
     def set_variable(self, name, value, local_only=False):
+        self._assert_mutable()
         name = normalize_var(name)
         if not isinstance(value, Value):
             raise TypeError("Expected a Sass type, while setting %s got %r" % (name, value,))
@@ -145,12 +153,14 @@ class Namespace(object):
         return self._get_callable(self._mixins, name, arity)
 
     def set_mixin(self, name, arity, cb):
+        self._assert_mutable()
         self._set_callable(self._mixins, name, arity, cb)
 
     def function(self, name, arity):
         return self._get_callable(self._functions, name, arity)
 
     def set_function(self, name, arity, cb):
+        self._assert_mutable()
         self._set_callable(self._functions, name, arity, cb)
 
 

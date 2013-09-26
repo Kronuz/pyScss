@@ -745,6 +745,7 @@ class Scss(object):
                     break
             if not new_params:
                 add(funct, 0, mixin)
+        # rule.namespace._mutable = False  # <- mixin namespace should be immutable from now on
 
     @print_timing(10)
     def _do_include(self, rule, p_children, scope, block):
