@@ -30,8 +30,11 @@ def test_pair_programmatic(scss_file_pair):
 
     with open(scss_fn) as fh:
         source = fh.read()
-    with open(css_fn) as fh:
-        expected = fh.read()
+    try:
+        with open(css_fn) as fh:
+            expected = fh.read()
+    except IOError:
+        expected = ''
 
     directory, _ = os.path.split(scss_fn)
     include_dir = os.path.join(directory, 'include')
