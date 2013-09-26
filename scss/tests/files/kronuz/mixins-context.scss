@@ -4,5 +4,6 @@
 
 div {
 	$second-color: blue;
+	$fourth-color: orange;
 	@include mymixin(yellow);
 }
