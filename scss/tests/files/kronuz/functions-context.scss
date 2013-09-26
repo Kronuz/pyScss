@@ -3,6 +3,6 @@
 @import "functions-context";
 
 #sidebar {
-	$gutter-width: 20px;
+	$gutter-width: 20px;  // This variable, declared globally from in functions-context is only assigned.
 	width: grid-width(5);
 }
