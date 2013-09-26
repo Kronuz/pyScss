@@ -601,17 +601,6 @@ class List(Value):
     def __getitem__(self, key):
         return self.value[key]
 
-    def __mul__(self, other):
-        # DEVIATION: Ruby Sass doesn't do this, because Ruby doesn't.  But
-        # Python does, and in Ruby Sass it's just fatal anyway.
-        if not isinstance(other, Number):
-            return super(List, self).__mul__(other)
-
-        if not other.is_unitless:
-            raise TypeError("Can only multiply %s by %s" % (self.__class__.__name__, other.__class__.__name__))
-
-        return List(self.value * int(other.value), use_comma=self.use_comma)
-
     def render(self, compress=False):
         if not self.value:
             raise ValueError("Can't render empty list as CSS")
@@ -622,6 +611,31 @@ class List(Value):
             item.render(compress=compress)
             for item in self.value
         )
+
+    # DEVIATION: binary ops on lists and scalars act element-wise
+    def __add__(self, other):
+        if isinstance(other, List):
+            return super(List, self).__add__(other)
+
+        return List([item + other for item in self], use_comma=self.use_comma)
+
+    def __sub__(self, other):
+        if isinstance(other, List):
+            return super(List, self).__sub__(other)
+
+        return List([item - other for item in self], use_comma=self.use_comma)
+
+    def __mul__(self, other):
+        if isinstance(other, List):
+            return super(List, self).__mul__(other)
+
+        return List([item * other for item in self], use_comma=self.use_comma)
+
+    def __div__(self, other):
+        if isinstance(other, List):
+            return super(List, self).__div__(other)
+
+        return List([item / other for item in self], use_comma=self.use_comma)
 
 
 def _constrain(value, lb=0, ub=1):

@@ -406,6 +406,7 @@ This is the same as the Sass syntax, but causes some parsing ambiguity, since
 selector or a mixin call.  Its future is uncertain, but you should probably
 avoid using it in SCSS files.
 
+
 Soft errors
 -----------
 
@@ -416,6 +417,19 @@ warning.
 
 pyScss 2.0 is likely to be much stricter; don't rely on any particular abuse of
 syntax to work in the future.
+
+
+Operations on lists
+-------------------
+
+Binary operations with a list on the left-hand side are performed element-wise:
+
+    p {
+        margin: (1em 0 3em) * 0.5;  // => 0.5em 0 1.5em
+    }
+
+Given that future versions of the reference compiler are likely to introduce
+built-in list operations, the future of this feature is unclear.
 
 
 Unsupported Sass features
