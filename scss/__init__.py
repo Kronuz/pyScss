@@ -1106,8 +1106,6 @@ class Scss(object):
         for v in List.from_maybe(values):
             inner_rule = rule.copy()
             inner_rule.unparsed_contents = block.unparsed_contents
-            # TODO/DEVIATION: this is required for the menu mixin to work
-            inner_rule.namespace = rule.namespace
 
             v = List.from_maybe(v)
             for i, var in enumerate(varlist):
