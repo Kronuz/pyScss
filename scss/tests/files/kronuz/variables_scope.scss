@@ -1,0 +1,29 @@
+@option compress:no;
+
+div {
+  $some: red;
+  color: $some;
+  @each $x in magenta orange {
+    $some: $x;
+  }
+  background: $some;
+  @if true {
+    $some: black;
+  }
+  border-color: $some;
+  @for $i from 1 through 2 {
+    $some: blue;
+  }
+  background-color: $some;
+  @each $y in 1 2 3 {
+    @each $x in black white {
+      $some: $x;
+    }
+  }
+  color: $some;
+}
+
+a {
+  $some: green !default;
+  color: $some;
+}
