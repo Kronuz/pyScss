@@ -54,11 +54,13 @@ parser SassExpression:
                                                     {{ return ArgspecLiteral(args, slurp=slurpy) }}
                         ]                           {{ return ArgspecLiteral([]) }}
                         | SLURPYVAR DOTDOTDOT       {{ return ArgspecLiteral([], slurp=SLURPYVAR) }}
+                        | DOTDOTDOT                 {{ return ArgspecLiteral([], slurp=all) }}
 
     rule argspec_items:                             {{ slurpy = None }}
                         argspec_item                {{ args = [argspec_item] }}
                         [ "," [
                             SLURPYVAR DOTDOTDOT     {{ slurpy = SLURPYVAR }}
+                            | DOTDOTDOT             {{ slurpy = all }}
                             | argspec_items         {{ more_args, slurpy = argspec_items }}
                                                     {{ args.extend(more_args) }}
                         ] ]                         {{ return args, slurpy }}

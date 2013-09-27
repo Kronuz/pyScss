@@ -735,7 +735,7 @@ class Scss(object):
             add = rule.namespace.set_function
 
         # Register the mixin for every possible arity it takes
-        if argspec_node.slurp:
+        if argspec_node.slurp or argspec_node.inject:
             add(funct, None, mixin)
         else:
             while len(new_params):
@@ -807,6 +807,12 @@ class Scss(object):
                 callee_argspec.slurp.name,
                 List(args, use_comma=True))
             args = []
+        elif callee_argspec.inject:
+            # Callee namespace gets all the extra kwargs whether declared or
+            # not
+            for var_name, value in kwargs.items():
+                callee_namespace.set_variable(var_name, value, local_only=True)
+            kwargs = {}
 
         if kwargs:
             raise NameError("Mixin %s has no such argument %s" % (funct, kwargs.keys()[0]))

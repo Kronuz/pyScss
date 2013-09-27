@@ -1051,7 +1051,7 @@ $default-menu-levels: 3 !default;
 	}
 }
 
-@mixin menu() {
+@mixin menu(...) {
 	/****** Structure Starts ******/
 	// Multilevel menu show/hide:
 	.built-menu .built-menu {

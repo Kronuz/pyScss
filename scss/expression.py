@@ -417,9 +417,16 @@ class ArgspecLiteral(Expression):
         # node).
         # slurp is the name of a variable to receive slurpy arguments.
         self.argpairs = tuple(argpairs)
-        if slurp:
+        if slurp is all:
+            # DEVIATION: special syntax to allow injecting arbitrary arguments
+            # from the caller to the callee
+            self.inject = True
+            self.slurp = None
+        elif slurp:
+            self.inject = False
             self.slurp = Variable(slurp)
         else:
+            self.inject = False
             self.slurp = None
 
     def iter_list_argspec(self):
@@ -597,16 +604,19 @@ class SassExpression(Parser):
 
     def argspec(self):
         _token_ = self._peek(self.argspec_rsts)
-        if _token_ != 'SLURPYVAR':
-            if self._peek(self.argspec_rsts_) not in self.argspec_chks:
+        if _token_ not in self.argspec_chks:
+            if self._peek(self.argspec_rsts_) not in self.argspec_chks_:
                 argspec_items = self.argspec_items()
                 args, slurpy = argspec_items
                 return ArgspecLiteral(args, slurp=slurpy)
             return ArgspecLiteral([])
-        else:  # == 'SLURPYVAR'
+        elif _token_ == 'SLURPYVAR':
             SLURPYVAR = self._scan('SLURPYVAR')
             DOTDOTDOT = self._scan('DOTDOTDOT')
             return ArgspecLiteral([], slurp=SLURPYVAR)
+        else:  # == 'DOTDOTDOT'
+            DOTDOTDOT = self._scan('DOTDOTDOT')
+            return ArgspecLiteral([], slurp=all)
 
     def argspec_items(self):
         slurpy = None
@@ -614,12 +624,15 @@ class SassExpression(Parser):
         args = [argspec_item]
         if self._peek(self.argspec_items_rsts) == '","':
             self._scan('","')
-            if self._peek(self.argspec_items_rsts_) not in self.argspec_chks:
+            if self._peek(self.argspec_items_rsts_) not in self.argspec_chks_:
                 _token_ = self._peek(self.argspec_items_rsts__)
                 if _token_ == 'SLURPYVAR':
                     SLURPYVAR = self._scan('SLURPYVAR')
                     DOTDOTDOT = self._scan('DOTDOTDOT')
                     slurpy = SLURPYVAR
+                elif _token_ == 'DOTDOTDOT':
+                    DOTDOTDOT = self._scan('DOTDOTDOT')
+                    slurpy = all
                 else:  # in self.argspec_items_chks
                     argspec_items = self.argspec_items()
                     more_args, slurpy = argspec_items
@@ -848,26 +861,27 @@ class SassExpression(Parser):
     m_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
     argspec_items_rsts = set(['RPAR', 'END', '","'])
     expr_map_rsts = set(['RPAR', '","'])
-    argspec_items_rsts__ = set(['KWVAR', 'LPAR', 'SLURPYVAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
+    argspec_items_rsts__ = set(['KWVAR', 'LPAR', 'QSTR', 'SLURPYVAR', 'COLOR', 'DOTDOTDOT', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
     kwatom_rsts = set(['KWVAR', 'KWID', 'KWSTR', 'KWQSTR', 'KWCOLOR', '":"', 'KWNUM'])
     argspec_item_chks = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
     a_expr_chks = set(['ADD', 'SUB'])
     expr_slst_rsts = set(['LPAR', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID', '","'])
     or_expr_rsts = set(['LPAR', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', 'FNCT', 'STR', 'NOT', 'ID', 'BANG_IMPORTANT', 'OR', '","'])
-    atom_rsts = set(['KWVAR', 'KWID', 'KWSTR', 'BANG_IMPORTANT', 'LPAR', 'COLOR', 'KWQSTR', 'SIGN', 'KWCOLOR', 'VAR', 'ADD', 'NUM', '":"', 'STR', 'NOT', 'QSTR', 'KWNUM', 'ID', 'FNCT'])
+    and_expr_rsts = set(['AND', 'LPAR', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', 'FNCT', 'STR', 'NOT', 'ID', 'BANG_IMPORTANT', 'OR', '","'])
     comparison_rsts = set(['LPAR', 'QSTR', 'RPAR', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'ADD', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'GE', 'NOT', 'OR', '","'])
-    argspec_chks = set(['END', 'RPAR'])
+    argspec_chks = set(['DOTDOTDOT', 'SLURPYVAR'])
     atom_rsts_ = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'VAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
     expr_map_rsts_ = set(['KWVAR', 'KWID', 'KWSTR', 'KWQSTR', 'RPAR', 'KWCOLOR', '":"', 'KWNUM', '","'])
     u_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'ADD', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
     comparison_chks = set(['GT', 'GE', 'NE', 'LT', 'LE', 'EQ'])
-    argspec_items_rsts_ = set(['KWVAR', 'LPAR', 'END', 'SLURPYVAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
+    argspec_items_rsts_ = set(['KWVAR', 'LPAR', 'QSTR', 'END', 'SLURPYVAR', 'COLOR', 'DOTDOTDOT', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
     a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
     m_expr_chks = set(['MUL', 'DIV'])
     kwatom_rsts_ = set(['UNITS', '":"'])
     argspec_items_chks = set(['KWVAR', 'LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
-    argspec_rsts = set(['KWVAR', 'LPAR', 'BANG_IMPORTANT', 'END', 'SLURPYVAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'RPAR', 'ID'])
-    and_expr_rsts = set(['AND', 'LPAR', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', 'FNCT', 'STR', 'NOT', 'ID', 'BANG_IMPORTANT', 'OR', '","'])
+    argspec_rsts = set(['KWVAR', 'LPAR', 'BANG_IMPORTANT', 'END', 'SLURPYVAR', 'COLOR', 'DOTDOTDOT', 'RPAR', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'QSTR', 'SIGN', 'ID'])
+    atom_rsts = set(['KWVAR', 'KWID', 'KWSTR', 'BANG_IMPORTANT', 'LPAR', 'COLOR', 'KWQSTR', 'SIGN', 'KWCOLOR', 'VAR', 'ADD', 'NUM', '":"', 'STR', 'NOT', 'QSTR', 'KWNUM', 'ID', 'FNCT'])
+    argspec_chks_ = set(['END', 'RPAR'])
     argspec_rsts_ = set(['KWVAR', 'LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'RPAR', 'ID'])
 
 

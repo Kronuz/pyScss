@@ -432,6 +432,23 @@ Given that future versions of the reference compiler are likely to introduce
 built-in list operations, the future of this feature is unclear.
 
 
+Mixin "injection"
+-----------------
+
+A mixin defined like this:
+
+    @mixin foo(...) {
+        // ...
+    }
+
+will accept **any** keyword arguments, which will be available as variables
+within the mixin.
+
+This behavior exists for historical reasons and due to the lack of a
+``**kwargs`` equivalent within Sass.  Its usage makes mixin behavior harder to
+understand and you should not use it.
+
+
 Unsupported Sass features
 =========================
 
