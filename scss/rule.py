@@ -55,6 +55,14 @@ class VariableScope(object):
     def __setitem__(self, key, value):
         self.set(key, value)
 
+    def __contains__(self, key):
+        try:
+            self[key]
+        except KeyError:
+            return False
+        else:
+            return True
+
     def keys(self):
         # For mapping interface
         return list(chain(*self.maps))

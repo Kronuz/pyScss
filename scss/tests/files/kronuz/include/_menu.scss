@@ -1,8 +1,6 @@
 $default-menu-levels: 3 !default;
 
-@mixin _menu-horizontal($level) {
-	$l: $level;
-
+@mixin _menu-horizontal($l, ...) {
 	ul.l#{$l} {
 		margin: 0;
 		padding: 0;
@@ -585,9 +583,7 @@ $default-menu-levels: 3 !default;
 	}
 }
 
-@mixin _menu-vertical($level) {
-	$l: $level;
-
+@mixin _menu-vertical($l, ...) {
 	ul.l#{$l} {
 		margin: 0;
 		padding: 0;
@@ -907,13 +903,11 @@ $default-menu-levels: 3 !default;
 	}
 }
 
-@mixin _menu-inplace($level) {
-	$l: $level;
-
+@mixin _menu-inplace($l, ...) {
 	$u#{$l}-padding-natural: 2px 10px !default;
 	$u#{$l}-margin-natural: 2px 0 0 0 !default;
 
-	@include _menu-vertical($l);
+	@include _menu-vertical($l, ...);
 
 	.built-menu.l#{$l} {
 		display: block;
@@ -928,13 +922,11 @@ $default-menu-levels: 3 !default;
 }
 
 
-@mixin _menu-accordion($level) {
-	$l: $level;
-
+@mixin _menu-accordion($l, ...) {
 	$u#{$l}-padding-natural: 0 0 !default;
 	$u#{$l}-margin-natural: 2px 10px 0 !default;
 
-	@include _menu-vertical($l);
+	@include _menu-vertical($l, ...);
 
 	.built-menu.l#{$l} {
 		ul.l#{$l} {
@@ -947,13 +939,11 @@ $default-menu-levels: 3 !default;
 	}
 }
 
-@mixin _menu-dropdown($level) {
-	$l: $level;
-
+@mixin _menu-dropdown($l, ...) {
 	$u#{$l}-box-shadow-natural: rgba(black, 12%) 0 2px 4px !default;
 	$u#{$l}-background-natural: white !default;
 
-	@include _menu-vertical($l);
+	@include _menu-vertical($l, ...);
 
 	.built-menu.l#{$l} {
 		position: absolute;
@@ -973,13 +963,11 @@ $default-menu-levels: 3 !default;
 	}
 }
 
-@mixin _menu-dropup($level) {
-	$l: $level;
-
+@mixin _menu-dropup($l, ...) {
 	$u#{$l}-box-shadow-natural: rgba(black, 12%) 0 2px 4px !default;
 	$u#{$l}-background-natural: white !default;
 
-	@include _menu-vertical($l);
+	@include _menu-vertical($l, ...);
 
 	.built-menu.l#{$l} {
 		position: absolute;
@@ -1001,13 +989,11 @@ $default-menu-levels: 3 !default;
 	}
 }
 
-@mixin _menu-dropright($level) {
-	$l: $level;
-
+@mixin _menu-dropright($l, ...) {
 	$u#{$l}-box-shadow-natural: rgba(black, 12%) 0 2px 4px !default;
 	$u#{$l}-background-natural: white !default;
 
-	@include _menu-vertical($l);
+	@include _menu-vertical($l, ...);
 
 	.built-menu.l#{$l} {
 		position: absolute;
@@ -1026,13 +1012,11 @@ $default-menu-levels: 3 !default;
 	}
 }
 
-@mixin _menu-dropleft($level) {
-	$l: $level;
-
+@mixin _menu-dropleft($l, ...) {
 	$u#{$l}-box-shadow-natural: rgba(black, 12%) 0 2px 4px !default;
 	$u#{$l}-background-natural: white !default;
 
-	@include _menu-vertical($l);
+	@include _menu-vertical($l, ...);
 
 	.built-menu.l#{$l} {
 		position: absolute;
@@ -1088,18 +1072,18 @@ $default-menu-levels: 3 !default;
 		@each $param in $params {
 			@each $s in $sufixes {
 				@each $p in $prefixes {
-					$final: undefined;
+					$final: null;
 					@each $n in $l, 0, -1 {
-						@if $final == undefined {
-							$final: first-value-of(
+						@if $final == null {
+							$final: first-value-of(reject((
 								$#{$p}#{$n}-#{$param}#{$s},
 								$#{$p}#{$n}-#{$param},
 								$#{$param}#{$s},
 								$#{$param}
-							);
+							), undefined));
 						}
 					}
-					@if $final != undefined {
+					@if $final != null {
 						$#{$p}#{$l}-#{$param}#{$s}: $final !default;
 						@if type-of($final) == 'color' {
 							$#{$p}#{$l}-#{$param}#{$s}-rgb: rgb($final) !default;
@@ -1134,6 +1118,6 @@ $default-menu-levels: 3 !default;
 
 	@for $l from 1 through $default-menu-levels {
 		$type: '_menu-' + $u#{$l}-type;
-		@include #{$type}($level: $l);
+		@include #{$type}($l, ...);
 	}
 }

@@ -778,9 +778,18 @@ class Scss(object):
         m_params = mixin[0]
         m_defaults = mixin[1]
         m_codestr = mixin[2]
-        callee_namespace = mixin[3].derive()
-        callee_calculator = Calculator(callee_namespace)
+        pristine_callee_namespace = mixin[3]
         callee_argspec = mixin[4]
+
+        if caller_argspec.inject and callee_argspec.inject:
+            # DEVIATION: Pass the ENTIRE local namespace to the mixin (yikes)
+            callee_namespace = Namespace.derive_from(
+                caller_namespace,
+                pristine_callee_namespace)
+        else:
+            callee_namespace = pristine_callee_namespace.derive()
+
+        callee_calculator = Calculator(callee_namespace)
 
         # Populate the mixin/function's namespace with its arguments
         for var_name, node in callee_argspec.iter_def_argspec():
@@ -1097,7 +1106,8 @@ class Scss(object):
         for v in List.from_maybe(values):
             inner_rule = rule.copy()
             inner_rule.unparsed_contents = block.unparsed_contents
-            inner_rule.namespace = inner_rule.namespace.derive()
+            # TODO/DEVIATION: this is required for the menu mixin to work
+            inner_rule.namespace = rule.namespace
 
             v = List.from_maybe(v)
             for i, var in enumerate(varlist):
