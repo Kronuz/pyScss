@@ -1038,8 +1038,10 @@ class Scss(object):
         calculator = Calculator(rule.namespace)
         condition = calculator.calculate(block.argument)
         if condition:
-            rule.unparsed_contents = block.unparsed_contents
-            self.manage_children(rule, p_children, scope)
+            inner_rule = rule.copy()
+            inner_rule.unparsed_contents = block.unparsed_contents
+            inner_rule.namespace = rule.namespace  # DEVIATION: Commenting this line gives the Sass bahavior
+            self.manage_children(inner_rule, p_children, scope)
         rule.options['@if'] = condition
 
     @print_timing(10)
@@ -1051,8 +1053,11 @@ class Scss(object):
             log.error("@else with no @if (%s)", rule.file_and_line)
         val = rule.options.pop('@if', True)
         if not val:
-            rule.unparsed_contents = block.unparsed_contents
-            self.manage_children(rule, p_children, scope)
+            inner_rule = rule.copy()
+            inner_rule.unparsed_contents = block.unparsed_contents
+            inner_rule.namespace = rule.namespace  # DEVIATION: Commenting this line gives the Sass bahavior
+            inner_rule.unparsed_contents = block.unparsed_contents
+            self.manage_children(inner_rule, p_children, scope)
 
     @print_timing(10)
     def _do_for(self, rule, p_children, scope, block):
@@ -1081,10 +1086,13 @@ class Scss(object):
         var = calculator.do_glob_math(var)
         var = normalize_var(var)
 
+        inner_rule = rule.copy()
+        inner_rule.unparsed_contents = block.unparsed_contents
+        inner_rule.namespace = rule.namespace  # DEVIATION: Commenting this line gives the Sass bahavior
+
         for i in rev(range(frm, through + 1)):
-            rule.unparsed_contents = block.unparsed_contents
-            rule.namespace.set_variable(var, Number(i))
-            self.manage_children(rule, p_children, scope)
+            inner_rule.namespace.set_variable(var, Number(i))
+            self.manage_children(inner_rule, p_children, scope)
 
     @print_timing(10)
     def _do_each(self, rule, p_children, scope, block):
@@ -1103,10 +1111,11 @@ class Scss(object):
             for var in varlist
         ]
 
-        for v in List.from_maybe(values):
-            inner_rule = rule.copy()
-            inner_rule.unparsed_contents = block.unparsed_contents
+        inner_rule = rule.copy()
+        inner_rule.unparsed_contents = block.unparsed_contents
+        inner_rule.namespace = rule.namespace  # DEVIATION: Commenting this line gives the Sass bahavior
 
+        for v in List.from_maybe(values):
             v = List.from_maybe(v)
             for i, var in enumerate(varlist):
                 if i >= len(v):
@@ -1114,7 +1123,6 @@ class Scss(object):
                 else:
                     value = v[i]
                 inner_rule.namespace.set_variable(var, value)
-
             self.manage_children(inner_rule, p_children, scope)
 
     # @print_timing(10)

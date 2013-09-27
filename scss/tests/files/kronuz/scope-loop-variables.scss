@@ -2,15 +2,14 @@
 
 div {
   @each $some in red blue {
-    // Since $some is undefined, the variable $some is contained inside @each.
+    // DEVIATION! in Sass, the outer $some is not modified here.
   }
   $some: green !default;
-  color: $some;
+  A-blue: $some;
 
   $other: null;
   @each $other in magenta orange {
-    // Since $other is defined above, simply entering @each would modify its value.
     // DEVIATION! in Sass, the outer $other is not modified here either.
   }
-  border-color: $other;
+  B-orange: $other;
 }
