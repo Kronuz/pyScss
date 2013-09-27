@@ -28,6 +28,33 @@ super baz {
     assert expected == output
 
 
+def test_debug_info():
+    # nb: debug info doesn't work if the source isn't a file
+    compiler = Scss(scss_opts=dict(compress=False, debug_info=True))
+    compiler._scss_files = {}
+    compiler._scss_files['input.css'] = """\
+div {
+    color: green;
+}
+table {
+    color: red;
+}
+"""
+    expected = """\
+@media -sass-debug-info{filename{font-family:file\:\/\/input\.css}line{font-family:\\000031}}
+div {
+  color: green;
+}
+@media -sass-debug-info{filename{font-family:file\:\/\/input\.css}line{font-family:\\000034}}
+table {
+  color: red;
+}
+"""
+
+    output = compiler.compile()
+    assert expected == output
+
+
 def test_extend_across_files():
     compiler = Scss(scss_opts=dict(compress=0))
     compiler._scss_files = {}
