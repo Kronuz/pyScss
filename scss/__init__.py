@@ -542,7 +542,7 @@ class Scss(object):
                     log.warn(repr(value))
                 elif code == '@print':
                     value = calculator.calculate(block.argument)
-                    sys.stderr.write("%s\n" % repr(value))
+                    sys.stderr.write("%s\n" % value)
                 elif code == '@raw':
                     value = calculator.calculate(block.argument)
                     sys.stderr.write("%s\n" % repr(value))
