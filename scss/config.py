@@ -15,6 +15,7 @@ CACHE_ROOT = None
 STATIC_URL = 'static/'
 ASSETS_URL = 'static/assets/'
 VERBOSITY = 1
+FATAL_UNDEFINED = True
 DEBUG = 0
 
 SPRTE_MAP_DIRECTION = 'vertical'

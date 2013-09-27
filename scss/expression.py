@@ -24,8 +24,6 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
-FATAL_UNDEFINED = True
-
 
 class Calculator(object):
     """Expression evaluator."""
@@ -74,10 +72,11 @@ class Calculator(object):
                     try:
                         v = self.namespace.variable(n)
                     except KeyError:
-                        if FATAL_UNDEFINED:
+                        if config.FATAL_UNDEFINED:
                             raise
                         else:
-                            log.error("Undefined variable '%s'", n, extra={'stack': True})
+                            if config.VERBOSITY > 1:
+                                log.error("Undefined variable '%s'", n, extra={'stack': True})
                             return n
                     else:
                         if v:
@@ -352,10 +351,11 @@ class Variable(Expression):
         try:
             value = calculator.namespace.variable(self.name)
         except KeyError:
-            if FATAL_UNDEFINED:
+            if config.FATAL_UNDEFINED:
                 raise
             else:
-                log.error("Undefined variable '%s'", self.name, extra={'stack': True})
+                if config.VERBOSITY > 1:
+                    log.error("Undefined variable '%s'", self.name, extra={'stack': True})
                 return Undefined()
         else:
             if isinstance(value, six.string_types):
