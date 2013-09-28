@@ -524,7 +524,6 @@ class Scss(object):
         except Exception as e:
             raise SassError(e, rule=rule)
 
-
     def _manage_children_impl(self, rule, p_children, scope):
         # A rule that has already returned should not end up here
         assert rule.retval is None
