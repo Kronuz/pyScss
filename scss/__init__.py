@@ -46,7 +46,7 @@ __author__ = AUTHOR + ' <' + AUTHOR_EMAIL + '>'
 __license__ = LICENSE
 
 
-from collections import defaultdict, deque
+from collections import defaultdict
 import glob
 from itertools import product
 import logging
@@ -388,25 +388,11 @@ class Scss(object):
             self.source_files.append(source_file)
             self.source_file_index[source_file.filename] = source_file
 
-        # Compile
-        namespace = self.root_namespace
-
-        children = []
-        for source_file in self.source_files:
-            rule = SassRule(
-                source_file=source_file,
-
-                unparsed_contents=source_file.contents,
-                namespace=namespace.derive(),
-                options=self.scss_opts,
-            )
-            children.append(rule)
-
-        # this will manage rule: child objects inside of a node
-        self.parse_children(children)
+        # this will compile and manage rule: child objects inside of a node
+        self.parse_children()
 
         # this will manage @extends
-        self.apply_extends(self.rules)
+        self.apply_extends()
 
         rules_by_file, css_files = self.parse_properties()
 
@@ -502,22 +488,27 @@ class Scss(object):
         return selectors, parents
 
     @print_timing(3)
-    def parse_children(self, children, scope=None):
-        children = deque(children)
-        while children:
-            rule = children.popleft()
+    def parse_children(self, scope=None):
+        children = []
+        for source_file in self.source_files:
+            rule = SassRule(
+                source_file=source_file,
 
-            # manage children or expand children:
-            new_children = deque()
-            self.manage_children(rule, new_children, scope)
-            children.extendleft(new_children)
-
+                unparsed_contents=source_file.contents,
+                namespace=self.root_namespace.derive(),
+                options=self.scss_opts,
+            )
             self.rules.append(rule)
+            children.append(rule)
+
+        for rule in children:
+            self.manage_children(rule, None, scope)
 
     @print_timing(4)
     def manage_children(self, rule, p_children, scope):
         try:
-            return self._manage_children_impl(rule, p_children, scope)
+            self._manage_children_impl(rule, p_children, scope)
+            return p_children
         except SassError as e:
             e.add_rule(rule)
             raise
@@ -1261,8 +1252,8 @@ class Scss(object):
 
             namespace=rule.namespace.derive(),
         )
-
-        p_children.appendleft(new_rule)
+        self.rules.append(new_rule)
+        self.manage_children(new_rule, p_children, scope)
 
     @print_timing(10)
     def _nest_rules(self, rule, p_children, scope, block):
@@ -1275,7 +1266,7 @@ class Scss(object):
 
         new_ancestry = rule.ancestry.with_nested_selectors(c_selectors)
 
-        _rule = SassRule(
+        new_rule = SassRule(
             source_file=rule.source_file,
             lineno=block.lineno,
             unparsed_contents=block.unparsed_contents,
@@ -1287,11 +1278,11 @@ class Scss(object):
 
             namespace=rule.namespace.derive(),
         )
-
-        p_children.appendleft(_rule)
+        self.rules.append(new_rule)
+        self.manage_children(new_rule, p_children, scope)
 
     @print_timing(3)
-    def apply_extends(self, rules):
+    def apply_extends(self):
         """Run through the given rules and translate all the pending @extends
         declarations into real selectors on parent rules.
 
@@ -1310,7 +1301,7 @@ class Scss(object):
         rule_order = dict()
         rule_dependencies = dict()
         order = 0
-        for rule in rules:
+        for rule in self.rules:
             rule_order[rule] = order
             # Rules are ultimately sorted by the earliest rule they must
             # *precede*, so every rule should "depend" on the next one
@@ -1324,7 +1315,7 @@ class Scss(object):
 
         # Now go through all the rules with an @extends and find their parent
         # rules.
-        for rule in rules:
+        for rule in self.rules:
             for selector in rule.extends_selectors:
                 # This is a little dirty.  intersection isn't a class method.
                 # Don't think about it too much.
@@ -1372,7 +1363,7 @@ class Scss(object):
                                 more_parent_selectors))
                         rule_dependencies[parent_rule].append(rule_order[rule])
 
-        rules.sort(key=lambda rule: min(rule_dependencies[rule]))
+        self.rules.sort(key=lambda rule: min(rule_dependencies[rule]))
 
     @print_timing(3)
     def parse_properties(self):
