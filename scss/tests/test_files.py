@@ -9,10 +9,8 @@ This limitation is completely arbitrary.
 
 from __future__ import absolute_import
 
-import glob
 import os.path
 import logging
-import pytest
 
 import scss
 
