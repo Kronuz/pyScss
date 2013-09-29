@@ -1,3 +1,5 @@
+@option compress:no;
+
 @mixin color-me($color: white) {
     color: $color;
 }

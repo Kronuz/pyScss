@@ -1,3 +1,5 @@
+@option compress:no;
+
 @each $animal, $color, $cursor in (puma, black, default),
                                   (sea-slug, blue, pointer),
                                   (egret, white, move) {

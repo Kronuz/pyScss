@@ -126,7 +126,7 @@ _default_scss_vars = {
 
 _default_scss_opts = {
     'verbosity': config.VERBOSITY,
-    'compress': 1,
+    'compress': config.COMPRESS,
 }
 
 _default_search_paths = ['.']
@@ -610,9 +610,9 @@ class Scss(object):
             value = value.strip()
             if option:
                 if value.lower() in ('1', 'true', 't', 'yes', 'y', 'on'):
-                    value = 1
+                    value = True
                 elif value.lower() in ('0', 'false', 'f', 'no', 'n', 'off', 'undefined'):
-                    value = 0
+                    value = False
                 rule.options[option.replace('-', '_')] = value
 
     def _get_funct_def(self, rule, calculator, argument):
@@ -1204,7 +1204,7 @@ class Scss(object):
                 # TODO kill this branch
                 pass
             else:
-                value = value.render(compress=self.scss_opts.get('compress', True))
+                value = value.render(compress=self.scss_opts.get('compress', config.COMPRESS))
 
             rule.properties.append((_prop, value))
 
@@ -1388,15 +1388,25 @@ class Scss(object):
         """
         Generate the final CSS string
         """
-        compress = self.scss_opts.get('compress', True)
-        if compress:
-            sc, sp, tb, nl = False, '', '', ''
-        else:
-            sc, sp, tb, nl = True, ' ', '  ', '\n'
+        compress = self.scss_opts.get('compress', config.COMPRESS)
+        debug_info = self.scss_opts.get('debug_info', False)
 
-        return self._create_css(rules, sc, sp, tb, nl, not compress and self.scss_opts.get('debug_info', False))
+        if compress is True:
+            sc, sp, tb, nst, nl, rnl, lnl, dbg = False, '', '', '', '', '', '', False
+        elif compress is False:
+            sc, sp, tb, nst, nl, rnl, lnl, dbg = True, ' ', '  ', '', '\n', '\n', '\n', debug_info
+        elif compress == 'compact':
+            sc, sp, tb, nst, nl, rnl, lnl, dbg = True, ' ', '', '', ' ', '\n', '', debug_info
+        elif compress == 'compressed':
+            sc, sp, tb, nst, nl, rnl, lnl, dbg = False, '', '', '', '', '', '', False
+        elif compress == 'expanded':
+            sc, sp, tb, nst, nl, rnl, lnl, dbg = True, ' ', '  ', '', '\n', '\n', '\n', debug_info
+        else:  # if compress == 'nested':
+            sc, sp, tb, nst, nl, rnl, lnl, dbg = True, ' ', '  ', '  ', '\n', '\n', ' ', debug_info
 
-    def _create_css(self, rules, sc=True, sp=' ', tb='  ', nl='\n', debug_info=False):
+        return self._create_css(rules, sc, sp, tb, nst, nl, rnl, lnl, dbg)
+
+    def _create_css(self, rules, sc=True, sp=' ', tb='  ', nst='  ', nl='\n', rnl='\n', lnl='', debug_info=False):
         skip_selectors = False
 
         prev_ancestry_headers = []
@@ -1434,7 +1444,7 @@ class Scss(object):
 
             # Close blocks and outdent as necessary
             for i in range(len(prev_ancestry_headers), first_mismatch, -1):
-                result += tb * (i - 1) + '}' + nl
+                result += tb * (i - 1) + '}' + rnl
 
             # Open new blocks as necessary
             for i in range(first_mismatch, len(ancestry)):
@@ -1466,16 +1476,16 @@ class Scss(object):
             dangling_property = False
 
             if not skip_selectors:
-                result += self._print_properties(rule.properties, sc, sp, tb * len(ancestry), nl, wrap)
+                result += self._print_properties(rule.properties, sc, sp, tb * len(ancestry), nl, lnl, wrap)
                 dangling_property = True
 
         # Close all remaining blocks
         for i in reversed(range(len(prev_ancestry_headers))):
-            result += tb * i + '}' + nl
+            result += tb * i + '}' + rnl
 
         return (result, total_rules, total_selectors)
 
-    def _print_properties(self, properties, sc=True, sp=' ', _tb='', nl='\n', wrap=None):
+    def _print_properties(self, properties, sc=True, sp=' ', _tb='', nl='\n', lnl=' ', wrap=None):
         if wrap is None:
             textwrap.TextWrapper.wordsep_re = re.compile(r'(?<=,)(\s*)')
             if hasattr(textwrap.TextWrapper, 'wordsep_simple_re'):
@@ -1494,8 +1504,11 @@ class Scss(object):
             else:
                 prop = name
 
-            if not sc and i == last_prop_index:
-                result += _tb + prop + nl
+            if i == last_prop_index:
+                if sc:
+                    result += _tb + prop + ';' + lnl
+                else:
+                    result += _tb + prop + lnl
             else:
                 result += _tb + prop + ';' + nl
         return result

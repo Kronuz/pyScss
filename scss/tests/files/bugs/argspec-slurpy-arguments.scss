@@ -1,3 +1,5 @@
+@option compress:no;
+
 @mixin box-shadow($shadows...) {
     box-shadow: $shadows;
 }

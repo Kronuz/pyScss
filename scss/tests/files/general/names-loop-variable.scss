@@ -1,3 +1,5 @@
+@option compress:no;
+
 a {
 	@each $link_color in red, blue {
 		color: $link-color;

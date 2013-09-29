@@ -1,3 +1,5 @@
+@option compress:no;
+
 @mixin _menu-horizontal($level) {
 	ul.l#{$level} {
 		li {

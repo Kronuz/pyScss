@@ -14,7 +14,8 @@ CACHE_ROOT = None
 # Urls for the static and assets:
 STATIC_URL = 'static/'
 ASSETS_URL = 'static/assets/'
-VERBOSITY = 1
+VERBOSITY = True
+COMPRESS = 'nested'
 FATAL_UNDEFINED = True
 DEBUG = 0
 
