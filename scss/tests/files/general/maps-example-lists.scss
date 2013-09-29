@@ -1,14 +1,14 @@
-// Taken from the Ruby documentation
+// Taken from the Ruby CHANGELOG
 $themes: (
-  mist: (
-    header: #DCFAC0,
-    text:   #00968B,
-    border: #85C79C
+  mist (
+    header #DCFAC0,
+    text   #00968B,
+    border #85C79C
   ),
-  spring: (
-    header: #F4FAC7,
-    text:   #C2454E,
-    border: #FFB158
+  spring (
+    header #F4FAC7,
+    text   #C2454E,
+    border #FFB158
   ),
   // ...
 );
