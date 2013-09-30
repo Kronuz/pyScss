@@ -435,35 +435,6 @@ class Scss(object):
 
     compile = Compilation
 
-    def longest_common_prefix(self, seq1, seq2):
-        start = 0
-        common = 0
-        length = min(len(seq1), len(seq2))
-        while start < length:
-            if seq1[start] != seq2[start]:
-                break
-            if seq1[start] == ' ':
-                common = start + 1
-            elif seq1[start] in ('#', ':', '.'):
-                common = start
-            start += 1
-        return common
-
-    def longest_common_suffix(self, seq1, seq2):
-        seq1, seq2 = seq1[::-1], seq2[::-1]
-        start = 0
-        common = 0
-        length = min(len(seq1), len(seq2))
-        while start < length:
-            if seq1[start] != seq2[start]:
-                break
-            if seq1[start] == ' ':
-                common = start + 1
-            elif seq1[start] in ('#', ':', '.'):
-                common = start + 1
-            start += 1
-        return common
-
     def parse_selectors(self, raw_selectors):
         """
         Parses out the old xCSS "foo extends bar" syntax.
