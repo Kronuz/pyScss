@@ -126,7 +126,7 @@ _default_scss_vars = {
 
 _default_scss_opts = {
     'verbosity': config.VERBOSITY,
-    'compress': config.COMPRESS,
+    'style': config.STYLE,
 }
 
 _default_search_paths = ['.']
@@ -613,7 +613,10 @@ class Scss(object):
                     value = True
                 elif value.lower() in ('0', 'false', 'f', 'no', 'n', 'off', 'undefined'):
                     value = False
-                rule.options[option.replace('-', '_')] = value
+                option = option.replace('-', '_')
+                if option == 'compress':
+                    option = 'style'
+                rule.options[option] = value
 
     def _get_funct_def(self, rule, calculator, argument):
         funct, lpar, argstr = argument.partition('(')
@@ -1204,7 +1207,9 @@ class Scss(object):
                 # TODO kill this branch
                 pass
             else:
-                value = value.render(compress=self.scss_opts.get('compress', config.COMPRESS))
+                style = self.scss_opts.get('style', config.STYLE)
+                compress = style in (True, 'compressed')
+                value = value.render(compress=compress)
 
             rule.properties.append((_prop, value))
 
@@ -1250,6 +1255,7 @@ class Scss(object):
             ancestry=RuleAncestry(new_ancestry),
 
             namespace=rule.namespace.derive(),
+            nested=rule.nested + 1,
         )
         self.rules.append(new_rule)
         self.manage_children(new_rule, scope)
@@ -1276,6 +1282,7 @@ class Scss(object):
             ancestry=new_ancestry,
 
             namespace=rule.namespace.derive(),
+            nested=rule.nested + 1,
         )
         self.rules.append(new_rule)
         self.manage_children(new_rule, scope)
@@ -1388,25 +1395,25 @@ class Scss(object):
         """
         Generate the final CSS string
         """
-        compress = self.scss_opts.get('compress', config.COMPRESS)
+        style = self.scss_opts.get('style', config.STYLE)
         debug_info = self.scss_opts.get('debug_info', False)
 
-        if compress is True:
-            sc, sp, tb, nst, nl, rnl, lnl, dbg = False, '', '', '', '', '', '', False
-        elif compress is False:
-            sc, sp, tb, nst, nl, rnl, lnl, dbg = True, ' ', '  ', '', '\n', '\n', '\n', debug_info
-        elif compress == 'compact':
-            sc, sp, tb, nst, nl, rnl, lnl, dbg = True, ' ', '', '', ' ', '\n', '', debug_info
-        elif compress == 'compressed':
-            sc, sp, tb, nst, nl, rnl, lnl, dbg = False, '', '', '', '', '', '', False
-        elif compress == 'expanded':
-            sc, sp, tb, nst, nl, rnl, lnl, dbg = True, ' ', '  ', '', '\n', '\n', '\n', debug_info
-        else:  # if compress == 'nested':
-            sc, sp, tb, nst, nl, rnl, lnl, dbg = True, ' ', '  ', '  ', '\n', '\n', ' ', debug_info
+        if style is True:
+            sc, sp, tb, nst, srnl, nl, rnl, lnl, dbg = False, '', '', False, '', '', '', '', False
+        elif style is False:
+            sc, sp, tb, nst, srnl, nl, rnl, lnl, dbg = True, ' ', '  ', False, '', '\n', '\n', '\n', debug_info
+        elif style == 'compact':
+            sc, sp, tb, nst, srnl, nl, rnl, lnl, dbg = True, ' ', '', False, '\n', ' ', '\n', ' ', debug_info
+        elif style == 'compressed':
+            sc, sp, tb, nst, srnl, nl, rnl, lnl, dbg = False, '', '', False, '', '', '', '', False
+        elif style == 'expanded':
+            sc, sp, tb, nst, srnl, nl, rnl, lnl, dbg = True, ' ', '  ', False, '\n', '\n', '\n', '\n', debug_info
+        else:  # if style == 'nested':
+            sc, sp, tb, nst, srnl, nl, rnl, lnl, dbg = True, ' ', '  ', True, '\n', '\n', '\n', ' ', debug_info
 
-        return self._create_css(rules, sc, sp, tb, nst, nl, rnl, lnl, dbg)
+        return self._create_css(rules, sc, sp, tb, nst, srnl, nl, rnl, lnl, dbg)
 
-    def _create_css(self, rules, sc=True, sp=' ', tb='  ', nst='  ', nl='\n', rnl='\n', lnl='', debug_info=False):
+    def _create_css(self, rules, sc=True, sp=' ', tb='  ', nst=True, srnl='\n', nl='\n', rnl='\n', lnl='', debug_info=False):
         skip_selectors = False
 
         prev_ancestry_headers = []
@@ -1428,6 +1435,11 @@ class Scss(object):
                 continue
 
             ancestry = rule.ancestry
+            ancestry_len = len(ancestry)
+            nested = rule.nested
+            if nested < 0:
+                nested = 0
+            nesting = nested if nst else 0
 
             first_mismatch = 0
             for i, (old_header, new_header) in enumerate(zip(prev_ancestry_headers, ancestry.headers)):
@@ -1445,9 +1457,11 @@ class Scss(object):
             # Close blocks and outdent as necessary
             for i in range(len(prev_ancestry_headers), first_mismatch, -1):
                 result += tb * (i - 1) + '}' + rnl
+                if nested == 0:
+                    result += srnl
 
             # Open new blocks as necessary
-            for i in range(first_mismatch, len(ancestry)):
+            for i in range(first_mismatch, ancestry_len):
                 header = ancestry.headers[i]
 
                 if debug_info:
@@ -1466,7 +1480,7 @@ class Scss(object):
                         header_string = nl.join(wrap(header_string))
                 else:
                     header_string = header.render()
-                result += tb * i + header_string + sp + '{' + nl
+                result += tb * (i + nesting) + header_string + sp + '{' + nl
 
                 total_rules += 1
                 if header.is_selector:
@@ -1476,7 +1490,7 @@ class Scss(object):
             dangling_property = False
 
             if not skip_selectors:
-                result += self._print_properties(rule.properties, sc, sp, tb * len(ancestry), nl, lnl, wrap)
+                result += self._print_properties(rule.properties, sc, sp, tb * (ancestry_len + nesting), nl, lnl, wrap)
                 dangling_property = True
 
         # Close all remaining blocks
@@ -1485,7 +1499,7 @@ class Scss(object):
 
         return (result, total_rules, total_selectors)
 
-    def _print_properties(self, properties, sc=True, sp=' ', _tb='', nl='\n', lnl=' ', wrap=None):
+    def _print_properties(self, properties, sc=True, sp=' ', tb='', nl='\n', lnl=' ', wrap=None):
         if wrap is None:
             textwrap.TextWrapper.wordsep_re = re.compile(r'(?<=,)(\s*)')
             if hasattr(textwrap.TextWrapper, 'wordsep_simple_re'):
@@ -1499,16 +1513,16 @@ class Scss(object):
         for i, (name, value) in enumerate(properties):
             if value is not None:
                 if nl:
-                    value = (nl + _tb + _tb).join(wrap(value))
+                    value = (nl + tb + tb).join(wrap(value))
                 prop = name + ':' + sp + value
             else:
                 prop = name
 
             if i == last_prop_index:
                 if sc:
-                    result += _tb + prop + ';' + lnl
+                    result += tb + prop + ';' + lnl
                 else:
-                    result += _tb + prop + lnl
+                    result += tb + prop + lnl
             else:
-                result += _tb + prop + ';' + nl
+                result += tb + prop + ';' + nl
         return result

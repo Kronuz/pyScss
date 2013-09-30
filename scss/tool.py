@@ -18,6 +18,11 @@ from scss.rule import UnparsedBlock
 from scss.expression import Calculator
 from scss.scss_meta import BUILD_INFO
 
+try:
+    raw_input
+except NameError:
+    raw_input = input
+
 log.setLevel(logging.INFO)
 
 
@@ -46,9 +51,11 @@ def main():
     parser.add_option("--no-debug-info", action="store_false",
                       dest="debug_info", default=False,
                       help="Turns off scss's debugging information")
-    parser.add_option("-t", "--test", action="store_true", help=SUPPRESS_HELP)
-    parser.add_option("-C", "--no-compress", action="store_false",
-                      dest="compress", default=True,
+    parser.add_option("-T", "--test", action="store_true", help=SUPPRESS_HELP)
+    parser.add_option("-t", "--style", metavar="NAME",
+                      dest="style", default='nested',
+                      help="Output style. Can be nested (default), compact, compressed, or expanded.")
+    parser.add_option("-C", "--no-compress", action="store_false", dest="style",
                       help="Don't minify outputted CSS")
     parser.add_option("-?", action="help", help=SUPPRESS_HELP)
     parser.add_option("-h", "--help", action="help",
@@ -140,7 +147,7 @@ def do_build(options, args):
         output = sys.stdout
 
     css = Scss(scss_opts={
-        'compress': options.compress,
+        'style': options.style,
         'debug_info': options.debug_info,
     })
     if args:
@@ -169,7 +176,7 @@ def watch_sources(options):
         def __init__(self, *args, **kwargs):
             super(ScssEventHandler, self).__init__(*args, **kwargs)
             self.css = Scss(scss_opts={
-                'compress': options.compress,
+                'style': options.style,
                 'debug_info': options.debug_info,
             })
             self.output = options.output

@@ -181,7 +181,8 @@ class SassRule(object):
             options=None, properties=None,
             namespace=None,
             lineno=0, extends_selectors=frozenset(),
-            ancestry=None):
+            ancestry=None,
+            nested=-1):
 
         self.source_file = source_file
         self.lineno = lineno
@@ -207,6 +208,8 @@ class SassRule(object):
             self.ancestry = RuleAncestry()
         else:
             self.ancestry = ancestry
+
+        self.nested = nested
 
     def __repr__(self):
         return "<SassRule %s, %d props>" % (
@@ -262,6 +265,7 @@ class SassRule(object):
             ancestry=self.ancestry,
 
             namespace=self.namespace.derive(),
+            nested=self.nested,
         )
 
 

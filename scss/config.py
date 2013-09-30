@@ -15,7 +15,7 @@ CACHE_ROOT = None
 STATIC_URL = 'static/'
 ASSETS_URL = 'static/assets/'
 VERBOSITY = True
-COMPRESS = 'nested'
+STYLE = 'nested'
 FATAL_UNDEFINED = True
 DEBUG = 0
 
