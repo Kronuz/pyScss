@@ -14,6 +14,8 @@ CACHE_ROOT = None
 # Urls for the static and assets:
 STATIC_URL = 'static/'
 ASSETS_URL = 'static/assets/'
+FONTS_ROOT = STATIC_ROOT
+FONTS_URL = STATIC_URL
 VERBOSITY = True
 STYLE = 'nested'
 FATAL_UNDEFINED = True
