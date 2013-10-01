@@ -16,6 +16,9 @@ from scss.rule import Namespace
 
 
 import pytest
+from scss import config
+import os
+from _pytest.monkeypatch import monkeypatch
 xfail = pytest.mark.xfail
 
 # TODO many of these tests could also stand to test for failure cases
@@ -145,14 +148,53 @@ def test_pow(calc):
 
 
 ## Fonts
-
 # font-url
+def test_font_url(calc):
+    assert calc('font-url("/some_path.woff")').render() == ('url(%(static_url)ssome_path.woff)' % {'static_url': config.STATIC_URL})
+    assert calc('font-url("/some_path.woff") format("woff")').render() == ('url(%(static_url)ssome_path.woff) format("woff")' % {'static_url': config.STATIC_URL})
+
 
 # font-files
+def test_font_files(calc):
+    """
+    @author: funvit
+    @note: adapted from  compass / test / units / sass_extensions_test.rb
+    """
+    assert '' == calc('font-files()').render()
+    assert ('url(%(static_url)sfont/name.woff) format("woff"), url(%(static_url)sfonts/name.ttf) format("truetype"), url(%(static_url)sfonts/name.svg#fontpath) format("svg")' % {'static_url': config.STATIC_URL}) == calc('font-files("/font/name.woff", woff, "/fonts/name.ttf", truetype, "/fonts/name.svg#fontpath", svg)').render()
+
+    assert ('url(%(static_url)sfont/with/right_ext.woff) format("woff")' % {'static_url': config.STATIC_URL}) == calc('font_files("/font/with/right_ext.woff")').render()
+    assert ('url(%(static_url)sfont/with/wrong_ext.woff) format("svg")' % {'static_url': config.STATIC_URL}) == calc('font_files("/font/with/wrong_ext.woff", "svg")').render()
+    assert ('url(%(static_url)sfont/with/no_ext) format("opentype")' % {'static_url': config.STATIC_URL}) == calc('font_files("/font/with/no_ext", "otf")').render() 
+    assert ('url(%(static_url)sfont/with/weird.ext) format("truetype")' % {'static_url': config.STATIC_URL}) == calc('font_files("/font/with/weird.ext", "truetype")').render()
+    
+    assert ('url(%(static_url)sfont/with/right_ext.woff) format("woff"), url(%(static_url)sfont/with/right_ext_also.otf) format("opentype")' % {'static_url': config.STATIC_URL}) == calc('font_files("/font/with/right_ext.woff", "/font/with/right_ext_also.otf")').render()
+    assert ('url(%(static_url)sfont/with/wrong_ext.woff) format("truetype"), url(%(static_url)sfont/with/right_ext.otf) format("opentype")' % {'static_url': config.STATIC_URL}) == calc('font_files("/font/with/wrong_ext.woff", "ttf", "/font/with/right_ext.otf")').render()
+    
 
 # inline-font-files
-
+def test_inline_font_files(calc):
+    """
+    @author: funvit
+    @note: adapted from  compass / test / units / sass_extensions_test.rb
+    """
+#    def mockreturn(path):
+#        return os.path.join(config.PROJECT_ROOT, 'tests/files/fonts', path.strip('/'))
+       
+    monkeypatch().setattr(config, 'FONTS_ROOT', os.path.join(config.PROJECT_ROOT, 'tests/files/fonts'))
+    
+    f = open(os.path.join(config.PROJECT_ROOT, 'tests/files/fonts/bgrove.base64.txt'), 'r')
+    font_base64 = ''.join((f.readlines()))
+    f.close()
+    assert 'url(data:font/truetype;base64,%s) format("truetype")' % font_base64 == calc('inline_font_files("/bgrove.ttf", truetype)').render()
 
 ## External stylesheets
 
 # stylesheet-url
+
+
+# for debugging uncomment next lines
+#if __name__=='__main__':
+#    test_font_url(calc())
+#    test_font_files(calc())
+#    test_inline_font_files(calc())
