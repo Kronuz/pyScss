@@ -59,7 +59,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
         except:
             filetime = 'NA'
     else:
-        _path = os.path.join(config.IMAGES_ROOT, filepath.strip('/'))
+        _path = os.path.join(config.IMAGES_ROOT.rstrip('/'), filepath.strip('/'))
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
             if inline or dst_color or spacing:
