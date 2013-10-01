@@ -85,7 +85,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
         key = (filetime, src_color, dst_color, spacing)
         key = file_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + file_ext
-        ASSETS_ROOT = config.ASSETS_ROOT or os.path.join(config.IMAGES_ROOT, 'assets')
+        ASSETS_ROOT = config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets')
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
 
         if os.path.exists(asset_path):
@@ -100,53 +100,71 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
                     filetime = int(os.path.getmtime(asset_path))
                     url = add_cache_buster(url, filetime)
         else:
-            image = Image.open(path)
-            width, height = collapse_x or image.size[0], collapse_y or image.size[1]
-            new_image = Image.new(
-                mode='RGBA',
-                size=(width + spacing[1] + spacing[3], height + spacing[0] + spacing[2]),
-                color=(0, 0, 0, 0)
-            )
-            for i, dst_color in enumerate(dst_colors):
-                src_color = src_colors[i]
-                pixdata = image.load()
-                for _y in xrange(image.size[1]):
-                    for _x in xrange(image.size[0]):
-                        pixel = pixdata[_x, _y]
-                        if pixel[:3] == src_color:
-                            pixdata[_x, _y] = tuple([int(c) for c in dst_color] + [pixel[3] if len(pixel) == 4 else 255])
-            iwidth, iheight = image.size
-            if iwidth != width or iheight != height:
-                cy = 0
-                while cy < iheight:
-                    cx = 0
-                    while cx < iwidth:
-                        cropped_image = image.crop((cx, cy, cx + width, cy + height))
-                        new_image.paste(cropped_image, (int(spacing[3]), int(spacing[0])), cropped_image)
-                        cx += width
-                    cy += height
-            else:
-                new_image.paste(image, (int(spacing[3]), int(spacing[0])))
-
-            if not inline:
-                try:
-                    new_image.save(asset_path)
-                    filepath = asset_file
-                    BASE_URL = config.ASSETS_URL
+            simply_process = False
+            image = None
+            try:
+                image = Image.open(path)
+            except IOError, e:
+                if not collapse_x and not collapse_y and not dst_colors:
+                    simply_process = True
+                    
+            if simply_process:
+                if not mime_type:
+                    mime_type = 'image/%s' % _path.split('.')[-1]
+                if inline:
+                    url = 'data:' + mime_type + ';base64,' + base64.b64encode(path.read())
+                else:
+                    url = '%s%s' % (BASE_URL, filepath)
                     if cache_buster:
                         filetime = int(os.path.getmtime(asset_path))
-                except IOError:
-                    log.exception("Error while saving image")
-                    inline = True  # Retry inline version
-                url = os.path.join(config.ASSETS_URL.rstrip('/'), asset_file.lstrip('/'))
-                if cache_buster:
-                    url = add_cache_buster(url, filetime)
-            if inline:
-                output = six.BytesIO()
-                new_image.save(output, format='PNG')
-                contents = output.getvalue()
-                output.close()
-                url = 'data:' + mime_type + ';base64,' + base64.b64encode(contents)
+                        url = add_cache_buster(url, filetime)
+            else:
+                width, height = collapse_x or image.size[0], collapse_y or image.size[1]
+                new_image = Image.new(
+                    mode='RGBA',
+                    size=(width + spacing[1] + spacing[3], height + spacing[0] + spacing[2]),
+                    color=(0, 0, 0, 0)
+                )
+                for i, dst_color in enumerate(dst_colors):
+                    src_color = src_colors[i]
+                    pixdata = image.load()
+                    for _y in xrange(image.size[1]):
+                        for _x in xrange(image.size[0]):
+                            pixel = pixdata[_x, _y]
+                            if pixel[:3] == src_color:
+                                pixdata[_x, _y] = tuple([int(c) for c in dst_color] + [pixel[3] if len(pixel) == 4 else 255])
+                iwidth, iheight = image.size
+                if iwidth != width or iheight != height:
+                    cy = 0
+                    while cy < iheight:
+                        cx = 0
+                        while cx < iwidth:
+                            cropped_image = image.crop((cx, cy, cx + width, cy + height))
+                            new_image.paste(cropped_image, (int(spacing[3]), int(spacing[0])), cropped_image)
+                            cx += width
+                        cy += height
+                else:
+                    new_image.paste(image, (int(spacing[3]), int(spacing[0])))
+    
+                if not inline:
+                    try:
+                        new_image.save(asset_path)
+                        filepath = asset_file
+                        BASE_URL = config.ASSETS_URL
+                        if cache_buster:
+                            filetime = int(os.path.getmtime(asset_path))
+                    except IOError:
+                        log.exception("Error while saving image")
+                        inline = True  # Retry inline version
+                    url = os.path.join(config.ASSETS_URL.rstrip('/'), asset_file.lstrip('/'))
+                    if cache_buster:
+                        url = add_cache_buster(url, filetime)
+                if inline:
+                    output = six.BytesIO()
+                    new_image.save(output, format='PNG')
+                    contents = output.getvalue()
+                    output.close()
+                    url = 'data:' + mime_type + ';base64,' + base64.b64encode(contents)
     else:
         url = os.path.join(BASE_URL.rstrip('/'), filepath.lstrip('/'))
         if cache_buster and filetime != 'NA':
