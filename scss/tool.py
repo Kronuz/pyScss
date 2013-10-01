@@ -55,7 +55,7 @@ def main():
     parser.add_option("-t", "--style", metavar="NAME",
                       dest="style", default='nested',
                       help="Output style. Can be nested (default), compact, compressed, or expanded.")
-    parser.add_option("-C", "--no-compress", action="store_false", dest="style",
+    parser.add_option("-C", "--no-compress", action="store_false", dest="style", default=True,
                       help="Don't minify outputted CSS")
     parser.add_option("-?", action="help", help=SUPPRESS_HELP)
     parser.add_option("-h", "--help", action="help",
