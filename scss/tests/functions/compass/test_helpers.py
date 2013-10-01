@@ -194,7 +194,7 @@ def test_inline_font_files(calc):
 
 
 # for debugging uncomment next lines
-if __name__=='__main__':
-    test_font_url(calc())
-    test_font_files(calc())
-    test_inline_font_files(calc())
+#if __name__=='__main__':
+#    test_font_url(calc())
+#    test_font_files(calc())
+#    test_inline_font_files(calc())
