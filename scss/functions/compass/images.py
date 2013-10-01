@@ -49,9 +49,9 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
     filepath = String.unquoted(path).value
     mime_type = inline and (String.unquoted(mime_type).value if mime_type else mimetypes.guess_type(filepath)[0])
     path = None
-    if callable(config.STATIC_ROOT):
+    if callable(config.IMAGES_ROOT):
         try:
-            _file, _storage = list(config.STATIC_ROOT(filepath))[0]
+            _file, _storage = list(config.IMAGES_ROOT(filepath))[0]
             d_obj = _storage.modified_time(_file)
             filetime = int(time.mktime(d_obj.timetuple()))
             if inline or dst_color or spacing:
@@ -59,14 +59,14 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
         except:
             filetime = 'NA'
     else:
-        _path = os.path.join(config.STATIC_ROOT, filepath.strip('/'))
+        _path = os.path.join(config.IMAGES_ROOT, filepath.strip('/'))
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
             if inline or dst_color or spacing:
                 path = open(_path, 'rb')
         else:
             filetime = 'NA'
-    BASE_URL = config.STATIC_URL
+    BASE_URL = config.IMAGES_URL
     if path:
         dst_colors = [list(Color(v).value[:3]) for v in List.from_maybe(dst_color) if v]
 
@@ -85,7 +85,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
         key = (filetime, src_color, dst_color, spacing)
         key = file_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
         asset_file = key + file_ext
-        ASSETS_ROOT = config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets')
+        ASSETS_ROOT = config.ASSETS_ROOT or os.path.join(config.IMAGES_ROOT, 'assets')
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
 
         if os.path.exists(asset_path):
@@ -138,7 +138,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
                 except IOError:
                     log.exception("Error while saving image")
                     inline = True  # Retry inline version
-                url = '%s%s' % (config.ASSETS_URL, asset_file)
+                url = os.path.join(config.ASSETS_URL.rstrip('/'), asset_file.lstrip('/'))
                 if cache_buster:
                     url = add_cache_buster(url, filetime)
             if inline:
@@ -148,8 +148,8 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
                 output.close()
                 url = 'data:' + mime_type + ';base64,' + base64.b64encode(contents)
     else:
-        url = '%s%s' % (BASE_URL, filepath)
-        if cache_buster:
+        url = os.path.join(BASE_URL.rstrip('/'), filepath.lstrip('/'))
+        if cache_buster and filetime != 'NA':
             url = add_cache_buster(url, filetime)
 
     if not only_path:
@@ -202,14 +202,14 @@ def image_width(image):
         width = _image_size_cache[filepath][0]
     except KeyError:
         width = 0
-        if callable(config.STATIC_ROOT):
+        if callable(config.IMAGES_ROOT):
             try:
-                _file, _storage = list(config.STATIC_ROOT(filepath))[0]
+                _file, _storage = list(config.IMAGES_ROOT(filepath))[0]
                 path = _storage.open(_file)
             except:
                 pass
         else:
-            _path = os.path.join(config.STATIC_ROOT, filepath.strip('/'))
+            _path = os.path.join(config.IMAGES_ROOT, filepath.strip('/'))
             if os.path.exists(_path):
                 path = open(_path, 'rb')
         if path:
@@ -234,14 +234,14 @@ def image_height(image):
         height = _image_size_cache[filepath][1]
     except KeyError:
         height = 0
-        if callable(config.STATIC_ROOT):
+        if callable(config.IMAGES_ROOT):
             try:
-                _file, _storage = list(config.STATIC_ROOT(filepath))[0]
+                _file, _storage = list(config.IMAGES_ROOT(filepath))[0]
                 path = _storage.open(_file)
             except:
                 pass
         else:
-            _path = os.path.join(config.STATIC_ROOT, filepath.strip('/'))
+            _path = os.path.join(config.IMAGES_ROOT, filepath.strip('/'))
             if os.path.exists(_path):
                 path = open(_path, 'rb')
         if path:

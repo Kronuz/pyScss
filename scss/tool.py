@@ -76,7 +76,11 @@ def main():
     paths_group.add_option("-F", "--fonts-root", metavar="PATH", dest="fonts_root",
                       help="Fonts root path (Where fonts are located)")
     paths_group.add_option("-f", "--fonts-url", metavar="PATH", dest="fonts_url",
-					  help="URL to reach the fonts in your fonts_root")
+                      help="URL to reach the fonts in your fonts_root")
+    paths_group.add_option("--images-root", metavar="PATH", dest="images_root",
+                      help="Images root path (Where images are located)")
+    paths_group.add_option("--images-url", metavar="PATH", dest="images_url",
+                      help="URL to reach the images in your images_root")
     paths_group.add_option("--cache-root", metavar="PATH", dest="cache_root",
                       help="Cache root path (Cache files will be created here)")
     parser.add_option_group(paths_group)
@@ -91,14 +95,22 @@ def main():
     config.VERBOSITY = 0
     if options.time:
         config.VERBOSITY = 2
+        
     if options.static_root is not None:
         config.STATIC_ROOT = options.static_root
     if options.assets_root is not None:
         config.ASSETS_ROOT = options.assets_root
+        
     if options.fonts_root is not None:
         config.FONTS_ROOT = options.fonts_root
     if options.fonts_url is not None:
         config.FONTS_URL = options.fonts_url
+        
+    if options.images_root is not None:
+        config.IMAGES_ROOT = options.images_root
+    if options.images_url is not None:
+        config.IMAGES_URL = options.images_url
+        
     if options.cache_root is not None:
         config.CACHE_ROOT = options.cache_root
     if options.load_paths is not None:
