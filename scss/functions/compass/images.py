@@ -102,11 +102,15 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
         else:
             simply_process = False
             image = None
-            try:
-                image = Image.open(path)
-            except IOError, e:
-                if not collapse_x and not collapse_y and not dst_colors:
-                    simply_process = True
+            
+            if _path.split('.')[-1] in ['cur']:
+                simply_process = True
+            else:
+                try:
+                    image = Image.open(path)
+                except IOError, e:
+                    if not collapse_x and not collapse_y and not dst_colors:
+                        simply_process = True
                     
             if simply_process:
                 if not mime_type:
