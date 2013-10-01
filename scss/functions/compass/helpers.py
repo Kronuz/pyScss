@@ -527,7 +527,12 @@ def _font_url(path, only_path=False, cache_buster=True, inline=False):
         if not FONT_TYPES.get(font_type):
             raise Exception('Could not determine font type for "%s"' % path.value)
         
-        url = 'data:font/' + FONT_TYPES.get(font_type) + ';base64,' + base64.b64encode(file.read())
+        mime = FONT_TYPES.get(font_type)
+        if font_type == 'woff':
+            mime = 'application/font-woff'
+        elif font_type=='eot':
+            mime = 'application/vnd.ms-fontobject'
+        url = 'data:' + (mime if '/' in mime else 'font/%s' % mime) + ';base64,' + base64.b64encode(file.read())
         file.close()
     else:
         url = '%s/%s' % (BASE_URL.rstrip('/'), filepath.lstrip('/'))
