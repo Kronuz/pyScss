@@ -6,7 +6,7 @@ from scss import Scss
 
 
 def test_super_selector():
-    compiler = Scss(scss_opts=dict(compress=False))
+    compiler = Scss(scss_opts=dict(style='expanded'))
     input = """\
 foo, bar {
   a: b;
@@ -19,6 +19,7 @@ baz {
 super foo, super bar {
   a: b;
 }
+
 super baz {
   c: d;
 }
@@ -30,7 +31,7 @@ super baz {
 
 def test_debug_info():
     # nb: debug info doesn't work if the source isn't a file
-    compiler = Scss(scss_opts=dict(compress=False, debug_info=True))
+    compiler = Scss(scss_opts=dict(style='expanded', debug_info=True))
     compiler._scss_files = {}
     compiler._scss_files['input.css'] = """\
 div {
@@ -45,6 +46,7 @@ table {
 div {
   color: green;
 }
+
 @media -sass-debug-info{filename{font-family:file\:\/\/input\.css}line{font-family:\\000034}}
 table {
   color: red;
