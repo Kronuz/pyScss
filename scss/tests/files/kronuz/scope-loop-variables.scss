@@ -1,4 +1,5 @@
 @option compress:no;
+@option legacy-scoping: yes;
 
 div {
   @each $some in red blue {

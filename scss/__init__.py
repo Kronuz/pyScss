@@ -131,6 +131,7 @@ _default_scss_vars = {
 _default_scss_opts = {
     'verbosity': config.VERBOSITY,
     'style': config.STYLE,
+    'legacy-scoping': False,
 }
 
 _default_search_paths = ['.']
@@ -1007,7 +1008,9 @@ class Scss(object):
         if condition:
             inner_rule = rule.copy()
             inner_rule.unparsed_contents = block.unparsed_contents
-            inner_rule.namespace = rule.namespace  # DEVIATION: Commenting this line gives the Sass bahavior
+            if rule.options.get('legacy_scoping'):
+                # DEVIATION: Allow not creating a new namespace
+                inner_rule.namespace = rule.namespace
             self.manage_children(inner_rule, scope)
         rule.options['@if'] = condition
 
@@ -1055,7 +1058,9 @@ class Scss(object):
 
         inner_rule = rule.copy()
         inner_rule.unparsed_contents = block.unparsed_contents
-        inner_rule.namespace = rule.namespace  # DEVIATION: Commenting this line gives the Sass bahavior
+        if rule.options.get('legacy_scoping'):
+            # DEVIATION: Allow not creating a new namespace
+            inner_rule.namespace = rule.namespace
 
         for i in rev(range(frm, through + 1)):
             inner_rule.namespace.set_variable(var, Number(i))
@@ -1080,7 +1085,9 @@ class Scss(object):
 
         inner_rule = rule.copy()
         inner_rule.unparsed_contents = block.unparsed_contents
-        inner_rule.namespace = rule.namespace  # DEVIATION: Commenting this line gives the Sass bahavior
+        if rule.options.get('legacy_scoping'):
+            # DEVIATION: Allow not creating a new namespace
+            inner_rule.namespace = rule.namespace
 
         for v in List.from_maybe(values):
             v = List.from_maybe(v)
