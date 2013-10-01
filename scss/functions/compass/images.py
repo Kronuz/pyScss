@@ -164,6 +164,8 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
                     new_image.save(output, format='PNG')
                     contents = output.getvalue()
                     output.close()
+                    if not mime_type:
+                        mime_type = 'image/%s' % _path.split('.')[-1]
                     url = 'data:' + mime_type + ';base64,' + base64.b64encode(contents)
     else:
         url = os.path.join(BASE_URL.rstrip('/'), filepath.lstrip('/'))
