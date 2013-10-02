@@ -75,9 +75,12 @@ class SassError(Exception):
         """
         # TODO this contains NULs and line numbers; could be much prettier
         if self.rule_stack:
-            return "Error parsing block:\n" + "    " + self.rule_stack[0].unparsed_contents
+            return (
+                "Error parsing block:\n" +
+                "    " + self.rule_stack[0].unparsed_contents + "\n"
+            )
         else:
-            return "Unknown error"
+            return "Unknown error\n"
 
     def format_sass_stack(self):
         """Return a "traceback" of Sass imports."""
@@ -92,8 +95,6 @@ class SassError(Exception):
             if rule.source_file is not last_file:
                 ret.extend(("...imported from ", rule.file_and_line, "\n"))
             last_file = rule.source_file
-
-        ret.append("\n")
 
         return "".join(ret)
 
@@ -120,7 +121,9 @@ class SassError(Exception):
             python_stack = self.format_python_stack()
             original_error = self.format_original_error()
 
-            return prefix + sass_stack + python_stack + original_error
+            # TODO not very well-specified whether these parts should already
+            # end in newlines, or how many
+            return prefix + "\n" + sass_stack + python_stack + original_error
         except Exception:
             # "unprintable error" is not helpful
             return str(self.exc)
@@ -134,13 +137,15 @@ class SassError(Exception):
         original_error = self.format_original_error()
         sass_stack = self.format_sass_stack()
 
-        message = prefix + original_error + sass_stack
+        message = prefix + "\n" + sass_stack + original_error
 
         # Super simple escaping: only quotes and newlines are illegal in css
         # strings
         message = message.replace('\\', '\\\\')
         message = message.replace('"', '\\"')
-        message = message.replace('\n', '\\A')
+        # use the maximum six digits here so it doesn't eat any following
+        # characters that happen to look like hex
+        message = message.replace('\n', '\\00000A')
 
         return BROWSER_ERROR_TEMPLATE.format('"' + message + '"')
 
@@ -150,7 +155,7 @@ class SassParseError(SassError):
 
     def format_prefix(self):
         decorated_expr, line = add_error_marker(self.expression, self.expression_pos or -1)
-        return """Error parsing expression:\n""" + decorated_expr
+        return """Error parsing expression:\n{0}\n""".format(decorated_expr)
 
 
 class SassEvaluationError(SassError):
@@ -161,4 +166,4 @@ class SassEvaluationError(SassError):
         # TODO might be nice to print the AST and indicate where the failure
         # was?
         decorated_expr, line = add_error_marker(self.expression, self.expression_pos or -1)
-        return """Error evaluating expression:\n""" + decorated_expr
+        return """Error evaluating expression:\n{0}\n""".format(decorated_expr)
