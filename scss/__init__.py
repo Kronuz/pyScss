@@ -293,7 +293,10 @@ class SourceFile(object):
 
 
 class Scss(object):
-    def __init__(self, scss_vars=None, scss_opts=None, scss_files=None, super_selector=None, library=ALL_BUILTINS_LIBRARY, func_registry=None, search_paths=None):
+    def __init__(self,
+            scss_vars=None, scss_opts=None, scss_files=None, super_selector=None,
+            live_errors=False, library=ALL_BUILTINS_LIBRARY, func_registry=None, search_paths=None):
+
         if super_selector:
             self.super_selector = super_selector + ' '
         else:
@@ -318,6 +321,9 @@ class Scss(object):
         # has never existed in a real release
         self._library = func_registry or library
         self._search_paths = search_paths
+
+        # If true, swallow compile errors and embed them in the output instead
+        self.live_errors = live_errors
 
         self.reset()
 
@@ -434,7 +440,15 @@ class Scss(object):
 
         return final_cont
 
-    compile = Compilation
+    def compile(self, *args, **kwargs):
+        try:
+            return self.Compilation(*args, **kwargs)
+        except SassError as e:
+            if self.live_errors:
+                # TODO should this setting also capture and display warnings?
+                return e.to_css()
+            else:
+                raise
 
     def parse_selectors(self, raw_selectors):
         """

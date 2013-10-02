@@ -57,6 +57,13 @@ table {
     assert expected == output
 
 
+def test_live_errors():
+    compiler = Scss(live_errors=True)
+    output = compiler.compile("""$foo: unitless(one);""")
+    assert "body:before" in output
+    assert "TypeError: Expected" in output
+
+
 def test_extend_across_files():
     compiler = Scss(scss_opts=dict(compress=0))
     compiler._scss_files = {}
