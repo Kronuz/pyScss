@@ -575,7 +575,7 @@ class List(Value):
         )
 
     def __hash__(self):
-        return hash((self.value, self.use_comma))
+        return hash((tuple(self.value), self.use_comma))
 
     def delimiter(self, compress=False):
         if self.use_comma:
@@ -882,6 +882,7 @@ class Color(Value):
 # TODO be unicode-clean and delete this nonsense
 DEFAULT_STRING_ENCODING = "utf8"
 
+
 class String(Value):
     """Represents both CSS quoted string values and CSS identifiers (such as
     `left`).
@@ -978,7 +979,7 @@ class Map(Value):
     sass_type_name = u'map'
 
     def __init__(self, pairs):
-        self.pairs = pairs
+        self.pairs = tuple(pairs)
         self.index = {}
         for key, value in pairs:
             self.index[key] = value
