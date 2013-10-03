@@ -43,7 +43,7 @@ class VariableScope(object):
         self.maps = [dict()] + list(maps)
 
     def __repr__(self):
-        return "<VariableScope(%s)>" % (', '.join(repr(map) for map in self.maps),)
+        return "<VariableScope(%s) at 0x%x>" % (', '.join(repr(map) for map in self.maps), id(self))
 
     def __getitem__(self, key):
         for map in self.maps:

@@ -527,6 +527,10 @@ class Scss(object):
                     sys.stderr.write("%s\n" % repr(value))
                 elif code == '@dump_context':
                     sys.stderr.write("%s\n" % repr(rule.namespace._variables))
+                elif code == '@dump_functions':
+                    sys.stderr.write("%s\n" % repr(rule.namespace._functions))
+                elif code == '@dump_mixins':
+                    sys.stderr.write("%s\n" % repr(rule.namespace._mixins))
                 elif code == '@dump_options':
                     sys.stderr.write("%s\n" % repr(rule.options))
                 elif code == '@debug':
