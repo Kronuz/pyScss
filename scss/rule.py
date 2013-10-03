@@ -33,17 +33,18 @@ def extend_unique(seq, more):
     return seq + type(seq)(new)
 
 
-class VariableScope(object):
+class Scope(object):
     """Implements Sass variable scoping.
 
     Similar to `ChainMap`, except that assigning a new value will replace an
     existing value, not mask it.
     """
     def __init__(self, maps=()):
+        assert all(isinstance(m, dict) or isinstance(m, self.__class__) for m in maps)  # Check all passed maps are compatible with the current Scope
         self.maps = [dict()] + list(maps)
 
     def __repr__(self):
-        return "<VariableScope(%s) at 0x%x>" % (', '.join(repr(map) for map in self.maps), id(self))
+        return "<%s(%s) at 0x%x>" % (self.__class__.__name__, ', '.join(repr(map) for map in self.maps), id(self))
 
     def __getitem__(self, key):
         for map in self.maps:
@@ -79,7 +80,21 @@ class VariableScope(object):
         self.maps[0][key] = value
 
     def new_child(self):
-        return VariableScope(self.maps)
+        return self.__class__(self.maps)
+
+
+class VariableScope(Scope):
+    pass
+
+
+class FunctionScope(Scope):
+    def __repr__(self):
+        return "<%s(%s) at 0x%x>" % (self.__class__.__name__, ', '.join('[%s]' % ', '.join('%s:%s' % (f, n) for f, n in sorted(map.keys())) for map in self.maps), id(self))
+
+
+class MixinScope(Scope):
+    def __repr__(self):
+        return "<%s(%s) at 0x%x>" % (self.__class__.__name__, ', '.join('[%s]' % ', '.join('%s:%s' % (f, n) for f, n in sorted(map.keys())) for map in self.maps), id(self))
 
 
 class Namespace(object):
@@ -97,11 +112,11 @@ class Namespace(object):
             self._variables = VariableScope([variables])
 
         if functions is None:
-            self._functions = VariableScope()
+            self._functions = FunctionScope()
         else:
-            self._functions = VariableScope([functions._functions])
+            self._functions = FunctionScope([functions._functions])
 
-        self._mixins = VariableScope()
+        self._mixins = MixinScope()
 
     def _assert_mutable(self):
         if not self._mutable:
@@ -118,8 +133,8 @@ class Namespace(object):
             # Note that this will create a 2-dimensional scope where each of
             # these scopes is checked first in order.  TODO is this right?
             self._variables = VariableScope(other._variables for other in others)
-            self._functions = VariableScope(other._functions for other in others)
-            self._mixins = VariableScope(other._mixins for other in others)
+            self._functions = FunctionScope(other._functions for other in others)
+            self._mixins = MixinScope(other._mixins for other in others)
         return self
 
     def derive(self):
