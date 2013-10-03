@@ -757,7 +757,7 @@ class Scss(object):
                 # Fallback to single parameter:
                 mixin = caller_namespace.mixin(funct, 1)
             except KeyError:
-                log.error("Required mixin not found: %s:%d (%s)", funct, argc, rule.file_and_line, extra={'stack': True})
+                log.error("Mixin not found: %s:%d (%s)", funct, argc, rule.file_and_line, extra={'stack': True})
                 return
             else:
                 args = [List(args, use_comma=True)]

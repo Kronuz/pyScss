@@ -307,7 +307,7 @@ class CallOp(Expression):
                 args = [args]
             except KeyError:
                 if not is_builtin_css_function(func_name):
-                    log.warn("Function not found: %s:%s", func_name, argspec_len, extra={'stack': True})
+                    log.error("Function not found: %s:%s", func_name, argspec_len, extra={'stack': True})
 
         if funct:
             ret = funct(*args, **kwargs)
