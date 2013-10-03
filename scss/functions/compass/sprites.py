@@ -503,7 +503,7 @@ def sprite_position(map, sprite, offset_x=None, offset_y=None):
         x = None
         if offset_x is not None and not isinstance(offset_x, Number):
             x = offset_x
-        if x not in ('left', 'right', 'center'):
+        if not x or x.value not in ('left', 'right', 'center'):
             if x:
                 offset_x = None
             x = Number(offset_x or 0, 'px')
@@ -512,7 +512,7 @@ def sprite_position(map, sprite, offset_x=None, offset_y=None):
         y = None
         if offset_y is not None and not isinstance(offset_y, Number):
             y = offset_y
-        if y not in ('top', 'bottom', 'center'):
+        if not y or y.value not in ('top', 'bottom', 'center'):
             if y:
                 offset_y = None
             y = Number(offset_y or 0, 'px')
