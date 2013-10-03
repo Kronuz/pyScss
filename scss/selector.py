@@ -36,7 +36,7 @@ r'''
     | [.#%] [-\w]+
 
     # Percentages are used for @keyframes
-    | \d+ [%]
+    | [-.\d]+ [%]
 
     # Plain identifiers, or single asterisks, are element names
     | [-\w]+
@@ -212,6 +212,8 @@ class Selector(object):
         pos = 0
         while pos < len(selector):
             # TODO i don't think this deals with " + " correctly.  anywhere.
+            # TODO this used to turn "1.5%" into empty string; why does error
+            # not work?
             m = SELECTOR_TOKENIZER.match(selector, pos)
             if not m:
                 # TODO prettify me
