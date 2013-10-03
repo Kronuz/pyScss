@@ -51,8 +51,7 @@ class Calculator(object):
         """Performs #{}-interpolation.  The result is always treated as a fixed
         syntactic unit and will not be re-evaluated.
         """
-        # TODO this should really accept and/or parse an *expression* and
-        # return a type  :|
+        # TODO that's a lie!  this should be in the parser for most cases.
         cont = str(cont)
         if '#{' not in cont:
             return cont
@@ -60,6 +59,7 @@ class Calculator(object):
         return cont
 
     def apply_vars(self, cont):
+        # TODO this is very complicated.
         if isinstance(cont, six.string_types) and '$' in cont:
             try:
                 # Optimization: the full cont is a variable in the context,

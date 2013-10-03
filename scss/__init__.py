@@ -1269,7 +1269,9 @@ class Scss(object):
         Implements Nested CSS rules
         """
         calculator = Calculator(rule.namespace)
-        raw_selectors = calculator.apply_vars(block.prop)
+        raw_selectors = calculator.do_glob_math(block.prop)
+        # DEVIATION: ruby sass doesn't support bare variables in selectors
+        raw_selectors = calculator.apply_vars(raw_selectors)
         c_selectors, c_parents = self.parse_selectors(raw_selectors)
 
         new_ancestry = rule.ancestry.with_nested_selectors(c_selectors)

@@ -386,6 +386,7 @@ def sprite_map(g, **kwargs):
             sprite_maps[asset.render()] = sprite_map
         for file_, size in sizes:
             _image_size_cache[file_] = size
+    # TODO this sometimes returns an empty list, or is never assigned to
     return asset
 
 
