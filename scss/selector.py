@@ -55,8 +55,10 @@ r'''
 TOKEN_TYPE_ORDER = {
     '#': 2,
     '.': 3,
-    ':': 4,
-    '[': 5,
+    '[': 4,
+    # Note that pseudo-selectors MUST come last, because pseudo-element
+    # selectors target a different element!
+    ':': 5,
     '%': 6,
 }
 TOKEN_SORT_KEY = lambda token: TOKEN_TYPE_ORDER.get(token[0], 0)
