@@ -9,7 +9,7 @@ from scss.types import Value, Undefined
 
 log = logging.getLogger(__name__)
 
-SORTED_SELECTORS = True
+SORTED_SELECTORS = False
 
 sort = sorted if SORTED_SELECTORS else lambda it: it
 
