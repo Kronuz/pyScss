@@ -7,8 +7,11 @@ import six
 
 from scss.types import Value, Undefined
 
-
 log = logging.getLogger(__name__)
+
+SORTED_SELECTORS = True
+
+sort = sorted if SORTED_SELECTORS else lambda it: it
 
 
 def normalize_var(name):
@@ -430,7 +433,7 @@ class BlockSelectorHeader(BlockHeader):
         return "<%s %r>" % (type(self).__name__, self.selectors)
 
     def render(self, sep=', ', super_selector=''):
-        return sep.join((
+        return sep.join(sort(
             super_selector + s.render()
             for s in self.selectors
             if not s.has_placeholder))
