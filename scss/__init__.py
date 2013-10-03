@@ -486,7 +486,7 @@ class Scss(object):
                 source_file=source_file,
 
                 unparsed_contents=source_file.contents,
-                namespace=root_namespace.derive(),
+                namespace=root_namespace,
                 options=self.scss_opts,
             )
             self.rules.append(rule)
