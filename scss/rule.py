@@ -97,6 +97,11 @@ class MixinScope(Scope):
         return "<%s(%s) at 0x%x>" % (self.__class__.__name__, ', '.join('[%s]' % ', '.join('%s:%s' % (f, n) for f, n in sorted(map.keys())) for map in self.maps), id(self))
 
 
+class ImportScope(Scope):
+    def __repr__(self):
+        return "<%s(%s) at 0x%x>" % (self.__class__.__name__, ', '.join('[%s]' % ', '.join(repr(k) for k in sorted(map.keys())) for map in self.maps), id(self))
+
+
 class Namespace(object):
     """..."""
     _mutable = True
@@ -118,6 +123,8 @@ class Namespace(object):
 
         self._mixins = MixinScope()
 
+        self._imports = ImportScope()
+
     def _assert_mutable(self):
         if not self._mutable:
             raise AttributeError("This Namespace instance is immutable")
@@ -129,12 +136,14 @@ class Namespace(object):
             self._variables = others[0]._variables.new_child()
             self._functions = others[0]._functions.new_child()
             self._mixins = others[0]._mixins.new_child()
+            self._imports = others[0]._imports.new_child()
         else:
             # Note that this will create a 2-dimensional scope where each of
             # these scopes is checked first in order.  TODO is this right?
             self._variables = VariableScope(other._variables for other in others)
             self._functions = FunctionScope(other._functions for other in others)
             self._mixins = MixinScope(other._mixins for other in others)
+            self._imports = ImportScope(other._imports for other in others)
         return self
 
     def derive(self):
@@ -154,6 +163,15 @@ class Namespace(object):
         if not isinstance(value, Value):
             raise TypeError("Expected a Sass type, while setting %s got %r" % (name, value,))
         self._variables.set(name, value, force_local=local_only)
+
+    def has_import(self, name, path=None):
+        import_key = (name, path)
+        return import_key in self._imports
+
+    def add_import(self, name, path=None):
+        self._assert_mutable()
+        import_key = (name, path)
+        self._imports[import_key] = True
 
     def _get_callable(self, chainmap, name, arity):
         name = normalize_var(name)

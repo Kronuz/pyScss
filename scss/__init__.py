@@ -481,14 +481,13 @@ class Scss(object):
     def parse_children(self, scope=None):
         children = []
         root_namespace = self.root_namespace
-        scss_opts = self.scss_opts
         for source_file in self.source_files:
             rule = SassRule(
                 source_file=source_file,
 
                 unparsed_contents=source_file.contents,
                 namespace=root_namespace.derive(),
-                options=scss_opts.copy(),
+                options=self.scss_opts,
             )
             self.rules.append(rule)
             children.append(rule)
@@ -533,6 +532,8 @@ class Scss(object):
                     sys.stderr.write("%s\n" % repr(rule.namespace._functions))
                 elif code == '@dump_mixins':
                     sys.stderr.write("%s\n" % repr(rule.namespace._mixins))
+                elif code == '@dump_imports':
+                    sys.stderr.write("%s\n" % repr(rule.namespace._imports))
                 elif code == '@dump_options':
                     sys.stderr.write("%s\n" % repr(rule.options))
                 elif code == '@debug':
@@ -850,8 +851,7 @@ class Scss(object):
         names = block.argument.split(',')
         for name in names:
             name = dequote(name.strip())
-            import_key = ('@import', name, rule.source_file.parent_dir)
-            if import_key in rule.options:
+            if rule.namespace.has_import(name, rule.source_file.parent_dir):
                 # If already imported in this scope, skip
                 continue
 
@@ -896,8 +896,8 @@ class Scss(object):
                 ancestry=rule.ancestry,
                 namespace=rule.namespace,
             )
+            rule.namespace.add_import(name, rule.source_file.parent_dir)
             self.manage_children(_rule, scope)
-            rule.options[import_key] = True
 
     def _find_import(self, rule, name):
         """Find the file referred to by an @import.
