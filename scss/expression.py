@@ -59,7 +59,8 @@ class Calculator(object):
         return cont
 
     def apply_vars(self, cont):
-        # TODO this is very complicated.
+        # TODO this is very complicated.  it should go away once everything
+        # valid is actually parseable.
         if isinstance(cont, six.string_types) and '$' in cont:
             try:
                 # Optimization: the full cont is a variable in the context,
@@ -90,8 +91,7 @@ class Calculator(object):
                         return v
 
                 cont = _interpolate_re.sub(_av, cont)
-        # XXX what?: if options is not None:
-        # ...apply math:
+        # TODO this is surprising and shouldn't be here
         cont = self.do_glob_math(cont)
         return cont
 
