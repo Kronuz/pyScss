@@ -40,11 +40,11 @@ class Scope(object):
     existing value, not mask it.
     """
     def __init__(self, maps=()):
-        assert all(isinstance(m, dict) or isinstance(m, self.__class__) for m in maps)  # Check all passed maps are compatible with the current Scope
+        assert all(isinstance(m, dict) or isinstance(m, type(self)) for m in maps)  # Check all passed maps are compatible with the current Scope
         self.maps = [dict()] + list(maps)
 
     def __repr__(self):
-        return "<%s(%s) at 0x%x>" % (self.__class__.__name__, ', '.join(repr(map) for map in self.maps), id(self))
+        return "<%s(%s) at 0x%x>" % (type(self).__name__, ', '.join(repr(map) for map in self.maps), id(self))
 
     def __getitem__(self, key):
         for map in self.maps:
@@ -80,7 +80,7 @@ class Scope(object):
         self.maps[0][key] = value
 
     def new_child(self):
-        return self.__class__(self.maps)
+        return type(self)(self.maps)
 
 
 class VariableScope(Scope):
@@ -89,17 +89,17 @@ class VariableScope(Scope):
 
 class FunctionScope(Scope):
     def __repr__(self):
-        return "<%s(%s) at 0x%x>" % (self.__class__.__name__, ', '.join('[%s]' % ', '.join('%s:%s' % (f, n) for f, n in sorted(map.keys())) for map in self.maps), id(self))
+        return "<%s(%s) at 0x%x>" % (type(self).__name__, ', '.join('[%s]' % ', '.join('%s:%s' % (f, n) for f, n in sorted(map.keys())) for map in self.maps), id(self))
 
 
 class MixinScope(Scope):
     def __repr__(self):
-        return "<%s(%s) at 0x%x>" % (self.__class__.__name__, ', '.join('[%s]' % ', '.join('%s:%s' % (f, n) for f, n in sorted(map.keys())) for map in self.maps), id(self))
+        return "<%s(%s) at 0x%x>" % (type(self).__name__, ', '.join('[%s]' % ', '.join('%s:%s' % (f, n) for f, n in sorted(map.keys())) for map in self.maps), id(self))
 
 
 class ImportScope(Scope):
     def __repr__(self):
-        return "<%s(%s) at 0x%x>" % (self.__class__.__name__, ', '.join('[%s]' % ', '.join(repr(k) for k in sorted(map.keys())) for map in self.maps), id(self))
+        return "<%s(%s) at 0x%x>" % (type(self).__name__, ', '.join('[%s]' % ', '.join(repr(k) for k in sorted(map.keys())) for map in self.maps), id(self))
 
 
 class Namespace(object):
@@ -411,7 +411,7 @@ class BlockAtRuleHeader(BlockHeader):
         self.argument = argument
 
     def __repr__(self):
-        return "<%s %r %r>" % (self.__class__.__name__, self.directive, self.argument)
+        return "<%s %r %r>" % (type(self).__name__, self.directive, self.argument)
 
     def render(self):
         if self.argument:
@@ -427,7 +427,7 @@ class BlockSelectorHeader(BlockHeader):
         self.selectors = tuple(selectors)
 
     def __repr__(self):
-        return "<%s %r>" % (self.__class__.__name__, self.selectors)
+        return "<%s %r>" % (type(self).__name__, self.selectors)
 
     def render(self, sep=', ', super_selector=''):
         return sep.join((
