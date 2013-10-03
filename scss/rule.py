@@ -2,7 +2,6 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import logging
-from itertools import chain
 import six
 
 from scss.types import Value, Undefined
@@ -43,8 +42,9 @@ class Scope(object):
     existing value, not mask it.
     """
     def __init__(self, maps=()):
+        maps = list(maps)
         assert all(isinstance(m, dict) or isinstance(m, type(self)) for m in maps)  # Check all passed maps are compatible with the current Scope
-        self.maps = [dict()] + list(maps)
+        self.maps = [dict()] + maps
 
     def __repr__(self):
         return "<%s(%s) at 0x%x>" % (type(self).__name__, ', '.join(repr(map) for map in self.maps), id(self))
@@ -69,7 +69,10 @@ class Scope(object):
 
     def keys(self):
         # For mapping interface
-        return list(chain(*self.maps))
+        keys = set()
+        for map in self.maps:
+            keys.update(map.keys())
+        return list(keys)
 
     def set(self, key, value, force_local=False):
         if not force_local:
