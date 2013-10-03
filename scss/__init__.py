@@ -481,13 +481,14 @@ class Scss(object):
     def parse_children(self, scope=None):
         children = []
         root_namespace = self.root_namespace
+        scss_opts = self.scss_opts
         for source_file in self.source_files:
             rule = SassRule(
                 source_file=source_file,
 
                 unparsed_contents=source_file.contents,
                 namespace=root_namespace.derive(),
-                options=self.scss_opts,
+                options=scss_opts.copy(),
             )
             self.rules.append(rule)
             children.append(rule)
