@@ -38,7 +38,7 @@ def test_pair_programmatic(scss_file_pair):
     include_dir = os.path.join(directory, 'include')
     scss.config.STATIC_ROOT = os.path.join(directory, 'static')
 
-    compiler = scss.Scss(scss_opts=dict(compress=0), search_paths=[include_dir])
+    compiler = scss.Scss(scss_opts=dict(style='expanded'), search_paths=[include_dir])
     actual = compiler.compile(source)
 
     # Normalize leading and trailing newlines

@@ -630,6 +630,7 @@ class Scss(object):
             # Whoops, no parens at all.  That's like calling with no arguments.
             argstr = ''
 
+        argstr = calculator.do_glob_math(argstr)
         argspec_node = calculator.parse_expression(argstr, target='goal_argspec')
         return funct, argspec_node
 
