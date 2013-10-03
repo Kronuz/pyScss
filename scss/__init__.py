@@ -781,7 +781,7 @@ class Scss(object):
             elif var_name in kwargs:
                 # Try keyword arguments
                 value = kwargs.pop(var_name)
-            elif node:
+            elif node is not None:
                 # OK, there's a default argument; try that
                 # DEVIATION: this allows argument defaults to refer to earlier
                 # argument values

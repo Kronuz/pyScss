@@ -443,7 +443,7 @@ class ArgspecLiteral(Expression):
             if var is None:
                 # value is actually the name
                 var = value
-                value = Literal(Undefined())
+                value = None
 
                 if started_kwargs:
                     raise SyntaxError(
