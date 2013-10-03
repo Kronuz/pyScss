@@ -480,12 +480,13 @@ class Scss(object):
     @print_timing(3)
     def parse_children(self, scope=None):
         children = []
+        root_namespace = self.root_namespace
         for source_file in self.source_files:
             rule = SassRule(
                 source_file=source_file,
 
                 unparsed_contents=source_file.contents,
-                namespace=self.root_namespace.derive(),
+                namespace=root_namespace.derive(),
                 options=self.scss_opts,
             )
             self.rules.append(rule)
