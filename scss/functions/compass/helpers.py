@@ -20,12 +20,22 @@ from scss import config
 from scss.functions.library import FunctionLibrary
 from scss.types import Boolean, List, Null, Number, String
 from scss.util import escape, to_str
+import re
 
 log = logging.getLogger(__name__)
 
 COMPASS_HELPERS_LIBRARY = FunctionLibrary()
 register = COMPASS_HELPERS_LIBRARY.register
 
+FONT_TYPES = {
+    'woff': 'woff',
+    'otf': 'opentype',
+    'opentype': 'opentype',
+    'ttf': 'truetype',
+    'truetype': 'truetype',
+    'svg': 'svg',
+    'eot': 'embedded-opentype'
+}
 
 def add_cache_buster(url, mtime):
     fragment = url.split('#')
@@ -488,73 +498,78 @@ COMPASS_HELPERS_LIBRARY.add(Number.wrap_python_function(math.tan), 'tan', 1)
 
 def _font_url(path, only_path=False, cache_buster=True, inline=False):
     filepath = String.unquoted(path).value
-    path = None
-    if callable(config.STATIC_ROOT):
+    file = None
+    if callable(config.FONTS_ROOT):
         try:
-            _file, _storage = list(config.STATIC_ROOT(filepath))[0]
+            _file, _storage = list(config.FONTS_ROOT(filepath))[0]
             d_obj = _storage.modified_time(_file)
             filetime = int(time.mktime(d_obj.timetuple()))
             if inline:
-                path = _storage.open(_file)
+                file = _storage.open(_file)
         except:
             filetime = 'NA'
     else:
-        _path = os.path.join(config.STATIC_ROOT, filepath.strip('/'))
+        _path = os.path.join(config.FONTS_ROOT, filepath.strip('/'))
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
             if inline:
-                path = open(_path, 'rb')
+                file = open(_path, 'rb')
         else:
             filetime = 'NA'
-    BASE_URL = config.STATIC_URL
+    BASE_URL = config.FONTS_URL
 
-    if path and inline:
-        mime_type = mimetypes.guess_type(filepath)[0]
-        url = 'data:' + mime_type + ';base64,' + base64.b64encode(path.read())
+    if file and inline:
+#        mime_type = mimetypes.guess_type(filepath)[0]
+        font_type = None
+        if re.match(r'^([^?]+)[.](.*)([?].*)?$', path.value):
+            font_type = String.unquoted(re.match(r'^([^?]+)[.](.*)([?].*)?$', path.value).groups()[1]).value
+                 
+        if not FONT_TYPES.get(font_type):
+            raise Exception('Could not determine font type for "%s"' % path.value)
+        
+        mime = FONT_TYPES.get(font_type)
+        if font_type == 'woff':
+            mime = 'application/font-woff'
+        elif font_type=='eot':
+            mime = 'application/vnd.ms-fontobject'
+        url = 'data:' + (mime if '/' in mime else 'font/%s' % mime) + ';base64,' + base64.b64encode(file.read())
+        file.close()
     else:
-        url = '%s%s' % (BASE_URL, filepath)
-        if cache_buster:
+        url = '%s/%s' % (BASE_URL.rstrip('/'), filepath.lstrip('/'))
+        if cache_buster and filetime != 'NA':
             url = add_cache_buster(url, filetime)
 
     if not only_path:
-        url = 'url("%s")' % escape(url)
+        url = 'url(%s)' % escape(url)
     return String.unquoted(url)
 
 
 def _font_files(args, inline):
-    args = List.from_maybe_starargs(args)
-    n = 0
-    params = [[], []]
-    for arg in args:
-        if isinstance(arg, List):
-            if len(arg) == 2:
-                if n % 2 == 1:
-                    params[1].append(None)
-                    n += 1
-                params[0].append(arg[0])
-                params[1].append(arg[1])
-                n += 2
-            else:
-                for arg2 in arg:
-                    params[n % 2].append(arg2)
-                    n += 1
-        else:
-            params[n % 2].append(arg)
-            n += 1
-    len0 = len(params[0])
-    len1 = len(params[1])
-    if len1 < len0:
-        params[1] += [None] * (len0 - len1)
-    elif len0 < len1:
-        params[0] += [None] * (len1 - len0)
+    if args == ():
+        return String.unquoted("")
+       
     fonts = []
-    for font, format in zip(params[0], params[1]):
-        if format:
-            fonts.append('%s format("%s")' % (_font_url(font, inline=inline), String.unquoted(format).value))
+    args_len = len(args)
+    skip_next = False
+    for index in xrange(len(args)):
+        arg = args[index]
+        if not skip_next:
+            font_type = args[index + 1] if args_len > (index +1) else None
+            if font_type and FONT_TYPES.has_key(font_type.value):
+                skip_next = True
+            else:
+                if re.match(r'^([^?]+)[.](.*)([?].*)?$', arg.value):
+                    font_type = String.unquoted(re.match(r'^([^?]+)[.](.*)([?].*)?$', arg.value).groups()[1])
+                   
+            if FONT_TYPES.has_key(font_type.value):
+                fonts.append(String.unquoted('%s format("%s")' % (_font_url(arg, inline=inline), String.unquoted(FONT_TYPES[font_type.value]).value)))
+            else:
+                raise Exception('Could not determine font type for "%s"' % arg.value)
         else:
-            fonts.append(_font_url(font, inline=inline))
-    return List(fonts)
+            skip_next = False
 
+    return List(fonts, separator=',')
+   
 
 @register('font-url', 1)
 @register('font-url', 2)
