@@ -53,7 +53,6 @@ import logging
 import os.path
 import re
 import sys
-import textwrap
 
 import six
 
@@ -1419,13 +1418,46 @@ class Scss(object):
         return self._create_css(rules, sc, sp, tb, nst, srnl, nl, rnl, lnl, dbg)
 
     def _textwrap(self, txt, width=70):
-        if not hasattr(self, '__textwrapper'):
-            textwrap.TextWrapper.wordsep_re = re.compile(r'(?<=,)(\s*)')
-            if hasattr(textwrap.TextWrapper, 'wordsep_simple_re'):
-                self.__textwrapper = textwrap.TextWrapper(width=width, break_long_words=False, break_on_hyphens=False)
-            else:
-                self.__textwrapper = textwrap.TextWrapper(width=width, break_long_words=False)
-        return self.__textwrapper.wrap(txt)
+        if not hasattr(self, '_textwrap_wordsep_re'):
+            self._textwrap_wordsep_re = re.compile(r'(?<=,)\s+')
+            self._textwrap_strings_re = re.compile(r'''(["'])(?:(?!\1)[^\\]|\\.)*\1''')
+
+        # First, remove commas from anything within strings (marking commas as \0):
+        def _repl(m):
+            ori = m.group(0)
+            fin = ori.replace(',', '\0')
+            if ori != fin:
+                subs[fin] = ori
+            return fin
+        subs = {}
+        txt = self._textwrap_strings_re.sub(_repl, txt)
+
+        # Mark split points for word separators using (marking spaces with \1):
+        txt = self._textwrap_wordsep_re.sub('\1', txt)
+
+        # Replace all the strings back:
+        for fin, ori in subs.items():
+            txt = txt.replace(fin, ori)
+
+        # Split in chunks:
+        chunks = txt.split('\1')
+
+        # Break in lines of at most long_width width appending chunks:
+        ln = ''
+        lines = []
+        long_width = int(width * 1.2)
+        for chunk in chunks:
+            _ln = ln + ' ' if ln else ''
+            _ln += chunk
+            if len(ln) >= width or len(_ln) >= long_width:
+                if ln:
+                    lines.append(ln)
+                _ln = chunk
+            ln = _ln
+        if ln:
+            lines.append(ln)
+
+        return lines
 
     def _create_css(self, rules, sc=True, sp=' ', tb='  ', nst=True, srnl='\n', nl='\n', rnl='\n', lnl='', debug_info=False):
         skip_selectors = False
