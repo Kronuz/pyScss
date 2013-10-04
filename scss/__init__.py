@@ -1418,17 +1418,19 @@ class Scss(object):
 
         return self._create_css(rules, sc, sp, tb, nst, srnl, nl, rnl, lnl, dbg)
 
+    def _textwrap(self, txt, width=70):
+        if not hasattr(self, '__textwrapper'):
+            textwrap.TextWrapper.wordsep_re = re.compile(r'(?<=,)(\s*)')
+            if hasattr(textwrap.TextWrapper, 'wordsep_simple_re'):
+                self.__textwrapper = textwrap.TextWrapper(width=width, break_long_words=False, break_on_hyphens=False)
+            else:
+                self.__textwrapper = textwrap.TextWrapper(width=width, break_long_words=False)
+        return self.__textwrapper.wrap(txt)
+
     def _create_css(self, rules, sc=True, sp=' ', tb='  ', nst=True, srnl='\n', nl='\n', rnl='\n', lnl='', debug_info=False):
         skip_selectors = False
 
         prev_ancestry_headers = []
-
-        textwrap.TextWrapper.wordsep_re = re.compile(r'(?<=,)(\s*)')
-        if hasattr(textwrap.TextWrapper, 'wordsep_simple_re'):
-            wrap = textwrap.TextWrapper(break_long_words=False, break_on_hyphens=False)
-        else:
-            wrap = textwrap.TextWrapper(break_long_words=False)
-        wrap = wrap.wrap
 
         total_rules = 0
         total_selectors = 0
@@ -1482,7 +1484,7 @@ class Scss(object):
                 if header.is_selector:
                     header_string = header.render(sep=',' + sp, super_selector=self.super_selector)
                     if nl:
-                        header_string = nl.join(wrap(header_string))
+                        header_string = (nl + tb * (i + nesting)).join(self._textwrap(header_string))
                 else:
                     header_string = header.render()
                 result += tb * (i + nesting) + header_string + sp + '{' + nl
@@ -1495,7 +1497,7 @@ class Scss(object):
             dangling_property = False
 
             if not skip_selectors:
-                result += self._print_properties(rule.properties, sc, sp, tb * (ancestry_len + nesting), nl, lnl, wrap)
+                result += self._print_properties(rule.properties, sc, sp, tb * (ancestry_len + nesting), nl, lnl)
                 dangling_property = True
 
         # Close all remaining blocks
@@ -1504,21 +1506,13 @@ class Scss(object):
 
         return (result, total_rules, total_selectors)
 
-    def _print_properties(self, properties, sc=True, sp=' ', tb='', nl='\n', lnl=' ', wrap=None):
-        if wrap is None:
-            textwrap.TextWrapper.wordsep_re = re.compile(r'(?<=,)(\s*)')
-            if hasattr(textwrap.TextWrapper, 'wordsep_simple_re'):
-                wrap = textwrap.TextWrapper(break_long_words=False, break_on_hyphens=False)
-            else:
-                wrap = textwrap.TextWrapper(break_long_words=False)
-            wrap = wrap.wrap
-
+    def _print_properties(self, properties, sc=True, sp=' ', tb='', nl='\n', lnl=' '):
         result = ''
         last_prop_index = len(properties) - 1
         for i, (name, value) in enumerate(properties):
             if value is not None:
                 if nl:
-                    value = (nl + tb + tb).join(wrap(value))
+                    value = (nl + tb + tb).join(self._textwrap(value))
                 prop = name + ':' + sp + value
             else:
                 prop = name
