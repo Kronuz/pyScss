@@ -781,8 +781,8 @@ class Color(Value):
         # Scale channels to 255 and round to integers; this allows only 8-bit
         # color, but Ruby sass makes the same assumption, and otherwise it's
         # easy to get lots of float errors for HSL colors.
-        left = tuple(round(n) for n in self.value)
-        right = tuple(round(n) for n in other.value)
+        left = tuple(round(n) for n in self.rgba255)
+        right = tuple(round(n) for n in other.rgba255)
         return Boolean(left == right)
 
     def __add__(self, other):
