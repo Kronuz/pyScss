@@ -185,11 +185,13 @@ class Namespace(object):
             imports[0] += 1
             self.use_import(imports[1])
 
-    def warn_unused_imports(self):
+    def unused_imports(self):
+        unused = []
         for import_key in self._imports.keys():
             imports = self._imports[import_key]
             if not imports[0]:
-                log.warn("Unused @import: '%s' (%s)", import_key[0], imports[2])
+                unused.append((import_key[0], imports[2]))
+        return unused
 
     def _get_callable(self, chainmap, name, arity):
         name = normalize_var(name)

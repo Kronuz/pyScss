@@ -494,7 +494,9 @@ class Scss(object):
         for rule in children:
             self.manage_children(rule, scope)
 
-        root_namespace.warn_unused_imports()
+        if self.scss_opts.get('warn_unused'):
+            for name, file_and_line in root_namespace.unused_imports():
+                log.warn("Unused @import: '%s' (%s)", name, file_and_line)
 
     @print_timing(4)
     def manage_children(self, rule, scope):
@@ -1274,7 +1276,10 @@ class Scss(object):
         self.rules.append(new_rule)
         rule.namespace.use_import(rule.import_key)
         self.manage_children(new_rule, scope)
-        new_rule.namespace.warn_unused_imports()
+
+        if new_rule.options.get('warn_unused'):
+            for name, file_and_line in new_rule.namespace.unused_imports():
+                log.warn("Unused @import: '%s' (%s)", name, file_and_line)
 
     @print_timing(10)
     def _nest_rules(self, rule, scope, block):
@@ -1306,7 +1311,10 @@ class Scss(object):
         self.rules.append(new_rule)
         rule.namespace.use_import(rule.import_key)
         self.manage_children(new_rule, scope)
-        new_rule.namespace.warn_unused_imports()
+
+        if new_rule.options.get('warn_unused'):
+            for name, file_and_line in new_rule.namespace.unused_imports():
+                log.warn("Unused @import: '%s' (%s)", name, file_and_line)
 
     @print_timing(3)
     def apply_extends(self):
