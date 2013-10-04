@@ -327,16 +327,12 @@ class Scss(object):
         self.reset()
 
     def get_scss_constants(self):
-        scss_vars = self.scss_vars or {}
+        scss_vars = self.root_namespace.variables
         return dict((k, v) for k, v in scss_vars.items() if k and (not k.startswith('$') or k.startswith('$') and k[1].isupper()))
 
     def get_scss_vars(self):
-        scss_vars = self.scss_vars or {}
+        scss_vars = self.root_namespace.variables
         return dict((k, v) for k, v in scss_vars.items() if k and not (not k.startswith('$') or k.startswith('$') and k[1].isupper()))
-
-    @property
-    def root_namespace(self):
-        return Namespace(variables=self.scss_vars, functions=self._library)
 
     def reset(self, input_scss=None):
         # Initialize
@@ -347,6 +343,8 @@ class Scss(object):
         self.scss_opts = _default_scss_opts.copy()
         if self._scss_opts is not None:
             self.scss_opts.update(self._scss_opts)
+
+        self.root_namespace = Namespace(variables=self.scss_vars, functions=self._library)
 
         # Figure out search paths.  Fall back from provided explicitly to
         # defined globally to just searching the current directory

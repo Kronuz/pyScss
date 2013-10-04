@@ -158,6 +158,10 @@ class Namespace(object):
         """
         return type(self).derive_from(self)
 
+    @property
+    def variables(self):
+        return dict((k, self._variables[k]) for k in self._variables.keys())
+
     def variable(self, name, throw=False):
         name = normalize_var(name)
         return self._variables[name]
