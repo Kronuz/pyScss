@@ -104,8 +104,7 @@ class MixinScope(Scope):
 
 
 class ImportScope(Scope):
-    def __repr__(self):
-        return "<%s(%s) at 0x%x>" % (type(self).__name__, ', '.join('[%s]' % ', '.join(repr(k) for k in sorted(map.keys())) for map in self.maps), id(self))
+    pass
 
 
 class Namespace(object):
@@ -170,14 +169,27 @@ class Namespace(object):
             raise TypeError("Expected a Sass type, while setting %s got %r" % (name, value,))
         self._variables.set(name, value, force_local=local_only)
 
-    def has_import(self, name, path=None):
-        import_key = (name, path)
+    def has_import(self, import_key):
         return import_key in self._imports
 
-    def add_import(self, name, path=None):
+    def add_import(self, import_key, parent_import_key, file_and_line):
         self._assert_mutable()
-        import_key = (name, path)
-        self._imports[import_key] = True
+        if import_key:
+            imports = [0, parent_import_key, file_and_line]
+            self._imports[import_key] = imports
+
+    def use_import(self, import_key):
+        self._assert_mutable()
+        if import_key and import_key in self._imports:
+            imports = self._imports[import_key]
+            imports[0] += 1
+            self.use_import(imports[1])
+
+    def warn_unused_imports(self):
+        for import_key in self._imports.keys():
+            imports = self._imports[import_key]
+            if not imports[0]:
+                log.warn("Unused @import: '%s' (%s)", import_key[0], imports[2])
 
     def _get_callable(self, chainmap, name, arity):
         name = normalize_var(name)
@@ -216,7 +228,7 @@ class SassRule(object):
     metadata, like `@extend` rules and `@media` nesting.
     """
 
-    def __init__(self, source_file, unparsed_contents=None,
+    def __init__(self, source_file, import_key=None, unparsed_contents=None,
             options=None, properties=None,
             namespace=None,
             lineno=0, extends_selectors=frozenset(),
@@ -224,6 +236,7 @@ class SassRule(object):
             nested=-1):
 
         self.source_file = source_file
+        self.import_key = import_key
         self.lineno = lineno
 
         self.unparsed_contents = unparsed_contents

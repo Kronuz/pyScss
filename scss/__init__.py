@@ -146,7 +146,7 @@ class SourceFile(object):
         self.line_numbers = line_numbers
         self.line_strip = line_strip
         self.contents = self.prepare_source(contents)
-        self.parent_dir = parent_dir
+        self.parent_dir = os.path.realpath(parent_dir)
         self.is_string = is_string
 
     @classmethod
@@ -494,6 +494,8 @@ class Scss(object):
         for rule in children:
             self.manage_children(rule, scope)
 
+        root_namespace.warn_unused_imports()
+
     @print_timing(4)
     def manage_children(self, rule, scope):
         try:
@@ -652,7 +654,7 @@ class Scss(object):
             if default is not None:
                 defaults[var_name] = default
 
-        mixin = [list(new_params), defaults, block.unparsed_contents, rule.namespace, argspec_node]
+        mixin = [list(new_params), defaults, block.unparsed_contents, rule.namespace, argspec_node, rule.import_key]
         if block.directive == '@function':
             def _call(mixin):
                 def __call(namespace, *args, **kwargs):
@@ -662,6 +664,8 @@ class Scss(object):
                     m_params = mixin[0]
                     m_defaults = mixin[1]
                     m_codestr = mixin[2]
+                    pristine_callee_namespace = mixin[3]
+                    import_key = mixin[5]
 
                     params = []
                     params_dict = {}
@@ -695,6 +699,7 @@ class Scss(object):
                         # consider itself as existing where it was defined, not
                         # called?
                         source_file=rule.source_file,
+                        import_key=rule.import_key,
 
                         # TODO
                         unparsed_contents=m_codestr,
@@ -708,6 +713,7 @@ class Scss(object):
 
                         namespace=m_vars,
                     )
+                    pristine_callee_namespace.use_import(import_key)
                     self.manage_children(_rule, scope)
                     ret = _rule.retval
                     if ret is None:
@@ -769,6 +775,7 @@ class Scss(object):
         m_codestr = mixin[2]
         pristine_callee_namespace = mixin[3]
         callee_argspec = mixin[4]
+        import_key = mixin[5]
 
         if caller_argspec.inject and callee_argspec.inject:
             # DEVIATION: Pass the ENTIRE local namespace to the mixin (yikes)
@@ -824,6 +831,7 @@ class Scss(object):
         _rule.lineno = block.lineno
 
         _rule.options['@content'] = block.unparsed_contents
+        pristine_callee_namespace.use_import(import_key)
         self.manage_children(_rule, scope)
 
     @print_timing(10)
@@ -851,9 +859,6 @@ class Scss(object):
         names = block.argument.split(',')
         for name in names:
             name = dequote(name.strip())
-            if rule.namespace.has_import(name, rule.source_file.parent_dir):
-                # If already imported in this scope, skip
-                continue
 
             source_file = None
             full_filename, seen_paths = self._find_import(rule, name)
@@ -873,7 +878,7 @@ class Scss(object):
                 source_file = SourceFile(
                     full_filename,
                     source,
-                    parent_dir=os.path.dirname(full_filename),
+                    parent_dir=os.path.realpath(os.path.dirname(full_filename)),
                 )
 
                 self.source_files.append(source_file)
@@ -884,8 +889,14 @@ class Scss(object):
                 log.warn("File to import not found or unreadable: '%s' (%s)%s", name, rule.file_and_line, load_paths_msg)
                 continue
 
+            import_key = (name, source_file.parent_dir)
+            if rule.namespace.has_import(import_key):
+                # If already imported in this scope, skip
+                continue
+
             _rule = SassRule(
                 source_file=source_file,
+                import_key=import_key,
                 lineno=block.lineno,
                 unparsed_contents=source_file.contents,
 
@@ -896,7 +907,7 @@ class Scss(object):
                 ancestry=rule.ancestry,
                 namespace=rule.namespace,
             )
-            rule.namespace.add_import(name, rule.source_file.parent_dir)
+            rule.namespace.add_import(import_key, rule.import_key, rule.file_and_line)
             self.manage_children(_rule, scope)
 
     def _find_import(self, rule, name):
@@ -1248,6 +1259,7 @@ class Scss(object):
         from scss.rule import RuleAncestry
         new_rule = SassRule(
             source_file=rule.source_file,
+            import_key=rule.import_key,
             lineno=block.lineno,
             unparsed_contents=block.unparsed_contents,
 
@@ -1260,7 +1272,9 @@ class Scss(object):
             nested=rule.nested + 1,
         )
         self.rules.append(new_rule)
+        rule.namespace.use_import(rule.import_key)
         self.manage_children(new_rule, scope)
+        new_rule.namespace.warn_unused_imports()
 
     @print_timing(10)
     def _nest_rules(self, rule, scope, block):
@@ -1277,6 +1291,7 @@ class Scss(object):
 
         new_rule = SassRule(
             source_file=rule.source_file,
+            import_key=rule.import_key,
             lineno=block.lineno,
             unparsed_contents=block.unparsed_contents,
 
@@ -1289,7 +1304,9 @@ class Scss(object):
             nested=rule.nested + 1,
         )
         self.rules.append(new_rule)
+        rule.namespace.use_import(rule.import_key)
         self.manage_children(new_rule, scope)
+        new_rule.namespace.warn_unused_imports()
 
     @print_timing(3)
     def apply_extends(self):

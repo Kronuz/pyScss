@@ -1,0 +1,14 @@
+@option compress:no;
+
+@import "functions-context";
+
+#test {
+	@import "functions-context";
+	@import "imports-unused";
+	@import "menu";
+	width: grid-width(10);
+}
+
+div {
+	width: grid-width(20);
+}
