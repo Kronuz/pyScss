@@ -474,8 +474,9 @@ CORE_LIBRARY.add(Number.wrap_python_function(math.floor), 'floor', 1)
 
 def __parse_separator(separator, default_from=None):
     if separator is None:
-        return None
+        separator = 'auto'
     separator = String.unquoted(separator).value
+
     if separator == 'comma':
         return True
     elif separator == 'space':

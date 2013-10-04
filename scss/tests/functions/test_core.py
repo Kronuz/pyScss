@@ -322,6 +322,9 @@ def test_append(calc):
     assert calc('append(10px, 20px, comma)') == calc('10px, 20px')
     assert calc('append((blue, red), green, space)') == calc('blue red green')
 
+    # TODO need to test for commas here
+    assert calc('append((a, b), c)') == calc('a, b, c')
+
 
 def test_zip(calc):
     # Examples from the Ruby docs
