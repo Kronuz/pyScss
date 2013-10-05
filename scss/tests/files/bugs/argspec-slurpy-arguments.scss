@@ -1,4 +1,4 @@
-@option compress:no;
+@option style:legacy;
 
 @mixin box-shadow($shadows...) {
     box-shadow: $shadows;

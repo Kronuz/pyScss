@@ -1,4 +1,4 @@
-@option compress:no;
+@option style:legacy;
 
 @mixin col($color, $background: $color, $border: undefined) {
   a {

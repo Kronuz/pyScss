@@ -614,6 +614,7 @@ class Scss(object):
                 option = option.replace('-', '_')
                 if option == 'compress':
                     option = 'style'
+                    log.warn("The option 'compress' is deprecated. Please use 'style' instead.")
                 rule.options[option] = value
 
     def _get_funct_def(self, rule, calculator, argument):
@@ -1425,14 +1426,12 @@ class Scss(object):
         style = self.scss_opts.get('style', config.STYLE)
         debug_info = self.scss_opts.get('debug_info', False)
 
-        if style is True:
-            sc, sp, tb, nst, srnl, nl, rnl, lnl, dbg = False, '', '', False, '', '', '', '', False
-        elif style is False:
+        if style == 'legacy' or style is False:
             sc, sp, tb, nst, srnl, nl, rnl, lnl, dbg = True, ' ', '  ', False, '', '\n', '\n', '\n', debug_info
+        elif style == 'compressed' or style is True:
+            sc, sp, tb, nst, srnl, nl, rnl, lnl, dbg = False, '', '', False, '', '', '', '', False
         elif style == 'compact':
             sc, sp, tb, nst, srnl, nl, rnl, lnl, dbg = True, ' ', '', False, '\n', ' ', '\n', ' ', debug_info
-        elif style == 'compressed':
-            sc, sp, tb, nst, srnl, nl, rnl, lnl, dbg = False, '', '', False, '', '', '', '', False
         elif style == 'expanded':
             sc, sp, tb, nst, srnl, nl, rnl, lnl, dbg = True, ' ', '  ', False, '\n', '\n', '\n', '\n', debug_info
         else:  # if style == 'nested':

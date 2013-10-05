@@ -1,4 +1,4 @@
-@option compress:no;
+@option style:legacy;
 
 a {
   @each $name, $number in (foo: 1px, bar: 2px, baz: 3px) {
