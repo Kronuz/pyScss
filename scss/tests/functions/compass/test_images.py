@@ -31,7 +31,9 @@ def calc():
 
 
 def test_image_url(calc):
-    assert calc('image-url("/some_path.jpg")').render() == ('url(%(images_url)ssome_path.jpg)' % {'images_url': config.IMAGES_URL})
+    # nb: config.IMAGES_URL is None and defaults to this
+    images_url = config.STATIC_URL
+    assert calc('image-url("/some_path.jpg")').render() == 'url({0}some_path.jpg)'.format(images_url)
 
 
 # inline-image

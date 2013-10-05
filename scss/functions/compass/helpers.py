@@ -499,9 +499,10 @@ COMPASS_HELPERS_LIBRARY.add(Number.wrap_python_function(math.tan), 'tan', 1)
 def _font_url(path, only_path=False, cache_buster=True, inline=False):
     filepath = String.unquoted(path).value
     file = None
-    if callable(config.FONTS_ROOT):
+    FONTS_ROOT = config.FONTS_ROOT or config.STATIC_ROOT
+    if callable(FONTS_ROOT):
         try:
-            _file, _storage = list(config.FONTS_ROOT(filepath))[0]
+            _file, _storage = list(FONTS_ROOT(filepath))[0]
             d_obj = _storage.modified_time(_file)
             filetime = int(time.mktime(d_obj.timetuple()))
             if inline:
@@ -509,24 +510,24 @@ def _font_url(path, only_path=False, cache_buster=True, inline=False):
         except:
             filetime = 'NA'
     else:
-        _path = os.path.join(config.FONTS_ROOT, filepath.strip('/'))
+        _path = os.path.join(FONTS_ROOT, filepath.strip('/'))
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
             if inline:
                 file = open(_path, 'rb')
         else:
             filetime = 'NA'
-    BASE_URL = config.FONTS_URL
 
+    BASE_URL = config.FONTS_URL or config.STATIC_URL
     if file and inline:
 #        mime_type = mimetypes.guess_type(filepath)[0]
         font_type = None
         if re.match(r'^([^?]+)[.](.*)([?].*)?$', path.value):
             font_type = String.unquoted(re.match(r'^([^?]+)[.](.*)([?].*)?$', path.value).groups()[1]).value
-                 
+
         if not FONT_TYPES.get(font_type):
             raise Exception('Could not determine font type for "%s"' % path.value)
-        
+
         mime = FONT_TYPES.get(font_type)
         if font_type == 'woff':
             mime = 'application/font-woff'
@@ -547,7 +548,7 @@ def _font_url(path, only_path=False, cache_buster=True, inline=False):
 def _font_files(args, inline):
     if args == ():
         return String.unquoted("")
-       
+
     fonts = []
     args_len = len(args)
     skip_next = False
@@ -560,7 +561,7 @@ def _font_files(args, inline):
             else:
                 if re.match(r'^([^?]+)[.](.*)([?].*)?$', arg.value):
                     font_type = String.unquoted(re.match(r'^([^?]+)[.](.*)([?].*)?$', arg.value).groups()[1])
-                   
+
             if FONT_TYPES.has_key(font_type.value):
                 fonts.append(String.unquoted('%s format("%s")' % (_font_url(arg, inline=inline), String.unquoted(FONT_TYPES[font_type.value]).value)))
             else:
@@ -569,7 +570,7 @@ def _font_files(args, inline):
             skip_next = False
 
     return List(fonts, separator=',')
-   
+
 
 @register('font-url', 1)
 @register('font-url', 2)

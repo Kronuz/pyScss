@@ -36,6 +36,9 @@ register = COMPASS_IMAGES_LIBRARY.register
 
 # ------------------------------------------------------------------------------
 
+def _images_root():
+    return config.IMAGES_ROOT or config.STATIC_ROOT
+
 
 def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_color=None, inline=False, mime_type=None, spacing=None, collapse_x=None, collapse_y=None):
     """
@@ -49,9 +52,10 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
     filepath = String.unquoted(path).value
     mime_type = inline and (String.unquoted(mime_type).value if mime_type else mimetypes.guess_type(filepath)[0])
     path = None
-    if callable(config.IMAGES_ROOT):
+    IMAGES_ROOT = _images_root()
+    if callable(IMAGES_ROOT):
         try:
-            _file, _storage = list(config.IMAGES_ROOT(filepath))[0]
+            _file, _storage = list(IMAGES_ROOT(filepath))[0]
             d_obj = _storage.modified_time(_file)
             filetime = int(time.mktime(d_obj.timetuple()))
             if inline or dst_color or spacing:
@@ -59,14 +63,15 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
         except:
             filetime = 'NA'
     else:
-        _path = os.path.join(config.IMAGES_ROOT.rstrip('/'), filepath.strip('/'))
+        _path = os.path.join(IMAGES_ROOT.rstrip('/'), filepath.strip('/'))
         if os.path.exists(_path):
             filetime = int(os.path.getmtime(_path))
             if inline or dst_color or spacing:
                 path = open(_path, 'rb')
         else:
             filetime = 'NA'
-    BASE_URL = config.IMAGES_URL
+
+    BASE_URL = config.IMAGES_URL or config.STATIC_URL
     if path:
         dst_colors = [list(Color(v).value[:3]) for v in List.from_maybe(dst_color) if v]
 
@@ -108,7 +113,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
             else:
                 try:
                     image = Image.open(path)
-                except IOError as e:
+                except IOError:
                     if not collapse_x and not collapse_y and not dst_colors:
                         simply_process = True
 
@@ -226,14 +231,15 @@ def image_width(image):
         width = _image_size_cache[filepath][0]
     except KeyError:
         width = 0
-        if callable(config.IMAGES_ROOT):
+        IMAGES_ROOT = _images_root()
+        if callable(IMAGES_ROOT):
             try:
-                _file, _storage = list(config.IMAGES_ROOT(filepath))[0]
+                _file, _storage = list(IMAGES_ROOT(filepath))[0]
                 path = _storage.open(_file)
             except:
                 pass
         else:
-            _path = os.path.join(config.IMAGES_ROOT, filepath.strip('/'))
+            _path = os.path.join(IMAGES_ROOT, filepath.strip('/'))
             if os.path.exists(_path):
                 path = open(_path, 'rb')
         if path:
@@ -258,14 +264,15 @@ def image_height(image):
         height = _image_size_cache[filepath][1]
     except KeyError:
         height = 0
-        if callable(config.IMAGES_ROOT):
+        IMAGES_ROOT = _images_root()
+        if callable(IMAGES_ROOT):
             try:
-                _file, _storage = list(config.IMAGES_ROOT(filepath))[0]
+                _file, _storage = list(IMAGES_ROOT(filepath))[0]
                 path = _storage.open(_file)
             except:
                 pass
         else:
-            _path = os.path.join(config.IMAGES_ROOT, filepath.strip('/'))
+            _path = os.path.join(IMAGES_ROOT, filepath.strip('/'))
             if os.path.exists(_path):
                 path = open(_path, 'rb')
         if path:
