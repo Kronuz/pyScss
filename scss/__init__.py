@@ -1491,16 +1491,33 @@ class Scss(object):
 
         result = ''
         dangling_property = False
+        separate = False
+        nesting = current_nesting = last_nesting = -1 if nst else 0
+        nesting_stack = []
         for rule in rules:
+            nested = rule.nested
+            if nested <= 1:
+                separate = True
+
+            if nst:
+                last_nesting = current_nesting
+                current_nesting = nested
+
+                delta_nesting = current_nesting - last_nesting
+                if delta_nesting > 0:
+                    nesting_stack += [nesting] * delta_nesting
+                elif delta_nesting < 0:
+                    nesting_stack = nesting_stack[:delta_nesting]
+                    nesting = nesting_stack[-1]
+
             if rule.is_empty:
                 continue
 
+            if nst:
+                nesting += 1
+
             ancestry = rule.ancestry
             ancestry_len = len(ancestry)
-            nested = rule.nested
-            if nested < 0:
-                nested = 0
-            nesting = nested if nst else 0
 
             first_mismatch = 0
             for i, (old_header, new_header) in enumerate(zip(prev_ancestry_headers, ancestry.headers)):
@@ -1518,13 +1535,15 @@ class Scss(object):
             # Close blocks and outdent as necessary
             for i in range(len(prev_ancestry_headers), first_mismatch, -1):
                 result += tb * (i - 1) + '}' + rnl
-                if nested == 0:
-                    result += srnl
 
             # Open new blocks as necessary
             for i in range(first_mismatch, ancestry_len):
                 header = ancestry.headers[i]
 
+                if separate:
+                    if result:
+                        result += srnl
+                    separate = False
                 if debug_info:
                     if not rule.source_file.is_string:
                         filename = rule.source_file.filename

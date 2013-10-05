@@ -239,7 +239,7 @@ class SassRule(object):
             namespace=None,
             lineno=0, extends_selectors=frozenset(),
             ancestry=None,
-            nested=-1):
+            nested=0):
 
         self.source_file = source_file
         self.import_key = import_key
