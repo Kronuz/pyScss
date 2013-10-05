@@ -1258,6 +1258,7 @@ class Scss(object):
             new_ancestry.append(block.header)
 
         from scss.rule import RuleAncestry
+        rule.descendants += 1
         new_rule = SassRule(
             source_file=rule.source_file,
             import_key=rule.import_key,
@@ -1293,6 +1294,7 @@ class Scss(object):
 
         new_ancestry = rule.ancestry.with_nested_selectors(c_selectors)
 
+        rule.descendants += 1
         new_rule = SassRule(
             source_file=rule.source_file,
             import_key=rule.import_key,

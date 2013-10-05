@@ -269,6 +269,8 @@ class SassRule(object):
 
         self.nested = nested
 
+        self.descendants = 0
+
     def __repr__(self):
         return "<SassRule %s, %d props>" % (
             self.ancestry,
@@ -299,13 +301,13 @@ class SassRule(object):
             # Rules containing CSS properties are never empty
             return False
 
-        if self.ancestry:
-            header = self.ancestry[-1]
-            if header.is_atrule and header.directive != '@media':
-                # At-rules should always be preserved, UNLESS they are @media
-                # blocks, which are known to be noise if they don't have any
-                # contents of their own
-                return False
+        if not self.descendants:
+            for header in self.ancestry.headers:
+                if header.is_atrule and header.directive != '@media':
+                    # At-rules should always be preserved, UNLESS they are @media
+                    # blocks, which are known to be noise if they don't have any
+                    # contents of their own
+                    return False
 
         return True
 
