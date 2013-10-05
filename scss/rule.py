@@ -331,6 +331,9 @@ class RuleAncestry(object):
     def __init__(self, headers=()):
         self.headers = tuple(headers)
 
+    def __repr__(self):
+        return "<%s %r>" % (type(self).__name__, self.headers)
+
     def __len__(self):
         return len(self.headers)
 
