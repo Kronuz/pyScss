@@ -556,7 +556,7 @@ def _font_files(args, inline):
     fonts = []
     args_len = len(args)
     skip_next = False
-    for index in xrange(len(args)):
+    for index in range(len(args)):
         arg = args[index]
         if not skip_next:
             font_type = args[index + 1] if args_len > (index + 1) else None
