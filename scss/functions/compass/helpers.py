@@ -10,7 +10,6 @@ from __future__ import absolute_import
 import base64
 import logging
 import math
-import mimetypes
 import os.path
 import time
 
@@ -24,6 +23,7 @@ import re
 
 log = logging.getLogger(__name__)
 
+
 COMPASS_HELPERS_LIBRARY = FunctionLibrary()
 register = COMPASS_HELPERS_LIBRARY.register
 
@@ -36,6 +36,7 @@ FONT_TYPES = {
     'svg': 'svg',
     'eot': 'embedded-opentype'
 }
+
 
 def add_cache_buster(url, mtime):
     fragment = url.split('#')
@@ -524,7 +525,6 @@ def _font_url(path, only_path=False, cache_buster=True, inline=False):
 
     BASE_URL = config.FONTS_URL or config.STATIC_URL
     if file and inline:
-#        mime_type = mimetypes.guess_type(filepath)[0]
         font_type = None
         if re.match(r'^([^?]+)[.](.*)([?].*)?$', path.value):
             font_type = String.unquoted(re.match(r'^([^?]+)[.](.*)([?].*)?$', path.value).groups()[1]).value
@@ -535,7 +535,7 @@ def _font_url(path, only_path=False, cache_buster=True, inline=False):
         mime = FONT_TYPES.get(font_type)
         if font_type == 'woff':
             mime = 'application/font-woff'
-        elif font_type=='eot':
+        elif font_type == 'eot':
             mime = 'application/vnd.ms-fontobject'
         url = 'data:' + (mime if '/' in mime else 'font/%s' % mime) + ';base64,' + base64.b64encode(file.read())
         file.close()
@@ -559,14 +559,14 @@ def _font_files(args, inline):
     for index in xrange(len(args)):
         arg = args[index]
         if not skip_next:
-            font_type = args[index + 1] if args_len > (index +1) else None
-            if font_type and FONT_TYPES.has_key(font_type.value):
+            font_type = args[index + 1] if args_len > (index + 1) else None
+            if font_type and font_type.value in FONT_TYPES:
                 skip_next = True
             else:
                 if re.match(r'^([^?]+)[.](.*)([?].*)?$', arg.value):
                     font_type = String.unquoted(re.match(r'^([^?]+)[.](.*)([?].*)?$', arg.value).groups()[1])
 
-            if FONT_TYPES.has_key(font_type.value):
+            if font_type.value in FONT_TYPES:
                 fonts.append(String.unquoted('%s format("%s")' % (_font_url(arg, inline=inline), String.unquoted(FONT_TYPES[font_type.value]).value)))
             else:
                 raise Exception('Could not determine font type for "%s"' % arg.value)

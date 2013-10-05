@@ -193,4 +193,3 @@ def test_inline_font_files(calc):
 ## External stylesheets
 
 # stylesheet-url
-
