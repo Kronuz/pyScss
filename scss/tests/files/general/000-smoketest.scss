@@ -8,5 +8,5 @@ div {
 }
 
 h1 {
-    @include junk;
+    @include junk;  // This mixin does not exist intentionally!
 }
