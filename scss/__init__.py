@@ -1408,11 +1408,11 @@ class Scss(object):
         rules_by_file = {}
 
         for rule in self.rules:
-            if not rule.properties:
-                continue
-
             source_file = rule.source_file
             rules_by_file.setdefault(source_file, []).append(rule)
+
+            if rule.is_empty:
+                continue
 
             if source_file not in seen_files:
                 seen_files.add(source_file)
