@@ -496,10 +496,14 @@ COMPASS_HELPERS_LIBRARY.add(Number.wrap_python_function(math.tan), 'tan', 1)
 # ------------------------------------------------------------------------------
 # Fonts
 
+def _fonts_root():
+    return config.STATIC_ROOT if config.FONTS_ROOT is None else config.FONTS_ROOT
+
+
 def _font_url(path, only_path=False, cache_buster=True, inline=False):
     filepath = String.unquoted(path).value
     file = None
-    FONTS_ROOT = config.FONTS_ROOT or config.STATIC_ROOT
+    FONTS_ROOT = _fonts_root()
     if callable(FONTS_ROOT):
         try:
             _file, _storage = list(FONTS_ROOT(filepath))[0]

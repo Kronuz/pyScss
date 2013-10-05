@@ -37,7 +37,7 @@ register = COMPASS_IMAGES_LIBRARY.register
 # ------------------------------------------------------------------------------
 
 def _images_root():
-    return config.IMAGES_ROOT or config.STATIC_ROOT
+    return config.STATIC_ROOT if config.IMAGES_ROOT is None else config.IMAGES_ROOT
 
 
 def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_color=None, inline=False, mime_type=None, spacing=None, collapse_x=None, collapse_y=None):
