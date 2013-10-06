@@ -20,8 +20,7 @@ import re
 # combinator -- i.e., it is a descendant of the root element.
 # TODO `*html` is incorrectly parsed as a single selector
 # TODO this oughta be touched up for css4 selectors
-SELECTOR_TOKENIZER = re.compile(
-r'''
+SELECTOR_TOKENIZER = re.compile(r'''
     # Colons introduce pseudo-selectors, sometimes with parens
     # TODO doesn't handle quoted )
     [:]+ [-\w]+ (?: [(] .+? [)] )?
@@ -243,12 +242,12 @@ class Selector(object):
                     SimpleSelector(pending['combinator'], pending['tokens']))
                 pending['combinator'] = ' '
                 pending['tokens'] = []
+
         def promote_selector():
             promote_simple()
             if pending['simples']:
                 ret.append(cls(pending['simples']))
             pending['simples'] = []
-
 
         pos = 0
         while pos < len(selector):
