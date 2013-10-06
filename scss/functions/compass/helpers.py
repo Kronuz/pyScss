@@ -335,9 +335,29 @@ def headers(frm=None, to=None):
 
 @register('nest')
 def nest(*arguments):
-    ret = ['']  # Hackery for initial value
+    if isinstance(arguments[0], List):
+        lst = arguments[0]
+    elif isinstance(arguments[0], String):
+        lst = arguments[0].value.split(',')
+    else:
+        raise TypeError("Expected list or string, got %r" % (arguments[0],))
 
-    for arg in arguments:
+    ret = []
+    for s in lst:
+        if isinstance(s, String):
+            s = s.value
+        elif isinstance(s, six.string_types):
+            s = s
+        else:
+            raise TypeError("Expected string, got %r" % (s,))
+
+        s = s.strip()
+        if not s:
+            continue
+
+        ret.append(s)
+
+    for arg in arguments[1:]:
         if isinstance(arg, List):
             lst = arg
         elif isinstance(arg, String):
