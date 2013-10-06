@@ -50,7 +50,13 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
         if not Image:
             raise Exception("Images manipulation require PIL")
     filepath = String.unquoted(path).value
-    mime_type = inline and (String.unquoted(mime_type).value if mime_type else mimetypes.guess_type(filepath)[0])
+    fileext = os.path.splitext(filepath)[1].lstrip('.').lower()
+    if mime_type:
+        mime_type = String.unquoted(mime_type).value
+    if not mime_type:
+        mime_type = mimetypes.guess_type(filepath)[0]
+    if not mime_type:
+        mime_type = 'image/%s' % fileext
     path = None
     IMAGES_ROOT = _images_root()
     if callable(IMAGES_ROOT):
@@ -108,7 +114,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
             simply_process = False
             image = None
 
-            if _path.split('.')[-1] in ['cur']:
+            if fileext in ('cur',):
                 simply_process = True
             else:
                 try:
@@ -118,8 +124,6 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
                         simply_process = True
 
             if simply_process:
-                if not mime_type:
-                    mime_type = 'image/%s' % _path.split('.')[-1]
                 if inline:
                     url = 'data:' + mime_type + ';base64,' + base64.b64encode(path.read())
                 else:
@@ -173,8 +177,6 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
                     new_image.save(output, format='PNG')
                     contents = output.getvalue()
                     output.close()
-                    if not mime_type:
-                        mime_type = 'image/%s' % _path.split('.')[-1]
                     url = 'data:' + mime_type + ';base64,' + base64.b64encode(contents)
     else:
         url = os.path.join(BASE_URL.rstrip('/'), filepath.lstrip('/'))
