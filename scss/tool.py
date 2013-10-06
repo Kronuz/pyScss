@@ -395,7 +395,7 @@ class SassRepl(object):
             # TODO respect compress?
             try:
                 yield(self.calculator.calculate(s).render())
-            except SassEvaluationError as e:
+            except (SyntaxError, SassEvaluationError) as e:
                 print("%s" % e, file=sys.stderr)
 
 
