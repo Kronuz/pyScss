@@ -17,6 +17,7 @@ from scss.rule import SassRule
 from scss.rule import UnparsedBlock
 from scss.expression import Calculator
 from scss.scss_meta import BUILD_INFO
+from scss.errors import SassEvaluationError
 
 try:
     raw_input
@@ -392,7 +393,10 @@ class SassRepl(object):
                 continue
 
             # TODO respect compress?
-            yield(self.calculator.calculate(s).render())
+            try:
+                yield(self.calculator.calculate(s).render())
+            except SassEvaluationError as e:
+                print("%s" % e, file=sys.stderr)
 
 
 if __name__ == "__main__":

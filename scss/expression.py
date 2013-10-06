@@ -74,7 +74,7 @@ class Calculator(object):
                         v = self.namespace.variable(n)
                     except KeyError:
                         if config.FATAL_UNDEFINED:
-                            raise
+                            raise SyntaxError("Undefined variable: '%s'." % n)
                         else:
                             if config.VERBOSITY > 1:
                                 log.error("Undefined variable '%s'", n, extra={'stack': True})
@@ -352,7 +352,7 @@ class Variable(Expression):
             value = calculator.namespace.variable(self.name)
         except KeyError:
             if config.FATAL_UNDEFINED:
-                raise
+                raise SyntaxError("Undefined variable: '%s'." % self.name)
             else:
                 if config.VERBOSITY > 1:
                     log.error("Undefined variable '%s'", self.name, extra={'stack': True})
