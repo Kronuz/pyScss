@@ -8,7 +8,7 @@ import re
 import six
 
 import scss.config as config
-from scss.cssdefs import COLOR_NAMES, is_builtin_css_function, _expr_glob_re, _interpolate_re, _variable_re
+from scss.cssdefs import COLOR_NAMES, is_builtin_css_function, _expr_glob_re, _interpolate_re
 from scss.errors import SassError, SassEvaluationError, SassParseError
 from scss.rule import Namespace
 from scss.types import Boolean, Color, List, Map, Null, Number, String, Undefined, Value
@@ -18,9 +18,9 @@ from scss.util import dequote, normalize_var
 # Load C acceleration modules
 Scanner = None
 try:
-    from scss._speedups import NoMoreTokens, Scanner
+    from scss._speedups import Scanner
 except ImportError:
-    from scss._native import NoMoreTokens, Scanner
+    from scss._native import Scanner
 
 log = logging.getLogger(__name__)
 
