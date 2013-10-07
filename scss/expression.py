@@ -36,7 +36,7 @@ class Calculator(object):
         else:
             self.namespace = namespace
 
-    def _pound_substitute(self, result, unquote):
+    def _pound_substitute(self, result):
         expr = result.group(1)
         value = self.evaluate_expression(expr)
 
@@ -45,9 +45,9 @@ class Calculator(object):
         elif value.is_null:
             return ""
         else:
-            return dequote(value.render(unquote=unquote))
+            return dequote(value.render())
 
-    def do_glob_math(self, cont, unquote=False):
+    def do_glob_math(self, cont):
         """Performs #{}-interpolation.  The result is always treated as a fixed
         syntactic unit and will not be re-evaluated.
         """
@@ -55,7 +55,7 @@ class Calculator(object):
         cont = str(cont)
         if '#{' not in cont:
             return cont
-        cont = _expr_glob_re.sub(lambda r: self._pound_substitute(r, unquote), cont)
+        cont = _expr_glob_re.sub(self._pound_substitute, cont)
         return cont
 
     def apply_vars(self, cont):

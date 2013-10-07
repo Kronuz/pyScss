@@ -101,7 +101,7 @@ class Value(object):
     def __neg__(self):
         return String("-" + self.render())
 
-    def render(self, compress=False, unquote=False):
+    def render(self, compress=False):
         return self.__str__()
 
 
@@ -130,7 +130,7 @@ class Null(Value):
     def __ne__(self, other):
         return Boolean(not self.__eq__(other))
 
-    def render(self, compress=False, unquote=False):
+    def render(self, compress=False):
         return self.sass_type_name
 
 
@@ -198,7 +198,7 @@ class Boolean(Value):
     def __bool__(self):
         return self.value
 
-    def render(self, compress=False, unquote=False):
+    def render(self, compress=False):
         if self.value:
             return 'true'
         else:
@@ -331,6 +331,7 @@ class Number(Value):
             unit_numer=self.unit_numer * int(exp.value),
             unit_denom=self.unit_denom * int(exp.value),
         )
+
 
     def __mul__(self, other):
         if not isinstance(other, Number):
@@ -470,7 +471,7 @@ class Number(Value):
     def is_unitless(self):
         return not self.unit_numer and not self.unit_denom
 
-    def render(self, compress=False, unquote=False):
+    def render(self, compress=False):
         if not self.has_simple_unit:
             raise ValueError("Can't express compound units in CSS: %r" % (self,))
 
@@ -604,14 +605,14 @@ class List(Value):
     def __getitem__(self, key):
         return self.value[key]
 
-    def render(self, compress=False, unquote=False):
+    def render(self, compress=False):
         if not self.value:
             raise ValueError("Can't render empty list as CSS")
 
         delim = self.delimiter(compress)
 
         return delim.join(
-            item.render(compress=compress, unquote=unquote)
+            item.render(compress=compress)
             for item in self.value
         )
 
@@ -847,7 +848,7 @@ class Color(Value):
 
         return Color.from_rgb(*new_rgb, alpha=self.alpha)
 
-    def render(self, compress=False, unquote=False):
+    def render(self, compress=False):
         """Return a rendered representation of the color.  If `compress` is
         true, the shortest possible representation is used; otherwise, named
         colors are rendered as names and all others are rendered as hex (or
@@ -942,8 +943,8 @@ class String(Value):
     def __hash__(self):
         return hash(self.value)
 
-    def __str__(self, unquote=False):
-        if self.quotes and not unquote:
+    def __str__(self):
+        if self.quotes:
             return self.quotes + escape(self.value) + self.quotes
         else:
             return self.value
@@ -983,8 +984,8 @@ class String(Value):
 
         return String(self.value * int(other.value), quotes=self.quotes)
 
-    def render(self, compress=False, unquote=False):
-        return self.__str__(unquote)
+    def render(self, compress=False):
+        return self.__str__()
 
 
 ### XXX EXPERIMENTAL XXX
@@ -1019,7 +1020,7 @@ class Map(Value):
     def get_by_pos(self, key):
         return self.pairs[key][1]
 
-    def render(self, compress=False, unquote=False):
+    def render(self, compress=False):
         raise TypeError("Cannot render map %r as CSS" % (self,))
 
 
