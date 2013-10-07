@@ -699,7 +699,7 @@ class Scss(object):
                         # TODO correct?  relevant?  seems the function should
                         # consider itself as existing where it was defined, not
                         # called?
-                        source_file=rule.source_file,
+                        source_file=block.parent_rule.source_file,
                         import_key=rule.import_key,
 
                         # TODO
@@ -829,6 +829,7 @@ class Scss(object):
         _rule = rule.copy()
         _rule.unparsed_contents = m_codestr
         _rule.namespace = callee_namespace
+        _rule.source_file = block.parent_rule.source_file
         _rule.lineno = block.lineno
 
         _rule.options['@content'] = block.unparsed_contents
