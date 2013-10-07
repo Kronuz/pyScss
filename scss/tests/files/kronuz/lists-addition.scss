@@ -1,7 +1,0 @@
-@option style:legacy;
-
-div {
-	$a: 4px 0 0;
-	$b: 1px 0 0 0;
-	margin: -($a + $b);
-}

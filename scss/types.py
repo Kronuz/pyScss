@@ -618,27 +618,38 @@ class List(Value):
     # DEVIATION: binary ops on lists and scalars act element-wise
     def __add__(self, other):
         if isinstance(other, List):
-            return super(List, self).__add__(other)
+            max_list, min_list = (self, other) if len(self) > len(other) else (other, self)
+            return List([item + max_list[i] for i, item in enumerate(min_list)], use_comma=self.use_comma)
 
         return List([item + other for item in self], use_comma=self.use_comma)
 
     def __sub__(self, other):
         if isinstance(other, List):
-            return super(List, self).__sub__(other)
+            max_list, min_list = (self, other) if len(self) > len(other) else (other, self)
+            return List([item - max_list[i] for i, item in enumerate(min_list)], use_comma=self.use_comma)
 
         return List([item - other for item in self], use_comma=self.use_comma)
 
     def __mul__(self, other):
         if isinstance(other, List):
-            return super(List, self).__mul__(other)
+            max_list, min_list = (self, other) if len(self) > len(other) else (other, self)
+            max_list, min_list = (self, other) if len(self) > len(other) else (other, self)
+            return List([item * max_list[i] for i, item in enumerate(min_list)], use_comma=self.use_comma)
 
         return List([item * other for item in self], use_comma=self.use_comma)
 
     def __div__(self, other):
         if isinstance(other, List):
-            return super(List, self).__div__(other)
+            max_list, min_list = (self, other) if len(self) > len(other) else (other, self)
+            return List([item / max_list[i] for i, item in enumerate(min_list)], use_comma=self.use_comma)
 
         return List([item / other for item in self], use_comma=self.use_comma)
+
+    def __pos__(self):
+        return self
+
+    def __neg__(self):
+        return List([-item for item in self], use_comma=self.use_comma)
 
 
 def _constrain(value, lb=0, ub=1):
