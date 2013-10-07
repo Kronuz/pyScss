@@ -1551,10 +1551,10 @@ class Scss(object):
                         filename = rule.source_file.filename
                         lineno = str(rule.lineno)
                         if debug_info == 'comments':
-                            result += '/* file: %s, line: %s */' % (filename, lineno) + nl
+                            result += tb * (i + nesting) + "/* file: %s, line: %s */" % (filename, lineno) + nl
                         else:
                             filename = _escape_chars_re.sub(r'\\\1', filename)
-                            result += "@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}" % (filename, lineno) + nl
+                            result += tb * (i + nesting) + "@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}" % (filename, lineno) + nl
 
                 if header.is_selector:
                     header_string = header.render(sep=',' + sp, super_selector=self.super_selector)
