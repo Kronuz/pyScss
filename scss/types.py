@@ -261,11 +261,11 @@ class Number(Value):
     def __float__(self):
         return float(self.value)
 
-    def __neg__(self):
-        return self * Number(-1)
-
     def __pos__(self):
         return self
+
+    def __neg__(self):
+        return self * Number(-1)
 
     def __str__(self):
         return self.render()
@@ -479,10 +479,14 @@ class Number(Value):
         else:
             unit = ''
 
-        if compress and unit in ZEROABLE_UNITS and self.value == 0:
+        value = self.value
+        if compress and unit in ZEROABLE_UNITS and value == 0:
             return '0'
 
-        val = "%0.05f" % round(self.value, 5)
+        if value == 0:  # -0.0 is plain 0
+            value = 0
+
+        val = "%0.05f" % round(value, 5)
         val = val.rstrip('0').rstrip('.')
 
         if compress and val.startswith('0.'):
