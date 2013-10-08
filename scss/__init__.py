@@ -1041,7 +1041,7 @@ class Scss(object):
         if condition:
             inner_rule = rule.copy()
             inner_rule.unparsed_contents = block.unparsed_contents
-            if rule.options.get('legacy_scoping'):
+            if rule.options.get('legacy_scoping'):  # TODO: name this option differently and maybe make this scoping mode for contol structures as the default as a default deviation
                 # DEVIATION: Allow not creating a new namespace
                 inner_rule.namespace = rule.namespace
             self.manage_children(inner_rule, scope)
@@ -1092,7 +1092,7 @@ class Scss(object):
 
         inner_rule = rule.copy()
         inner_rule.unparsed_contents = block.unparsed_contents
-        if rule.options.get('legacy_scoping'):
+        if rule.options.get('legacy_scoping'):  # TODO: name this option differently and maybe make this scoping mode for contol structures as the default as a default deviation
             # DEVIATION: Allow not creating a new namespace
             inner_rule.namespace = rule.namespace
 
@@ -1119,7 +1119,7 @@ class Scss(object):
 
         inner_rule = rule.copy()
         inner_rule.unparsed_contents = block.unparsed_contents
-        if rule.options.get('legacy_scoping'):
+        if rule.options.get('legacy_scoping'):  # TODO: name this option differently and maybe make this scoping mode for contol structures as the default as a default deviation
             # DEVIATION: Allow not creating a new namespace
             inner_rule.namespace = rule.namespace
 
