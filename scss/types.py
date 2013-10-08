@@ -549,7 +549,7 @@ class List(Value):
 
     sass_type_name = u'list'
 
-    def __init__(self, iterable, separator=None, use_comma=None):
+    def __init__(self, iterable, separator=None, use_comma=None, is_literal=False):
         if isinstance(iterable, List):
             iterable = iterable.value
 
@@ -567,6 +567,8 @@ class List(Value):
             self.use_comma = separator == ","
         else:
             self.use_comma = use_comma
+
+        self.is_literal = is_literal
 
     @classmethod
     def maybe_new(cls, values, use_comma=True):
@@ -662,9 +664,19 @@ class List(Value):
 
         delim = self.delimiter(compress)
 
+        if self.is_literal:
+            value = self.value
+        else:
+            # Non-literal lists have nulls stripped
+            value = [item for item in self.value if not item.is_null]
+            # Non-empty lists containing only nulls become nothing, just like
+            # single nulls
+            if not value:
+                return ''
+
         return delim.join(
             item.render(compress=compress)
-            for item in self.value
+            for item in value
         )
 
     # DEVIATION: binary ops on lists and scalars act element-wise

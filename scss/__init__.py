@@ -1568,12 +1568,17 @@ class Scss(object):
         result = ''
         last_prop_index = len(properties) - 1
         for i, (name, value) in enumerate(properties):
-            if value is not None:
+            if value is None:
+                prop = name
+            elif value:
                 if nl:
                     value = (nl + tb + tb).join(self._textwrap(value))
                 prop = name + ':' + sp + value
             else:
-                prop = name
+                # Empty string means there's supposed to be a value but it
+                # evaluated to nothing; skip this
+                # TODO interacts poorly with last_prop_index
+                continue
 
             if i == last_prop_index:
                 if sc:

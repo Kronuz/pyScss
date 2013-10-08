@@ -378,7 +378,8 @@ class ListLiteral(Expression):
 
     def evaluate(self, calculator, divide=False):
         items = [item.evaluate(calculator, divide=divide) for item in self.items]
-        return List(items, separator="," if self.comma else "")
+        # TODO sort of overloading "divide" here...  rename i think
+        return List(items, use_comma=self.comma, is_literal=not divide)
 
 
 class MapLiteral(Expression):
