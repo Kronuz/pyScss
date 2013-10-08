@@ -1081,6 +1081,7 @@ class Scss(object):
             return
 
         if frm > through:
+            # DEVIATION: allow reversed '@for .. from .. through' (same as enumerate() and range())
             frm, through = through, frm
             rev = reversed
         else:

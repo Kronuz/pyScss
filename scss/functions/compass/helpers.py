@@ -288,6 +288,7 @@ def enumerate_(prefix, frm, through, separator='-'):
     except ValueError:
         through = frm
     if frm > through:
+        # DEVIATION: allow reversed enumerations (and ranges as range() uses enumerate, like '@for .. from .. through')
         frm, through = through, frm
         rev = reversed
     else:
@@ -393,6 +394,7 @@ def nest(*arguments):
 
 
 # This isn't actually from Compass, but it's just a shortcut for enumerate().
+# DEVIATION: allow reversed ranges (range() uses enumerate() which allows reversed values, like '@for .. from .. through')
 @register('range', 1)
 @register('range', 2)
 def range_(frm, through=None):
