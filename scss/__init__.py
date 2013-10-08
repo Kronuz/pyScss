@@ -721,18 +721,17 @@ class Scss(object):
 
                     _rule = SassRule(
                         source_file=block.parent_rule.source_file,
-                        import_key=rule.import_key,
-
                         unparsed_contents=m_codestr,
-                        options=rule.options.copy(),
+                        lineno=block.lineno,
+                        namespace=callee_namespace,
 
+                        # rule
+                        import_key=rule.import_key,
+                        options=rule.options,
                         properties=rule.properties,
                         extends_selectors=rule.extends_selectors,
                         ancestry=rule.ancestry,
                         nested=rule.nested,
-
-                        lineno=block.lineno,
-                        namespace=callee_namespace,
                     )
                     try:
                         self.manage_children(_rule, scope)
@@ -761,7 +760,6 @@ class Scss(object):
                     break
             if not new_params:
                 add(funct, 0, mixin)
-        # rule.namespace._mutable = False  # <- mixin namespace should be immutable from now on
 
     @print_timing(10)
     def _do_include(self, rule, scope, block):
@@ -807,18 +805,17 @@ class Scss(object):
 
         _rule = SassRule(
             source_file=block.parent_rule.source_file,
-            import_key=rule.import_key,
-
             unparsed_contents=m_codestr,
-            options=rule.options,
+            lineno=block.lineno,
+            namespace=callee_namespace,
 
+            # rule
+            import_key=rule.import_key,
+            options=rule.options,
             properties=rule.properties,
             extends_selectors=rule.extends_selectors,
             ancestry=rule.ancestry,
             nested=rule.nested,
-
-            lineno=block.lineno,
-            namespace=callee_namespace,
         )
 
         _rule.options['@content'] = block.unparsed_contents
