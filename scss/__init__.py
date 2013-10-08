@@ -141,6 +141,12 @@ class SourceFile(object):
         self.parent_dir = os.path.realpath(parent_dir)
         self.is_string = is_string
 
+    def __repr__(self):
+        return "<SourceFile '%s' at 0x%x>" % (
+            self.filename,
+            id(self),
+        )
+
     @classmethod
     def from_filename(cls, fn, filename=None, is_sass=None, line_numbers=True):
         if filename is None:
