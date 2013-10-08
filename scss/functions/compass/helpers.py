@@ -296,7 +296,7 @@ def enumerate_(prefix, frm, through, separator='-'):
 
     ret = []
     for i in rev(range(frm, through + 1)):
-        if prefix.value:
+        if prefix and prefix.value:
             ret.append(String.unquoted(prefix.value + separator + str(i)))
         else:
             ret.append(Number(i))
