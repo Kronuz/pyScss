@@ -46,7 +46,8 @@ Other than these cases, the directory names are arbitrary.
 License and copyright
 ---------------------
 
-Copyright © 2012 German M. Bravo (Kronuz).  Licensed under the `MIT license`_.
+Copyright © 2012 German M. Bravo (Kronuz), with additional heavy contributions
+by Eevee (Alex Munroe).  Licensed under the `MIT license`_.
 
 .. _MIT license: http://www.opensource.org/licenses/mit-license.php
 
@@ -59,6 +60,9 @@ pyScss is inspired by and partially derived from various projects:
 .. _Compass: http://compass-style.org/
 .. _Sass: http://sass-lang.com/
 .. _xCSS: http://xcss.antpaw.org/docs/
+
+Special thanks to Yelp for allowing Eevee to contribute to pyScss during
+working hours.  Yelp does not claim copyright.
 
 
 Changelog
