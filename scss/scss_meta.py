@@ -44,7 +44,7 @@ xCSS:
 
 """
 
-VERSION_INFO = (1, 3, '0pre')
+VERSION_INFO = (1, 3, 0, 'dev1')
 DATE_INFO = (2013, 10, 8)  # YEAR, MONTH, DAY
 VERSION = '.'.join(str(i) for i in VERSION_INFO)
 REVISION = '%04d%02d%02d' % DATE_INFO
