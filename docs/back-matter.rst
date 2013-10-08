@@ -68,6 +68,9 @@ working hours.  Yelp does not claim copyright.
 Changelog
 ---------
 
+1.3.0 (unreleased)
+^^^^^^^^^^^^^^^^^^
+
 1.2.0 (Oct 8, 2013)
 ^^^^^^^^^^^^^^^^^^^
 
