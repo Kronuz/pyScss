@@ -685,7 +685,13 @@ class List(Value):
             max_list, min_list = (self, other) if len(self) > len(other) else (other, self)
             return List([item + max_list[i] for i, item in enumerate(min_list)], use_comma=self.use_comma)
 
-        return List([item + other for item in self], use_comma=self.use_comma)
+        elif isinstance(other, String):
+            # UN-DEVIATION: adding a string should fall back to canonical
+            # behavior of string addition
+            return super(List, self).__add__(other)
+
+        else:
+            return List([item + other for item in self], use_comma=self.use_comma)
 
     def __sub__(self, other):
         if isinstance(other, List):

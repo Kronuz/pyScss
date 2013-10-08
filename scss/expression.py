@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from __future__ import print_function
 
 from functools import partial
 import logging
@@ -378,8 +379,17 @@ class ListLiteral(Expression):
 
     def evaluate(self, calculator, divide=False):
         items = [item.evaluate(calculator, divide=divide) for item in self.items]
-        # TODO sort of overloading "divide" here...  rename i think
-        return List(items, use_comma=self.comma, is_literal=not divide)
+
+        # Whether this is a "plain" literal matters for null removal: nulls are
+        # left alone if this is a completely vanilla CSS property
+        is_literal = True
+        if divide:
+            # TODO sort of overloading "divide" here...  rename i think
+            is_literal = False
+        elif not all(isinstance(item, Literal) for item in self.items):
+            is_literal = False
+
+        return List(items, use_comma=self.comma, is_literal=is_literal)
 
 
 class MapLiteral(Expression):

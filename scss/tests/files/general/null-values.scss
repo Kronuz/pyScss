@@ -8,4 +8,6 @@ div {
     c: 1 (null, null) 2;
     // empty properties aren't printed
     d: (null, null);
+    // and it applies recursively
+    e: (((null, 1, null), (null, 2), null), (3, null, (null, null)));
 }
