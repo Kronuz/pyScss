@@ -574,8 +574,8 @@ class Scss(object):
                     self._do_for(rule, scope, block)
                 elif code == '@each':
                     self._do_each(rule, scope, block)
-                # elif code == '@while':
-                #     self._do_while(rule, scope, block)
+                elif code == '@while':
+                    self._do_while(rule, scope, block)
                 elif code in ('@variables', '@vars'):
                     self._get_variables(rule, scope, block)
                 elif block.unparsed_contents is None:
@@ -1133,23 +1133,22 @@ class Scss(object):
                 inner_rule.namespace.set_variable(var, value)
             self.manage_children(inner_rule, scope)
 
-    # @print_timing(10)
-    # def _do_while(self, rule, scope, block):
-    #     THIS DOES NOT WORK AS MODIFICATION OF INNER VARIABLES ARE NOT KNOWN AT THIS POINT!!
-    #     """
-    #     Implements @while
-    #     """
-    #     first_val = None
-    #     while True:
-    #         val = self.calculator.calculate(block.argument, rule, rule.context, rule.options)
-    #         val = bool(False if not val or isinstance(val, six.string_types) and (val in ('0', 'false', 'undefined') or _variable_re.match(val)) else val)
-    #         if first_val is None:
-    #             first_val = val
-    #         if not val:
-    #             break
-    #         rule.unparsed_contents = block.unparsed_contents
-    #         self.manage_children(rule, scope)
-    #     rule.options['@if'] = first_val
+    @print_timing(10)
+    def _do_while(self, rule, scope, block):
+        """
+        Implements @while
+        """
+        calculator = Calculator(rule.namespace)
+        first_condition = condition = calculator.calculate(block.argument)
+        while condition:
+            inner_rule = rule.copy()
+            inner_rule.unparsed_contents = block.unparsed_contents
+            if rule.options.get('legacy_scoping'):  # TODO: name this option differently and maybe make this scoping mode for contol structures as the default as a default deviation
+                # DEVIATION: Allow not creating a new namespace
+                inner_rule.namespace = rule.namespace
+            self.manage_children(inner_rule, scope)
+            condition = calculator.calculate(block.argument)
+        rule.options['@if'] = first_condition
 
     @print_timing(10)
     def _get_variables(self, rule, scope, block):
