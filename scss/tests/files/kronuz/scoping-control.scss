@@ -1,5 +1,5 @@
 @option style:legacy;
-@option legacy-scoping: yes;
+@option legacy-scoping:yes;
 
 div {
   $first: red;
@@ -28,7 +28,7 @@ div {
   B-white: $first;
 
   // Second round of tests (undefined variables defined within @if, @for or @each):
-  // DEVIATION! in Sass, the colors inside the following constructs (since they're undefined) are left undefined at the end of the blocks:;
+  // DEVIATION! in Sass, the colors inside the following constructs (since they're undefined) are left undefined at the end of the control blocks:
   @if true {
     $second: olive;
   }
