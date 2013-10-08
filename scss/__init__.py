@@ -706,10 +706,12 @@ class Scss(object):
             if default is not None:
                 defaults[var_name] = default
 
-        mixin = [None, None, block.unparsed_contents, rule.namespace, argspec_node, rule.import_key]
+        mixin = [rule.source_file, block.lineno, block.unparsed_contents, rule.namespace, argspec_node, rule.import_key]
         if block.directive == '@function':
             def _call(mixin):
                 def __call(namespace, *args, **kwargs):
+                    source_file = mixin[0]
+                    lineno = mixin[1]
                     m_codestr = mixin[2]
                     pristine_callee_namespace = mixin[3]
                     callee_namespace = pristine_callee_namespace.derive()
@@ -726,9 +728,9 @@ class Scss(object):
                         callee_namespace, mixin, args, kwargs)
 
                     _rule = SassRule(
-                        source_file=block.parent_rule.source_file,
+                        source_file=source_file,
+                        lineno=lineno,
                         unparsed_contents=m_codestr,
-                        lineno=block.lineno,
                         namespace=callee_namespace,
 
                         # rule
@@ -794,6 +796,8 @@ class Scss(object):
                 args = [List(args, use_comma=True)]
                 # TODO what happens to kwargs?
 
+        source_file = mixin[0]
+        lineno = mixin[1]
         m_codestr = mixin[2]
         pristine_callee_namespace = mixin[3]
         callee_argspec = mixin[4]
@@ -810,9 +814,9 @@ class Scss(object):
             callee_namespace, mixin, args, kwargs)
 
         _rule = SassRule(
-            source_file=block.parent_rule.source_file,
+            source_file=source_file,
+            lineno=lineno,
             unparsed_contents=m_codestr,
-            lineno=block.lineno,
             namespace=callee_namespace,
 
             # rule
@@ -889,8 +893,8 @@ class Scss(object):
 
             _rule = SassRule(
                 source_file=source_file,
-                import_key=import_key,
                 lineno=block.lineno,
+                import_key=import_key,
                 unparsed_contents=source_file.contents,
 
                 # rule
