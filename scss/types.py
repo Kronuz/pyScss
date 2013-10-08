@@ -447,6 +447,29 @@ class Number(Value):
 
         return wrapped
 
+    def to_python_index(self, length, check_bounds=True):
+        """Return a plain Python integer appropriate for indexing a sequence of
+        the given length.  Raise if this is impossible for any reason
+        whatsoever.
+        """
+        if not self.is_unitless:
+            raise ValueError("Index cannot have units: {0!r}".format(self))
+
+        ret = int(self.value)
+        if ret != self.value:
+            raise ValueError("Index must be an integer: {0!r}".format(ret))
+
+        if ret == 0:
+            raise ValueError("Index cannot be zero")
+
+        if check_bounds and abs(ret) > length:
+            raise ValueError("Index {0!r} out of bounds for length {1}".format(ret, length))
+
+        if ret > 0:
+            return ret - 1
+        else:
+            return ret
+
     @property
     def has_simple_unit(self):
         """Returns True iff the unit is expressible in CSS, i.e., has no

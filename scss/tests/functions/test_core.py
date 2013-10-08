@@ -246,6 +246,46 @@ def test_quote(calc):
     assert ret.quotes == '"'
 
 
+# TODO more of these need quote checking too
+def test_str_length(calc):
+    # Examples from the Ruby docs
+    assert calc('str-length("foo")') == calc('3')
+
+
+def test_str_insert(calc):
+    # Examples from the Ruby docs
+    assert calc('str-insert("abcd", "X", 1)') == calc('"Xabcd"')
+    assert calc('str-insert("abcd", "X", 4)') == calc('"abcXd"')
+    # DEVIATION: see https://github.com/nex3/sass/issues/954
+    assert calc('str-insert("abcd", "X", 5)') == calc('"abcdX"')
+
+
+def test_str_index(calc):
+    # Examples from the Ruby docs
+    assert calc('str-index(abcd, a)') == calc('1')
+    assert calc('str-index(abcd, ab)') == calc('1')
+    assert calc('str-index(abcd, X)') == calc('0')
+    assert calc('str-index(abcd, c)') == calc('3')
+
+
+def test_str_slice(calc):
+    # Examples from the Ruby docs
+    assert calc('str-slice("abcd", 2, 3)') == calc('"bc"')
+    assert calc('str-slice("abcd", 2)') == calc('"bcd"')
+    assert calc('str-slice("abcd", -3, -2)') == calc('"bc"')
+    assert calc('str-slice("abcd", 2, -2)') == calc('"bc"')
+
+
+def test_to_upper_case(calc):
+    # Examples from the Ruby docs
+    assert calc('to-upper-case(abcd)') == calc('ABCD')
+
+
+def test_to_lower_case(calc):
+    # Examples from the Ruby docs
+    assert calc('to-lower-case(ABCD)') == calc('abcd')
+
+
 # ------------------------------------------------------------------------------
 # Number functions
 
@@ -335,6 +375,18 @@ def test_index(calc):
     # Examples from the Ruby docs
     assert calc('index(1px solid red, solid)') == calc('2')
     assert calc('index(1px solid red, dashed)') == calc('false')
+
+
+def test_list_separator(calc):
+    # Examples from the Ruby docs
+    assert calc('list-separator(1px 2px 3px)') == calc('space')
+    assert calc('list-separator(1px, 2px, 3px)') == calc('comma')
+    assert calc('list-separator("foo")') == calc('space')
+
+
+def test_set_nth(calc):
+    # Examples from the Ruby docs
+    assert calc('set-nth($list: 10px 20px 30px, $n: 2, $value: -20px)') == calc('10px -20px 30px')
 
 
 # ------------------------------------------------------------------------------

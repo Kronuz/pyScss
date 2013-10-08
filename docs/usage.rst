@@ -4,8 +4,8 @@ Installation and usage
 Installation
 ------------
 
-pyScss requires only Python 2.5 or later, including Python 3.x.  Install with
-pip::
+pyScss requires only Python 2.5 or later, including Python 3.x.  PyPy is also
+known to work.  Install with pip::
 
     pip install pyScss
 

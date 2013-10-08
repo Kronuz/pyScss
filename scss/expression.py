@@ -304,7 +304,7 @@ class CallOp(Expression):
             try:
                 # DEVIATION: Fall back to single parameter
                 funct = calculator.namespace.function(func_name, 1)
-                args = [args]
+                args = [List(args, use_comma=True)]
             except KeyError:
                 if not is_builtin_css_function(func_name):
                     log.error("Function not found: %s:%s", func_name, argspec_len, extra={'stack': True})

@@ -7,8 +7,9 @@ pyScss syntax
 Supported Sass features
 =======================
 
-pyScss is mostly compatible with Sass 3.2.  The canonical syntax reference is
-in the Sass documentation:
+pyScss is mostly compatible with Sass 3.2 and has partial support for the
+upcoming Sass 3.3.  The canonical syntax reference is in the Sass
+documentation:
 http://sass-lang.com/docs/yardoc/file.SASS_REFERENCE.html
 
 
@@ -22,7 +23,8 @@ for the SASS (YAML-like) syntax.
 Built-in functions
 ------------------
 
-All of the functions described in `the Sass documentation`_ are supported.
+All of the Sass 3.2 functions described in `the Sass documentation`_ are
+supported.
 
 .. _the Sass documentation: <http://sass-lang.com/docs/yardoc/Sass/Script/Functions.html
 
@@ -460,3 +462,25 @@ considered a bug.
 
 The ``@while`` construct doesn't work at all and will be left intact in the
 output, like any other unrecognized ``@``-rule.
+
+
+CLI
+---
+
+pyScss's command-line arguments are not entirely compatible with those of the
+reference compiler.
+
+
+Sass 3.3
+--------
+
+The following Sass 3.3 improvements are not yet implemented, but are planned
+for the near future:
+
+* Use of ``&`` in expressions.
+* ``@at-root``
+* Source map support.
+* Using ``...`` multiple times in a function call, or passing a map of
+  arguments with ``...``.  Likewise, ``keywords()`` is not implemented.
+* ``unique-id()``, ``call()``, and the various ``*-exists()`` functions are not
+  implemented.

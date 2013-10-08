@@ -113,6 +113,7 @@ New features
 * Python 3 support.  As a result, Python 2.5 no longer works; whether this is a bug or a feature is not yet clear.
 * It's possible to write custom Sass functions in Python, though the API for this is not final.
 * Experimental support for the map type and destructuring ``@each``, both unreleased additions to the Ruby project.
+* Support for the new string and list functions in Sass 3.3.
 * Added ``background-brushed``.
 
 Backwards-incompatible changes

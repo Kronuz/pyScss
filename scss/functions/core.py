@@ -431,7 +431,7 @@ def change_color(color, red=None, green=None, blue=None, hue=None, saturation=No
 
 
 # ------------------------------------------------------------------------------
-# String type manipulation
+# String functions
 
 @register('e', 1)
 @register('escape', 1)
@@ -453,6 +453,73 @@ def quote(*args):
         return String(arg.value, quotes='"')
     else:
         return String(arg.render(), quotes='"')
+
+
+@register('str-length', 1)
+def str_length(string):
+    expect_type(string, String)
+
+    # nb: can't use `len(string)`, because that gives the Sass list length,
+    # which is 1
+    return Number(len(string.value))
+
+
+# TODO this and several others should probably also require integers
+# TODO and assert that the indexes are valid
+@register('str-insert', 3)
+def str_insert(string, insert, index):
+    expect_type(string, String)
+    expect_type(insert, String)
+    expect_type(index, Number, unit=None)
+
+    py_index = index.to_python_index(len(string.value), check_bounds=False)
+    return String(
+        string.value[:py_index] +
+            insert.value +
+            string.value[py_index:],
+        quotes=string.quotes)
+
+
+@register('str-index', 2)
+def str_index(string, substring):
+    expect_type(string, String)
+    expect_type(substring, String)
+
+    # 1-based indexing, with 0 for failure
+    return Number(string.value.find(substring.value) + 1)
+
+
+@register('str-slice', 2)
+@register('str-slice', 3)
+def str_slice(string, start_at, end_at=None):
+    expect_type(string, String)
+    expect_type(start_at, Number, unit=None)
+    py_start_at = start_at.to_python_index(len(string.value))
+
+    if end_at is None:
+        py_end_at = None
+    else:
+        expect_type(end_at, Number, unit=None)
+        # Endpoint is inclusive, unlike Python
+        py_end_at = end_at.to_python_index(len(string.value)) + 1
+
+    return String(
+        string.value[py_start_at:py_end_at],
+        quotes=string.quotes)
+
+
+@register('to-upper-case', 1)
+def to_upper_case(string):
+    expect_type(string, String)
+
+    return String(string.value.upper(), quotes=string.quotes)
+
+
+@register('to-lower-case', 1)
+def to_lower_case(string):
+    expect_type(string, String)
+
+    return String(string.value.lower(), quotes=string.quotes)
 
 
 # ------------------------------------------------------------------------------
@@ -572,6 +639,25 @@ def zip_(*lists):
     return List(
         [List(zipped) for zipped in zip(*lists)],
         use_comma=True)
+
+
+# TODO need a way to use "list" as the arg name without shadowing the builtin
+@register('list-separator', 1)
+def list_separator(list):
+    if list.use_comma:
+        return String.unquoted('comma')
+    else:
+        return String.unquoted('space')
+
+
+@register('set-nth', 3)
+def set_nth(list, n, value):
+    expect_type(n, Number, unit=None)
+
+    py_n = n.to_python_index(len(list))
+    return List(
+        tuple(list[:py_n]) + (value,) + tuple(list[py_n + 1:]),
+        use_comma=list.use_comma)
 
 
 # ------------------------------------------------------------------------------
