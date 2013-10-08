@@ -127,14 +127,6 @@ _default_scss_vars = {
     'bgc:': String.unquoted('background-color:'),
 }
 
-_default_scss_opts = {
-    'verbosity': config.VERBOSITY,
-    'style': config.STYLE,
-    'legacy-scoping': False,
-}
-
-_default_search_paths = ['.']
-
 
 ################################################################################
 
@@ -340,15 +332,13 @@ class Scss(object):
         if self._scss_vars is not None:
             self.scss_vars.update(self._scss_vars)
 
-        self.scss_opts = _default_scss_opts.copy()
-        if self._scss_opts is not None:
-            self.scss_opts.update(self._scss_opts)
+        self.scss_opts = self._scss_opts.copy() if self._scss_opts else {}
 
         self.root_namespace = Namespace(variables=self.scss_vars, functions=self._library)
 
         # Figure out search paths.  Fall back from provided explicitly to
         # defined globally to just searching the current directory
-        self.search_paths = list(_default_search_paths)
+        self.search_paths = ['.']
         if self._search_paths is not None:
             assert not isinstance(self._search_paths, six.string_types), \
                 "`search_paths` should be an iterable, not a string"
@@ -539,9 +529,9 @@ class Scss(object):
                 elif code == '@debug':
                     setting = block.argument.strip()
                     if setting.lower() in ('1', 'true', 't', 'yes', 'y', 'on'):
-                        setting = 1
+                        setting = True
                     elif setting.lower() in ('0', 'false', 'f', 'no', 'n', 'off', 'undefined'):
-                        setting = 0
+                        setting = False
                     config.DEBUG = setting
                     log.info("Debug mode is %s", 'On' if config.DEBUG else 'Off')
                 elif code == '@option':
@@ -1033,7 +1023,7 @@ class Scss(object):
         if condition:
             inner_rule = rule.copy()
             inner_rule.unparsed_contents = block.unparsed_contents
-            if rule.options.get('legacy_scoping'):  # TODO: name this option differently and maybe make this scoping mode for contol structures as the default as a default deviation
+            if not rule.options.get('control_scoping', config.CONTROL_SCOPING):  # TODO: maybe make this scoping mode for contol structures as the default as a default deviation
                 # DEVIATION: Allow not creating a new namespace
                 inner_rule.namespace = rule.namespace
             self.manage_children(inner_rule, scope)
@@ -1084,7 +1074,7 @@ class Scss(object):
 
         inner_rule = rule.copy()
         inner_rule.unparsed_contents = block.unparsed_contents
-        if rule.options.get('legacy_scoping'):  # TODO: name this option differently and maybe make this scoping mode for contol structures as the default as a default deviation
+        if not rule.options.get('control_scoping', config.CONTROL_SCOPING):  # TODO: maybe make this scoping mode for contol structures as the default as a default deviation
             # DEVIATION: Allow not creating a new namespace
             inner_rule.namespace = rule.namespace
 
@@ -1111,7 +1101,7 @@ class Scss(object):
 
         inner_rule = rule.copy()
         inner_rule.unparsed_contents = block.unparsed_contents
-        if rule.options.get('legacy_scoping'):  # TODO: name this option differently and maybe make this scoping mode for contol structures as the default as a default deviation
+        if not rule.options.get('control_scoping', config.CONTROL_SCOPING):  # TODO: maybe make this scoping mode for contol structures as the default as a default deviation
             # DEVIATION: Allow not creating a new namespace
             inner_rule.namespace = rule.namespace
 
@@ -1135,7 +1125,7 @@ class Scss(object):
         while condition:
             inner_rule = rule.copy()
             inner_rule.unparsed_contents = block.unparsed_contents
-            if rule.options.get('legacy_scoping'):  # TODO: name this option differently and maybe make this scoping mode for contol structures as the default as a default deviation
+            if not rule.options.get('control_scoping', config.CONTROL_SCOPING):  # TODO: maybe make this scoping mode for contol structures as the default as a default deviation
                 # DEVIATION: Allow not creating a new namespace
                 inner_rule.namespace = rule.namespace
             self.manage_children(inner_rule, scope)
