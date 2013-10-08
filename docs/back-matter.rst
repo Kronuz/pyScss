@@ -68,8 +68,8 @@ working hours.  Yelp does not claim copyright.
 Changelog
 ---------
 
-1.2.0 (not yet released)
-^^^^^^^^^^^^^^^^^^^^^^^^
+1.2.0 (Oct 8, 2013)
+^^^^^^^^^^^^^^^^^^^
 
 This is a significant release that greatly increases compatibility with the
 reference compiler; in particular, the Sass port of Bootstrap now compiles.
