@@ -101,6 +101,22 @@ class Value(object):
     def __neg__(self):
         return String("-" + self.render())
 
+    def to_dict(self):
+        """Return the Python dict equivalent of this map.
+
+        If this type can't be expressed as a map, raise.
+        """
+        return dict(self.to_pairs())
+
+    def to_pairs(self):
+        """Return the Python list-of-tuples equivalent of this map.  Note that
+        this is different from ``self.to_dict().items()``, because Sass maps
+        preserve order.
+
+        If this type can't be expressed as a map, raise.
+        """
+        raise ValueError("Not a map: {0!r}".format(self))
+
     def render(self, compress=False):
         return self.__str__()
 
@@ -628,6 +644,16 @@ class List(Value):
     def __getitem__(self, key):
         return self.value[key]
 
+    def to_pairs(self):
+        pairs = []
+        for item in self:
+            if len(item) != 2:
+                return super(List, self).to_pairs()
+
+            pairs.append(tuple(item))
+
+        return pairs
+
     def render(self, compress=False):
         if not self.value:
             raise ValueError("Can't render empty list as CSS")
@@ -1011,16 +1037,19 @@ class String(Value):
         return self.__str__()
 
 
-### XXX EXPERIMENTAL XXX
 missing = object()
 class Map(Value):
     sass_type_name = u'map'
 
-    def __init__(self, pairs):
+    def __init__(self, pairs, index=None):
         self.pairs = tuple(pairs)
-        self.index = {}
-        for key, value in pairs:
-            self.index[key] = value
+
+        if index is None:
+            self.index = {}
+            for key, value in pairs:
+                self.index[key] = value
+        else:
+            self.index = index
 
     def __repr__(self):
         return "<Map: (%s)>" % (", ".join("%s: %s" % pair for pair in self.pairs),)
@@ -1034,14 +1063,20 @@ class Map(Value):
     def __iter__(self):
         return iter(self.pairs)
 
-    def get_by_key(self, key, default=missing):
-        if default is missing:
-            return self.index[key]
-        else:
-            return self.index.get(key, default)
+    def __getitem__(self, index):
+        return List(self.pairs[index], use_comma=True)
 
-    def get_by_pos(self, key):
-        return self.pairs[key][1]
+    def __eq__(self, other):
+        try:
+            return self.pairs == other.to_pairs()
+        except ValueError:
+            return NotImplemented
+
+    def to_dict(self):
+        return self.index
+
+    def to_pairs(self):
+        return self.pairs
 
     def render(self, compress=False):
         raise TypeError("Cannot render map %r as CSS" % (self,))

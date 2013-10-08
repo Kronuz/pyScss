@@ -343,6 +343,9 @@ def test_nth(calc):
     # Examples from the Ruby docs
     assert calc('nth(10px 20px 30px, 1)') == calc('10px')
     assert calc('nth((Helvetica, Arial, sans-serif), 3)') == calc('sans-serif')
+    assert calc('nth((width: 10px, length: 20px), 2)') == calc('length, 20px')
+
+    assert calc('nth(10px 20px 30px, -1)') == calc('30px')
 
 
 def test_join(calc):
@@ -393,7 +396,34 @@ def test_set_nth(calc):
 # Map functions
 
 
-# ...
+def test_map_get(calc):
+    # Examples from the Ruby docs
+    assert calc('map-get(("foo": 1, "bar": 2), "foo")') == calc('1')
+    assert calc('map-get(("foo": 1, "bar": 2), "bar")') == calc('2')
+    assert calc('map-get(("foo": 1, "bar": 2), "baz")') == calc('null')
+
+
+def test_map_merge(calc):
+    # Examples from the Ruby docs
+    assert calc('map-merge(("foo": 1), ("bar": 2))') == calc('("foo": 1, "bar": 2)')
+    assert calc('map-merge(("foo": 1, "bar": 2), ("bar": 3))') == calc('("foo": 1, "bar": 3)')
+
+
+def test_map_keys(calc):
+    # Examples from the Ruby docs
+    assert calc('map-keys(("foo": 1, "bar": 2))') == calc('"foo", "bar"')
+
+
+def test_map_values(calc):
+    # Examples from the Ruby docs
+    assert calc('map-values(("foo": 1, "bar": 2))') == calc('1, 2')
+    assert calc('map-values(("foo": 1, "bar": 2, "baz": 1))') == calc('1, 2, 1')
+
+
+def test_map_has_key(calc):
+    # Examples from the Ruby docs
+    assert calc('map-has-key(("foo": 1, "bar": 2), "foo")') == calc('true')
+    assert calc('map-has-key(("foo": 1, "bar": 2), "baz")') == calc('false')
 
 
 # ------------------------------------------------------------------------------
