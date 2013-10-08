@@ -720,22 +720,18 @@ class Scss(object):
                         callee_namespace, mixin, args, kwargs)
 
                     _rule = SassRule(
-                        # TODO correct?  relevant?  seems the function should
-                        # consider itself as existing where it was defined, not
-                        # called?
                         source_file=block.parent_rule.source_file,
                         import_key=rule.import_key,
 
-                        # TODO
                         unparsed_contents=m_codestr,
-                        #context=m_vars,
                         options=rule.options.copy(),
+
+                        properties=rule.properties,
+                        extends_selectors=rule.extends_selectors,
+                        ancestry=rule.ancestry,
+                        nested=rule.nested,
+
                         lineno=block.lineno,
-
-                        # R
-                        #ancestry=R.ancestry,
-                        #extends_selectors=R.extends_selectors,
-
                         namespace=callee_namespace,
                     )
                     try:
@@ -809,11 +805,21 @@ class Scss(object):
             "Mixin {0}".format(funct),
             callee_namespace, mixin, args, kwargs)
 
-        _rule = rule.copy()
-        _rule.unparsed_contents = m_codestr
-        _rule.namespace = callee_namespace
-        _rule.source_file = block.parent_rule.source_file
-        _rule.lineno = block.lineno
+        _rule = SassRule(
+            source_file=block.parent_rule.source_file,
+            import_key=rule.import_key,
+
+            unparsed_contents=m_codestr,
+            options=rule.options,
+
+            properties=rule.properties,
+            extends_selectors=rule.extends_selectors,
+            ancestry=rule.ancestry,
+            nested=rule.nested,
+
+            lineno=block.lineno,
+            namespace=callee_namespace,
+        )
 
         _rule.options['@content'] = block.unparsed_contents
         self.manage_children(_rule, scope)
