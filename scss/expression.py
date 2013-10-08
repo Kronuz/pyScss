@@ -334,7 +334,10 @@ class Literal(Expression):
         return '<%s(%s)>' % (self.__class__.__name__, repr(self.value))
 
     def __init__(self, value):
-        self.value = value
+        if isinstance(value, Undefined) and config.FATAL_UNDEFINED:
+            raise SyntaxError("Undefined literal.")
+        else:
+            self.value = value
 
     def evaluate(self, calculator, divide=False):
         return self.value
