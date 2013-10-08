@@ -260,8 +260,6 @@ class SassRule(object):
         else:
             self.properties = properties
 
-        self.retval = None
-
         if ancestry is None:
             self.ancestry = RuleAncestry()
         else:

@@ -500,6 +500,8 @@ class Scss(object):
     def manage_children(self, rule, scope):
         try:
             self._manage_children_impl(rule, scope)
+        except SassReturn:
+            raise
         except SassError as e:
             e.add_rule(rule)
             raise
@@ -507,9 +509,6 @@ class Scss(object):
             raise SassError(e, rule=rule)
 
     def _manage_children_impl(self, rule, scope):
-        # A rule that has already returned should not end up here
-        assert rule.retval is None
-
         calculator = Calculator(rule.namespace)
 
         for c_lineno, c_property, c_codestr in locate_blocks(rule.unparsed_contents):
@@ -559,9 +558,9 @@ class Scss(object):
                     #rule.extends_selectors.update(p.strip() for p in selectors.replace(',', '&').split('&'))
                     #rule.extends_selectors.discard('')
                 elif code == '@return':
+                    # TODO should assert this only happens within a @function
                     ret = calculator.calculate(block.argument)
-                    rule.retval = ret
-                    return
+                    raise SassReturn(ret)
                 elif code == '@include':
                     self._do_include(rule, scope, block)
                 elif code in ('@mixin', '@function'):
@@ -636,6 +635,62 @@ class Scss(object):
         argspec_node = calculator.parse_expression(argstr, target='goal_argspec')
         return funct, argspec_node
 
+    def _populate_namespace_from_call(self, name, callee_namespace, mixin, args, kwargs):
+        # Mutation protection
+        args = list(args)
+        kwargs = dict(kwargs)
+
+        #m_params = mixin[0]
+        #m_defaults = mixin[1]
+        #m_codestr = mixin[2]
+        pristine_callee_namespace = mixin[3]
+        callee_argspec = mixin[4]
+        import_key = mixin[5]
+
+        callee_calculator = Calculator(callee_namespace)
+
+        # Populate the mixin/function's namespace with its arguments
+        for var_name, node in callee_argspec.iter_def_argspec():
+            if args:
+                # If there are positional arguments left, use the first
+                value = args.pop(0)
+            elif var_name in kwargs:
+                # Try keyword arguments
+                value = kwargs.pop(var_name)
+            elif node is not None:
+                # OK, there's a default argument; try that
+                # DEVIATION: this allows argument defaults to refer to earlier
+                # argument values
+                value = node.evaluate(callee_calculator, divide=True)
+            else:
+                # TODO this should raise
+                value = Undefined()
+
+            callee_namespace.set_variable(var_name, value, local_only=True)
+
+        if callee_argspec.slurp:
+            # Slurpy var gets whatever is left
+            callee_namespace.set_variable(
+                callee_argspec.slurp.name,
+                List(args, use_comma=True))
+            args = []
+        elif callee_argspec.inject:
+            # Callee namespace gets all the extra kwargs whether declared or
+            # not
+            for var_name, value in kwargs.items():
+                callee_namespace.set_variable(var_name, value, local_only=True)
+            kwargs = {}
+
+        # TODO would be nice to say where the mixin/function came from
+        if kwargs:
+            raise NameError("%s has no such argument %s" % (name, kwargs.keys()[0]))
+
+        if args:
+            raise NameError("%s received extra arguments: %r" % (name, args))
+
+        pristine_callee_namespace.use_import(import_key)
+        return callee_namespace
+
     @print_timing(10)
     def _do_functions(self, rule, scope, block):
         """
@@ -655,45 +710,24 @@ class Scss(object):
             if default is not None:
                 defaults[var_name] = default
 
-        mixin = [list(new_params), defaults, block.unparsed_contents, rule.namespace, argspec_node, rule.import_key]
+        mixin = [None, None, block.unparsed_contents, rule.namespace, argspec_node, rule.import_key]
         if block.directive == '@function':
             def _call(mixin):
                 def __call(namespace, *args, **kwargs):
-                    calculator = Calculator(namespace.derive())
-
-                    m_vars = rule.namespace
-                    m_params = mixin[0]
-                    m_defaults = mixin[1]
                     m_codestr = mixin[2]
                     pristine_callee_namespace = mixin[3]
-                    import_key = mixin[5]
+                    callee_namespace = pristine_callee_namespace.derive()
 
-                    params = []
-                    params_dict = {}
-                    for i, var_value in enumerate(args):
-                        try:
-                            var_name = m_params[i]
-                            params.append(var_name)
-                            params_dict[var_name] = var_value
-                        except IndexError:
-                            log.error("Function %s:%d receives more arguments than expected (%d)", funct, len(m_params), len(args), extra={'stack': True})
-                            break
-                    for var_name, var_value in kwargs.items():
-                        var_name = '$' + var_name
-                        params.append(var_name)
-                        params_dict[var_name] = var_value
+                    # TODO CallOp converts Sass names to Python names, so we
+                    # have to convert them back to Sass names.  would be nice
+                    # to avoid this back-and-forth somehow
+                    kwargs = dict(
+                        (normalize_var('$' + key), value)
+                        for (key, value) in kwargs.items())
 
-                    # Evaluate all parameters sent to the function in order:
-                    for var_name in params:
-                        value = params_dict[var_name]
-                        m_vars.set_variable(var_name, value)
-
-                    # Evaluate arguments not passed to the mixin/function (from the defaults):
-                    for var_name in m_params:
-                        if var_name not in params_dict and var_name in m_defaults:
-                            var_value = m_defaults[var_name]
-                            value = var_value.evaluate(calculator)
-                            m_vars.set_variable(var_name, value)
+                    self._populate_namespace_from_call(
+                        "Function {0}".format(funct),
+                        callee_namespace, mixin, args, kwargs)
 
                     _rule = SassRule(
                         # TODO correct?  relevant?  seems the function should
@@ -712,14 +746,14 @@ class Scss(object):
                         #ancestry=R.ancestry,
                         #extends_selectors=R.extends_selectors,
 
-                        namespace=m_vars,
+                        namespace=callee_namespace,
                     )
-                    pristine_callee_namespace.use_import(import_key)
-                    self.manage_children(_rule, scope)
-                    ret = _rule.retval
-                    if ret is None:
-                        ret = Null()
-                    return ret
+                    try:
+                        self.manage_children(_rule, scope)
+                    except SassReturn as e:
+                        return e.retval
+                    else:
+                        return Null()
                 return __call
             _mixin = _call(mixin)
             _mixin.mixin = mixin
@@ -770,14 +804,9 @@ class Scss(object):
                 args = [List(args, use_comma=True)]
                 # TODO what happens to kwargs?
 
-        # TODO share this code with the @function boilerplate above
-        m_params = mixin[0]
-        m_defaults = mixin[1]
         m_codestr = mixin[2]
         pristine_callee_namespace = mixin[3]
         callee_argspec = mixin[4]
-        import_key = mixin[5]
-
         if caller_argspec.inject and callee_argspec.inject:
             # DEVIATION: Pass the ENTIRE local namespace to the mixin (yikes)
             callee_namespace = Namespace.derive_from(
@@ -786,45 +815,9 @@ class Scss(object):
         else:
             callee_namespace = pristine_callee_namespace.derive()
 
-        callee_calculator = Calculator(callee_namespace)
-
-        # Populate the mixin/function's namespace with its arguments
-        for var_name, node in callee_argspec.iter_def_argspec():
-            if args:
-                # If there are positional arguments left, use the first
-                value = args.pop(0)
-            elif var_name in kwargs:
-                # Try keyword arguments
-                value = kwargs.pop(var_name)
-            elif node is not None:
-                # OK, there's a default argument; try that
-                # DEVIATION: this allows argument defaults to refer to earlier
-                # argument values
-                value = node.evaluate(callee_calculator, divide=True)
-            else:
-                # TODO this should raise
-                value = Undefined()
-
-            callee_namespace.set_variable(var_name, value, local_only=True)
-
-        if callee_argspec.slurp:
-            # Slurpy var gets whatever is left
-            callee_namespace.set_variable(
-                callee_argspec.slurp.name,
-                List(args, use_comma=True))
-            args = []
-        elif callee_argspec.inject:
-            # Callee namespace gets all the extra kwargs whether declared or
-            # not
-            for var_name, value in kwargs.items():
-                callee_namespace.set_variable(var_name, value, local_only=True)
-            kwargs = {}
-
-        if kwargs:
-            raise NameError("Mixin %s has no such argument %s" % (funct, kwargs.keys()[0]))
-
-        if args:
-            raise NameError("Mixin %s received extra arguments: %r" % (funct, args))
+        self._populate_namespace_from_call(
+            "Mixin {0}".format(funct),
+            callee_namespace, mixin, args, kwargs)
 
         _rule = rule.copy()
         _rule.unparsed_contents = m_codestr
@@ -833,7 +826,6 @@ class Scss(object):
         _rule.lineno = block.lineno
 
         _rule.options['@content'] = block.unparsed_contents
-        pristine_callee_namespace.use_import(import_key)
         self.manage_children(_rule, scope)
 
     @print_timing(10)
@@ -1601,3 +1593,17 @@ class Scss(object):
             else:
                 result += tb + prop + ';' + nl
         return result
+
+
+# TODO: this should inherit from SassError, but can't, because that assumes
+# it's wrapping another error.  fix this with the exception hierarchy
+class SassReturn(Exception):
+    """Special control-flow exception used to hop up the stack from a Sass
+    function's ``@return``.
+    """
+    def __init__(self, retval):
+        self.retval = retval
+        Exception.__init__(self)
+
+    def __str__(self):
+        return "Returning {0!r}".format(self.retval)
