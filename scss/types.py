@@ -462,7 +462,7 @@ class Number(Value):
 
         return wrapped
 
-    def to_python_index(self, length, check_bounds=True):
+    def to_python_index(self, length, check_bounds=True, circular=False):
         """Return a plain Python integer appropriate for indexing a sequence of
         the given length.  Raise if this is impossible for any reason
         whatsoever.
@@ -477,13 +477,16 @@ class Number(Value):
         if ret == 0:
             raise ValueError("Index cannot be zero")
 
-        if check_bounds and abs(ret) > length:
+        if check_bounds and not circular and abs(ret) > length:
             raise ValueError("Index {0!r} out of bounds for length {1}".format(ret, length))
 
         if ret > 0:
-            return ret - 1
-        else:
-            return ret
+            ret -= 1
+
+        if circular:
+            ret = ret % length
+
+        return ret
 
     @property
     def has_simple_unit(self):

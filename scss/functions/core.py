@@ -593,7 +593,8 @@ def nth(lst, n):
         else:
             raise ValueError("Invalid index %r" % (n,))
     else:
-        i = n.to_python_index(len(lst))
+        # DEVIATION: nth treats lists as circular lists
+        i = n.to_python_index(len(lst), circular=True)
 
     return lst[i]
 
