@@ -457,13 +457,6 @@ Unsupported Sass features
 Some Sass features are not supported or have some gaps.  Each of these may be
 considered a bug.
 
-``@while``
-----------
-
-The ``@while`` construct doesn't work at all and will be left intact in the
-output, like any other unrecognized ``@``-rule.
-
-
 CLI
 ---
 
