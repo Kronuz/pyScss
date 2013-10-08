@@ -26,7 +26,7 @@ SELECTOR_TOKENIZER = re.compile(r'''
     [:]+ [-\w]+ (?: [(] .+? [)] )?
 
     # These guys are combinators -- note that a single space counts too
-    | \s* [ +>~] \s*
+    | \s* [ +>~,] \s*
 
     # Square brackets are attribute tests
     # TODO: this doesn't handle ] within a string
