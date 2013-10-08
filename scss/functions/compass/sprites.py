@@ -152,6 +152,7 @@ def sprite_map(g, **kwargs):
         inline = Boolean(kwargs.get('inline', False))
 
         sprite_map = None
+        asset = None
         file_asset = None
         inline_asset = None
         if os.path.exists(asset_path) or inline:
