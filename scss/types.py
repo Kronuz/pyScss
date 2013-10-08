@@ -348,7 +348,6 @@ class Number(Value):
             unit_denom=self.unit_denom * int(exp.value),
         )
 
-
     def __mul__(self, other):
         if not isinstance(other, Number):
             return NotImplemented
@@ -1037,7 +1036,6 @@ class String(Value):
         return self.__str__()
 
 
-missing = object()
 class Map(Value):
     sass_type_name = u'map'
 
