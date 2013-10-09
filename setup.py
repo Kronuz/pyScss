@@ -22,6 +22,8 @@ speedups = Feature(
     'optional C speed-enhancement module',
     standard=True,
     ext_modules=[
+        # NOTE: header files are included by MANIFEST.in; Extension does not
+        # include headers in an sdist (since they're typically in /usr/lib)
         Extension(
             'scss._speedups',
             sources=['scss/src/_speedups.c', 'scss/src/block_locator.c', 'scss/src/scanner.c'],
