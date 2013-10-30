@@ -5,4 +5,7 @@
   font-weight: bold;
   font-size: 2em;
 }
+%unused {
+  foo: bar;
+}
 .notice { @extend %extreme; }

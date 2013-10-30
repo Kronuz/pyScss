@@ -1405,6 +1405,8 @@ class Scss(object):
                                 more_parent_selectors))
                         rule_dependencies[parent_rule].append(rule_order[rule])
 
+        # clean up placeholder only rules
+        self.rules = [rule for rule in self.rules if not rule.is_pure_placeholder]
         self.rules.sort(key=lambda rule: min(rule_dependencies[rule]))
 
     @print_timing(3)
