@@ -62,6 +62,16 @@ TOKEN_TYPE_ORDER = {
 }
 TOKEN_SORT_KEY = lambda token: TOKEN_TYPE_ORDER.get(token[0], 0)
 
+PSEUDO_ELEMENTS = (
+    ':after',
+    ':before',
+    ':first-line',
+    ':first-letter',
+)
+# Psudo elements must go after any other simple selectors
+# ref: http://www.w3.org/TR/selectors/#pseudo-elements
+TOKEN_RENDER_SORT_KEY = lambda token: any([token.endswith(x) for x in PSEUDO_ELEMENTS])
+
 
 def _is_combinator_subset_of(specific, general, is_first=True):
     """Return whether `specific` matches a non-strict subset of what `general`
@@ -207,6 +217,7 @@ class SimpleSelector(object):
 
     def render(self):
         # TODO fail if there are no tokens, or if one is a placeholder?
+        self.tokens = sorted(self.tokens, key=TOKEN_RENDER_SORT_KEY)
         rendered = ''.join(self.tokens)
         if self.combinator != ' ':
             rendered = ' '.join((self.combinator, rendered))

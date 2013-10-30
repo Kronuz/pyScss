@@ -3,5 +3,6 @@
 
 a {
   color: blue;
+  &:after {display: block}
   &:hover {text-decoration: underline}
 }
