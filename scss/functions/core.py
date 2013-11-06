@@ -275,10 +275,10 @@ def greyscale(color):
 
 @register('grayscale', 1)
 def grayscale(color):
-    if isinstance(color, Number) and color.is_unitless:
-        # grayscale(n) is a CSS3 filter and should be left intact, but only
-        # when using the "a" spelling
-        return String.unquoted("grayscale(%d)" % (color.value,))
+    if isinstance(color, Number):
+        # grayscale(n) and grayscale(n%) are CSS3 filters and should be left intact, but only                                                                                                                                                           
+        # when using the "a" spelling                                                                                                                                                                                                                   
+        return String.unquoted("grayscale(%s)" % (color.render(),))
     else:
         return greyscale(color)
 
