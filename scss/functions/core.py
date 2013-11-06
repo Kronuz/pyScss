@@ -278,7 +278,7 @@ def grayscale(color):
     if isinstance(color, Number):
         # grayscale(n) and grayscale(n%) are CSS3 filters and should be left intact, but only                                                                                                                                                           
         # when using the "a" spelling                                                                                                                                                                                                                   
-        return String.unquoted("grayscale(%s)" % (color,))
+        return String.unquoted("grayscale(%s)" % (color.render(),))
     else:
         return greyscale(color)
 
