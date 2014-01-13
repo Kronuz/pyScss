@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import time
+from functools import wraps
 
 import six
 
@@ -121,6 +122,8 @@ def print_timing(level=0):
 def profile(fn):
     import cProfile
     import pstats
+
+    @wraps(fn)
     def wrapper(*args, **kwargs):
         profiler = cProfile.Profile()
         stream = six.StringIO()
