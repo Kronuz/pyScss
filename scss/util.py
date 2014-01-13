@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
+import os
 import re
 import sys
 import time
@@ -144,3 +145,72 @@ def profile(fn):
             stream.close()
         return res
     return wrapper
+
+
+################################################################################
+# http://code.activestate.com/recipes/325905-memoize-decorator-with-timeout/
+
+class tmemoize(object):
+    """
+    Memoize With Timeout
+
+    Usage:
+        @tmemoize()
+        def z(a,b):
+            return a + b
+
+        @tmemoize(timeout=5)
+        def x(a,b):
+            return a + b
+    """
+    _caches = {}
+    _timeouts = {}
+    _collected = time.time()
+
+    def __init__(self, timeout=60, gc=3600):
+        self.timeout = timeout
+        self.gc = gc
+
+    def collect(self):
+        """Clear cache of results which have timed out"""
+        for func in self._caches:
+            cache = {}
+            for key in self._caches[func]:
+                if (time.time() - self._caches[func][key][1]) < self._timeouts[func]:
+                    cache[key] = self._caches[func][key]
+            self._caches[func] = cache
+
+    def __call__(self, func):
+        self._caches[func] = {}
+        self._timeouts[func] = self.timeout
+
+        @wraps(func)
+        def wrapper(*args):
+            key = args
+            now = time.time()
+            cache = self._caches[func]
+            try:
+                ret, last = cache[key]
+                if now - last > self.timeout:
+                    raise KeyError
+            except KeyError:
+                ret, last = cache[key] = (func(*args), now)
+            if now - self._collected > self.gc:
+                self.collect()
+                self._collected = time.time()
+            return ret
+        return wrapper
+
+
+################################################################################
+# Memoized getmtime (can accept storage)
+@tmemoize()
+def getmtime(filename, storage=None):
+    try:
+        if storage:
+            d_obj = storage.modified_time(filename)
+            return int(time.mktime(d_obj.timetuple()))
+        else:
+            return int(os.path.getmtime(filename))
+    except:
+        pass

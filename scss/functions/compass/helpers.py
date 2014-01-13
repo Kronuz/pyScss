@@ -18,7 +18,7 @@ import six
 from scss import config
 from scss.functions.library import FunctionLibrary
 from scss.types import Boolean, List, Null, Number, String
-from scss.util import escape, to_str
+from scss.util import escape, to_str, getmtime
 import re
 
 log = logging.getLogger(__name__)
@@ -530,20 +530,21 @@ def _font_url(path, only_path=False, cache_buster=True, inline=False):
     if callable(FONTS_ROOT):
         try:
             _file, _storage = list(FONTS_ROOT(filepath))[0]
-            d_obj = _storage.modified_time(_file)
-            filetime = int(time.mktime(d_obj.timetuple()))
-            if inline:
-                file = _storage.open(_file)
-        except:
+        except IndexError:
+            filetime = None
+        else:
+            filetime = getmtime(_file, _storage)
+        if filetime is None:
             filetime = 'NA'
+        elif inline:
+            file = _storage.open(_file)
     else:
         _path = os.path.join(FONTS_ROOT, filepath.strip('/'))
-        if os.path.exists(_path):
-            filetime = int(os.path.getmtime(_path))
-            if inline:
-                file = open(_path, 'rb')
-        else:
+        filetime = getmtime(_path)
+        if filetime is None:
             filetime = 'NA'
+        elif inline:
+            file = open(_path, 'rb')
 
     BASE_URL = config.FONTS_URL or config.STATIC_URL
     if file and inline:
@@ -634,15 +635,16 @@ def stylesheet_url(path, only_path=False, cache_buster=True):
     if callable(config.STATIC_ROOT):
         try:
             _file, _storage = list(config.STATIC_ROOT(filepath))[0]
-            d_obj = _storage.modified_time(_file)
-            filetime = int(time.mktime(d_obj.timetuple()))
-        except:
+        except IndexError:
+            filetime = None
+        else:
+            filetime = getmtime(_file, _storage)
+        if filetime is None:
             filetime = 'NA'
     else:
         _path = os.path.join(config.STATIC_ROOT, filepath.strip('/'))
-        if os.path.exists(_path):
-            filetime = int(os.path.getmtime(_path))
-        else:
+        filetime = getmtime(_path)
+        if filetime is None:
             filetime = 'NA'
     BASE_URL = config.STATIC_URL
 

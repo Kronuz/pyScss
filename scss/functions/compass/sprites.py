@@ -36,7 +36,7 @@ from scss.functions.compass import _image_size_cache
 from scss.functions.compass.layouts import PackedSpritesLayout, HorizontalSpritesLayout, VerticalSpritesLayout, DiagonalSpritesLayout
 from scss.functions.library import FunctionLibrary
 from scss.types import Color, List, Number, String, Boolean
-from scss.util import escape
+from scss.util import escape, getmtime
 
 log = logging.getLogger(__name__)
 
@@ -171,11 +171,7 @@ def sprite_map(g, **kwargs):
 
             if sprite_map:
                 for file_, storage in files:
-                    if storage is not None:
-                        d_obj = storage.modified_time(file_)
-                        _time = time.mktime(d_obj.timetuple())
-                    else:
-                        _time = os.path.getmtime(file_)
+                    _time = getmtime(file_, storage)
                     if save_time < _time:
                         if _time > now_time:
                             log.warning("File '%s' has a date in the future (cache ignored)" % file_)

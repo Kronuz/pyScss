@@ -8,7 +8,6 @@ import hashlib
 import logging
 import mimetypes
 import os.path
-import time
 
 import six
 from six.moves import xrange
@@ -18,7 +17,7 @@ from scss.functions.compass import _image_size_cache
 from scss.functions.compass.helpers import add_cache_buster
 from scss.functions.library import FunctionLibrary
 from scss.types import Color, List, Number, String
-from scss.util import escape
+from scss.util import escape, getmtime
 
 try:
     from PIL import Image
@@ -62,20 +61,21 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
     if callable(IMAGES_ROOT):
         try:
             _file, _storage = list(IMAGES_ROOT(filepath))[0]
-            d_obj = _storage.modified_time(_file)
-            filetime = int(time.mktime(d_obj.timetuple()))
-            if inline or dst_color or spacing:
-                path = _storage.open(_file)
-        except:
+        except IndexError:
+            filetime = None
+        else:
+            filetime = getmtime(_file, _storage)
+        if filetime is None:
             filetime = 'NA'
+        elif inline or dst_color or spacing:
+            path = _storage.open(_file)
     else:
         _path = os.path.join(IMAGES_ROOT.rstrip('/'), filepath.strip('/'))
-        if os.path.exists(_path):
-            filetime = int(os.path.getmtime(_path))
-            if inline or dst_color or spacing:
-                path = open(_path, 'rb')
-        else:
+        filetime = getmtime(_path)
+        if filetime is None:
             filetime = 'NA'
+        elif inline or dst_color or spacing:
+            path = open(_path, 'rb')
 
     BASE_URL = config.IMAGES_URL or config.STATIC_URL
     if path:
@@ -108,7 +108,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
             else:
                 url = '%s%s' % (BASE_URL, filepath)
                 if cache_buster:
-                    filetime = int(os.path.getmtime(asset_path))
+                    filetime = getmtime(asset_path)
                     url = add_cache_buster(url, filetime)
         else:
             simply_process = False
@@ -129,7 +129,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
                 else:
                     url = '%s%s' % (BASE_URL, filepath)
                     if cache_buster:
-                        filetime = int(os.path.getmtime(asset_path))
+                        filetime = getmtime(asset_path)
                         url = add_cache_buster(url, filetime)
             else:
                 width, height = collapse_x or image.size[0], collapse_y or image.size[1]
@@ -165,7 +165,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
                         filepath = asset_file
                         BASE_URL = config.ASSETS_URL
                         if cache_buster:
-                            filetime = int(os.path.getmtime(asset_path))
+                            filetime = getmtime(asset_path)
                     except IOError:
                         log.exception("Error while saving image")
                         inline = True  # Retry inline version
@@ -237,9 +237,10 @@ def image_width(image):
         if callable(IMAGES_ROOT):
             try:
                 _file, _storage = list(IMAGES_ROOT(filepath))[0]
-                path = _storage.open(_file)
-            except:
+            except IndexError:
                 pass
+            else:
+                path = _storage.open(_file)
         else:
             _path = os.path.join(IMAGES_ROOT, filepath.strip('/'))
             if os.path.exists(_path):
@@ -270,9 +271,10 @@ def image_height(image):
         if callable(IMAGES_ROOT):
             try:
                 _file, _storage = list(IMAGES_ROOT(filepath))[0]
-                path = _storage.open(_file)
-            except:
+            except IndexError:
                 pass
+            else:
+                path = _storage.open(_file)
         else:
             _path = os.path.join(IMAGES_ROOT, filepath.strip('/'))
             if os.path.exists(_path):
