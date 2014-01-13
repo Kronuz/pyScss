@@ -8,6 +8,7 @@ from scss.functions.compass.sprites import COMPASS_SPRITES_LIBRARY
 from scss.functions.compass.gradients import COMPASS_GRADIENTS_LIBRARY
 from scss.functions.compass.helpers import COMPASS_HELPERS_LIBRARY
 from scss.functions.compass.images import COMPASS_IMAGES_LIBRARY
+from scss.functions.bootstrap import BOOTSTRAP_LIBRARY
 
 
 ALL_BUILTINS_LIBRARY = FunctionLibrary()
@@ -18,6 +19,7 @@ ALL_BUILTINS_LIBRARY.inherit(
     COMPASS_HELPERS_LIBRARY,
     COMPASS_IMAGES_LIBRARY,
     COMPASS_SPRITES_LIBRARY,
+    BOOTSTRAP_LIBRARY,
 )
 
 # TODO back-compat for the only codebase still using the old name  :)
