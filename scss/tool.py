@@ -90,28 +90,28 @@ def main():
                       dest="is_sass", default=None,
                       help="Sass mode")
 
-    (options, args) = parser.parse_args()
+    options, args = parser.parse_args()
 
     # General runtime configuration
     config.VERBOSITY = 0
     if options.time:
         config.VERBOSITY = 2
-        
+
     if options.static_root is not None:
         config.STATIC_ROOT = options.static_root
     if options.assets_root is not None:
         config.ASSETS_ROOT = options.assets_root
-        
+
     if options.fonts_root is not None:
         config.FONTS_ROOT = options.fonts_root
     if options.fonts_url is not None:
         config.FONTS_URL = options.fonts_url
-        
+
     if options.images_root is not None:
         config.IMAGES_ROOT = options.images_root
     if options.images_url is not None:
         config.IMAGES_URL = options.images_url
-        
+
     if options.cache_root is not None:
         config.CACHE_ROOT = options.cache_root
     if options.load_paths is not None:
