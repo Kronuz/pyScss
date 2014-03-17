@@ -813,8 +813,14 @@ class Scss(object):
             callee_namespace, mixin, args, kwargs)
 
         _rule = SassRule(
-            source_file=source_file,
-            lineno=lineno,
+            # These must be file and line in which the @include occurs
+            source_file=rule.source_file,
+            lineno=rule.lineno,
+
+            # These must be file and line in which the @mixin was defined
+            from_source_file=source_file,
+            from_lineno=lineno,
+
             unparsed_contents=m_codestr,
             namespace=callee_namespace,
 
@@ -891,8 +897,14 @@ class Scss(object):
                 continue
 
             _rule = SassRule(
-                source_file=source_file,
+                # These must be file and line in which the @import occurs
+                source_file=rule.source_file,
                 lineno=block.lineno,
+
+                # These must be source file of the imported file
+                from_source_file=source_file,
+                from_lineno=0,
+
                 import_key=import_key,
                 unparsed_contents=source_file.contents,
 

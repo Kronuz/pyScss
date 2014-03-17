@@ -239,7 +239,11 @@ class SassRule(object):
             namespace=None,
             lineno=0, extends_selectors=frozenset(),
             ancestry=None,
-            nested=0):
+            nested=0,
+            from_source_file=None, from_lineno=0):
+
+        self.from_source_file = from_source_file
+        self.from_lineno = from_lineno
 
         self.source_file = source_file
         self.import_key = import_key
@@ -288,7 +292,10 @@ class SassRule(object):
         """Return the filename and line number where this rule originally
         appears, in the form "foo.scss:3".  Used for error messages.
         """
-        return "%s:%d" % (self.source_file.filename, self.lineno)
+        ret = "%s:%d" % (self.source_file.filename, self.lineno)
+        if self.from_source_file:
+            ret += " (%s:%d)" % (self.from_source_file.filename, self.from_lineno)
+        return ret
 
     @property
     def is_empty(self):
@@ -313,6 +320,10 @@ class SassRule(object):
         return type(self)(
             source_file=self.source_file,
             lineno=self.lineno,
+
+            from_source_file=self.from_source_file,
+            from_lineno=self.from_lineno,
+
             unparsed_contents=self.unparsed_contents,
 
             options=self.options,
