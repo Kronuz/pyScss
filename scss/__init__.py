@@ -857,7 +857,7 @@ class Scss(object):
             name = dequote(name.strip())
 
             source_file = None
-            full_filename, seen_paths = self._find_import(rule, name)
+            full_filename, seen_paths = self._find_import(rule, name, skip=rule.source_file.filename)
 
             if full_filename is None:
                 i_codestr = self._do_magic_import(rule, scope, block)
@@ -906,7 +906,7 @@ class Scss(object):
             rule.namespace.add_import(import_key, rule.import_key, rule.file_and_line)
             self.manage_children(_rule, scope)
 
-    def _find_import(self, rule, name):
+    def _find_import(self, rule, name, skip=None):
         """Find the file referred to by an @import.
 
         Takes a name from an @import and returns an absolute path, or None.
@@ -932,6 +932,8 @@ class Scss(object):
                 for prefix, suffix in product(('_', ''), search_exts):
                     full_filename = os.path.join(full_path, prefix + name + suffix)
                     if os.path.exists(full_filename):
+                        if full_filename == skip:
+                            continue
                         return full_filename, seen_paths
 
         return None, seen_paths
