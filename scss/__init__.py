@@ -1556,14 +1556,19 @@ class Scss(object):
                         result += srnl
                     separate = False
                 if debug_info:
-                    if not rule.source_file.is_string:
-                        filename = rule.source_file.filename
-                        lineno = str(rule.lineno)
+                    def _print_debug_info(filename, lineno):
                         if debug_info == 'comments':
-                            result += tb * (i + nesting) + "/* file: %s, line: %s */" % (filename, lineno) + nl
+                            result = tb * (i + nesting) + "/* file: %s, line: %s */" % (filename, lineno) + nl
                         else:
                             filename = _escape_chars_re.sub(r'\\\1', filename)
-                            result += tb * (i + nesting) + "@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}" % (filename, lineno) + nl
+                            result = tb * (i + nesting) + "@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}" % (filename, lineno) + nl
+                        return result
+
+                    if rule.lineno and rule.source_file and not rule.source_file.is_string:
+                        result += _print_debug_info(rule.source_file.filename, rule.lineno)
+
+                    if rule.from_lineno and rule.from_source_file and not rule.from_source_file.is_string:
+                        result += _print_debug_info(rule.from_source_file.filename, rule.from_lineno)
 
                 if header.is_selector:
                     header_string = header.render(sep=',' + sp, super_selector=self.super_selector)
