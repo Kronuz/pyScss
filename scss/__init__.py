@@ -897,15 +897,9 @@ class Scss(object):
                 continue
 
             _rule = SassRule(
-                # These must be file and line in which the @import occurs
-                source_file=rule.source_file,
-                lineno=block.lineno,
-
-                # These must be source file of the imported file
-                from_source_file=source_file,
-                from_lineno=0,
-
+                source_file=source_file,
                 import_key=import_key,
+                lineno=block.lineno,
                 unparsed_contents=source_file.contents,
 
                 # rule
