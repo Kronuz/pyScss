@@ -9,11 +9,12 @@
 * Copyright (c) 2011 German M. Bravo (Kronuz), All rights reserved.
 */
 #include <Python.h>
+#include "py3defs.h"
 #include "block_locator.h"
 #include "scanner.h"
 
 /* BlockLocator */
-staticforward PyTypeObject scss_BlockLocatorType;
+static PyTypeObject scss_BlockLocatorType;
 
 typedef struct {
 	PyObject_HEAD
@@ -46,7 +47,7 @@ scss_BlockLocator_dealloc(scss_BlockLocator *self)
 {
 	if (self->locator != NULL) BlockLocator_del(self->locator);
 
-	self->ob_type->tp_free((PyObject*)self);
+	Py_TYPE(self)->tp_free((PyObject*)self);
 
 	#ifdef DEBUG
 		PySys_WriteStderr("Scss BlockLocator object destroyed!\n");
@@ -93,8 +94,7 @@ scss_BlockLocator_iternext(scss_BlockLocator *self)
 /* Type definition */
 
 static PyTypeObject scss_BlockLocatorType = {
-	PyObject_HEAD_INIT(NULL)
-	0,                                         /* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"scss._BlockLocator",                      /* tp_name */
 	sizeof(scss_BlockLocator),                 /* tp_basicsize */
 	0,                                         /* tp_itemsize */
@@ -136,7 +136,7 @@ static PyTypeObject scss_BlockLocatorType = {
 /* Scanner */
 static PyObject *PyExc_scss_NoMoreTokens;
 
-staticforward PyTypeObject scss_ScannerType;
+static PyTypeObject scss_ScannerType;
 
 typedef struct {
 	PyObject_HEAD
@@ -179,8 +179,13 @@ scss_Scanner_token(scss_Scanner *self, PyObject *args)
 					_restrictions = PyMem_New(Pattern, size);
 					iter = PyObject_GetIter(restrictions);
 					while ((item = PyIter_Next(iter))) {
+#if PY_MAJOR_VERSION >= 3
+						if (PyBytes_Check(item)) {
+							_restrictions[restrictions_sz].tok = PyBytes_AsString(item);
+#else
 						if (PyString_Check(item)) {
 							_restrictions[restrictions_sz].tok = PyString_AsString(item);
+#endif
 							_restrictions[restrictions_sz].expr = NULL;
 							restrictions_sz++;
 						}
@@ -263,9 +268,15 @@ scss_Scanner_setup_patterns(PyObject *self, PyObject *patterns)
 				if (_is_tuple || PyList_Check(item)) {
 					item0 = _is_tuple ? PyTuple_GetItem(item, 0) : PyList_GetItem(item, 0);
 					item1 = _is_tuple ? PyTuple_GetItem(item, 1) : PyList_GetItem(item, 1);
+#if PY_MAJOR_VERSION >= 3
+					if (PyBytes_Check(item0) && PyBytes_Check(item1)) {
+						_patterns[patterns_sz].tok = PyBytes_AsString(item0);
+						_patterns[patterns_sz].expr = PyBytes_AsString(item1);
+#else
 					if (PyString_Check(item0) && PyString_Check(item1)) {
 						_patterns[patterns_sz].tok = PyString_AsString(item0);
 						_patterns[patterns_sz].expr = PyString_AsString(item1);
+#endif
 						patterns_sz++;
 					}
 				}
@@ -310,9 +321,15 @@ scss_Scanner_init(scss_Scanner *self, PyObject *args, PyObject *kwds)
 				if (_is_tuple || PyList_Check(item)) {
 					item0 = _is_tuple ? PyTuple_GetItem(item, 0) : PyList_GetItem(item, 0);
 					item1 = _is_tuple ? PyTuple_GetItem(item, 1) : PyList_GetItem(item, 1);
+#if PY_MAJOR_VERSION >= 3
+					if (PyBytes_Check(item0) && PyBytes_Check(item1)) {
+						_patterns[patterns_sz].tok = PyBytes_AsString(item0);
+						_patterns[patterns_sz].expr = PyBytes_AsString(item1);
+#else
 					if (PyString_Check(item0) && PyString_Check(item1)) {
 						_patterns[patterns_sz].tok = PyString_AsString(item0);
 						_patterns[patterns_sz].expr = PyString_AsString(item1);
+#endif
 						patterns_sz++;
 					}
 				}
@@ -327,8 +344,13 @@ scss_Scanner_init(scss_Scanner *self, PyObject *args, PyObject *kwds)
 		_ignore = PyMem_New(Pattern, size);
 		for (i = 0; i < size; ++i) {
 			item = is_tuple ? PyTuple_GetItem(ignore, i) : PyList_GetItem(ignore, i);
+#if PY_MAJOR_VERSION >= 3
+			if (PyBytes_Check(item)) {
+				_ignore[ignore_sz].tok = PyBytes_AsString(item);
+#else
 			if (PyString_Check(item)) {
 				_ignore[ignore_sz].tok = PyString_AsString(item);
+#endif
 				_ignore[ignore_sz].expr = NULL;
 				ignore_sz++;
 			}
@@ -357,6 +379,22 @@ scss_Scanner_repr(scss_Scanner *self)
 
 	if (self->scanner != NULL && self->scanner->tokens_sz) {
 		start = self->scanner->tokens_sz - 10;
+#if PY_MAJOR_VERSION >= 3
+		repr = PyBytes_FromString("");
+		for (i = (start < 0) ? 0 : start; i < self->scanner->tokens_sz; i++) {
+			p_token = &self->scanner->tokens[i];
+			PyBytes_ConcatAndDel(&repr, PyBytes_FromString("\n"));
+			pos = (int)(p_token->string - self->scanner->input);
+			PyBytes_ConcatAndDel(&repr, PyBytes_FromFormat("  (@%d)  %s  =  ",
+				pos, p_token->regex->tok));
+			tmp = PyBytes_FromStringAndSize(p_token->string, p_token->string_sz);
+			PyBytes_ConcatAndDel(&repr, PyObject_Repr(tmp));
+			Py_XDECREF(tmp);
+		}
+	} else {
+		repr = PyBytes_FromString("None");
+	}
+#else
 		repr = PyString_FromString("");
 		for (i = (start < 0) ? 0 : start; i < self->scanner->tokens_sz; i++) {
 			p_token = &self->scanner->tokens[i];
@@ -371,6 +409,7 @@ scss_Scanner_repr(scss_Scanner *self)
 	} else {
 		repr = PyString_FromString("None");
 	}
+#endif
 
 	return (PyObject *)repr;
 
@@ -442,7 +481,7 @@ scss_Scanner_dealloc(scss_Scanner *self)
 {
 	if (self->scanner != NULL) Scanner_del(self->scanner);
 
-	self->ob_type->tp_free((PyObject*)self);
+	Py_TYPE(self)->tp_free((PyObject*)self);
 
 	#ifdef DEBUG
 		PySys_WriteStderr("Scss Scanner object destroyed!\n");
@@ -458,8 +497,7 @@ static PyMethodDef scss_Scanner_methods[] = {
 };
 
 static PyTypeObject scss_ScannerType = {
-	PyObject_HEAD_INIT(NULL)
-	0,                                         /* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"scss.Scanner",                            /* tp_name */
 	sizeof(scss_Scanner),                      /* tp_basicsize */
 	0,                                         /* tp_itemsize */
@@ -521,26 +559,52 @@ static PyMethodDef scss_methods[] = {
 	{NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
+#if PY_MAJOR_VERSION >= 3
+
+/* Module definition */
+
+static struct PyModuleDef speedups_module_def = {
+    PyModuleDef_HEAD_INIT,
+    "_speedups",         /* m_name */
+    NULL,                /* m_doc */
+    (Py_ssize_t) -1,     /* m_size */
+    scss_methods,        /* m_methods */
+    NULL,                /* m_reload */
+    NULL,                /* m_traverse */
+    NULL,                /* m_clear */
+    NULL,                /* m_free */
+};
+
+#endif
 
 /* Module init function */
 
-PyMODINIT_FUNC
-init_speedups(void)
+#if PY_MAJOR_VERSION >= 3
+    #define MOD_INIT(name) PyMODINIT_FUNC PyInit_##name(void)
+#else
+    #define MOD_INIT(name) PyMODINIT_FUNC init##name(void)
+#endif
+
+MOD_INIT(_speedups)
 {
-	PyObject* m;
+#if PY_MAJOR_VERSION >= 3
+	PyObject* m = PyModule_Create(&speedups_module_def);
+#else
+	PyObject* m = Py_InitModule("_speedups", scss_methods);
+#endif
 
 	scss_BlockLocatorType.tp_new = PyType_GenericNew;
-	if (PyType_Ready(&scss_BlockLocatorType) < 0)
-		return;
-
 	scss_ScannerType.tp_new = PyType_GenericNew;
-	if (PyType_Ready(&scss_ScannerType) < 0)
+#if PY_MAJOR_VERSION >= 3
+	if (PyType_Ready(&scss_BlockLocatorType) < 0 || PyType_Ready(&scss_ScannerType) < 0)
+		return m;
+#else
+	if (PyType_Ready(&scss_BlockLocatorType) < 0 || PyType_Ready(&scss_ScannerType) < 0)
 		return;
+#endif
 
 	BlockLocator_initialize();
 	Scanner_initialize(NULL, 0);
-
-	m = Py_InitModule("_speedups", scss_methods);
 
 	Py_INCREF(&scss_BlockLocatorType);
 	PyModule_AddObject(m, "_BlockLocator", (PyObject *)&scss_BlockLocatorType);
@@ -551,4 +615,8 @@ init_speedups(void)
 	PyExc_scss_NoMoreTokens = PyErr_NewException("_speedups.NoMoreTokens", NULL, NULL);
 	Py_INCREF(PyExc_scss_NoMoreTokens);
 	PyModule_AddObject(m, "NoMoreTokens", (PyObject *)PyExc_scss_NoMoreTokens);
+#if PY_MAJOR_VERSION >= 3
+    
+    return m;
+#endif
 }
