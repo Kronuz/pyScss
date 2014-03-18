@@ -49,6 +49,7 @@ from collections import defaultdict
 import glob
 from itertools import product
 import logging
+import warnings
 import os.path
 import re
 import sys
@@ -79,7 +80,6 @@ locate_blocks = None
 try:
     from scss._speedups import locate_blocks
 except ImportError:
-    import warnings
     warnings.warn(
         "Scanning acceleration disabled (_speedups not found)!",
         RuntimeWarning
@@ -852,15 +852,18 @@ class Scss(object):
         Implements @import
         Load and import mixins and functions and rules
         """
-        # Protect against going to prohibited places...
-        if any(scary_token in block.argument for scary_token in ('..', '://', 'url(')):
-            rule.properties.append((block.prop, None))
-            return
-
         full_filename = None
         names = block.argument.split(',')
         for name in names:
             name = dequote(name.strip())
+
+            # Protect against going to prohibited places...
+            if any(scary_token in name for scary_token in ('..', '://', 'url(')):
+                rule.properties.append((block.prop, None))
+                warnings.warn(
+                    "Ignored import: %s" % name,
+                    RuntimeWarning)
+                continue
 
             source_file = None
             full_filename, seen_paths = self._find_import(rule, name, skip=rule.source_file.filename)
