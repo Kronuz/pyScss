@@ -1,0 +1,5 @@
+#A {
+    @include min-screen(anything) {
+        any-property: any-value;
+    }
+}

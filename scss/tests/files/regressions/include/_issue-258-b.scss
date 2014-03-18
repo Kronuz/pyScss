@@ -1,0 +1,7 @@
+#B {
+    my-property: this-should-be-before-media-query;
+
+    @include min-screen(100px) {
+        my-property: this-should-be-last;
+    }
+}

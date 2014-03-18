@@ -1,0 +1,13 @@
+@media screen and (min-width: anything) {
+  #A {
+    any-property: any-value;
+  }
+}
+#B {
+  my-property: this-should-be-before-media-query;
+}
+@media screen and (min-width: 100px) {
+  #B {
+    my-property: this-should-be-last;
+  }
+}
