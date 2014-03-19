@@ -316,6 +316,17 @@ class SassRule(object):
 
         return True
 
+    @property
+    def is_pure_placeholder(self):
+        selectors = self.selectors
+        if not selectors:
+            return False
+        for s in selectors:
+            if not s.has_placeholder:
+                return False
+        return True 
+
+
     def copy(self):
         return type(self)(
             source_file=self.source_file,
