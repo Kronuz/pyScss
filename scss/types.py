@@ -1,9 +1,11 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
 
 import colorsys
 import operator
+from warnings import warn
 
 import six
 
@@ -989,6 +991,11 @@ class String(Value):
             value = str(value)
 
         if isinstance(value, six.binary_type):
+            warn(FutureWarning(
+                "String got a bytes type {0!r} "
+                "-- this will no longer be supported in pyScss 2.0"
+                .format(value)
+            ))
             value = value.decode(DEFAULT_STRING_ENCODING)
 
         if not isinstance(value, six.text_type):
@@ -997,11 +1004,7 @@ class String(Value):
         # TODO probably disallow creating an unquoted string outside a
         # set of chars like [-a-zA-Z0-9]+
 
-        if six.PY3:
-            self.value = value
-        else:
-            # TODO well, at least 3 uses unicode everywhere
-            self.value = value.encode(DEFAULT_STRING_ENCODING)
+        self.value = value
         self.quotes = quotes
 
     @classmethod

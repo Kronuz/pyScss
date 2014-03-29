@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 from __future__ import print_function
+from __future__ import unicode_literals
 
 import base64
 import hashlib
@@ -106,6 +107,11 @@ def make_filename_hash(key):
     suitable for a filename.
     """
     key_repr = repr(key).encode('utf8')
+    # This is really stupid but necessary for making the repr()s be the same on
+    # Python 2 and 3 and thus allowing the test suite to run on both.
+    # TODO better solutions include: not using a repr, not embedding hashes in
+    # the expected test results
+    key_repr = re.sub(b"\\bu'", b"'", key_repr)
     key_hash = hashlib.md5(key_repr).digest()
     return base64.b64encode(key_hash, b'__').decode('ascii').rstrip('=')
 

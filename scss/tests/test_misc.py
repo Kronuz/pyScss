@@ -98,10 +98,11 @@ def test_extend_across_files():
 
 
 def test_unicode_files():
-    compiler = Scss()
+    compiler = Scss(scss_opts=dict(style='expanded'))
     unicode_input = u"""q {
   quotes: "“" "”" "‘" "’";
-}"""
+}
+"""
     output = compiler.compile(unicode_input)
 
     assert output == unicode_input

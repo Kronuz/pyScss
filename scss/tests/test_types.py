@@ -1,4 +1,7 @@
 """Tests for the type system."""
+from __future__ import absolute_import
+from __future__ import print_function
+from __future__ import unicode_literals
 
 from scss.types import Color, Null, Number, String
 
@@ -36,7 +39,7 @@ def test_addition():
 
     ret = String('abc', quotes='"') + String('def', quotes=None)
     assert ret == String('abcdef')
-    assert ret.quotes is '"'
+    assert ret.quotes == '"'
 
     ret = String('abc', quotes=None) + String('def', quotes='"')
     assert ret == String('abcdef')

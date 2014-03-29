@@ -36,6 +36,7 @@ xCSS:
 """
 from __future__ import absolute_import
 from __future__ import print_function
+from __future__ import unicode_literals
 
 from scss.scss_meta import BUILD_INFO, PROJECT, VERSION, REVISION, URL, AUTHOR, AUTHOR_EMAIL, LICENSE
 
@@ -47,6 +48,7 @@ __license__ = LICENSE
 
 from collections import defaultdict
 import glob
+from io import BytesIO
 from itertools import product
 import logging
 import warnings
@@ -59,6 +61,7 @@ import six
 from scss import config
 from scss.cssdefs import (
     SEPARATOR,
+    determine_encoding,
     _ml_comment_re, _sl_comment_re,
     _escape_chars_re,
     _spaces_re, _expand_rules_space_re, _collapse_properties_space_re,
@@ -131,8 +134,9 @@ _default_scss_vars = {
 
 
 class SourceFile(object):
-    def __init__(self, filename, contents, parent_dir='.', is_string=False, is_sass=None, line_numbers=True, line_strip=True):
+    def __init__(self, filename, contents, encoding=None, parent_dir='.', is_string=False, is_sass=None, line_numbers=True, line_strip=True):
         self.filename = filename
+        self.encoding = encoding
         self.sass = filename.endswith('.sass') if is_sass is None else is_sass
         self.line_numbers = line_numbers
         self.line_strip = line_strip
@@ -147,17 +151,32 @@ class SourceFile(object):
         )
 
     @classmethod
-    def from_filename(cls, fn, filename=None, is_sass=None, line_numbers=True):
+    def from_filename(cls, fn, filename=None, **kwargs):
         if filename is None:
             _, filename = os.path.split(fn)
 
         with open(fn) as f:
-            contents = f.read()
+            return cls.from_file(f, filename=filename, **kwargs)
 
-        return cls(filename, contents, is_sass=is_sass, line_numbers=line_numbers)
+    @classmethod
+    def from_file(cls, f, filename, **kwargs):
+        encoding = determine_encoding(f)
+
+        return cls(filename, contents, encoding=encoding, **kwargs)
 
     @classmethod
     def from_string(cls, string, filename=None, is_sass=None, line_numbers=True):
+        if isinstance(string, six.text_type):
+            # Already decoded; we don't know what encoding to use for output,
+            # though, so assume UTF-8
+            # TODO in this case we could still look for a @charset, right?
+            pass
+        elif isinstance(string, six.binary_type):
+            encoding = determine_encoding(BytesIO(string))
+            string = string.decode(encoding)
+        else:
+            raise TypeError("Expected a string, got {0!r}".format(string))
+
         if filename is None:
             filename = "<string %r...>" % string[:50]
 

@@ -1,3 +1,6 @@
+"""Constants and functions defined by the CSS specification, not specific to
+Sass.
+"""
 from math import pi
 import re
 
@@ -337,6 +340,24 @@ def is_builtin_css_function(name):
         return True
 
     return False
+
+# ------------------------------------------------------------------------------
+# CSS character set determination
+# Based upon: http://www.w3.org/TR/CSS2/syndata.html#charset
+
+def determine_encoding(f):
+    """Return the appropriate encoding for the given file, according to the CSS
+    charset rules.
+
+    `f` should be a file-like object, opened in binary mode with the cursor at
+    the beginning.
+    """
+    # TODO haha.
+
+    # This is the ultimate default: just assume UTF-8
+    return "UTF-8"
+
+
 
 # ------------------------------------------------------------------------------
 # Bits and pieces of grammar, as regexen

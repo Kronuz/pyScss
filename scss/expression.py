@@ -1,10 +1,12 @@
 from __future__ import absolute_import
 from __future__ import print_function
+from __future__ import unicode_literals
 
 from functools import partial
 import logging
 import operator
 import re
+from warnings import warn
 
 import six
 
@@ -53,7 +55,13 @@ class Calculator(object):
         syntactic unit and will not be re-evaluated.
         """
         # TODO that's a lie!  this should be in the parser for most cases.
-        cont = str(cont)
+        if not isinstance(cont, six.string_types):
+            warn(FutureWarning(
+                "do_glob_math was passed a non-string {0!r} "
+                "-- this will no longer be supported in pyScss 2.0"
+                .format(cont)
+            ))
+            cont = six.text_type(cont)
         if '#{' not in cont:
             return cont
         cont = _expr_glob_re.sub(self._pound_substitute, cont)
