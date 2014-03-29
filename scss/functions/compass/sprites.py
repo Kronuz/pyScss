@@ -8,9 +8,7 @@ from __future__ import absolute_import
 
 import six
 
-import base64
 import glob
-import hashlib
 import logging
 import os.path
 import tempfile
@@ -36,7 +34,7 @@ from scss.functions.compass import _image_size_cache
 from scss.functions.compass.layouts import PackedSpritesLayout, HorizontalSpritesLayout, VerticalSpritesLayout, DiagonalSpritesLayout
 from scss.functions.library import FunctionLibrary
 from scss.types import Color, List, Number, String, Boolean
-from scss.util import escape, getmtime
+from scss.util import escape, getmtime, make_data_url, make_filename_hash
 
 log = logging.getLogger(__name__)
 
@@ -142,8 +140,8 @@ def sprite_map(g, **kwargs):
             return String.unquoted('')
 
         map_name = os.path.normpath(os.path.dirname(g)).replace('\\', '_').replace('/', '_')
-        key = list(zip(*files)[0]) + [repr(kwargs), config.ASSETS_URL]
-        key = map_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
+        key = [f for (f, s) in files] + [repr(kwargs), config.ASSETS_URL]
+        key = map_name + '-' + make_filename_hash(key)
         asset_file = key + '.png'
         ASSETS_ROOT = config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets')
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
@@ -354,7 +352,7 @@ def sprite_map(g, **kwargs):
                 contents = output.getvalue()
                 output.close()
                 mime_type = 'image/png'
-                url = 'data:' + mime_type + ';base64,' + base64.b64encode(contents)
+                url = make_data_url(mime_type, contents)
 
             url = 'url(%s)' % escape(url)
             if inline:

@@ -3,8 +3,6 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
-import base64
-import hashlib
 import logging
 import mimetypes
 import os.path
@@ -17,7 +15,7 @@ from scss.functions.compass import _image_size_cache
 from scss.functions.compass.helpers import add_cache_buster
 from scss.functions.library import FunctionLibrary
 from scss.types import Color, List, Number, String
-from scss.util import escape, getmtime
+from scss.util import escape, getmtime, make_data_url, make_filename_hash
 
 try:
     from PIL import Image
@@ -94,8 +92,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
 
         file_name, file_ext = os.path.splitext(os.path.normpath(filepath).replace('\\', '_').replace('/', '_'))
         key = (filetime, src_color, dst_color, spacing)
-        key = file_name + '-' + base64.urlsafe_b64encode(hashlib.md5(repr(key)).digest()).rstrip('=').replace('-', '_')
-        asset_file = key + file_ext
+        asset_file = file_name + '-' + make_filename_hash(key) + file_ext
         ASSETS_ROOT = config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets')
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
 
@@ -104,7 +101,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
             BASE_URL = config.ASSETS_URL
             if inline:
                 path = open(asset_path, 'rb')
-                url = 'data:' + mime_type + ';base64,' + base64.b64encode(path.read())
+                url = make_data_url(mime_type, path.read())
             else:
                 url = '%s%s' % (BASE_URL, filepath)
                 if cache_buster:
@@ -125,7 +122,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
 
             if simply_process:
                 if inline:
-                    url = 'data:' + mime_type + ';base64,' + base64.b64encode(path.read())
+                    url = make_data_url(mime_type, path.read())
                 else:
                     url = '%s%s' % (BASE_URL, filepath)
                     if cache_buster:
@@ -177,7 +174,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
                     new_image.save(output, format='PNG')
                     contents = output.getvalue()
                     output.close()
-                    url = 'data:' + mime_type + ';base64,' + base64.b64encode(contents)
+                    url = make_data_url(mime_type, contents)
     else:
         url = os.path.join(BASE_URL.rstrip('/'), filepath.lstrip('/'))
         if cache_buster and filetime != 'NA':

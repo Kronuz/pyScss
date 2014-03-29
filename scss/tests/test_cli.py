@@ -5,7 +5,13 @@ from subprocess import PIPE, Popen
 
 
 def test_stdio():
-    proc = Popen(['python', '-m', 'scss.tool', '-C'], stdin=PIPE, stdout=PIPE)
+    proc = Popen(
+        ['python', '-m', 'scss.tool', '-C'],
+        stdin=PIPE,
+        stdout=PIPE,
+        # this automatically handles encoding/decoding on py3
+        universal_newlines=True,
+    )
     out, _ = proc.communicate("""
         $color: red;
 

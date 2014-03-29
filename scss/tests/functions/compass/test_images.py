@@ -40,16 +40,14 @@ def test_image_url(calc):
 def test_inline_image(calc):
     monkeypatch().setattr(config, 'IMAGES_ROOT', os.path.join(config.PROJECT_ROOT, 'tests/files/images'))
 
-    f = open(os.path.join(config.PROJECT_ROOT, 'tests/files/images/test-qr.base64.txt'), 'rb')
-    font_base64 = f.read()
-    f.close()
+    with open(os.path.join(config.PROJECT_ROOT, 'tests/files/images/test-qr.base64.txt'), 'r') as f:
+        font_base64 = f.read()
     assert 'url(data:image/png;base64,%s)' % font_base64 == calc('inline_image("/test-qr.png")').render()
 
 
 def test_inline_cursor(calc):
     monkeypatch().setattr(config, 'IMAGES_ROOT', os.path.join(config.PROJECT_ROOT, 'tests/files/cursors'))
 
-    f = open(os.path.join(config.PROJECT_ROOT, 'tests/files/cursors/fake.base64.txt'), 'rb')
-    font_base64 = f.read()
-    f.close()
+    with open(os.path.join(config.PROJECT_ROOT, 'tests/files/cursors/fake.base64.txt'), 'r') as f:
+        font_base64 = f.read()
     assert 'url(data:image/cur;base64,%s)' % font_base64 == calc('inline_image("/fake.cur")').render()

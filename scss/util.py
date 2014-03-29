@@ -1,6 +1,8 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
+import base64
+import hashlib
 import os
 import re
 import sys
@@ -91,6 +93,21 @@ def normalize_var(var):
     dashes.
     """
     return var.replace('_', '-')
+
+
+def make_data_url(mime_type, data):
+    """Generate a `data:` URL from the given data and MIME type."""
+    return "data:{0};base64,{1}".format(
+        mime_type, base64.b64encode(data).decode('ascii'))
+
+
+def make_filename_hash(key):
+    """Convert the given key (a simple Python object) to a unique-ish hash
+    suitable for a filename.
+    """
+    key_repr = repr(key).encode('utf8')
+    key_hash = hashlib.md5(key_repr).digest()
+    return base64.b64encode(key_hash, b'__').decode('ascii').rstrip('=')
 
 
 ################################################################################

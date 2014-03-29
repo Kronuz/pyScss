@@ -7,7 +7,6 @@ This collection is not necessarily complete or up-to-date.
 
 from __future__ import absolute_import
 
-import base64
 import logging
 import math
 import os.path
@@ -18,7 +17,7 @@ import six
 from scss import config
 from scss.functions.library import FunctionLibrary
 from scss.types import Boolean, List, Null, Number, String
-from scss.util import escape, to_str, getmtime
+from scss.util import escape, to_str, getmtime, make_data_url
 import re
 
 log = logging.getLogger(__name__)
@@ -560,7 +559,9 @@ def _font_url(path, only_path=False, cache_buster=True, inline=False):
             mime = 'application/font-woff'
         elif font_type == 'eot':
             mime = 'application/vnd.ms-fontobject'
-        url = 'data:' + (mime if '/' in mime else 'font/%s' % mime) + ';base64,' + base64.b64encode(file.read())
+        url = make_data_url(
+            (mime if '/' in mime else 'font/%s' % mime),
+            file.read())
         file.close()
     else:
         url = '%s/%s' % (BASE_URL.rstrip('/'), filepath.lstrip('/'))
