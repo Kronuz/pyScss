@@ -1,0 +1,7 @@
+// from https://github.com/Kronuz/pyScss/issues/257
+$colors: yellow #FFA500, blue #4682B4, green #2ca02c;
+@each $color in $colors {
+  .color-#{nth($color, 1)} {
+    background-color: nth($color, 2);
+  }
+}

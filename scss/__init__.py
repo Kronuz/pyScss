@@ -1116,11 +1116,16 @@ class Scss(object):
         if not values:
             return
 
-        varlist = varstring.split(",")
         varlist = [
             normalize_var(calculator.do_glob_math(var.strip()))
-            for var in varlist
+            # TODO use list parsing here
+            for var in varstring.split(",")
         ]
+
+        # `@each $foo, in $bar` unpacks, but `@each $foo in $bar` does not!
+        unpack = len(varlist) > 1
+        if not varlist[-1]:
+            varlist.pop()
 
         inner_rule = rule.copy()
         inner_rule.unparsed_contents = block.unparsed_contents
@@ -1129,13 +1134,16 @@ class Scss(object):
             inner_rule.namespace = rule.namespace
 
         for v in List.from_maybe(values):
-            v = List.from_maybe(v)
-            for i, var in enumerate(varlist):
-                if i >= len(v):
-                    value = Null()
-                else:
-                    value = v[i]
-                inner_rule.namespace.set_variable(var, value)
+            if unpack:
+                v = List.from_maybe(v)
+                for i, var in enumerate(varlist):
+                    if i >= len(v):
+                        value = Null()
+                    else:
+                        value = v[i]
+                    inner_rule.namespace.set_variable(var, value)
+            else:
+                inner_rule.namespace.set_variable(varlist[0], v)
             self.manage_children(inner_rule, scope)
 
     @print_timing(10)
