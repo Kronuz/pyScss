@@ -6,7 +6,7 @@
     transparentize1: transparentize(rgba(0, 0, 0, 0.5), 0.1); // rgba(0, 0, 0, 0.4)
     transparentize2: transparentize(rgba(0, 0, 0, 0.8), 0.2); // rgba(0, 0, 0, 0.6)
 
-    lighten1: lighten(hsl(0, 0%, 0%), 30%); // hsl(0, 0, 30)
+    lighten1: lighten(hsl(0, 0%, 0%), 20%); // hsl(0, 0, 20)
     lighten2: lighten(#800, 20%); // #e00
 
     darken1: darken(hsl(25, 100%, 80%), 30%); // hsl(25deg, 100%, 50%)
