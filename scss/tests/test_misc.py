@@ -1,3 +1,4 @@
+# -*- encoding: utf-8 -*-
 """Tests for miscellaneous features that should maybe be broken out into their
 own files, maybe.
 """
@@ -94,3 +95,13 @@ def test_extend_across_files():
 """
 
     assert expected == actual
+
+
+def test_unicode_files():
+    compiler = Scss()
+    unicode_input = u"""q {
+  quotes: "“" "”" "‘" "’";
+}"""
+    output = compiler.compile(unicode_input)
+
+    assert output == unicode_input
