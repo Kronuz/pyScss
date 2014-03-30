@@ -12,6 +12,8 @@ import six
 from scss.cssdefs import COLOR_LOOKUP, COLOR_NAMES, ZEROABLE_UNITS, convert_units_to_base_units, cancel_base_units, count_base_units
 from scss.util import escape
 
+PRECISION = 8
+
 
 ################################################################################
 # pyScss data types:
@@ -327,7 +329,7 @@ class Number(Value):
                 else:
                     raise ValueError("Can't reconcile units: %r and %r" % (self, other))
 
-        return Boolean(op(round(left.value, 5), round(right.value, 5)))
+        return Boolean(op(round(left.value, PRECISION), round(right.value, PRECISION)))
 
     def __pow__(self, exp):
         if not isinstance(exp, Number):
@@ -530,7 +532,7 @@ class Number(Value):
         if value == 0:  # -0.0 is plain 0
             value = 0
 
-        val = "%0.05f" % round(value, 5)
+        val = ('%%0.0%df' % PRECISION) % round(value, PRECISION)
         val = val.rstrip('0').rstrip('.')
 
         if compress and val.startswith('0.'):

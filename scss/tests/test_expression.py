@@ -37,7 +37,7 @@ def test_reference_operations():
     calc = Calculator(ns).calculate
 
     # Simple example
-    assert calc('1in + 8pt') == Number(1.11111111, "in")
+    assert calc('1in + 8pt') == Number(1.1111111111111112, "in")
 
     # Division
     ns.set_variable('$width', Number(1000, "px"))
