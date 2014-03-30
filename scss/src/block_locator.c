@@ -77,8 +77,6 @@ _BlockLocator_start_parenthesis(BlockLocator *self) {
 
 	// parenthesis begins:
 	self->par++;
-	self->thin = NULL;
-	self->safe = self->codestr_ptr + 1;
 }
 
 static void
@@ -125,12 +123,8 @@ _BlockLocator_start_block1(BlockLocator *self) {
 		self->skip = 1;
 	} else {
 		self->start = self->codestr_ptr;
-		if (self->thin != NULL && _strip(self->thin, self->codestr_ptr, NULL, NULL)) {
-			self->init = self->thin;
-		}
 		_BlockLocator_push_lineno(self, self->lineno);
 		_BlockLocator_flush_properties(self);
-		self->thin = NULL;
 	}
 	self->depth++;
 }
@@ -166,8 +160,7 @@ _BlockLocator_end_block1(BlockLocator *self) {
 		self->block.lineno = _BlockLocator_pop_lineno(self);
 		self->block.error = 1;
 
-		self->init = self->safe = self->lose = self->end + 1;
-		self->thin = NULL;
+		self->init = self->lose = self->end + 1;
 	}
 	self->skip = 0;
 }
@@ -203,37 +196,7 @@ _BlockLocator_end_property(BlockLocator *self) {
 			self->block.lineno = self->lineno;
 			self->block.error = 1;
 		}
-		self->init = self->safe = self->lose = self->codestr_ptr + 1;
-	}
-	self->thin = NULL;
-}
-
-static void
-_BlockLocator_mark_safe(BlockLocator *self) {
-	#ifdef DEBUG
-		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
-	#endif
-
-	// We are on a safe zone
-	if (self->thin != NULL && _strip(self->thin, self->codestr_ptr, NULL, NULL)) {
-		self->init = self->thin;
-	}
-	self->thin = NULL;
-	self->safe = self->codestr_ptr + 1;
-}
-
-static void
-_BlockLocator_mark_thin(BlockLocator *self) {
-	#ifdef DEBUG
-		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
-	#endif
-
-	// Step on thin ice, if it breaks, it breaks here
-	if (self->thin != NULL && _strip(self->thin, self->codestr_ptr, NULL, NULL)) {
-		self->init = self->thin;
-		self->thin = self->codestr_ptr + 1;
-	} else if (self->thin == NULL && _strip(self->safe, self->codestr_ptr, NULL, NULL)) {
-		self->thin = self->codestr_ptr + 1;
+		self->init = self->lose = self->codestr_ptr + 1;
 	}
 }
 
@@ -302,10 +265,6 @@ init_function_map(void) {
 
 	scss_function_map[(int)';' + 256*0 + 256*256*0 + 256*256*2*0] = _BlockLocator_end_property;
 
-	scss_function_map[(int)',' + 256*0 + 256*256*0 + 256*256*2*0] = _BlockLocator_mark_safe;
-
-	scss_function_map[(int)'\n' + 256*0 + 256*256*0 + 256*256*2*0] = _BlockLocator_mark_thin;
-
 	scss_function_map[0 + 256*0 + 256*256*0 + 256*256*2*0] = _BlockLocator_flush_properties;
 	scss_function_map[0 + 256*0 + 256*256*0 + 256*256*2*1] = _BlockLocator_flush_properties;
 	scss_function_map[0 + 256*0 + 256*256*0 + 256*256*2*2] = _BlockLocator_flush_properties;
@@ -358,9 +317,7 @@ BlockLocator_new(PyUnicodeObject* codestr)
 		self->instr = 0;
 		self->depth = 0;
 		self->skip = 0;
-		self->thin = self->codestr;
 		self->init = self->codestr;
-		self->safe = self->codestr;
 		self->lose = self->codestr;
 		self->start = NULL;
 		self->end = NULL;
@@ -395,9 +352,7 @@ BlockLocator_rewind(BlockLocator *self)
 	self->instr = 0;
 	self->depth = 0;
 	self->skip = 0;
-	self->thin = self->codestr;
 	self->init = self->codestr;
-	self->safe = self->codestr;
 	self->lose = self->codestr;
 	self->start = NULL;
 	self->end = NULL;

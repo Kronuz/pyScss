@@ -28,8 +28,7 @@ def locate_blocks(codestr):
     instr = None
     depth = 0
     skip = False
-    thin = None
-    i = init = safe = lose = 0
+    i = init = lose = 0
     start = end = None
     lineno_stack = deque()
 
@@ -46,8 +45,6 @@ def locate_blocks(codestr):
             instr = c  # A string starts
         elif c == '(':  # parenthesis begins:
             par += 1
-            thin = None
-            safe = i + 1
         elif c == ')':  # parenthesis ends:
             par -= 1
         elif not par and not instr:
@@ -58,14 +55,11 @@ def locate_blocks(codestr):
                     else:
                         lineno_stack.append(lineno)
                         start = i
-                        if thin is not None and codestr[thin:i].strip():
-                            init = thin
                         if lose < init:
                             _property = codestr[lose:init].strip()
                             if _property:
                                 yield lineno, _property, None
                             lose = init
-                        thin = None
                 depth += 1
             elif c == '}':  # block ends:
                 if depth <= 0:
@@ -79,8 +73,7 @@ def locate_blocks(codestr):
                             _codestr = codestr[start + 1:end].strip()
                             if _selectors:
                                 yield lineno_stack.pop(), _selectors, _codestr
-                            init = safe = lose = end + 1
-                            thin = None
+                            init = lose = end + 1
                         skip = False
             elif depth == 0:
                 if c == ';':  # End of property (or block):
@@ -89,19 +82,7 @@ def locate_blocks(codestr):
                         _property = codestr[lose:init].strip()
                         if _property:
                             yield lineno, _property, None
-                        init = safe = lose = i + 1
-                    thin = None
-                elif c == ',':
-                    if thin is not None and codestr[thin:i].strip():
-                        init = thin
-                    thin = None
-                    safe = i + 1
-                elif c == '\n':
-                    if thin is not None and codestr[thin:i].strip():
-                        init = thin
-                        thin = i + 1
-                    elif thin is None and codestr[safe:i].strip():
-                        thin = i + 1  # Step on thin ice, if it breaks, it breaks here
+                        init = lose = i + 1
     if depth > 0:
         if not skip:
             _selectors = codestr[init:start].strip()

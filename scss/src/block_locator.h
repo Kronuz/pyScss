@@ -41,9 +41,7 @@ typedef struct {
     Py_UNICODE instr;
     int depth;
     int skip;
-    Py_UNICODE *thin;
     Py_UNICODE *init;
-    Py_UNICODE *safe;
     Py_UNICODE *lose;
     Py_UNICODE *start;
     Py_UNICODE *end;
