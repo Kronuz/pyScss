@@ -232,9 +232,13 @@ def ie_hex_str(color):
 @register('opacify', 2)
 def opacify(color, amount):
     r, g, b, a = color.rgba
+    if amount.is_simple_unit('%'):
+        amt = amount.value / 100
+    else:
+        amt = amount.value
     return Color.from_rgb(
         r, g, b,
-        alpha=color.alpha + amount.value)
+        alpha=a + amt)
 
 
 @register('fade-out', 2)
@@ -242,9 +246,13 @@ def opacify(color, amount):
 @register('transparentize', 2)
 def transparentize(color, amount):
     r, g, b, a = color.rgba
+    if amount.is_simple_unit('%'):
+        amt = amount.value / 100
+    else:
+        amt = amount.value
     return Color.from_rgb(
         r, g, b,
-        alpha=color.alpha - amount.value)
+        alpha=a - amt)
 
 
 @register('lighten', 2)
