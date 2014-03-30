@@ -1,6 +1,9 @@
 """Tests for expressions.  This test module is currently a bit ill-defined and
 contains a variety of expression-related tests.
 """
+from __future__ import absolute_import
+from __future__ import unicode_literals
+
 from scss.errors import SassEvaluationError
 from scss.expression import Calculator
 from scss.functions.core import CORE_LIBRARY

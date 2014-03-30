@@ -9,6 +9,8 @@ http://compass-style.org/reference/compass/helpers/
 Some functions appear to be undocumented, but nonetheless are part of Compass's
 Ruby code.
 """
+from __future__ import absolute_import
+from __future__ import unicode_literals
 
 from scss.expression import Calculator
 from scss.functions.compass.images import COMPASS_IMAGES_LIBRARY

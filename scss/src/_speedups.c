@@ -179,6 +179,8 @@ scss_Scanner_token(scss_Scanner *self, PyObject *args)
 	long size;
 
 	Token *p_token;
+	PyObject *py_tok;
+	PyObject *py_token;
 
 	int token_num;
 	PyObject *restrictions = NULL;
@@ -227,13 +229,23 @@ scss_Scanner_token(scss_Scanner *self, PyObject *args)
 				PyErr_SetNone(PyExc_Exception);
 				return NULL;
 			}
+
+			py_tok = PyUnicode_DecodeUTF8(p_token->regex->tok, strlen(p_token->regex->tok), "strict");
+			if (py_tok == NULL) {
+				return NULL;
+			}
+
+			py_token = PyUnicode_DecodeUTF8(p_token->string, p_token->string_sz, "strict");
+			if (py_token == NULL) {
+				return NULL;
+			}
+
 			return Py_BuildValue(
-				"iiss#",
+				"iiOO",
 				p_token->string - self->scanner->input,
 				p_token->string - self->scanner->input + p_token->string_sz,
-				p_token->regex->tok,
-				p_token->string,
-				p_token->string_sz
+				py_tok,
+				py_token
 			);
 		}
 	}

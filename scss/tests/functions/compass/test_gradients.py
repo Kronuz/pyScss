@@ -1,4 +1,6 @@
 """Tests for Compass gradient generation."""
+from __future__ import absolute_import
+from __future__ import unicode_literals
 
 from scss.expression import Calculator
 from scss.functions.compass.gradients import COMPASS_GRADIENTS_LIBRARY, linear_gradient

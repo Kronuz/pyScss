@@ -4,6 +4,9 @@ These tests call the relevant functions directly, rather than going through a
 calculator.  They all do a considerable amount of work, and that's what's being
 tested, rather than the parsing or type system.
 """
+from __future__ import absolute_import
+from __future__ import unicode_literals
+
 import scss.functions.extra as libextra
 from scss.types import Boolean, Color, Number
 
