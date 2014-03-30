@@ -48,7 +48,7 @@ __license__ = LICENSE
 
 from collections import defaultdict
 import glob
-from io import BytesIO
+import io
 from itertools import product
 import logging
 import warnings
@@ -154,12 +154,16 @@ class SourceFile(object):
         if filename is None:
             _, filename = os.path.split(fn)
 
-        with open(fn) as f:
+        # Open in binary mode so we can reliably detect the encoding
+        with open(fn, 'rb') as f:
             return cls.from_file(f, filename=filename, **kwargs)
 
     @classmethod
     def from_file(cls, f, filename, **kwargs):
         encoding = determine_encoding(f)
+        contents = f.read()
+        if isinstance(contents, six.binary_type):
+            contents = contents.decode(encoding)
 
         return cls(filename, contents, encoding=encoding, **kwargs)
 
@@ -167,19 +171,22 @@ class SourceFile(object):
     def from_string(cls, string, filename=None, is_sass=None, line_numbers=True):
         if isinstance(string, six.text_type):
             # Already decoded; we don't know what encoding to use for output,
-            # though, so assume UTF-8
-            # TODO in this case we could still look for a @charset, right?
-            pass
+            # though, so still check for a @charset.
+            encoding = determine_encoding(io.StringIO(string))
         elif isinstance(string, six.binary_type):
-            encoding = determine_encoding(BytesIO(string))
+            encoding = determine_encoding(io.BytesIO(string))
             string = string.decode(encoding)
         else:
             raise TypeError("Expected a string, got {0!r}".format(string))
 
         if filename is None:
             filename = "<string %r...>" % string[:50]
+            is_string = True
+        else:
+            # Must have come from a file at some point
+            is_string = False
 
-        return cls(filename, string, is_string=True, is_sass=is_sass, line_numbers=line_numbers)
+        return cls(filename, string, is_string=is_string, is_sass=is_sass, line_numbers=line_numbers)
 
     def parse_scss_line(self, line_no, line, state):
         ret = ''
@@ -378,7 +385,7 @@ class Scss(object):
             for name, contents in list(self._scss_files.items()):
                 if name in self.source_file_index:
                     raise KeyError("Duplicate filename %r" % name)
-                source_file = SourceFile(name, contents)
+                source_file = SourceFile.from_string(contents, name)
                 self.source_files.append(source_file)
                 self.source_file_index[name] = source_file
 
@@ -892,11 +899,8 @@ class Scss(object):
                 source_file = self.source_file_index[full_filename]
 
             else:
-                with open(full_filename) as f:
-                    source = f.read()
-                source_file = SourceFile(
+                source_file = SourceFile.from_filename(
                     full_filename,
-                    source,
                     parent_dir=os.path.realpath(os.path.dirname(full_filename)),
                 )
 

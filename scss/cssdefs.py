@@ -4,6 +4,8 @@ Sass.
 from math import pi
 import re
 
+import six
+
 # ------------------------------------------------------------------------------
 # Built-in CSS color names
 # See: http://www.w3.org/TR/css3-color/#svg-color
@@ -349,13 +351,81 @@ def determine_encoding(f):
     """Return the appropriate encoding for the given file, according to the CSS
     charset rules.
 
-    `f` should be a file-like object, opened in binary mode with the cursor at
-    the beginning.
+    `f` should be a file-like object with the cursor at the beginning.
     """
-    # TODO haha.
+    # 200 bytes should be enough for anyone
+    buf = f.read(200)
+    f.seek(0)
 
-    # This is the ultimate default: just assume UTF-8
-    return "UTF-8"
+    # The ultimate default is utf8; bravo, W3C
+    bom_encoding = 'UTF-8'
+
+    if not buf:
+        # What
+        return bom_encoding
+
+    if isinstance(buf, six.text_type):
+        # We got a file that, for whatever reason, produces already-decoded
+        # text.  Check for the BOM (which is useless now) and believe
+        # whatever's in the @charset.
+        if buf[0] == '\ufeff':
+            buf = buf[0:]
+
+        # This is pretty similar to the code below, but without any encoding
+        # double-checking.
+        charset_start = '@charset "'
+        charset_end = '";'
+        if buf.startswith(charset_start):
+            start = len(charset_start)
+            end = buf.index(charset_end, start)
+            return buf[start:end]
+        else:
+            return bom_encoding
+
+    # BOMs
+    if buf[:3] == b'\xef\xbb\xbf':
+        bom_encoding = 'UTF-8'
+        buf = buf[3:]
+    if buf[:4] == b'\x00\x00\xfe\xff':
+        bom_encoding = 'UTF-32BE'
+        buf = buf[4:]
+    elif buf[:4] == b'\xff\xfe\x00\x00':
+        bom_encoding = 'UTF-32LE'
+        buf = buf[4:]
+    if buf[:4] == b'\x00\x00\xff\xfe':
+        raise UnicodeError("UTF-32-2143 is not supported")
+    elif buf[:4] == b'\xfe\xff\x00\x00':
+        raise UnicodeError("UTF-32-2143 is not supported")
+    elif buf[:2] == b'\xfe\xff':
+        bom_encoding = 'UTF-16BE'
+        buf = buf[2:]
+    elif buf[:2] == b'\xff\xfe':
+        bom_encoding = 'UTF-16LE'
+        buf = buf[2:]
+
+    # The spec requires exactly this syntax; no escapes or extra spaces or
+    # other shenanigans, thank goodness.
+    charset_start = '@charset "'.encode(bom_encoding)
+    charset_end = '";'.encode(bom_encoding)
+    if buf.startswith(charset_start):
+        start = len(charset_start)
+        end = buf.index(charset_end, start)
+        encoded_encoding = buf[start:end]
+        encoding = encoded_encoding.decode(bom_encoding)
+
+        # Ensure that decoding with the specified encoding actually produces
+        # the same @charset rule
+        encoded_charset = buf[:end + len(charset_end)]
+        if (encoded_charset.decode(encoding) !=
+                encoded_charset.decode(bom_encoding)):
+            raise UnicodeError(
+                "@charset {0} is incompatible with detected encoding {1}"
+                .format(bom_encoding, encoding))
+    else:
+        # With no @charset, believe the BOM
+        encoding = bom_encoding
+
+    return encoding
 
 
 
