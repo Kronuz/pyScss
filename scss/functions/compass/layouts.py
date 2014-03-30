@@ -1,9 +1,10 @@
 """Functions used for generating packed CSS sprite maps.
 
-
 These are ported from the Binary Tree Bin Packing Algorithm:
 http://codeincomplete.com/posts/2011/5/7/bin_packing/
 """
+from __future__ import absolute_import
+from __future__ import unicode_literals
 
 # Copyright (c) 2011, 2012, 2013 Jake Gordon and contributors
 # Copyright (c) 2013 German M. Bravo

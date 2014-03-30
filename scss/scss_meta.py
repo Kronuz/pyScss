@@ -42,6 +42,7 @@ xCSS:
     for both Py3.x and Py2.x
 
 """
+from __future__ import unicode_literals
 
 VERSION_INFO = (1, 3, 0, 'dev1')
 DATE_INFO = (2013, 10, 8)  # YEAR, MONTH, DAY

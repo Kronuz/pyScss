@@ -4,8 +4,8 @@ See: http://compass-style.org/reference/compass/helpers/
 
 This collection is not necessarily complete or up-to-date.
 """
-
 from __future__ import absolute_import
+from __future__ import unicode_literals
 
 import logging
 import math
@@ -296,7 +296,7 @@ def enumerate_(prefix, frm, through, separator='-'):
     ret = []
     for i in rev(range(frm, through + 1)):
         if prefix and prefix.value:
-            ret.append(String.unquoted(prefix.value + separator + str(i)))
+            ret.append(String.unquoted(prefix.value + separator + six.text_type(i)))
         else:
             ret.append(Number(i))
 
@@ -329,7 +329,7 @@ def headers(frm=None, to=None):
             to = 6 if to is None else int(getattr(to, 'value', to))
         except ValueError:
             to = 6
-    ret = [String.unquoted('h' + str(i)) for i in range(frm, to + 1)]
+    ret = [String.unquoted('h' + six.text_type(i)) for i in range(frm, to + 1)]
     return List(ret, use_comma=True)
 
 

@@ -3,8 +3,8 @@
 These are ported from the Compass sprite library:
 http://compass-style.org/reference/compass/utilities/sprites/
 """
-
 from __future__ import absolute_import
+from __future__ import unicode_literals
 
 import six
 

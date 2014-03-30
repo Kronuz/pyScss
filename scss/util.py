@@ -67,7 +67,7 @@ def to_str(num):
         return 'true' if num else 'false'
     elif num is None:
         return ''
-    return str(num)
+    return six.text_type(num)
 
 
 def to_float(num):

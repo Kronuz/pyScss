@@ -1,8 +1,8 @@
 """Utilities for working with gradients.  Inspired by Compass, but not quite
 the same.
 """
-
 from __future__ import absolute_import
+from __future__ import unicode_literals
 
 import base64
 import logging

@@ -1,3 +1,9 @@
+from __future__ import absolute_import
+from __future__ import print_function
+from __future__ import unicode_literals
+
+import six
+
 import sys
 import traceback
 
@@ -112,7 +118,9 @@ class SassError(Exception):
         """
         # TODO eventually we'll have sass-specific errors that will want nicer
         # "names" in browser display and stderr
-        return "".join((type(self.exc).__name__, ": ", str(self.exc), "\n"))
+        return "".join((
+            type(self.exc).__name__, ": ", six.text_type(self.exc), "\n",
+        ))
 
     def __str__(self):
         try:
@@ -126,7 +134,7 @@ class SassError(Exception):
             return prefix + "\n" + sass_stack + python_stack + original_error
         except Exception:
             # "unprintable error" is not helpful
-            return str(self.exc)
+            return six.text_type(self.exc)
 
     def to_css(self):
         """Return a stylesheet that will show the wrapped error at the top of

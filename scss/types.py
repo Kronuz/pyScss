@@ -988,7 +988,7 @@ class String(Value):
         elif isinstance(value, Number):
             # TODO this may only be necessary in the case of __radd__ and
             # number values
-            value = str(value)
+            value = six.text_type(value)
 
         if isinstance(value, six.binary_type):
             warn(FutureWarning(
