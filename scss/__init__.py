@@ -204,7 +204,6 @@ class SourceFile(object):
         output = state['prev_line']
         if self.line_strip:
             output = output.strip()
-        output_line_no = state['prev_line_no']
 
         state['prev_line'] = line
         state['prev_line_no'] = line_no
@@ -257,7 +256,6 @@ class SourceFile(object):
         output = state['prev_line']
         if self.line_strip:
             output = output.strip()
-        output_line_no = state['prev_line_no']
 
         state['prev_indent'] = indent
         state['prev_line'] = line

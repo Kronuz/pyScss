@@ -463,7 +463,6 @@ def image_color(color, width=1, height=1):
     new_image.save(output, format='PNG')
     contents = output.getvalue()
     output.close()
-    mime_type = 'image/png'
     url = make_data_url('image/png', contents)
     inline = 'url("%s")' % escape(url)
     return String.unquoted(inline)
