@@ -48,7 +48,6 @@ __license__ = LICENSE
 
 from collections import defaultdict
 import glob
-import io
 from itertools import product
 import logging
 import warnings
@@ -160,8 +159,8 @@ class SourceFile(object):
 
     @classmethod
     def from_file(cls, f, filename, **kwargs):
-        encoding = determine_encoding(f)
         contents = f.read()
+        encoding = determine_encoding(contents)
         if isinstance(contents, six.binary_type):
             contents = contents.decode(encoding)
 
@@ -172,9 +171,9 @@ class SourceFile(object):
         if isinstance(string, six.text_type):
             # Already decoded; we don't know what encoding to use for output,
             # though, so still check for a @charset.
-            encoding = determine_encoding(io.StringIO(string))
+            encoding = determine_encoding(string)
         elif isinstance(string, six.binary_type):
-            encoding = determine_encoding(io.BytesIO(string))
+            encoding = determine_encoding(string)
             string = string.decode(encoding)
         else:
             raise TypeError("Expected a string, got {0!r}".format(string))
@@ -393,13 +392,17 @@ class Scss(object):
 
     #@profile
     #@print_timing(2)
-    def Compilation(self, scss_string=None, scss_file=None, super_selector=None, filename=None, is_sass=None, line_numbers=True):
+    def Compilation(self, scss_string=None, scss_file=None, source_files=None, super_selector=None, filename=None, is_sass=None, line_numbers=True):
+        # TODO this signature is totally wacky; it should just take a list of
+        # source files
         if super_selector:
             self.super_selector = super_selector + ' '
         self.reset()
 
         source_file = None
-        if scss_string is not None:
+        if source_files is not None:
+            self.source_files = source_files
+        elif scss_string is not None:
             source_file = SourceFile.from_string(scss_string, filename, is_sass, line_numbers)
         elif scss_file is not None:
             source_file = SourceFile.from_filename(scss_file, filename, is_sass, line_numbers)
@@ -1264,6 +1267,7 @@ class Scss(object):
         """
         Implements @-blocks
         """
+        # TODO handle @charset, probably?
         # Interpolate the current block
         # TODO this seems like it should be done in the block header.  and more
         # generally?

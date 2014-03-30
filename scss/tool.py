@@ -163,19 +163,38 @@ def run_tests():
 
 def do_build(options, args):
     if options.output is not None:
-        output = open(options.output, 'wt')
+        out = open(options.output, 'wb')
     else:
-        output = sys.stdout
+        out = sys.stdout
+        # Get the unencoded stream on Python 3
+        out = getattr(out, 'buffer', out)
 
     css = Scss(scss_opts={
         'style': options.style,
         'debug_info': options.debug_info,
     })
     if args:
+        source_files = [
+            SourceFile.from_filename(path, is_sass=options.is_sass)
+            for path in args
+        ]
         for path in args:
-            output.write(css.compile(scss_file=path, is_sass=options.is_sass))
+            out.write(css.compile(scss_file=path, is_sass=options.is_sass))
     else:
-        output.write(css.compile(sys.stdin.read(), is_sass=options.is_sass))
+        source_files = [
+            SourceFile.from_file(sys.stdin, "<stdin>", is_sass=options.is_sass)]
+
+    encodings = set(source.encoding for source in source_files)
+    if len(encodings) > 1:
+        sys.stderr.write(
+            "Can't combine these files!  "
+            "They have different encodings: {0}\n"
+            .format(', '.join(encodings))
+        )
+        sys.exit(3)
+
+    output = css.compile(source_files=source_files)
+    out.write(output.encode(source_files[0].encoding))
 
     for f, t in profiling.items():
         sys.stderr.write("%s took %03fs" % (f, t))

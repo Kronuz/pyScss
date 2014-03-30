@@ -347,16 +347,12 @@ def is_builtin_css_function(name):
 # CSS character set determination
 # Based upon: http://www.w3.org/TR/CSS2/syndata.html#charset
 
-def determine_encoding(f):
-    """Return the appropriate encoding for the given file, according to the CSS
-    charset rules.
+def determine_encoding(buf):
+    """Return the appropriate encoding for the given CSS source, according to
+    the CSS charset rules.
 
-    `f` should be a file-like object with the cursor at the beginning.
+    `buf` may be either a string or bytes.
     """
-    # 200 bytes should be enough for anyone
-    buf = f.read(200)
-    f.seek(0)
-
     # The ultimate default is utf8; bravo, W3C
     bom_encoding = 'UTF-8'
 
