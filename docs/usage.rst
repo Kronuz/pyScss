@@ -9,7 +9,12 @@ known to work.  Install with pip::
 
     pip install pyScss
 
-Its lone dependency is the ``six`` library, which pip should install for you.
+Its lone Python dependency is the ``six`` library, which pip should install for
+you.
+
+There's also an optional C speedup module, which requires having ``libpcre``
+and its development headers installed, with UTF-8 support enabled (which it is
+by default).
 
 
 Usage
