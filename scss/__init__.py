@@ -60,7 +60,6 @@ import six
 
 from scss import config
 from scss.cssdefs import (
-    SEPARATOR,
     determine_encoding,
     _ml_comment_re, _sl_comment_re,
     _escape_chars_re,
@@ -205,8 +204,6 @@ class SourceFile(object):
         state['prev_line_no'] = line_no
 
         if output:
-            if self.line_numbers:
-                output = str(output_line_no + 1) + SEPARATOR + output
             output += '\n'
             ret += output
 
@@ -261,8 +258,6 @@ class SourceFile(object):
         state['prev_line_no'] = line_no
 
         if output:
-            if self.line_numbers:
-                output = str(output_line_no + 1) + SEPARATOR + output
             output += '\n'
             ret += output
         return ret

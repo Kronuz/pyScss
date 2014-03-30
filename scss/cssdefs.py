@@ -362,8 +362,6 @@ def determine_encoding(f):
 # ------------------------------------------------------------------------------
 # Bits and pieces of grammar, as regexen
 
-SEPARATOR = '\x00'
-
 _expr_glob_re = re.compile(r'''
     \#\{(.*?)\}                   # Global Interpolation only
 ''', re.VERBOSE)

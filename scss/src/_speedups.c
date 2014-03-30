@@ -21,19 +21,32 @@ typedef struct {
 	BlockLocator *locator;
 } scss_BlockLocator;
 
+static char*
+scss_pyunicode_to_utf8(PyObject* obj, int *len)
+{
+	PyObject* intermediate_bytes = PyUnicode_AsUTF8String(obj);
+	assert(intermediate_bytes != NULL);
+	char* internal_buffer = PyBytes_AsString(intermediate_bytes);
+	*len = PyBytes_Size(intermediate_bytes);
+	char* ret = PyMem_New(char, *len + 1);
+	memcpy(ret, internal_buffer, *len + 1);
+	Py_DECREF(intermediate_bytes);
+	return ret;
+}
+
 static int
 scss_BlockLocator_init(scss_BlockLocator *self, PyObject *args, PyObject *kwds)
 {
-	char *codestr;
+	PyUnicodeObject *codestr;
 	int codestr_sz;
 
 	self->locator = NULL;
 
-	if (!PyArg_ParseTuple(args, "s#", &codestr, &codestr_sz)) {
+	if (!PyArg_ParseTuple(args, "U", &codestr, &codestr_sz)) {
 		return -1;
 	}
 
-	self->locator = BlockLocator_new(codestr, codestr_sz);
+	self->locator = BlockLocator_new(codestr);
 
 	#ifdef DEBUG
 		PySys_WriteStderr("Scss BlockLocator object initialized! (%lu bytes)\n", sizeof(scss_BlockLocator));
@@ -71,7 +84,7 @@ scss_BlockLocator_iternext(scss_BlockLocator *self)
 
 		if (block->error > 0) {
 			return Py_BuildValue(
-				"is#s#",
+				"iu#u#",
 				block->lineno,
 				block->selprop,
 				block->selprop_sz,
@@ -171,6 +184,7 @@ scss_Scanner_token(scss_Scanner *self, PyObject *args)
 	PyObject *restrictions = NULL;
 	Pattern *_restrictions = NULL;
 	int restrictions_sz = 0;
+	int len;
 	if (self->scanner != NULL) {
 		if (PyArg_ParseTuple(args, "i|O", &token_num, &restrictions)) {
 			if (restrictions != NULL) {
@@ -179,13 +193,8 @@ scss_Scanner_token(scss_Scanner *self, PyObject *args)
 					_restrictions = PyMem_New(Pattern, size);
 					iter = PyObject_GetIter(restrictions);
 					while ((item = PyIter_Next(iter))) {
-#if PY_MAJOR_VERSION >= 3
-						if (PyBytes_Check(item)) {
-							_restrictions[restrictions_sz].tok = PyBytes_AsString(item);
-#else
-						if (PyString_Check(item)) {
-							_restrictions[restrictions_sz].tok = PyString_AsString(item);
-#endif
+						if (PyUnicode_Check(item)) {
+							_restrictions[restrictions_sz].tok = scss_pyunicode_to_utf8(item, &len);
 							_restrictions[restrictions_sz].expr = NULL;
 							restrictions_sz++;
 						}
@@ -257,6 +266,7 @@ scss_Scanner_setup_patterns(PyObject *self, PyObject *patterns)
 
 	Pattern *_patterns = NULL;
 	int patterns_sz = 0;
+	int len;
 	if (!Scanner_initialized()) {
 		is_tuple = PyTuple_Check(patterns);
 		if (is_tuple || PyList_Check(patterns)) {
@@ -268,15 +278,9 @@ scss_Scanner_setup_patterns(PyObject *self, PyObject *patterns)
 				if (_is_tuple || PyList_Check(item)) {
 					item0 = _is_tuple ? PyTuple_GetItem(item, 0) : PyList_GetItem(item, 0);
 					item1 = _is_tuple ? PyTuple_GetItem(item, 1) : PyList_GetItem(item, 1);
-#if PY_MAJOR_VERSION >= 3
-					if (PyBytes_Check(item0) && PyBytes_Check(item1)) {
-						_patterns[patterns_sz].tok = PyBytes_AsString(item0);
-						_patterns[patterns_sz].expr = PyBytes_AsString(item1);
-#else
-					if (PyString_Check(item0) && PyString_Check(item1)) {
-						_patterns[patterns_sz].tok = PyString_AsString(item0);
-						_patterns[patterns_sz].expr = PyString_AsString(item1);
-#endif
+					if (PyUnicode_Check(item0) && PyUnicode_Check(item1)) {
+						_patterns[patterns_sz].tok = scss_pyunicode_to_utf8(item0, &len);
+						_patterns[patterns_sz].expr = scss_pyunicode_to_utf8(item1, &len);
 						patterns_sz++;
 					}
 				}
@@ -299,14 +303,16 @@ scss_Scanner_init(scss_Scanner *self, PyObject *args, PyObject *kwds)
 	PyObject *patterns, *ignore;
 	Pattern *_patterns = NULL;
 	int patterns_sz = 0;
+	int len;
 	Pattern *_ignore = NULL;
 	int ignore_sz = 0;
-	char *input = NULL;
-	int input_sz = 0;
+	PyObject *py_input = NULL;
+	char *encoded_input = NULL;
+	int encoded_input_sz = 0;
 
 	self->scanner = NULL;
 
-	if (!PyArg_ParseTuple(args, "OO|z#", &patterns, &ignore, &input, &input_sz)) {
+	if (!PyArg_ParseTuple(args, "OO|U", &patterns, &ignore, &py_input)) {
 		return -1;
 	}
 
@@ -321,15 +327,9 @@ scss_Scanner_init(scss_Scanner *self, PyObject *args, PyObject *kwds)
 				if (_is_tuple || PyList_Check(item)) {
 					item0 = _is_tuple ? PyTuple_GetItem(item, 0) : PyList_GetItem(item, 0);
 					item1 = _is_tuple ? PyTuple_GetItem(item, 1) : PyList_GetItem(item, 1);
-#if PY_MAJOR_VERSION >= 3
-					if (PyBytes_Check(item0) && PyBytes_Check(item1)) {
-						_patterns[patterns_sz].tok = PyBytes_AsString(item0);
-						_patterns[patterns_sz].expr = PyBytes_AsString(item1);
-#else
-					if (PyString_Check(item0) && PyString_Check(item1)) {
-						_patterns[patterns_sz].tok = PyString_AsString(item0);
-						_patterns[patterns_sz].expr = PyString_AsString(item1);
-#endif
+					if (PyUnicode_Check(item0) && PyUnicode_Check(item1)) {
+						_patterns[patterns_sz].tok = scss_pyunicode_to_utf8(item0, &len);
+						_patterns[patterns_sz].expr = scss_pyunicode_to_utf8(item1, &len);
 						patterns_sz++;
 					}
 				}
@@ -344,20 +344,22 @@ scss_Scanner_init(scss_Scanner *self, PyObject *args, PyObject *kwds)
 		_ignore = PyMem_New(Pattern, size);
 		for (i = 0; i < size; ++i) {
 			item = is_tuple ? PyTuple_GetItem(ignore, i) : PyList_GetItem(ignore, i);
-#if PY_MAJOR_VERSION >= 3
-			if (PyBytes_Check(item)) {
-				_ignore[ignore_sz].tok = PyBytes_AsString(item);
-#else
-			if (PyString_Check(item)) {
-				_ignore[ignore_sz].tok = PyString_AsString(item);
-#endif
+			if (PyUnicode_Check(item)) {
+				_ignore[ignore_sz].tok = scss_pyunicode_to_utf8(item, &len);
 				_ignore[ignore_sz].expr = NULL;
 				ignore_sz++;
 			}
 		}
 	}
 
-	self->scanner = Scanner_new(_patterns, patterns_sz, _ignore, ignore_sz, input, input_sz);
+	encoded_input = scss_pyunicode_to_utf8(py_input, &encoded_input_sz);
+	self->scanner = Scanner_new(
+		_patterns,
+		patterns_sz,
+		_ignore,
+		ignore_sz,
+		encoded_input,
+		encoded_input_sz);
 
 	if (_patterns != NULL) PyMem_Del(_patterns);
 	if (_ignore != NULL) PyMem_Del(_ignore);
@@ -379,7 +381,6 @@ scss_Scanner_repr(scss_Scanner *self)
 
 	if (self->scanner != NULL && self->scanner->tokens_sz) {
 		start = self->scanner->tokens_sz - 10;
-#if PY_MAJOR_VERSION >= 3
 		repr = PyBytes_FromString("");
 		for (i = (start < 0) ? 0 : start; i < self->scanner->tokens_sz; i++) {
 			p_token = &self->scanner->tokens[i];
@@ -394,22 +395,6 @@ scss_Scanner_repr(scss_Scanner *self)
 	} else {
 		repr = PyBytes_FromString("None");
 	}
-#else
-		repr = PyString_FromString("");
-		for (i = (start < 0) ? 0 : start; i < self->scanner->tokens_sz; i++) {
-			p_token = &self->scanner->tokens[i];
-			PyString_ConcatAndDel(&repr, PyString_FromString("\n"));
-			pos = (int)(p_token->string - self->scanner->input);
-			PyString_ConcatAndDel(&repr, PyString_FromFormat("  (@%d)  %s  =  ",
-				pos, p_token->regex->tok));
-			tmp = PyString_FromStringAndSize(p_token->string, p_token->string_sz);
-			PyString_ConcatAndDel(&repr, PyObject_Repr(tmp));
-			Py_XDECREF(tmp);
-		}
-	} else {
-		repr = PyString_FromString("None");
-	}
-#endif
 
 	return (PyObject *)repr;
 

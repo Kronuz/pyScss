@@ -26,7 +26,8 @@ reprn(char *str, size_t len) {
 	static char strings[10240];
 	static size_t current = 0;
 	size_t reqlen = 2;
-	char c,
+        unsigned char c;
+	char
 		 *out,
 		 *write,
 		 *begin = str,
@@ -76,10 +77,10 @@ reprn(char *str, size_t len) {
 			if (write + 5 >= strings + 10240) break;
 			sprintf(write, "\\t");
 			write += 2;
-		} else if (c < ' ') {
+		} else if (c < ' ' || c > 126) {
 			if (write + 6 >= strings + 10240) break;
 			sprintf(write, "\\x%02x", c);
-			write += 3;
+			write += 4;
 		} else {
 			if (write + 4 >= strings + 10240) break;
 			*write++ = c;

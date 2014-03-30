@@ -40,8 +40,8 @@ Pattern_regex(char *tok, char *expr) {
 			Pattern_patterns_bsz = Pattern_patterns_bsz + BLOCK_SIZE_PATTERNS;
 			PyMem_Resize(Pattern_patterns, Pattern, Pattern_patterns_bsz);
 		}
-		Pattern_patterns[j].tok = PyMem_Strdup(tok);
-		Pattern_patterns[j].expr = PyMem_Strdup(expr);
+		Pattern_patterns[j].tok = tok;
+		Pattern_patterns[j].expr = expr;
 		Pattern_patterns[j].pattern = NULL;
 		Pattern_patterns_sz = j + 1;
 		return &Pattern_patterns[j];
@@ -51,9 +51,10 @@ Pattern_regex(char *tok, char *expr) {
 
 static int
 Pattern_match(Pattern *regex, char *string, int string_sz, int start_at, Token *p_token) {
-	int options = PCRE_ANCHORED;
+	int options = PCRE_ANCHORED | PCRE_UTF8;
 	const char *errptr;
 	int ret, erroffset, ovector[3];
+        ovector[0] = ovector[1] = ovector[2] = 0;
 	pcre *p_pattern = regex->pattern;
 
 	#ifdef DEBUG
@@ -306,7 +307,7 @@ Scanner_reset(Scanner *self, char *input, int input_sz) {
 	if (self->input != NULL) {
 		PyMem_Del(self->input);
 	}
-	self->input = PyMem_Strndup(input, input_sz);
+	self->input = input;
 	self->input_sz = input_sz;
 	#ifdef DEBUG
 		fprintf(stderr, "Scanning in %s\n", repr(self->input));

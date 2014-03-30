@@ -324,7 +324,7 @@ class SassRule(object):
         for s in selectors:
             if not s.has_placeholder:
                 return False
-        return True 
+        return True
 
 
     def copy(self):
@@ -410,6 +410,8 @@ class BlockHeader(object):
 
     @classmethod
     def parse(cls, prop, has_contents=False):
+        prop = prop.strip()
+
         # Simple pre-processing
         if prop.startswith('+') and not has_contents:
             # Expand '+' at the beginning of a rule as @include.  But not if

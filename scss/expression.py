@@ -128,7 +128,7 @@ class Calculator(object):
     def evaluate_expression(self, expr, divide=False):
         try:
             ast = self.parse_expression(expr)
-        except SassError:
+        except SassError as e:
             if config.DEBUG:
                 raise
             else:
@@ -140,7 +140,19 @@ class Calculator(object):
             raise SassEvaluationError(e, expression=expr)
 
     def parse_expression(self, expr, target='goal'):
-        if not isinstance(expr, six.string_types):
+        if isinstance(expr, six.text_type):
+            # OK
+            pass
+        elif isinstance(expr, six.binary_type):
+            # Dubious
+            warn(FutureWarning(
+                "parse_expression was passed binary data {0!r} "
+                "-- this will no longer be supported in pyScss 2.0"
+                .format(expr)
+            ))
+            # Don't guess an encoding; you reap what you sow
+            expr = six.text_type(expr)
+        else:
             raise TypeError("Expected string, got %r" % (expr,))
 
         key = (target, expr)

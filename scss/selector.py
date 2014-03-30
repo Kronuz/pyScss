@@ -217,7 +217,7 @@ class SimpleSelector(object):
 
     def render(self):
         # TODO fail if there are no tokens, or if one is a placeholder?
-        self.tokens = sorted(self.tokens, key=TOKEN_RENDER_SORT_KEY)
+        self.tokens = tuple(sorted(self.tokens, key=TOKEN_RENDER_SORT_KEY))
         rendered = ''.join(self.tokens)
         if self.combinator != ' ':
             rendered = ' '.join((self.combinator, rendered))

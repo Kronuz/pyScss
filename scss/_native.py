@@ -1,37 +1,16 @@
 """Pure-Python scanner and parser, used if _speedups is not available."""
+from __future__ import absolute_import
 from __future__ import print_function
+from __future__ import unicode_literals
 
-from scss.cssdefs import SEPARATOR
+from collections import deque
+
 import re
 
 DEBUG = False
 
 # TODO copied from __init__
-_nl_num_re = re.compile(r'\n.+' + SEPARATOR, re.MULTILINE)
 _blocks_re = re.compile(r'[{},;()\'"\n]')
-
-
-def _strip_selprop(selprop, lineno):
-    # Get the line number of the selector or property and strip all other
-    # line numbers that might still be there (from multiline selectors)
-    _lineno, _sep, selprop = selprop.partition(SEPARATOR)
-    if _sep == SEPARATOR:
-        _lineno = _lineno.strip(' \t\n;')
-        try:
-            lineno = int(_lineno)
-        except ValueError:
-            pass
-    else:
-        selprop = _lineno
-    selprop = _nl_num_re.sub('\n', selprop)
-    selprop = selprop.strip()
-    return selprop, lineno
-
-
-def _strip(selprop):
-    # Strip all line numbers, ignoring them in the way
-    selprop, _ = _strip_selprop(selprop, None)
-    return selprop
 
 
 def locate_blocks(codestr):
@@ -43,7 +22,7 @@ def locate_blocks(codestr):
     (the one between `{` and `}`, which can be nested), or the "lose" code
     (properties) that doesn't have any blocks.
     """
-    lineno = 0
+    lineno = 1
 
     par = 0
     instr = None
@@ -52,10 +31,14 @@ def locate_blocks(codestr):
     thin = None
     i = init = safe = lose = 0
     start = end = None
+    lineno_stack = deque()
 
     for m in _blocks_re.finditer(codestr):
         i = m.start(0)
         c = codestr[i]
+        if c == '\n':
+            lineno += 1
+
         if instr is not None:
             if c == instr:
                 instr = None  # A string ends (FIXME: needs to accept escaped characters)
@@ -73,26 +56,29 @@ def locate_blocks(codestr):
                     if i > 0 and codestr[i - 1] == '#':  # Do not process #{...} as blocks!
                         skip = True
                     else:
+                        lineno_stack.append(lineno)
                         start = i
-                        if thin is not None and _strip(codestr[thin:i]):
+                        if thin is not None and codestr[thin:i].strip():
                             init = thin
                         if lose < init:
-                            _property, lineno = _strip_selprop(codestr[lose:init], lineno)
+                            _property = codestr[lose:init].strip()
                             if _property:
                                 yield lineno, _property, None
                             lose = init
                         thin = None
                 depth += 1
             elif c == '}':  # block ends:
-                if depth > 0:
+                if depth <= 0:
+                    raise SyntaxError("Unexpected closing brace on line {0}".format(lineno))
+                else:
                     depth -= 1
                     if depth == 0:
                         if not skip:
                             end = i
-                            _selectors, lineno = _strip_selprop(codestr[init:start], lineno)
+                            _selectors = codestr[init:start].strip()
                             _codestr = codestr[start + 1:end].strip()
                             if _selectors:
-                                yield lineno, _selectors, _codestr
+                                yield lineno_stack.pop(), _selectors, _codestr
                             init = safe = lose = end + 1
                             thin = None
                         skip = False
@@ -100,25 +86,25 @@ def locate_blocks(codestr):
                 if c == ';':  # End of property (or block):
                     init = i
                     if lose < init:
-                        _property, lineno = _strip_selprop(codestr[lose:init], lineno)
+                        _property = codestr[lose:init].strip()
                         if _property:
                             yield lineno, _property, None
                         init = safe = lose = i + 1
                     thin = None
                 elif c == ',':
-                    if thin is not None and _strip(codestr[thin:i]):
+                    if thin is not None and codestr[thin:i].strip():
                         init = thin
                     thin = None
                     safe = i + 1
                 elif c == '\n':
-                    if thin is not None and _strip(codestr[thin:i]):
+                    if thin is not None and codestr[thin:i].strip():
                         init = thin
                         thin = i + 1
-                    elif thin is None and _strip(codestr[safe:i]):
+                    elif thin is None and codestr[safe:i].strip():
                         thin = i + 1  # Step on thin ice, if it breaks, it breaks here
     if depth > 0:
         if not skip:
-            _selectors, lineno = _strip_selprop(codestr[init:start], lineno)
+            _selectors = codestr[init:start].strip()
             _codestr = codestr[start + 1:].strip()
             if _selectors:
                 yield lineno, _selectors, _codestr
@@ -130,7 +116,8 @@ def locate_blocks(codestr):
                 raise Exception("Block never closed: '%s'" % _selectors)
     losestr = codestr[lose:]
     for _property in losestr.split(';'):
-        _property, lineno = _strip_selprop(_property, lineno)
+        _property = _property.strip()
+        lineno += _property.count('\n')
         if _property:
             yield lineno, _property, None
 

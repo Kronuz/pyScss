@@ -8,6 +8,8 @@
 * MIT license (http://www.opensource.org/licenses/mit-license.php)
 * Copyright (c) 2011 German M. Bravo (Kronuz), All rights reserved.
 */
+#include <Python.h>
+
 #ifndef BLOCK_LOCATOR_H
 #define BLOCK_LOCATOR_H
 
@@ -16,29 +18,35 @@
 typedef struct {
     int error;
     int lineno;
-    char *selprop;
+    Py_UNICODE *selprop;
     int selprop_sz;
-    char *codestr;
+    Py_UNICODE *codestr;
     int codestr_sz;
 } Block;
 
+typedef struct _lineno_stack {
+    int lineno;
+    struct _lineno_stack* next;
+} _lineno_stack;
+
 typedef struct {
     char exc[MAX_EXC_STRING];
-    char *_codestr;
-    char *codestr;
-    char *codestr_ptr;
-    int codestr_sz;
+    PyUnicodeObject *py_codestr;
+    Py_UNICODE *codestr;
+    Py_UNICODE *codestr_ptr;
+    Py_ssize_t codestr_sz;
+    _lineno_stack* lineno_stack;
     int lineno;
     int par;
-    char instr;
+    Py_UNICODE instr;
     int depth;
     int skip;
-    char *thin;
-    char *init;
-    char *safe;
-    char *lose;
-    char *start;
-    char *end;
+    Py_UNICODE *thin;
+    Py_UNICODE *init;
+    Py_UNICODE *safe;
+    Py_UNICODE *lose;
+    Py_UNICODE *start;
+    Py_UNICODE *end;
     Block block;
 } BlockLocator;
 
@@ -46,7 +54,7 @@ void BlockLocator_initialize(void);
 void BlockLocator_finalize(void);
 
 Block* BlockLocator_iternext(BlockLocator *self);
-BlockLocator *BlockLocator_new(char *codestr, int codestr_sz);
+BlockLocator *BlockLocator_new(PyUnicodeObject *codestr);
 void BlockLocator_del(BlockLocator *self);
 
 #endif
