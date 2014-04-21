@@ -270,7 +270,7 @@ def elements_of_type(display):
     ret = _elements_of_type.get(d.value, None)
     if ret is None:
         raise Exception("Elements of type '%s' not found!" % d.value)
-    return List(ret, use_comma=True)
+    return List(map(String, ret), use_comma=True)
 
 
 @register('enumerate', 3)
