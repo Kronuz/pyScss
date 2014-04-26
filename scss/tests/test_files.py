@@ -11,6 +11,7 @@ from __future__ import absolute_import
 
 import os.path
 import logging
+import pytest
 
 import scss
 
@@ -23,7 +24,8 @@ logger.addHandler(console)
 
 def test_pair_programmatic(scss_file_pair):
     scss_fn, css_fn, pytest_trigger = scss_file_pair
-    if pytest_trigger:
+
+    if pytest_trigger is pytest.skip:
         pytest_trigger()
 
     with open(scss_fn) as fh:
@@ -38,11 +40,19 @@ def test_pair_programmatic(scss_file_pair):
     include_dir = os.path.join(directory, 'include')
     scss.config.STATIC_ROOT = os.path.join(directory, 'static')
 
-    compiler = scss.Scss(scss_opts=dict(style='expanded'), search_paths=[include_dir])
-    actual = compiler.compile(source)
+    try:
+        compiler = scss.Scss(scss_opts=dict(style='expanded'), search_paths=[include_dir])
+        actual = compiler.compile(source)
+    except Exception:
+        if pytest_trigger is pytest.xfail:
+            pytest_trigger()
+        raise
 
     # Normalize leading and trailing newlines
     actual = actual.strip('\n')
     expected = expected.strip('\n')
 
-    assert expected == actual
+    if pytest_trigger is pytest.xfail:
+        assert expected != actual
+    else:
+        assert expected == actual
