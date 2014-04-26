@@ -908,8 +908,7 @@ class Scss(object):
 
             if source_file is None:
                 load_paths_msg = "\nLoad paths:\n\t%s" % "\n\t".join(seen_paths)
-                log.warn("File to import not found or unreadable: '%s' (%s)%s", name, rule.file_and_line, load_paths_msg)
-                continue
+                raise IOError("File to import not found or unreadable: '%s' (%s)%s" % (name, rule.file_and_line, load_paths_msg))
 
             import_key = (name, source_file.parent_dir)
             if rule.namespace.has_import(import_key):
