@@ -132,14 +132,22 @@ _default_scss_vars = {
 
 
 class SourceFile(object):
-    def __init__(self, filename, contents, encoding=None, parent_dir='.', is_string=False, is_sass=None, line_numbers=True, line_strip=True):
+    def __init__(self, filename, contents, encoding=None, parent_dir=None, is_string=False, is_sass=None, line_numbers=True, line_strip=True):
+        filename = os.path.realpath(filename)
+        if parent_dir is None:
+            parent_dir = os.path.dirname(filename)
+        else:
+            parent_dir = os.path.realpath(parent_dir)
+        filename = os.path.basename(filename)
+
         self.filename = filename
+        self.parent_dir = parent_dir
+
         self.encoding = encoding
         self.sass = filename.endswith('.sass') if is_sass is None else is_sass
         self.line_numbers = line_numbers
         self.line_strip = line_strip
         self.contents = self.prepare_source(contents)
-        self.parent_dir = os.path.realpath(parent_dir)
         self.is_string = is_string
 
     def __repr__(self):
@@ -148,26 +156,32 @@ class SourceFile(object):
             id(self),
         )
 
-    @classmethod
-    def from_filename(cls, fn, filename=None, **kwargs):
-        if filename is None:
-            _, filename = os.path.split(fn)
+    @property
+    def full_filename(self):
+        if self.is_string:
+            return self.filename
+        return os.path.join(self.parent_dir, self.filename)
 
+    @classmethod
+    def from_filename(cls, fn, filename=None, parent_dir=None, **kwargs):
         # Open in binary mode so we can reliably detect the encoding
         with open(fn, 'rb') as f:
-            return cls.from_file(f, filename=filename, **kwargs)
+            return cls.from_file(f, filename=filename, parent_dir=parent_dir, **kwargs)
 
     @classmethod
-    def from_file(cls, f, filename, **kwargs):
+    def from_file(cls, f, filename=None, parent_dir=None, **kwargs):
         contents = f.read()
         encoding = determine_encoding(contents)
         if isinstance(contents, six.binary_type):
             contents = contents.decode(encoding)
 
-        return cls(filename, contents, encoding=encoding, **kwargs)
+        if filename is None:
+            filename = getattr(f, 'name', None)
+
+        return cls(filename, contents, encoding=encoding, parent_dir=parent_dir, **kwargs)
 
     @classmethod
-    def from_string(cls, string, filename=None, is_sass=None, line_numbers=True):
+    def from_string(cls, string, filename=None, parent_dir=None, is_sass=None, line_numbers=True):
         if isinstance(string, six.text_type):
             # Already decoded; we don't know what encoding to use for output,
             # though, so still check for a @charset.
@@ -185,7 +199,7 @@ class SourceFile(object):
             # Must have come from a file at some point
             is_string = False
 
-        return cls(filename, string, is_string=is_string, is_sass=is_sass, line_numbers=line_numbers)
+        return cls(filename, string, parent_dir=parent_dir, is_string=is_string, is_sass=is_sass, line_numbers=line_numbers)
 
     def parse_scss_line(self, line_no, line, state):
         ret = ''
@@ -382,7 +396,7 @@ class Scss(object):
             for name, contents in list(self._scss_files.items()):
                 if name in self.source_file_index:
                     raise KeyError("Duplicate filename %r" % name)
-                source_file = SourceFile.from_string(contents, name)
+                source_file = SourceFile.from_string(contents, filename=name)
                 self.source_files.append(source_file)
                 self.source_file_index[name] = source_file
 
@@ -401,9 +415,9 @@ class Scss(object):
         if source_files is not None:
             self.source_files = source_files
         elif scss_string is not None:
-            source_file = SourceFile.from_string(scss_string, filename, is_sass, line_numbers)
+            source_file = SourceFile.from_string(scss_string, filename=filename, is_sass=is_sass, line_numbers=line_numbers)
         elif scss_file is not None:
-            source_file = SourceFile.from_filename(scss_file, filename, is_sass, line_numbers)
+            source_file = SourceFile.from_filename(scss_file, filename=filename, is_sass=is_sass, line_numbers=line_numbers)
 
         if source_file is not None:
             # Clear the existing list of files
@@ -886,7 +900,7 @@ class Scss(object):
                 continue
 
             source_file = None
-            full_filename, seen_paths = self._find_import(rule, name, skip=rule.source_file.filename)
+            full_filename, seen_paths = self._find_import(rule, name, skip=rule.source_file.full_filename)
 
             if full_filename is None:
                 i_codestr = self._do_magic_import(rule, scope, block)
@@ -898,10 +912,7 @@ class Scss(object):
                 source_file = self.source_file_index[full_filename]
 
             else:
-                source_file = SourceFile.from_filename(
-                    full_filename,
-                    parent_dir=os.path.realpath(os.path.dirname(full_filename)),
-                )
+                source_file = SourceFile.from_filename(full_filename)
 
                 self.source_files.append(source_file)
                 self.source_file_index[full_filename] = source_file
