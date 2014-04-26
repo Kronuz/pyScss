@@ -882,9 +882,7 @@ class Scss(object):
             # Protect against going to prohibited places...
             if any(scary_token in name for scary_token in ('..', '://', 'url(')):
                 rule.properties.append((block.prop, None))
-                warnings.warn(
-                    "Ignored import: %s" % name,
-                    RuntimeWarning)
+                warnings.warn("Ignored import: %s" % name, RuntimeWarning)
                 continue
 
             source_file = None
