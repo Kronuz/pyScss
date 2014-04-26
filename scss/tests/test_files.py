@@ -4,7 +4,8 @@ A test is any file with a `.scss` extension.  It'll be compiled, and the output
 will be compared to the contents of a file named `foo.css`.
 
 Currently, test files must be nested exactly one directory below `files/`.
-This limitation is completely arbitrary.
+This limitation is completely arbitrary. Files starting with '_' are skipped.
+
 """
 
 from __future__ import absolute_import

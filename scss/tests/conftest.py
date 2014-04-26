@@ -38,6 +38,9 @@ def pytest_configure(config):
     test_file_tuples = []
     test_file_ids = []
     for fn in glob.glob(os.path.join(FILES_DIR, '*/*.scss')):
+        if os.path.basename(fn)[0] == '_':
+            continue
+
         relfn = os.path.relpath(fn, FILES_DIR)
         pytest_trigger = None
 
