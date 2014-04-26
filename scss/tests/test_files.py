@@ -42,7 +42,7 @@ def test_pair_programmatic(scss_file_pair):
     scss.config.STATIC_ROOT = os.path.join(directory, 'static')
 
     try:
-        compiler = scss.Scss(scss_opts=dict(style='expanded'), search_paths=[include_dir])
+        compiler = scss.Scss(scss_opts=dict(style='expanded'), search_paths=[include_dir, directory])
         actual = compiler.compile(source)
     except Exception:
         if pytest_trigger is pytest.xfail:
