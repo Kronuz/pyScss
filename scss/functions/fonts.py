@@ -163,7 +163,7 @@ def font_sheet(g, **kwargs):
             for i, glyph_filename in enumerate(glyphs()):
                 codepoint = i + GLYPH_START
                 codepoints.append(codepoint)
-                glyph = font.createChar(codepoint)
+                glyph = font.createChar(codepoint, names[i])
                 glyph.importOutlines(glyph_filename)
                 os.unlink(glyph_filename)
                 if autowidth:
