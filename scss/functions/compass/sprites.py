@@ -368,8 +368,9 @@ def sprite_map(g, **kwargs):
             sprite_map['*n*'] = map_name
             sprite_map['*t*'] = filetime
 
+            sizes = zip(files, sizes)
             cache_tmp = tempfile.NamedTemporaryFile(delete=False, dir=ASSETS_ROOT)
-            pickle.dump((now_time, file_asset, inline_asset, sprite_map, zip(files, sizes)), cache_tmp)
+            pickle.dump((now_time, file_asset, inline_asset, sprite_map, sizes), cache_tmp)
             cache_tmp.close()
             os.rename(cache_tmp.name, cache_path)
 
