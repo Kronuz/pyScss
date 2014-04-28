@@ -220,6 +220,9 @@ def radial_gradient(*args):
 
     position_and_angle = _get_gradient_position_and_angle(args)
     shape_and_size = _get_gradient_shape_and_size(args)
+    if position_and_angle == shape_and_size:
+        shape_and_size = None
+
     color_stops = _get_gradient_color_stops(args)
     if color_stops is None:
         raise Exception('No color stops provided to radial-gradient function')
