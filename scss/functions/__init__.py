@@ -4,6 +4,7 @@ from scss.functions.library import FunctionLibrary
 
 from scss.functions.core import CORE_LIBRARY
 from scss.functions.extra import EXTRA_LIBRARY
+from scss.functions.fonts import FONTS_LIBRARY
 from scss.functions.compass.sprites import COMPASS_SPRITES_LIBRARY
 from scss.functions.compass.gradients import COMPASS_GRADIENTS_LIBRARY
 from scss.functions.compass.helpers import COMPASS_HELPERS_LIBRARY
@@ -15,6 +16,7 @@ ALL_BUILTINS_LIBRARY = FunctionLibrary()
 ALL_BUILTINS_LIBRARY.inherit(
     CORE_LIBRARY,
     EXTRA_LIBRARY,
+    FONTS_LIBRARY,
     COMPASS_GRADIENTS_LIBRARY,
     COMPASS_HELPERS_LIBRARY,
     COMPASS_IMAGES_LIBRARY,
