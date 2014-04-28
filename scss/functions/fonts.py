@@ -80,9 +80,9 @@ def font_sheet(g, **kwargs):
             log.error("Nothing found at '%s'", glob_path)
             return String.unquoted('')
 
-        font_name = os.path.normpath(os.path.dirname(g)).replace('\\', '_').replace('/', '_')
+        glyph_name = os.path.normpath(os.path.dirname(g)).replace('\\', '_').replace('/', '_')
         key = [f for (f, s) in files] + [repr(kwargs), config.ASSETS_URL]
-        key = font_name + '-' + make_filename_hash(key)
+        key = glyph_name + '-' + make_filename_hash(key)
         asset_files = {
             'ttf': key + '.ttf',
             'svg': key + '.svg',
@@ -135,9 +135,9 @@ def font_sheet(g, **kwargs):
             font.em = 512
             font.ascent = 448
             font.descent = 64
-            font.fontname = font_name
-            font.familyname = font_name
-            font.fullname = font_name
+            font.fontname = glyph_name
+            font.familyname = glyph_name
+            font.fullname = glyph_name
             if autowidth:
                 font.autoWidth(0, 0, 512)
             if autohint:
@@ -190,7 +190,7 @@ def font_sheet(g, **kwargs):
                         if cache_buster:
                             params.append('v=%s' % filetime)
                         if type_ == 'svg':
-                            params.append('#' + font_name)
+                            params.append('#' + glyph_name)
                         if params:
                             url += '?' + '&'.join(params)
                         urls[type_] = url
@@ -225,7 +225,7 @@ def font_sheet(g, **kwargs):
             font_sheet['*'] = now_time
             font_sheet['*f*'] = asset_files
             font_sheet['*k*'] = key
-            font_sheet['*n*'] = font_name
+            font_sheet['*n*'] = glyph_name
             font_sheet['*t*'] = filetime
 
             codepoints = zip(files, codepoints)
@@ -246,8 +246,8 @@ def font_sheet(g, **kwargs):
     return asset
 
 
-@register('fonts', 1)
-def fonts(sheet):
+@register('glyphs', 1)
+def glyphs(sheet):
     sheet = sheet.render()
     font_sheet = font_sheets.get(sheet, {})
     return List([String.unquoted(f) for f in sorted(f for f in font_sheet if not f.startswith('*'))])
@@ -286,14 +286,14 @@ def font_format(type_):
     return String.unquoted('')
 
 
-@register('font-content', 2)
-def font_content(sheet, font):
+@register('glyph-code', 2)
+def glyph_code(sheet, font):
     sheet = sheet.render()
     font_sheet = font_sheets.get(sheet)
-    font_name = String.unquoted(font).value
-    font = font_sheet and font_sheet.get(font_name)
+    glyph_name = String.unquoted(font).value
+    glyph = font_sheet and font_sheet.get(glyph_name)
     if not font_sheet:
         log.error("No font sheet found: %s", sheet, extra={'stack': True})
-    elif not font:
-        log.error("No font found: %s in %s", font_name, font_sheet['*n*'], extra={'stack': True})
-    return String('\\%x' % font[1])
+    elif not glyph:
+        log.error("No glyph found: %s in %s", glyph_name, font_sheet['*n*'], extra={'stack': True})
+    return String('\\%x' % glyph[1])

@@ -1,9 +1,9 @@
-$icons: font-sheet("fontsheet/*.svg", $cache-buster: false);
+$font: font-sheet("fontsheet/*.svg", $cache-buster: false);
 
 @font-face {
 	font-family: 'FontSheet';
-	src: font-url($icons, 'eot', $cache-buster: false);
-	src: $icons;
+	src: font-url($font, 'eot', $cache-buster: false);
+	src: $font;
 	font-weight: normal;
 	font-style: normal;
 }
@@ -18,8 +18,8 @@ $icons: font-sheet("fontsheet/*.svg", $cache-buster: false);
   -moz-osx-font-smoothing: grayscale;
 }
 
-@each $icon in fonts($icons) {
-    .icon-#{$icon}:before {
-        content: font-content($icons, $icon);
+@each $glyph in glyphs($font) {
+    .icon-#{$glyph}:before {
+        content: glyph-code($font, $glyph);
     }
 }
