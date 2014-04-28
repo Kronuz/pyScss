@@ -423,10 +423,15 @@ def sprite_file(map, sprite):
 
 @register('sprites', 1)
 @register('sprite-names', 1)
-def sprites(map):
+def sprites(map, remove_suffix=False):
     map = map.render()
     sprite_map = sprite_maps.get(map, {})
-    return List(list(String.unquoted(s) for s in sorted(s for s in sprite_map if not s.startswith('*'))))
+    return List([String.unquoted(s) for s in sorted(set(s.rsplit('-', 1)[0] if remove_suffix else s for s in sprite_map if not s.startswith('*')))])
+
+
+@register('sprite-classes', 1)
+def sprite_classes(map):
+    return sprites(map, True)
 
 
 @register('sprite', 2)
@@ -478,6 +483,17 @@ def sprite_url(map, cache_buster=True):
         url = "url(%s)" % escape(url)
         return String.unquoted(url)
     return String.unquoted('')
+
+
+@register('has-sprite', 2)
+def has_sprite(map, sprite):
+    map = map.render()
+    sprite_map = sprite_maps.get(map)
+    sprite_name = String.unquoted(sprite).value
+    sprite = sprite_map and sprite_map.get(sprite_name)
+    if not sprite_map:
+        log.error("No sprite map found: %s", map, extra={'stack': True})
+    return Boolean(bool(sprite))
 
 
 @register('sprite-position', 2)

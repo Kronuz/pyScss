@@ -247,10 +247,16 @@ def font_sheet(g, **kwargs):
 
 
 @register('glyphs', 1)
-def glyphs(sheet):
+@register('glyph-names', 1)
+def glyphs(sheet, remove_suffix=False):
     sheet = sheet.render()
     font_sheet = font_sheets.get(sheet, {})
-    return List([String.unquoted(f) for f in sorted(f for f in font_sheet if not f.startswith('*'))])
+    return List([String.unquoted(f) for f in sorted(set(f.rsplit('-', 1)[0] if remove_suffix else f for f in font_sheet if not f.startswith('*')))])
+
+
+@register('glyph-classes', 1)
+def glyph_classes(sheet):
+    return glyphs(sheet, True)
 
 
 @register('font-url', 2)
@@ -286,11 +292,22 @@ def font_format(type_):
     return String.unquoted('')
 
 
-@register('glyph-code', 2)
-def glyph_code(sheet, font):
+@register('has-glyph', 2)
+def has_glyph(sheet, glyph):
     sheet = sheet.render()
     font_sheet = font_sheets.get(sheet)
-    glyph_name = String.unquoted(font).value
+    glyph_name = String.unquoted(glyph).value
+    glyph = font_sheet and font_sheet.get(glyph_name)
+    if not font_sheet:
+        log.error("No font sheet found: %s", sheet, extra={'stack': True})
+    return Boolean(bool(glyph))
+
+
+@register('glyph-code', 2)
+def glyph_code(sheet, glyph):
+    sheet = sheet.render()
+    font_sheet = font_sheets.get(sheet)
+    glyph_name = String.unquoted(glyph).value
     glyph = font_sheet and font_sheet.get(glyph_name)
     if not font_sheet:
         log.error("No font sheet found: %s", sheet, extra={'stack': True})
