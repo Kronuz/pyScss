@@ -38,12 +38,15 @@ _BlockLocator_push_lineno(BlockLocator *self, int lineno) {
 
 static int
 _BlockLocator_pop_lineno(BlockLocator *self) {
+	int lineno;
+	_lineno_stack *dead;
+
 	if (self->lineno_stack == NULL) {
 		return 0;
 	}
 
-	int lineno = self->lineno_stack->lineno;
-	_lineno_stack *dead = self->lineno_stack;
+	lineno = self->lineno_stack->lineno;
+	dead = self->lineno_stack;
 	self->lineno_stack = self->lineno_stack->next;
 	free(dead);
 	return lineno;

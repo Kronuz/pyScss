@@ -24,11 +24,15 @@ typedef struct {
 static char*
 scss_pyunicode_to_utf8(PyObject* obj, int *len)
 {
-	PyObject* intermediate_bytes = PyUnicode_AsUTF8String(obj);
+	char* internal_buffer;
+        char* ret;
+	PyObject* intermediate_bytes;
+
+	intermediate_bytes = PyUnicode_AsUTF8String(obj);
 	assert(intermediate_bytes != NULL);
-	char* internal_buffer = PyBytes_AsString(intermediate_bytes);
+	internal_buffer = PyBytes_AsString(intermediate_bytes);
 	*len = PyBytes_Size(intermediate_bytes);
-	char* ret = PyMem_New(char, *len + 1);
+	ret = PyMem_New(char, *len + 1);
 	memcpy(ret, internal_buffer, *len + 1);
 	Py_DECREF(intermediate_bytes);
 	return ret;
