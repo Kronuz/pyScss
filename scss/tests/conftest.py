@@ -44,18 +44,22 @@ def pytest_configure(config):
         relfn = os.path.relpath(fn, FILES_DIR)
         pytest_trigger = None
 
-        if not include_ruby and (
-                relfn.startswith('from-sassc/')
-                or relfn.startswith('from-ruby/')):
-            pytest_trigger = pytest.skip
+        if relfn.startswith(('from-sassc/', 'from-ruby/')):
+            pytest_trigger = pytest.mark.skipif(
+                not include_ruby, reason="skipping ruby tests by default")
 
         elif relfn.startswith('xfail/'):
-            pytest_trigger = pytest.xfail
+            pytest_trigger = pytest.mark.xfail
 
         if file_filters and not any(rx.search(relfn) for rx in file_filters):
-            pytest_trigger = pytest.skip
+            pytest_trigger = pytest.mark.skipif(
+                reason="skipping due to --test-file-filter")
 
-        test_file_tuples.append((fn, fn[:-5] + '.css', pytest_trigger))
+        pair = (fn, fn[:-5] + '.css')
+        if pytest_trigger:
+            pair = pytest_trigger(pair)
+
+        test_file_tuples.append(pair)
         test_file_ids.append(fn)
 
 
