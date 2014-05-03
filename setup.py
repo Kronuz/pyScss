@@ -1,11 +1,13 @@
 #!/usr/bin/env python
-import os
-import sys
-from setuptools import setup, Extension, Feature
-from setuptools.dist import Distribution
 from distutils.command.build_ext import build_ext
 from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
+import os
+import platform
+import sys
+
+from setuptools import setup, Extension, Feature
+from setuptools.dist import Distribution
 
 # Need to install `six` to be able to import from the scss namespace
 Distribution(dict(setup_requires='six'))
@@ -14,9 +16,6 @@ from scss.scss_meta import PROJECT, URL, VERSION, AUTHOR, AUTHOR_EMAIL, LICENSE,
 
 # fail safe compilation shamelessly stolen from the simplejson
 # setup.py file.  Original author: Bob Ippolito
-
-is_jython = 'java' in sys.platform
-is_pypy = hasattr(sys, 'pypy_version_info')
 
 speedups = Feature(
     'optional C speed-enhancement module',
@@ -136,11 +135,16 @@ def try_building_extension():
 
         echo(LINE)
         echo(BUILD_EXT_WARNING)
+        echo('pyScss will still work fine, but may be slower.')
+        echo(
+            'The most likely cause is missing PCRE headers; you may need to '
+            'install libpcre or libpcre-dev, depending on your platform.'
+        )
         echo('Plain-Python installation succeeded.')
         echo(LINE)
 
 
-if not (is_pypy or is_jython):
+if platform.python_implementation() == 'CPython':
     try_building_extension()
 else:
     run_setup(False)

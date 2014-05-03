@@ -77,14 +77,9 @@ log = logging.getLogger(__name__)
 
 ################################################################################
 # Load C acceleration modules
-locate_blocks = None
 try:
     from scss._speedups import locate_blocks
 except ImportError:
-    warnings.warn(
-        "Scanning acceleration disabled (_speedups not found)!",
-        RuntimeWarning
-        )
     from scss._native import locate_blocks
 
 ################################################################################
