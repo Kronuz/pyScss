@@ -37,6 +37,7 @@ xCSS:
 from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
+from __future__ import division
 
 from scss.scss_meta import BUILD_INFO, PROJECT, VERSION, REVISION, URL, AUTHOR, AUTHOR_EMAIL, LICENSE
 
@@ -244,7 +245,7 @@ class SourceFile(object):
             state['indent_marker'] = indent
 
         if state['indent_marker']:
-            indent /= state['indent_marker']
+            indent //= state['indent_marker']
 
         if indent == state['prev_indent']:
             # same indentation as previous line
