@@ -398,8 +398,8 @@ class Scss(object):
 
         self.rules = []
 
-    #@profile
-    #@print_timing(2)
+    # @profile
+    # @print_timing(2)
     def Compilation(self, scss_string=None, scss_file=None, source_files=None, super_selector=None, filename=None, is_sass=None, line_numbers=True):
         # TODO this signature is totally wacky; it should just take a list of
         # source files
@@ -501,7 +501,7 @@ class Scss(object):
 
         return selectors, parents
 
-    @print_timing(3)
+    # @print_timing(3)
     def parse_children(self, scope=None):
         children = []
         root_namespace = self.root_namespace
@@ -523,7 +523,7 @@ class Scss(object):
             for name, file_and_line in root_namespace.unused_imports():
                 log.warn("Unused @import: '%s' (%s)", name, file_and_line)
 
-    @print_timing(4)
+    # @print_timing(4)
     def manage_children(self, rule, scope):
         try:
             self._manage_children_impl(rule, scope)
@@ -541,77 +541,24 @@ class Scss(object):
         for c_lineno, c_property, c_codestr in locate_blocks(rule.unparsed_contents):
             block = UnparsedBlock(rule, c_lineno, c_property, c_codestr)
 
+            ####################################################################
+            # At (@) blocks
             if block.is_atrule:
                 code = block.directive
-                code = code.lower()
-                if code == '@warn':
-                    value = calculator.calculate(block.argument)
-                    log.warn(repr(value))
-                elif code == '@print':
-                    value = calculator.calculate(block.argument)
-                    sys.stderr.write("%s\n" % value)
-                elif code == '@raw':
-                    value = calculator.calculate(block.argument)
-                    sys.stderr.write("%s\n" % repr(value))
-                elif code == '@dump_context':
-                    sys.stderr.write("%s\n" % repr(rule.namespace._variables))
-                elif code == '@dump_functions':
-                    sys.stderr.write("%s\n" % repr(rule.namespace._functions))
-                elif code == '@dump_mixins':
-                    sys.stderr.write("%s\n" % repr(rule.namespace._mixins))
-                elif code == '@dump_imports':
-                    sys.stderr.write("%s\n" % repr(rule.namespace._imports))
-                elif code == '@dump_options':
-                    sys.stderr.write("%s\n" % repr(rule.options))
-                elif code == '@debug':
-                    setting = block.argument.strip()
-                    if setting.lower() in ('1', 'true', 't', 'yes', 'y', 'on'):
-                        setting = True
-                    elif setting.lower() in ('0', 'false', 'f', 'no', 'n', 'off', 'undefined'):
-                        setting = False
-                    config.DEBUG = setting
-                    log.info("Debug mode is %s", 'On' if config.DEBUG else 'Off')
-                elif code == '@option':
-                    self._settle_options(rule, scope, block)
-                elif code == '@content':
-                    self._do_content(rule, scope, block)
-                elif code == '@import':
-                    self._do_import(rule, scope, block)
-                elif code == '@extend':
-                    from scss.selector import Selector
-                    selectors = calculator.apply_vars(block.argument)
-                    # XXX this no longer handles `&`, which is from xcss
-                    rule.extends_selectors.extend(Selector.parse_many(selectors))
-                    #rule.extends_selectors.update(p.strip() for p in selectors.replace(',', '&').split('&'))
-                    #rule.extends_selectors.discard('')
-                elif code == '@return':
-                    # TODO should assert this only happens within a @function
-                    ret = calculator.calculate(block.argument)
-                    raise SassReturn(ret)
-                elif code == '@include':
-                    self._do_include(rule, scope, block)
-                elif code in ('@mixin', '@function'):
-                    self._do_functions(rule, scope, block)
-                elif code in ('@if', '@else if'):
-                    self._do_if(rule, scope, block)
-                elif code == '@else':
-                    self._do_else(rule, scope, block)
-                elif code == '@for':
-                    self._do_for(rule, scope, block)
-                elif code == '@each':
-                    self._do_each(rule, scope, block)
-                elif code == '@while':
-                    self._do_while(rule, scope, block)
-                elif code in ('@variables', '@vars'):
-                    self._get_variables(rule, scope, block)
-                elif block.unparsed_contents is None:
-                    rule.properties.append((block.prop, None))
-                elif scope is None:  # needs to have no scope to crawl down the nested rules
-                    self._nest_at_rules(rule, scope, block)
+                code = '_at_' + code.lower().replace(' ', '_')[1:]
+                try:
+                    getattr(self, code)(calculator, rule, scope, block)
+                except AttributeError:
+                    if block.unparsed_contents is None:
+                        rule.properties.append((block.prop, None))
+                    elif scope is None:  # needs to have no scope to crawl down the nested rules
+                        self._nest_at_rules(rule, scope, block)
+
             ####################################################################
             # Properties
             elif block.unparsed_contents is None:
                 self._get_properties(rule, scope, block)
+
             # Nested properties
             elif block.is_scope:
                 if block.header.unscoped_value:
@@ -621,13 +568,109 @@ class Scss(object):
                 rule.unparsed_contents = block.unparsed_contents
                 subscope = (scope or '') + block.header.scope + '-'
                 self.manage_children(rule, subscope)
+
             ####################################################################
             # Nested rules
             elif scope is None:  # needs to have no scope to crawl down the nested rules
                 self._nest_rules(rule, scope, block)
 
-    @print_timing(10)
-    def _settle_options(self, rule, scope, block):
+    def _at_warn(self, calculator, rule, scope, block):
+        """
+        Implements @warn
+        """
+        value = calculator.calculate(block.argument)
+        log.warn(repr(value))
+
+    def _at_print(self, calculator, rule, scope, block):
+        """
+        Implements @print
+        """
+        value = calculator.calculate(block.argument)
+        sys.stderr.write("%s\n" % value)
+
+    def _at_raw(self, calculator, rule, scope, block):
+        """
+        Implements @raw
+        """
+        value = calculator.calculate(block.argument)
+        sys.stderr.write("%s\n" % repr(value))
+
+    def _at_dump_context(self, calculator, rule, scope, block):
+        """
+        Implements @dump_context
+        """
+        sys.stderr.write("%s\n" % repr(rule.namespace._variables))
+
+    def _at_dump_functions(self, calculator, rule, scope, block):
+        """
+        Implements @dump_functions
+        """
+        sys.stderr.write("%s\n" % repr(rule.namespace._functions))
+
+    def _at_dump_mixins(self, calculator, rule, scope, block):
+        """
+        Implements @dump_mixins
+        """
+        sys.stderr.write("%s\n" % repr(rule.namespace._mixins))
+
+    def _at_dump_imports(self, calculator, rule, scope, block):
+        """
+        Implements @dump_imports
+        """
+        sys.stderr.write("%s\n" % repr(rule.namespace._imports))
+
+    def _at_dump_options(self, calculator, rule, scope, block):
+        """
+        Implements @dump_options
+        """
+        sys.stderr.write("%s\n" % repr(rule.options))
+
+    def _at_debug(self, calculator, rule, scope, block):
+        """
+        Implements @debug
+        """
+        setting = block.argument.strip()
+        if setting.lower() in ('1', 'true', 't', 'yes', 'y', 'on'):
+            setting = True
+        elif setting.lower() in ('0', 'false', 'f', 'no', 'n', 'off', 'undefined'):
+            setting = False
+        config.DEBUG = setting
+        log.info("Debug mode is %s", 'On' if config.DEBUG else 'Off')
+
+    def _at_pdb(self, calculator, rule, scope, block):
+        """
+        Implements @pdb
+        """
+        try:
+            import ipdb as pdb
+        except ImportError:
+            import pdb
+        pdb.set_trace()
+
+    def _at_extend(self, calculator, rule, scope, block):
+        """
+        Implements @extend
+        """
+        from scss.selector import Selector
+        selectors = calculator.apply_vars(block.argument)
+        # XXX this no longer handles `&`, which is from xcss
+        rule.extends_selectors.extend(Selector.parse_many(selectors))
+        #rule.extends_selectors.update(p.strip() for p in selectors.replace(',', '&').split('&'))
+        #rule.extends_selectors.discard('')
+
+    def _at_return(self, calculator, rule, scope, block):
+        """
+        Implements @return
+        """
+        # TODO should assert this only happens within a @function
+        ret = calculator.calculate(block.argument)
+        raise SassReturn(ret)
+
+    # @print_timing(10)
+    def _at_option(self, calculator, rule, scope, block):
+        """
+        Implements @option
+        """
         for option in block.argument.split(','):
             option, value = (option.split(':', 1) + [''])[:2]
             option = option.strip().lower()
@@ -718,15 +761,14 @@ class Scss(object):
         pristine_callee_namespace.use_import(import_key)
         return callee_namespace
 
-    @print_timing(10)
-    def _do_functions(self, rule, scope, block):
+    # @print_timing(10)
+    def _at_function(self, calculator, rule, scope, block):
         """
         Implements @mixin and @function
         """
         if not block.argument:
             raise SyntaxError("%s requires a function name (%s)" % (block.directive, rule.file_and_line))
 
-        calculator = Calculator(rule.namespace)
         funct, argspec_node = self._get_funct_def(rule, calculator, block.argument)
 
         defaults = {}
@@ -799,9 +841,10 @@ class Scss(object):
                     break
             if not new_params:
                 add(funct, 0, mixin)
+    _at_mixin = _at_function
 
-    @print_timing(10)
-    def _do_include(self, rule, scope, block):
+    # @print_timing(10)
+    def _at_include(self, calculator, rule, scope, block):
         """
         Implements @include, for @mixins
         """
@@ -868,8 +911,8 @@ class Scss(object):
         _rule.options['@content'] = block.unparsed_contents
         self.manage_children(_rule, scope)
 
-    @print_timing(10)
-    def _do_content(self, rule, scope, block):
+    # @print_timing(10)
+    def _at_content(self, calculator, rule, scope, block):
         """
         Implements @content
         """
@@ -878,8 +921,8 @@ class Scss(object):
         rule.unparsed_contents = rule.options.pop('@content', '')
         self.manage_children(rule, scope)
 
-    @print_timing(10)
-    def _do_import(self, rule, scope, block):
+    # @print_timing(10)
+    def _at_import(self, calculator, rule, scope, block):
         """
         Implements @import
         Load and import mixins and functions and rules
@@ -899,7 +942,7 @@ class Scss(object):
             full_filename, seen_paths = self._find_import(rule, name, skip=rule.source_file.full_filename)
 
             if full_filename is None:
-                i_codestr = self._do_magic_import(rule, scope, block)
+                i_codestr = self._at_magic_import(calculator, rule, scope, block)
 
                 if i_codestr is not None:
                     source_file = SourceFile.from_string(i_codestr)
@@ -970,8 +1013,8 @@ class Scss(object):
 
         return None, seen_paths
 
-    @print_timing(10)
-    def _do_magic_import(self, rule, scope, block):
+    # @print_timing(10)
+    def _at_magic_import(self, calculator, rule, scope, block):
         """
         Implements @import for sprite-maps
         Imports magic sprite map directories
@@ -989,8 +1032,6 @@ class Scss(object):
         # Build magic context
         map_name = os.path.normpath(os.path.dirname(block.argument)).replace('\\', '_').replace('/', '_')
         kwargs = {}
-
-        calculator = Calculator(rule.namespace)
 
         def setdefault(var, val):
             _var = '$' + map_name + '-' + var
@@ -1050,8 +1091,8 @@ class Scss(object):
         ''' % {'map_name': map_name, 'sprites': ' '.join(names)}
         return ret
 
-    @print_timing(10)
-    def _do_if(self, rule, scope, block):
+    # @print_timing(10)
+    def _at_if(self, calculator, rule, scope, block):
         """
         Implements @if and @else if
         """
@@ -1064,7 +1105,6 @@ class Scss(object):
                 # Last @if succeeded; stop here
                 return
 
-        calculator = Calculator(rule.namespace)
         condition = calculator.calculate(block.argument)
         if condition:
             inner_rule = rule.copy()
@@ -1074,9 +1114,10 @@ class Scss(object):
                 inner_rule.namespace = rule.namespace
             self.manage_children(inner_rule, scope)
         rule.options['@if'] = condition
+    _at_else_if = _at_if
 
-    @print_timing(10)
-    def _do_else(self, rule, scope, block):
+    # @print_timing(10)
+    def _at_else(self, calculator, rule, scope, block):
         """
         Implements @else
         """
@@ -1090,8 +1131,8 @@ class Scss(object):
             inner_rule.unparsed_contents = block.unparsed_contents
             self.manage_children(inner_rule, scope)
 
-    @print_timing(10)
-    def _do_for(self, rule, scope, block):
+    # @print_timing(10)
+    def _at_for(self, calculator, rule, scope, block):
         """
         Implements @for
         """
@@ -1099,7 +1140,6 @@ class Scss(object):
         frm, _, through = name.partition(' through ')
         if not through:
             frm, _, through = frm.partition(' to ')
-        calculator = Calculator(rule.namespace)
         frm = calculator.calculate(frm)
         through = calculator.calculate(through)
         try:
@@ -1128,13 +1168,12 @@ class Scss(object):
             inner_rule.namespace.set_variable(var, Number(i))
             self.manage_children(inner_rule, scope)
 
-    @print_timing(10)
-    def _do_each(self, rule, scope, block):
+    # @print_timing(10)
+    def _at_each(self, calculator, rule, scope, block):
         """
         Implements @each
         """
         varstring, _, valuestring = block.argument.partition(' in ')
-        calculator = Calculator(rule.namespace)
         values = calculator.calculate(valuestring)
         if not values:
             return
@@ -1169,12 +1208,11 @@ class Scss(object):
                 inner_rule.namespace.set_variable(varlist[0], v)
             self.manage_children(inner_rule, scope)
 
-    @print_timing(10)
-    def _do_while(self, rule, scope, block):
+    # @print_timing(10)
+    def _at_while(self, calculator, rule, scope, block):
         """
         Implements @while
         """
-        calculator = Calculator(rule.namespace)
         first_condition = condition = calculator.calculate(block.argument)
         while condition:
             inner_rule = rule.copy()
@@ -1186,8 +1224,8 @@ class Scss(object):
             condition = calculator.calculate(block.argument)
         rule.options['@if'] = first_condition
 
-    @print_timing(10)
-    def _get_variables(self, rule, scope, block):
+    # @print_timing(10)
+    def _at_variables(self, calculator, rule, scope, block):
         """
         Implements @variables and @vars
         """
@@ -1198,8 +1236,9 @@ class Scss(object):
         self.manage_children(_rule, scope)
         for name, value in _rule.properties.items():
             rule.namespace.set_variable(name, value)
+    _at_vars = _at_variables
 
-    @print_timing(10)
+    # @print_timing(10)
     def _get_properties(self, rule, scope, block):
         """
         Implements properties and variables extraction and assignment
@@ -1264,7 +1303,7 @@ class Scss(object):
 
             rule.properties.append((_prop, value))
 
-    @print_timing(10)
+    # @print_timing(10)
     def _nest_at_rules(self, rule, scope, block):
         """
         Implements @-blocks
@@ -1319,7 +1358,7 @@ class Scss(object):
             for name, file_and_line in new_rule.namespace.unused_imports():
                 log.warn("Unused @import: '%s' (%s)", name, file_and_line)
 
-    @print_timing(10)
+    # @print_timing(10)
     def _nest_rules(self, rule, scope, block):
         """
         Implements Nested CSS rules
@@ -1355,7 +1394,7 @@ class Scss(object):
             for name, file_and_line in new_rule.namespace.unused_imports():
                 log.warn("Unused @import: '%s' (%s)", name, file_and_line)
 
-    @print_timing(3)
+    # @print_timing(3)
     def apply_extends(self):
         """Run through the given rules and translate all the pending @extends
         declarations into real selectors on parent rules.
@@ -1441,7 +1480,7 @@ class Scss(object):
         self.rules = [rule for rule in self.rules if not rule.is_pure_placeholder]
         self.rules.sort(key=lambda rule: min(rule_dependencies[rule]))
 
-    @print_timing(3)
+    # @print_timing(3)
     def parse_properties(self):
         css_files = []
         seen_files = set()
@@ -1460,7 +1499,7 @@ class Scss(object):
 
         return rules_by_file, css_files
 
-    @print_timing(3)
+    # @print_timing(3)
     def create_css(self, rules):
         """
         Generate the final CSS string

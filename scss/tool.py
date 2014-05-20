@@ -341,14 +341,14 @@ class SassRepl(object):
                 block = UnparsedBlock(rule, 1, s, None)
                 code, name = (s.split(None, 1) + [''])[:2]
                 if code == '@option':
-                    self.css._settle_options(rule, children, scope, block)
+                    self.css._at_options(self.calculator, rule, scope, block)
                     continue
                 elif code == '@import':
-                    self.css._do_import(rule, children, scope, block)
+                    self.css._at_import(self.calculator, rule, scope, block)
                     continue
                 elif code == '@include':
                     final_cont = ''
-                    self.css._do_include(rule, children, scope, block)
+                    self.css._at_include(self.calculator, rule, scope, block)
                     code = self.css._print_properties(properties).rstrip('\n')
                     if code:
                         final_cont += code
