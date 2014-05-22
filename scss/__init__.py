@@ -85,6 +85,8 @@ except ImportError:
 
 ################################################################################
 
+_default_rule_re = re.compile(r'(?i)\s+!default\Z')
+_xcss_extends_re = re.compile(r'\s+extends\s+')
 
 _safe_strings = {
     '^doubleslash^': '//',
@@ -487,7 +489,7 @@ class Scss(object):
 
         from scss.selector import Selector
 
-        parts = re.split(r'\s+extends\s+', raw_selectors, 1)
+        parts = _xcss_extends_re.split(raw_selectors, 1)  # handle old xCSS extends
         if len(parts) > 1:
             unparsed_selectors, unsplit_parents = parts
             # Multiple `extends` are delimited by `&`
@@ -1259,7 +1261,7 @@ class Scss(object):
         if raw_value is not None:
             raw_value = raw_value.strip()
             if prop.startswith('$'):
-                raw_value, subs = re.subn(r'(?i)\s+!default\Z', '', raw_value)
+                raw_value, subs = _default_rule_re.subn('', raw_value)  # handle !default
                 if subs:
                     is_default = True
 
