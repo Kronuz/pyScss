@@ -34,6 +34,8 @@ KEEP_FONT_SHEETS = int(MAX_FONT_SHEETS * 0.8)
 FONTS_LIBRARY = FunctionLibrary()
 register = FONTS_LIBRARY.register
 
+FONT_TYPES = ('eot', 'woff', 'ttf', 'svg')  # eot should be first for IE support
+
 FONT_MIME_TYPES = {
     'ttf': 'application/x-font-ttf',
     'svg': 'image/svg+xml',
@@ -178,7 +180,7 @@ def font_sheet(g, **kwargs):
             # Generate font files
             if not inline:
                 urls = {}
-                for i, type_ in enumerate(('eot', 'woff', 'ttf', 'svg')):
+                for i, type_ in enumerate(FONT_TYPES):
                     asset_path = asset_paths[type_]
                     try:
                         font.generate(asset_path)
@@ -198,7 +200,7 @@ def font_sheet(g, **kwargs):
                         inline = False
             if inline:
                 urls = {}
-                for type_ in ('eot', 'woff', 'ttf', 'svg'):
+                for type_ in FONT_TYPES:
                     _tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.' + type_)
                     _tmp.file.close()
                     font.generate(_tmp.name)
@@ -218,7 +220,7 @@ def font_sheet(g, **kwargs):
                     assets[type_] = inline_assets[type_] = List([String.unquoted(url), String.unquoted(format_)])
                 else:
                     assets[type_] = file_assets[type_] = List([String.unquoted(url), String.unquoted(format_)])
-            asset = List([a for a in assets.values()], separator=",")
+            asset = List([assets[type_] for type_ in FONT_TYPES], separator=",")
 
             # Add the new object:
             font_sheet = dict(zip(names, zip(rfiles, codepoints)))
