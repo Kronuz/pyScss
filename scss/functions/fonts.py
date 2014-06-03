@@ -80,14 +80,14 @@ def font_sheet(g, **kwargs):
             log.error("Nothing found at '%s'", glob_path)
             return String.unquoted('')
 
-        glyph_name = os.path.normpath(os.path.dirname(g)).replace('\\', '_').replace('/', '_')
+        glyph_name = os.path.basename(os.path.dirname(g))
         key = [f for (f, s) in files] + [repr(kwargs), config.ASSETS_URL]
         key = glyph_name + '-' + make_filename_hash(key)
         asset_files = {
+            'eot': key + '.eot',
+            'woff': key + '.woff',
             'ttf': key + '.ttf',
             'svg': key + '.svg',
-            'woff': key + '.woff',
-            'eot': key + '.eot',
         }
         ASSETS_ROOT = config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets')
         asset_paths = dict((type_, os.path.join(ASSETS_ROOT, asset_file)) for type_, asset_file in asset_files.items())
@@ -152,6 +152,7 @@ def font_sheet(g, **kwargs):
                     svgtext = _file.read()
                     svgtext = svgtext.replace('<switch>', '')
                     svgtext = svgtext.replace('</switch>', '')
+                    svgtext = svgtext.replace('<svg>', '<svg xmlns="http://www.w3.org/2000/svg">')
                     _glyph = tempfile.NamedTemporaryFile(delete=False, suffix=".svg")
                     _glyph.file.write(svgtext)
                     _glyph.file.close()
@@ -177,15 +178,14 @@ def font_sheet(g, **kwargs):
             # Generate font files
             if not inline:
                 urls = {}
-                for type_ in ('ttf', 'svg', 'woff', 'eot'):
+                for i, type_ in enumerate(('eot', 'woff', 'ttf', 'svg')):
                     asset_path = asset_paths[type_]
                     try:
                         font.generate(asset_path)
-                        # svgtext.replace('<svg>', '<svg xmlns="http://www.w3.org/2000/svg">')
                         asset_file = asset_files[type_]
                         url = '%s%s' % (config.ASSETS_URL, asset_file)
                         params = []
-                        if type_ == 'eot':
+                        if i == 0:
                             params.append('#iefix')
                         if cache_buster:
                             params.append('v=%s' % filetime)
@@ -198,7 +198,7 @@ def font_sheet(g, **kwargs):
                         inline = False
             if inline:
                 urls = {}
-                for type_ in ('ttf', 'svg', 'woff', 'eot'):
+                for type_ in ('eot', 'woff', 'ttf', 'svg'):
                     _tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.' + type_)
                     _tmp.file.close()
                     font.generate(_tmp.name)
