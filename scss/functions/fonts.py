@@ -5,11 +5,14 @@ Functions used for generating custom fonts from SVG files.
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import errno
 import glob
 import logging
 import os
 import time
 import tempfile
+import subprocess
+import warnings
 
 try:
     import cPickle as pickle
@@ -27,6 +30,9 @@ from scss.types import String, Boolean, List
 from scss.util import getmtime, escape, make_data_url, make_filename_hash
 
 log = logging.getLogger(__name__)
+
+TTFAUTOHINT_EXECUTABLE = 'ttfautohint'
+TTF2EOT_EXECUTABLE = 'ttf2eot'
 
 MAX_FONT_SHEETS = 4096
 KEEP_FONT_SHEETS = int(MAX_FONT_SHEETS * 0.8)
@@ -55,6 +61,46 @@ GLYPH_START = 0xf100
 
 font_sheets = {}
 _font_sheet_cache = {}
+
+
+def ttfautohint(ttf):
+    try:
+        proc = subprocess.Popen(
+            [TTFAUTOHINT_EXECUTABLE, '--hinting-limit=200', '--hinting-range-max=50', '--symbol'],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+    except OSError as e:
+        if e.errno in (errno.EACCES, errno.ENOENT):
+            warnings.warn('Could not autohint ttf font: The executable %s could not be run: %s' % (TTFAUTOHINT_EXECUTABLE, e))
+            return None
+        else:
+            raise e
+    output, output_err = proc.communicate(ttf)
+    if proc.returncode != 0:
+        warnings.warn("Could not autohint ttf font: Unknown error!")
+        return None
+    return output
+
+
+def ttf2eot(ttf):
+    try:
+        proc = subprocess.Popen(
+            [TTF2EOT_EXECUTABLE],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+    except OSError as e:
+        if e.errno in (errno.EACCES, errno.ENOENT):
+            warnings.warn('Could not generate eot font: The executable %s could not be run: %s' % (TTF2EOT_EXECUTABLE, e))
+            return None
+        else:
+            raise e
+    output, output_err = proc.communicate(ttf)
+    if proc.returncode != 0:
+        warnings.warn("Could not generate eot font: Unknown error!")
+        return None
+    return output
 
 
 @register('font-sheet')
@@ -180,14 +226,29 @@ def font_sheet(g, **kwargs):
             # Generate font files
             if not inline:
                 urls = {}
-                for i, type_ in enumerate(FONT_TYPES):
+                for type_ in reversed(FONT_TYPES):
                     asset_path = asset_paths[type_]
                     try:
-                        font.generate(asset_path)
+                        if type_ == 'eot':
+                            ttf_path = asset_paths['ttf']
+                            with open(ttf_path) as ttf_fh, open(asset_path, 'wb') as asset_fh:
+                                contents = ttf2eot(ttf_fh.read())
+                                if contents is None:
+                                    continue
+                                asset_fh.write(contents)
+                        else:
+                            font.generate(asset_path)
+                            if type_ == 'ttf':
+                                contents = None
+                                with open(asset_path) as asset_fh:
+                                    contents = ttfautohint(asset_fh.read())
+                                if contents is not None:
+                                    with open(asset_path, 'wb') as asset_fh:
+                                        asset_fh.write(contents)
                         asset_file = asset_files[type_]
                         url = '%s%s' % (config.ASSETS_URL, asset_file)
                         params = []
-                        if i == 0:
+                        if type_ == FONT_TYPES[0]:
                             params.append('#iefix')
                         if cache_buster:
                             params.append('v=%s' % filetime)
@@ -198,16 +259,28 @@ def font_sheet(g, **kwargs):
                         urls[type_] = url
                     except IOError:
                         inline = False
+
             if inline:
                 urls = {}
-                for type_ in FONT_TYPES:
-                    _tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.' + type_)
-                    _tmp.file.close()
-                    font.generate(_tmp.name)
-                    with open(_tmp.name) as fh:
-                        contents = fh.read()
+                for type_ in reversed(FONT_TYPES):
+                    contents = None
+                    if type_ == 'eot':
+                        ttf_path = asset_paths['ttf']
+                        with open(ttf_path) as ttf_fh:
+                            contents = ttf2eot(ttf_fh.read())
+                            if contents is None:
+                                continue
+                    else:
+                        _tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.' + type_)
+                        _tmp.file.close()
+                        font.generate(_tmp.name)
+                        with open(_tmp.name) as asset_fh:
+                            if type_ == 'ttf':
+                                _contents = asset_fh.read()
+                                contents = ttfautohint(_contents)
+                            if contents is None:
+                                contents = _contents
                     os.unlink(_tmp.name)
-                    # contents.replace('<svg>', '<svg xmlns="http://www.w3.org/2000/svg">')
                     mime_type = FONT_MIME_TYPES[type_]
                     url = make_data_url(mime_type, contents)
                     urls[type_] = url
