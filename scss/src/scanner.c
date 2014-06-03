@@ -55,7 +55,7 @@ Pattern_match(Pattern *regex, char *string, int string_sz, int start_at, Token *
 	const char *errptr;
 	int ret, erroffset, ovector[3];
 	pcre *p_pattern = regex->pattern;
-        ovector[0] = ovector[1] = ovector[2] = 0;
+	ovector[0] = ovector[1] = ovector[2] = 0;
 
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);

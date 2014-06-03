@@ -25,7 +25,7 @@ static char*
 scss_pyunicode_to_utf8(PyObject* obj, int *len)
 {
 	char* internal_buffer;
-        char* ret;
+	char* ret;
 	PyObject* intermediate_bytes;
 
 	intermediate_bytes = PyUnicode_AsUTF8String(obj);
