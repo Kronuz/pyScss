@@ -276,7 +276,7 @@ def font_sheet(g, **kwargs):
                         asset_file = asset_files[type_]
                         url = '%s%s' % (config.ASSETS_URL, asset_file)
                         params = []
-                        if type_ == FONT_TYPES[0]:
+                        if not urls:
                             params.append('#iefix')
                         if cache_buster:
                             params.append('v=%s' % filetime)
@@ -321,7 +321,7 @@ def font_sheet(g, **kwargs):
                     assets[type_] = inline_assets[type_] = List([String.unquoted(url), String.unquoted(format_)])
                 else:
                     assets[type_] = file_assets[type_] = List([String.unquoted(url), String.unquoted(format_)])
-            asset = List([assets[type_] for type_ in FONT_TYPES], separator=",")
+            asset = List([assets[type_] for type_ in FONT_TYPES if type_ in assets], separator=",")
 
             # Add the new object:
             font_sheet = dict(zip(tnames, zip(rfiles, codepoints)))
