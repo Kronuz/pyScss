@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import sys
 from functools import partial
 import logging
 import operator
@@ -137,7 +138,7 @@ class Calculator(object):
         try:
             return ast.evaluate(self, divide=divide)
         except Exception as e:
-            raise SassEvaluationError(e, expression=expr)
+            six.reraise(SassEvaluationError, SassEvaluationError(e, expression=expr), sys.exc_info()[2])
 
     def parse_expression(self, expr, target='goal'):
         if isinstance(expr, six.text_type):
