@@ -110,25 +110,52 @@ def font_sheet(g, **kwargs):
 
     now_time = time.time()
 
-    g = String(g, quotes=None).value
+    globs = String(g, quotes=None).value
+    globs = sorted(g.strip() for g in globs.split(','))
 
-    if g in font_sheets:
-        font_sheets[glob]['*'] = now_time
-    elif '..' not in g:  # Protect against going to prohibited places...
-        if callable(config.STATIC_ROOT):
-            glob_path = g
-            rfiles = files = sorted(config.STATIC_ROOT(g))
-        else:
-            glob_path = os.path.join(config.STATIC_ROOT, g)
-            files = glob.glob(glob_path)
-            files = sorted((f, None) for f in files)
-            rfiles = [(rf[len(config.STATIC_ROOT):], s) for rf, s in files]
+    _k_ = ','.join(globs)
 
+    files = None
+    rfiles = None
+    tfiles = None
+    base_name = None
+    glob_path = None
+    glyph_name = None
+
+    if _k_ in font_sheets:
+        font_sheets[_k_]['*'] = now_time
+    else:
+        files = []
+        rfiles = []
+        tfiles = []
+        for _glob in globs:
+            if '..' not in _glob:  # Protect against going to prohibited places...
+                if callable(config.STATIC_ROOT):
+                    _glob_path = _glob
+                    _rfiles = _files = sorted(config.STATIC_ROOT(_glob))
+                else:
+                    _glob_path = os.path.join(config.STATIC_ROOT, _glob)
+                    _files = glob.glob(_glob_path)
+                    _files = sorted((f, None) for f in _files)
+                    _rfiles = [(rf[len(config.STATIC_ROOT):], s) for rf, s in _files]
+                if _files:
+                    files.extend(_files)
+                    rfiles.extend(_rfiles)
+                    base_name = os.path.basename(os.path.dirname(_glob))
+                    _glyph_name, _, _glyph_type = base_name.partition('.')
+                    if _glyph_type:
+                        _glyph_type += '-'
+                    if not glyph_name:
+                        glyph_name = _glyph_name
+                    tfiles.extend([_glyph_type] * len(_files))
+                else:
+                    glob_path = _glob_path
+
+    if files is not None:
         if not files:
             log.error("Nothing found at '%s'", glob_path)
             return String.unquoted('')
 
-        glyph_name = os.path.basename(os.path.dirname(g))
         key = [f for (f, s) in files] + [repr(kwargs), config.ASSETS_URL]
         key = glyph_name + '-' + make_filename_hash(key)
         asset_files = {
@@ -207,6 +234,7 @@ def font_sheet(g, **kwargs):
                     yield _glyph.name
 
             names = tuple(os.path.splitext(os.path.basename(file_))[0] for file_, storage in files)
+            tnames = tuple(tfiles[i] + n for i, n in enumerate(names))
 
             codepoints = []
             for i, glyph_filename in enumerate(glyphs()):
@@ -296,7 +324,7 @@ def font_sheet(g, **kwargs):
             asset = List([assets[type_] for type_ in FONT_TYPES], separator=",")
 
             # Add the new object:
-            font_sheet = dict(zip(names, zip(rfiles, codepoints)))
+            font_sheet = dict(zip(tnames, zip(rfiles, codepoints)))
             font_sheet['*'] = now_time
             font_sheet['*f*'] = asset_files
             font_sheet['*k*'] = key

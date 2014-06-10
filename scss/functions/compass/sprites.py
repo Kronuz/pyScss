@@ -121,25 +121,50 @@ def sprite_map(g, **kwargs):
 
     now_time = time.time()
 
-    g = String(g, quotes=None).value
+    globs = String(g, quotes=None).value
+    globs = sorted(g.strip() for g in globs.split(','))
 
-    if g in sprite_maps:
-        sprite_maps[glob]['*'] = now_time
-    elif '..' not in g:  # Protect against going to prohibited places...
-        if callable(config.STATIC_ROOT):
-            glob_path = g
-            rfiles = files = sorted(config.STATIC_ROOT(g))
-        else:
-            glob_path = os.path.join(config.STATIC_ROOT, g)
-            files = glob.glob(glob_path)
-            files = sorted((f, None) for f in files)
-            rfiles = [(rf[len(config.STATIC_ROOT):], s) for rf, s in files]
+    _k_ = ','.join(globs)
 
+    files = None
+    rfiles = None
+    tfiles = None
+    map_name = None
+
+    if _k_ in sprite_maps:
+        sprite_maps[_k_]['*'] = now_time
+    else:
+        files = []
+        rfiles = []
+        tfiles = []
+        for _glob in globs:
+            if '..' not in _glob:  # Protect against going to prohibited places...
+                if callable(config.STATIC_ROOT):
+                    _glob_path = _glob
+                    _rfiles = _files = sorted(config.STATIC_ROOT(_glob))
+                else:
+                    _glob_path = os.path.join(config.STATIC_ROOT, _glob)
+                    _files = glob.glob(_glob_path)
+                    _files = sorted((f, None) for f in _files)
+                    _rfiles = [(rf[len(config.STATIC_ROOT):], s) for rf, s in _files]
+                if _files:
+                    files.extend(_files)
+                    rfiles.extend(_rfiles)
+                    base_name = os.path.normpath(os.path.dirname(_glob)).replace('\\', '_').replace('/', '_')
+                    _map_name, _, _map_type = base_name.partition('.')
+                    if _map_type:
+                        _map_type += '-'
+                    if not map_name:
+                        map_name = _map_name
+                    tfiles.extend([_map_type] * len(_files))
+                else:
+                    glob_path = _glob_path
+
+    if files is not None:
         if not files:
             log.error("Nothing found at '%s'", glob_path)
             return String.unquoted('')
 
-        map_name = os.path.normpath(os.path.dirname(g)).replace('\\', '_').replace('/', '_')
         key = [f for (f, s) in files] + [repr(kwargs), config.ASSETS_URL]
         key = map_name + '-' + make_filename_hash(key)
         asset_file = key + '.png'
@@ -223,6 +248,7 @@ def sprite_map(g, **kwargs):
                     yield _image
 
             names = tuple(os.path.splitext(os.path.basename(file_))[0] for file_, storage in files)
+            tnames = tuple(tfiles[i] + n for i, n in enumerate(names))
 
             has_dst_colors = False
             all_dst_colors = []
@@ -361,7 +387,7 @@ def sprite_map(g, **kwargs):
                 asset = file_asset = List([String.unquoted(url), String.unquoted(repeat)])
 
             # Add the new object:
-            sprite_map = dict(zip(names, zip(sizes, rfiles, offsets_x, offsets_y)))
+            sprite_map = dict(zip(tnames, zip(sizes, rfiles, offsets_x, offsets_y)))
             sprite_map['*'] = now_time
             sprite_map['*f*'] = asset_file
             sprite_map['*k*'] = key
