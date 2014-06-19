@@ -5,6 +5,7 @@ Functions used for generating custom fonts from SVG files.
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import re
 import errno
 import glob
 import logging
@@ -55,6 +56,14 @@ FONT_FORMATS = {
     'woff': "format('woff')",
     'eot': "format('embedded-opentype')",
 }
+
+GLYPH_WIDTH_RE = re.compile(r'width="(\d+(\.\d+)?)')
+GLYPH_HEIGHT_RE = re.compile(r'height="(\d+(\.\d+)?)')
+
+GLYPH_HEIGHT = 512
+GLYPH_ASCENT = 448
+GLYPH_DESCENT = GLYPH_HEIGHT - GLYPH_ASCENT
+GLYPH_WIDTH = GLYPH_HEIGHT
 
 # Offset to work around Chrome Windows bug
 GLYPH_START = 0xf100
@@ -201,22 +210,18 @@ def font_sheet(g, **kwargs):
 
         if font_sheet is None or asset is None:
             cache_buster = Boolean(kwargs.get('cache_buster', True))
-            autowidth = Boolean(kwargs.get('autowidth', True))
+            autowidth = Boolean(kwargs.get('autowidth', False))
             autohint = Boolean(kwargs.get('autohint', True))
 
             font = fontforge.font()
             font.encoding = 'UnicodeFull'
             font.design_size = 16
-            font.em = 512
-            font.ascent = 448
-            font.descent = 64
+            font.em = GLYPH_HEIGHT
+            font.ascent = GLYPH_ASCENT
+            font.descent = GLYPH_DESCENT
             font.fontname = glyph_name
             font.familyname = glyph_name
             font.fullname = glyph_name
-            if autowidth:
-                font.autoWidth(0, 0, 512)
-            if autohint:
-                font.autoHint()
 
             def glyphs(f=lambda x: x):
                 for file_, storage in f(files):
@@ -228,26 +233,39 @@ def font_sheet(g, **kwargs):
                     svgtext = svgtext.replace('<switch>', '')
                     svgtext = svgtext.replace('</switch>', '')
                     svgtext = svgtext.replace('<svg>', '<svg xmlns="http://www.w3.org/2000/svg">')
+                    m = GLYPH_WIDTH_RE.search(svgtext)
+                    if m:
+                        width = float(m.group(1))
+                    else:
+                        width = None
+                    m = GLYPH_HEIGHT_RE.search(svgtext)
+                    if m:
+                        height = float(m.group(1))
+                    else:
+                        height = None
                     _glyph = tempfile.NamedTemporaryFile(delete=False, suffix=".svg")
                     _glyph.file.write(svgtext)
                     _glyph.file.close()
-                    yield _glyph.name
+                    yield _glyph.name, width, height
 
             names = tuple(os.path.splitext(os.path.basename(file_))[0] for file_, storage in files)
             tnames = tuple(tfiles[i] + n for i, n in enumerate(names))
 
             codepoints = []
-            for i, glyph_filename in enumerate(glyphs()):
+            for i, (glyph_filename, glyph_width, glyph_height) in enumerate(glyphs()):
+                if glyph_height and glyph_height != GLYPH_HEIGHT:
+                    warnings.warn("Glyphs should be %spx-high" % GLYPH_HEIGHT)
                 codepoint = i + GLYPH_START
+                name = names[i]
                 codepoints.append(codepoint)
-                glyph = font.createChar(codepoint, names[i])
+                glyph = font.createChar(codepoint, name)
                 glyph.importOutlines(glyph_filename)
                 os.unlink(glyph_filename)
+                glyph.width = glyph_width or GLYPH_WIDTH
                 if autowidth:
+                    # Autowidth removes side bearings
                     glyph.left_side_bearing = glyph.right_side_bearing = 0
-                    glyph.round()
-                else:
-                    glyph.width = 512
+                glyph.round()
 
             filetime = int(now_time)
 
@@ -268,8 +286,9 @@ def font_sheet(g, **kwargs):
                             font.generate(asset_path)
                             if type_ == 'ttf':
                                 contents = None
-                                with open(asset_path) as asset_fh:
-                                    contents = ttfautohint(asset_fh.read())
+                                if autohint:
+                                    with open(asset_path) as asset_fh:
+                                        contents = ttfautohint(asset_fh.read())
                                 if contents is not None:
                                     with open(asset_path, 'wb') as asset_fh:
                                         asset_fh.write(contents)
@@ -303,9 +322,10 @@ def font_sheet(g, **kwargs):
                         _tmp.file.close()
                         font.generate(_tmp.name)
                         with open(_tmp.name) as asset_fh:
-                            if type_ == 'ttf':
-                                _contents = asset_fh.read()
-                                contents = ttfautohint(_contents)
+                            if autohint:
+                                if type_ == 'ttf':
+                                    _contents = asset_fh.read()
+                                    contents = ttfautohint(_contents)
                             if contents is None:
                                 contents = _contents
                     os.unlink(_tmp.name)
