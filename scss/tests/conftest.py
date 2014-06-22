@@ -37,18 +37,18 @@ def pytest_configure(config):
     # relative paths to the input file.
     test_file_tuples = []
     test_file_ids = []
-    for fn in glob.glob(os.path.join(FILES_DIR, '*/*.scss')):
+    for fn in glob.glob(os.path.join(FILES_DIR, '*%s*.scss' % os.sep)):
         if os.path.basename(fn)[0] == '_':
             continue
 
         relfn = os.path.relpath(fn, FILES_DIR)
         pytest_trigger = None
 
-        if relfn.startswith(('from-sassc/', 'from-ruby/')):
+        if relfn.startswith(('from-sassc' + os.sep, 'from-ruby' + os.sep)):
             pytest_trigger = pytest.mark.skipif(
                 not include_ruby, reason="skipping ruby tests by default")
 
-        elif relfn.startswith('xfail/'):
+        elif relfn.startswith('xfail' + os.sep):
             pytest_trigger = pytest.mark.xfail
 
         if file_filters and not any(rx.search(relfn) for rx in file_filters):
