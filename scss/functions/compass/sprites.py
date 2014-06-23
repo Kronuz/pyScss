@@ -122,7 +122,7 @@ def sprite_map(g, **kwargs):
     now_time = time.time()
 
     globs = String(g, quotes=None).value
-    globs = sorted(g.strip() for g in globs.split(','))
+    globs = sorted(g.strip(' "') for g in globs.split(','))
 
     _k_ = ','.join(globs)
 
@@ -150,7 +150,7 @@ def sprite_map(g, **kwargs):
                 if _files:
                     files.extend(_files)
                     rfiles.extend(_rfiles)
-                    base_name = os.path.normpath(os.path.dirname(_glob)).replace('\\', '_').replace('/', '_')
+                    base_name = os.path.normpath(os.path.dirname(_glob)).replace(os.sep, '_')
                     _map_name, _, _map_type = base_name.partition('.')
                     if _map_type:
                         _map_type += '-'
@@ -325,6 +325,7 @@ def sprite_map(g, **kwargs):
 
             offsets_x = []
             offsets_y = []
+            selectors = []
             for i, image in enumerate(images()):
                 x, y, width, height, cssx, cssy, cssw, cssh = layout_positions[i]
                 iwidth, iheight = image.size
@@ -358,6 +359,13 @@ def sprite_map(g, **kwargs):
                 offsets_x.append(cssx)
                 offsets_y.append(cssy)
 
+                # extracting selector for compass spriting's magic selectors
+                # http://compass-style.org/help/tutorials/spriting/magic-selectors/
+                name = os.path.splitext(os.path.basename(image.filename))[0]
+                spl = name.split('_')
+                selector = spl[-1] if len(spl) > 1 else None
+                selectors.append(selector)
+
             if useless_dst_color:
                 log.warning("Useless use of $dst-color in sprite map for files at '%s' (never used for)" % glob_path)
 
@@ -387,7 +395,7 @@ def sprite_map(g, **kwargs):
                 asset = file_asset = List([String.unquoted(url), String.unquoted(repeat)])
 
             # Add the new object:
-            sprite_map = dict(zip(tnames, zip(sizes, rfiles, offsets_x, offsets_y)))
+            sprite_map = dict(zip(tnames, zip(sizes, rfiles, offsets_x, offsets_y, selectors)))
             sprite_map['*'] = now_time
             sprite_map['*f*'] = asset_file
             sprite_map['*k*'] = key
@@ -398,6 +406,9 @@ def sprite_map(g, **kwargs):
             cache_tmp = tempfile.NamedTemporaryFile(delete=False, dir=ASSETS_ROOT)
             pickle.dump((now_time, file_asset, inline_asset, sprite_map, sizes), cache_tmp)
             cache_tmp.close()
+            if os.path.exists(cache_path):
+                # renaming when replacing an existing file causes an error on windows
+                os.remove(cache_path)
             os.rename(cache_tmp.name, cache_path)
 
             # Use the sorted list to remove older elements (keep only 500 objects):
@@ -559,3 +570,22 @@ def sprite_position(map, sprite, offset_x=None, offset_y=None):
                 y -= Number(sprite[3], 'px')
         return List([x, y])
     return List([Number(0), Number(0)])
+
+
+@register('sprite-does-not-have-parent', 2)
+def sprite_does_not_have_parent(map, sprite):
+    map = map.render()
+    sprite_map = sprite_maps.get(map)
+    sprite_name = String.unquoted(sprite).value
+    sprite = sprite_map and sprite_map.get(sprite_name)
+    # if there is no selector, the sprite does not have any parents
+    return Boolean(not sprite[4])
+
+
+@register('sprite-has-selector', 3)
+def sprite_has_selector(map, sprite, selector):
+    map = map.render()
+    sprite_map = sprite_maps.get(map)
+    sprite_name = String.unquoted(sprite).value
+    sprite = sprite_map and sprite_map.get(sprite_name + '_' + selector.value)
+    return Boolean(sprite)

@@ -1021,28 +1021,27 @@ class Scss(object):
         Implements @import for sprite-maps
         Imports magic sprite map directories
         """
+        to_import = block.argument.strip('"')
         if callable(config.STATIC_ROOT):
-            files = sorted(config.STATIC_ROOT(block.argument))
+            files = sorted(config.STATIC_ROOT(to_import))
         else:
-            glob_path = os.path.join(config.STATIC_ROOT, block.argument)
+            glob_path = os.path.join(config.STATIC_ROOT, to_import)
             files = glob.glob(glob_path)
             files = sorted((file[len(config.STATIC_ROOT):], None) for file in files)
 
         if not files:
             return
 
-        # Build magic context
-        map_name = os.path.normpath(os.path.dirname(block.argument)).replace('\\', '_').replace('/', '_')
+        # Populate namespace with sprite variables
+        map_name = os.path.normpath(os.path.dirname(to_import)).replace(os.sep, '_')
         kwargs = {}
 
         def setdefault(var, val):
             _var = '$' + map_name + '-' + var
-            if _var in rule.context:
-                kwargs[var] = calculator.interpolate(rule.context[_var], rule, self._library)
-            else:
-                rule.context[_var] = val
-                kwargs[var] = calculator.interpolate(val, rule, self._library)
-            return rule.context[_var]
+            if _var not in rule.namespace.variables:
+                rule.namespace.set_variable(_var, val)
+            kwargs[var] = calculator.interpolate(_var)
+            return rule.namespace.variable(_var)
 
         setdefault('sprite-base-class', String('.' + map_name + '-sprite', quotes=None))
         setdefault('sprite-dimensions', Boolean(False))
@@ -1054,7 +1053,7 @@ class Scss(object):
             setdefault(n + '-position', position)
             setdefault(n + '-spacing', spacing)
             setdefault(n + '-repeat', repeat)
-        rule.context['$' + map_name + '-' + 'sprites'] = sprite_map(block.argument, **kwargs)
+        rule.namespace.set_variable('$' + map_name + '-' + 'sprites', sprite_map(block.argument, **kwargs))
         ret = '''
             @import "compass/utilities/sprites/base";
 
@@ -1079,7 +1078,7 @@ class Scss(object):
             // It will also apply the image dimensions if $dimensions is true.
             @mixin %(map_name)s-sprite($name, $dimensions: $%(map_name)s-sprite-dimensions, $offset-x: 0, $offset-y: 0) {
                 @extend #{$%(map_name)s-sprite-base-class};
-                @include sprite($%(map_name)s-sprites, $name, $dimensions, $offset-x, $offset-y);
+                @include sprite($%(map_name)s-sprites, $name, $dimensions, $offset-x, $offset-y, False);
             }
 
             @mixin %(map_name)s-sprites($sprite-names, $dimensions: $%(map_name)s-sprite-dimensions) {

@@ -275,6 +275,9 @@ class Number(Value):
     def __hash__(self):
         return hash((self.value, self.unit_numer, self.unit_denom))
 
+    def __nonzero__(self):
+        return bool(self.value)
+
     def __int__(self):
         return int(self.value)
 

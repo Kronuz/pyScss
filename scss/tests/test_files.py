@@ -25,6 +25,14 @@ logger.addHandler(console)
 def test_pair_programmatic(scss_file_pair):
     scss_fn, css_fn = scss_file_pair
 
+    if scss_fn.endswith('sprite-import.scss'):
+        # disable cache_buster on sprite_map
+        sprite_map_0 = scss.sprite_map
+        def sprite_map_patch(g, **kwargs):
+            kwargs.setdefault('cache_buster', scss.types.Boolean(False))
+            return sprite_map_0(g, **kwargs)
+        scss.sprite_map = sprite_map_patch
+
     with open(scss_fn) as fh:
         source = fh.read()
     try:
