@@ -68,7 +68,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
         elif inline or dst_color or spacing:
             path = _storage.open(_file)
     else:
-        _path = os.path.join(IMAGES_ROOT.rstrip('/'), filepath.strip('/'))
+        _path = os.path.join(IMAGES_ROOT.rstrip(os.sep), filepath.strip('\\/'))
         filetime = getmtime(_path)
         if filetime is None:
             filetime = 'NA'
@@ -90,7 +90,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
         spacing = [int(Number(v).value) for v in List.from_maybe(spacing)]
         spacing = (spacing * 4)[:4]
 
-        file_name, file_ext = os.path.splitext(os.path.normpath(filepath).replace('\\', '_').replace('/', '_'))
+        file_name, file_ext = os.path.splitext(os.path.normpath(filepath).replace(os.sep, '_'))
         key = (filetime, src_color, dst_color, spacing)
         asset_file = file_name + '-' + make_filename_hash(key) + file_ext
         ASSETS_ROOT = config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets')
@@ -166,7 +166,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
                     except IOError:
                         log.exception("Error while saving image")
                         inline = True  # Retry inline version
-                    url = os.path.join(config.ASSETS_URL.rstrip('/'), asset_file.lstrip('/'))
+                    url = os.path.join(config.ASSETS_URL.rstrip(os.sep), asset_file.lstrip(os.sep))
                     if cache_buster:
                         url = add_cache_buster(url, filetime)
                 if inline:
@@ -176,9 +176,12 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
                     output.close()
                     url = make_data_url(mime_type, contents)
     else:
-        url = os.path.join(BASE_URL.rstrip('/'), filepath.lstrip('/'))
+        url = os.path.join(BASE_URL.rstrip('/'), filepath.lstrip('\\/'))
         if cache_buster and filetime != 'NA':
             url = add_cache_buster(url, filetime)
+
+    if not os.sep == '/':
+        url = url.replace(os.sep, '/')
 
     if not only_path:
         url = 'url(%s)' % escape(url)
@@ -239,7 +242,7 @@ def image_width(image):
             else:
                 path = _storage.open(_file)
         else:
-            _path = os.path.join(IMAGES_ROOT, filepath.strip('/'))
+            _path = os.path.join(IMAGES_ROOT, filepath.strip(os.sep))
             if os.path.exists(_path):
                 path = open(_path, 'rb')
         if path:
@@ -273,7 +276,7 @@ def image_height(image):
             else:
                 path = _storage.open(_file)
         else:
-            _path = os.path.join(IMAGES_ROOT, filepath.strip('/'))
+            _path = os.path.join(IMAGES_ROOT, filepath.strip(os.sep))
             if os.path.exists(_path):
                 path = open(_path, 'rb')
         if path:
