@@ -347,7 +347,7 @@ class CallOp(Expression):
         rendered_args = [arg.render() for arg in args]
 
         return String(
-            u"%s(%s)" % (func_name, u", ".join(rendered_args)),
+            six.u("%s(%s)" % (func_name, six.u(", ".join(rendered_args)))),
             quotes=None)
 
 
