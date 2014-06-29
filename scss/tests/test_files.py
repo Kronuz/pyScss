@@ -12,6 +12,8 @@ from __future__ import absolute_import
 
 import os.path
 import logging
+import sys
+from importlib import import_module
 
 import scss
 
@@ -25,10 +27,14 @@ logger.addHandler(console)
 def test_pair_programmatic(scss_file_pair):
     scss_fn, css_fn = scss_file_pair
 
-    # look for a config script related to the pair and execute it if found
+    # look for a python module related to the pair and execute it if found
+    mod = None
     cfg_script = scss_fn.replace('.scss', '.py')
     if os.path.exists(cfg_script):
-        execfile(cfg_script)
+        sys.path[0:0] = [os.path.dirname(scss_fn)]
+        mod = import_module(os.path.splitext(os.path.split(scss_fn)[1])[0])
+        getattr(mod, 'setUp', lambda: None)()
+        sys.path = sys.path[1:]
 
     with open(scss_fn) as fh:
         source = fh.read()
@@ -44,6 +50,8 @@ def test_pair_programmatic(scss_file_pair):
 
     compiler = scss.Scss(scss_opts=dict(style='expanded'), search_paths=[include_dir, directory])
     actual = compiler.compile(source)
+
+    getattr(mod, 'tearDown', lambda:None)()
 
     # Normalize leading and trailing newlines
     actual = actual.strip('\n')

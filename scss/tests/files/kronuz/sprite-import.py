@@ -11,4 +11,10 @@ def sprite_map_patch(g, **kwargs):
     kwargs.setdefault('cache_buster', scss.types.Boolean(False))
     return sprite_map_0(g, **kwargs)
 
-scss.sprite_map = sprite_map_patch
+
+def setUp():
+    scss.sprite_map = sprite_map_patch
+
+
+def tearDown():
+    scss.sprite_map = sprite_map_0
