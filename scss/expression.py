@@ -571,7 +571,6 @@ class Parser(object):
 
 
 ################################################################################
-## Grammar compiled using Yapps:
 
 class SassExpressionScanner(Scanner):
     patterns = None
@@ -703,13 +702,15 @@ class SassExpression(Parser):
         return (kwatom, expr_slst)
 
     def expr_lst(self):
-        expr_slst = self.expr_slst()
-        v = [expr_slst]
+        v = []
+        while self._peek(self.expr_lst_rsts) not in self.argspec_items_rsts:
+            expr_slst = self.expr_slst()
+            v.append(expr_slst)
         while self._peek(self.argspec_items_rsts) == '","':
             self._scan('","')
             expr_slst = self.expr_slst()
             v.append(expr_slst)
-        return ListLiteral(v) if len(v) > 1 else v[0]
+        return v[0] if len(v) == 1 else ListLiteral(v)
 
     def expr_slst(self):
         or_expr = self.or_expr()
@@ -827,10 +828,10 @@ class SassExpression(Parser):
         if _token_ == 'LPAR':
             LPAR = self._scan('LPAR')
             _token_ = self._peek(self.atom_rsts)
-            if _token_ not in self.argspec_item_chks:
+            if _token_ in self.atom_chks:
                 expr_map = self.expr_map()
                 v = expr_map
-            else:  # in self.argspec_item_chks
+            else:  # in self.atom_chks_
                 expr_lst = self.expr_lst()
                 v = expr_lst
             RPAR = self._scan('RPAR')
@@ -892,6 +893,7 @@ class SassExpression(Parser):
             KWVAR = self._scan('KWVAR')
             return Variable(KWVAR)
 
+    atom_chks_ = set(['LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'RPAR', 'ID', '","'])
     u_expr_chks = set(['LPAR', 'COLOR', 'QSTR', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
     m_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
     argspec_items_rsts = set(['RPAR', 'END', '","'])
@@ -908,19 +910,23 @@ class SassExpression(Parser):
     atom_rsts_ = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'VAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'UNITS', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
     expr_map_rsts_ = set(['KWVAR', 'KWID', 'KWSTR', 'KWQSTR', 'RPAR', 'KWCOLOR', '":"', 'KWNUM', '","'])
     u_expr_rsts = set(['LPAR', 'COLOR', 'QSTR', 'SIGN', 'ADD', 'NUM', 'FNCT', 'STR', 'VAR', 'BANG_IMPORTANT', 'ID'])
+    atom_chks = set(['KWVAR', 'KWID', 'KWSTR', 'KWQSTR', 'KWCOLOR', '":"', 'KWNUM'])
     comparison_chks = set(['GT', 'GE', 'NE', 'LT', 'LE', 'EQ'])
     argspec_items_rsts_ = set(['KWVAR', 'LPAR', 'QSTR', 'END', 'SLURPYVAR', 'COLOR', 'DOTDOTDOT', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
     a_expr_rsts = set(['LPAR', 'SUB', 'QSTR', 'RPAR', 'BANG_IMPORTANT', 'LE', 'COLOR', 'NE', 'LT', 'NUM', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'STR', 'VAR', 'EQ', 'ID', 'AND', 'ADD', 'NOT', 'OR', '","'])
     m_expr_chks = set(['MUL', 'DIV'])
     kwatom_rsts_ = set(['UNITS', '":"'])
+    expr_lst_rsts = set(['LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'RPAR', 'ID', '","'])
     argspec_items_chks = set(['KWVAR', 'LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
     argspec_rsts = set(['KWVAR', 'LPAR', 'BANG_IMPORTANT', 'END', 'SLURPYVAR', 'COLOR', 'DOTDOTDOT', 'RPAR', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'QSTR', 'SIGN', 'ID'])
-    atom_rsts = set(['KWVAR', 'KWID', 'KWSTR', 'BANG_IMPORTANT', 'LPAR', 'COLOR', 'KWQSTR', 'SIGN', 'KWCOLOR', 'VAR', 'ADD', 'NUM', '":"', 'STR', 'NOT', 'QSTR', 'KWNUM', 'ID', 'FNCT'])
+    atom_rsts = set(['KWVAR', 'KWID', 'KWSTR', 'LPAR', 'KWQSTR', 'RPAR', 'KWCOLOR', 'BANG_IMPORTANT', 'COLOR', 'NUM', '":"', 'QSTR', 'END', 'SIGN', 'ADD', 'FNCT', 'STR', 'VAR', 'ID', 'NOT', 'KWNUM', '","'])
     argspec_chks_ = set(['END', 'RPAR'])
     argspec_rsts_ = set(['KWVAR', 'LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'RPAR', 'ID'])
 
 
-### Grammar ends.
-################################################################################
+
+
+
+### Grammar ends.################################################################################
 
 __all__ = ('Calculator',)
