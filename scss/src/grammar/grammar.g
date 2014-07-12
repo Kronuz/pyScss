@@ -80,11 +80,14 @@ parser SassExpression:
 
 
     # Lists:
-    rule expr_lst:      expr_slst                   {{ v = [expr_slst] }}
+    rule expr_lst:                                  {{ v = [] }}
+                        (
+                            expr_slst               {{ v.append(expr_slst) }}
+                        )*
                         (
                             ","
                             expr_slst               {{ v.append(expr_slst) }}
-                        )*                          {{ return ListLiteral(v) if len(v) > 1 else v[0] }}
+                        )*                          {{ return v[0] if len(v) == 1 else ListLiteral(v) }}
 
 
     # Expressions:
@@ -132,7 +135,8 @@ parser SassExpression:
                         | ADD u_expr                {{ return UnaryOp(operator.pos, u_expr) }}
                         | atom                      {{ return atom }}
 
-    rule atom:          LPAR (
+    rule atom:
+                        LPAR (
                             expr_map                {{ v = expr_map }}
                             | expr_lst              {{ v = expr_lst }}
                         ) RPAR                      {{ return Parentheses(v) }}
