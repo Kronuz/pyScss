@@ -20,7 +20,7 @@ PRECISION = 8
 
 class Value(object):
     is_null = False
-    sass_type_name = u'unknown'
+    sass_type_name = six.u('unknown')
 
     def __repr__(self):
         return '<%s(%s)>' % (self.__class__.__name__, repr(self.value))
@@ -127,7 +127,7 @@ class Value(object):
 
 class Null(Value):
     is_null = True
-    sass_type_name = u'null'
+    sass_type_name = six.u('null')
 
     def __init__(self, value=None):
         pass
@@ -155,7 +155,7 @@ class Null(Value):
 
 
 class Undefined(Null):
-    sass_type_name = u'undefined'
+    sass_type_name = six.u('undefined')
 
     def __init__(self, value=None):
         pass
@@ -204,7 +204,7 @@ class Undefined(Null):
 
 
 class Boolean(Value):
-    sass_type_name = u'bool'
+    sass_type_name = six.u('bool')
 
     def __init__(self, value):
         self.value = bool(value)
@@ -226,7 +226,7 @@ class Boolean(Value):
 
 
 class Number(Value):
-    sass_type_name = u'number'
+    sass_type_name = six.u('number')
 
     def __init__(self, amount, unit=None, unit_numer=(), unit_denom=()):
         if isinstance(amount, Number):
@@ -551,7 +551,7 @@ class List(Value):
     in CSS output.
     """
 
-    sass_type_name = u'list'
+    sass_type_name = six.u('list')
 
     def __init__(self, iterable, separator=None, use_comma=None, is_literal=False):
         if isinstance(iterable, List):
@@ -737,7 +737,7 @@ def _constrain(value, lb=0, ub=1):
 
 
 class Color(Value):
-    sass_type_name = u'color'
+    sass_type_name = six.u('color')
     original_literal = None
 
     def __init__(self, tokens):
@@ -980,7 +980,7 @@ class String(Value):
     Otherwise, double quotes are used.
     """
 
-    sass_type_name = u'string'
+    sass_type_name = six.u('string')
 
     def __init__(self, value, quotes='"'):
         if isinstance(value, String):
@@ -1063,7 +1063,7 @@ class String(Value):
 
 
 class Map(Value):
-    sass_type_name = u'map'
+    sass_type_name = six.u('map')
 
     def __init__(self, pairs, index=None):
         self.pairs = tuple(pairs)
@@ -1117,10 +1117,10 @@ def expect_type(value, types, unit=any):
         if len(sass_type_names) == 1:
             sass_type = sass_type_names[0]
         elif len(sass_type_names) == 2:
-            sass_type = u' or '.join(sass_type_names)
+            sass_type = six.u(' or ').join(sass_type_names)
         else:
-            sass_type = u', '.join(sass_type_names[:-1])
-            sass_type += u', or ' + sass_type_names[-1]
+            sass_type = six.u(', ').join(sass_type_names[:-1])
+            sass_type += six.u(', or ') + sass_type_names[-1]
 
         raise TypeError("Expected %s, got %r" % (sass_type, value))
 
