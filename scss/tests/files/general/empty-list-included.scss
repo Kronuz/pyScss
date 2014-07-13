@@ -1,0 +1,17 @@
+@function pass-through($inputs) {
+  $list : ();
+
+  @each $input in $inputs {
+    $list: append($list, $input, comma);
+  }
+
+  @return $list;
+}
+
+
+
+$test: pass-through(p);
+
+#{$test} {
+  color: red;
+}

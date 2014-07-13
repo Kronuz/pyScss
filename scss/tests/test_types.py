@@ -3,7 +3,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from scss.types import Color, Null, Number, String
+from scss.types import Color, List, Null, Number, String
 
 import pytest
 
@@ -147,6 +147,12 @@ def test_comparison_null():
 
     with pytest.raises(TypeError):
         null < null
+
+
+def test_unrenderable():
+    # Empty lists can't be rendered as CSS
+    with pytest.raises(ValueError):
+        List([]).render()
 
 
 # TODO write more!  i'm lazy.
