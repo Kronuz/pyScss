@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 from __future__ import print_function
-from __future__ import unicode_literals
+
 
 import sys
 from functools import partial
@@ -347,7 +347,7 @@ class CallOp(Expression):
         rendered_args = [arg.render() for arg in args]
 
         return String(
-            six.u("%s(%s)" % (func_name, six.u(", ".join(rendered_args)))),
+            "%s(%s)" % (func_name, ", ".join(rendered_args)),
             quotes=None)
 
 
