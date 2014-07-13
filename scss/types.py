@@ -1062,6 +1062,13 @@ class String(Value):
         return self.__str__()
 
 
+class Url(String):
+    def render(self, compress=False):
+        # TODO url-escape whatever needs escaping
+        # TODO does that mean we should un-url-escape when parsing?  probably
+        return "url({0})".format(super(String, self).render(compress))
+
+
 class Map(Value):
     sass_type_name = six.u('map')
 

@@ -40,6 +40,10 @@ parser SassExpression:
     token KWID: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\s*:)"
     token ID: "[-a-zA-Z_][-a-zA-Z0-9_]*"
     token BANG_IMPORTANT: "!important"
+    # http://dev.w3.org/csswg/css-syntax-3/#consume-a-url-token0
+    # URLs may not contain quotes, parentheses, or unprintables
+    # TODO reify escapes, for this and for strings
+    token URL: "(?:[\\\\].|[^'\"()\\x00-\\x08\\x0b\\x0e-\\x1f\\x7f])*"
 
     # Goals:
     rule goal:          expr_lst END                {{ return expr_lst }}
@@ -152,6 +156,17 @@ parser SassExpression:
             | expr_map              {{ v = expr_map }}
             | expr_lst              {{ v = expr_lst }}
         ) RPAR                      {{ return Parentheses(v) }}
+        # Special functions.  Note that these technically overlap with the
+        # regular function rule, which makes this not quite LL -- but they're
+        # different tokens so yapps can't tell, and it resolves the conflict by
+        # picking the first one.
+        | "url" LPAR
+            (
+                URL                 {{ quotes = None }}
+                | "\"" URL "\""     {{ quotes = '"' }}
+                | "'" URL "'"       {{ quotes = "'" }}
+            )
+            RPAR                    {{ return Literal(Url(URL, quotes=quotes)) }}
         | FNCT LPAR argspec RPAR    {{ return CallOp(FNCT, argspec) }}
         | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
         | ID                        {{ return Literal(parse_bareword(ID)) }}
