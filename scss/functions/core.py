@@ -8,8 +8,6 @@ from __future__ import unicode_literals
 import logging
 import math
 
-import six
-
 from six.moves import xrange
 
 from scss.functions.library import FunctionLibrary
@@ -223,7 +221,7 @@ def lightness(color):
 @register('ie-hex-str', 1)
 def ie_hex_str(color):
     c = Color(color).value
-    return String(six.u('#%02X%02X%02X%02X') % (round(c[3] * 255), round(c[0]), round(c[1]), round(c[2])))
+    return String(u'#%02X%02X%02X%02X' % (round(c[3] * 255), round(c[0]), round(c[1]), round(c[2])))
 
 
 # ------------------------------------------------------------------------------
