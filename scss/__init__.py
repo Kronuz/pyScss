@@ -1075,19 +1075,18 @@ class Scss(object):
             }
 
             // Extends the sprite base class and set the background position for the desired sprite.
-            // It will also apply the image dimensions if $dimensions is true.
-            @mixin %(map_name)s-sprite($name, $dimensions: $%(map_name)s-sprite-dimensions, $offset-x: 0, $offset-y: 0) {
+            @mixin %(map_name)s-sprite($name, $offset-x: 0, $offset-y: 0) {
                 @extend #{$%(map_name)s-sprite-base-class};
-                @include sprite($%(map_name)s-sprites, $name, $dimensions, $offset-x, $offset-y, False);
+                @include sprite($%(map_name)s-sprites, $name, $offset-x, $offset-y, False);
             }
 
-            @mixin %(map_name)s-sprites($sprite-names, $dimensions: $%(map_name)s-sprite-dimensions) {
-                @include sprites($%(map_name)s-sprites, $sprite-names, $%(map_name)s-sprite-base-class, $dimensions);
+            @mixin %(map_name)s-sprites($sprite-names) {
+                @include sprites($%(map_name)s-sprites, $sprite-names, $%(map_name)s-sprite-base-class);
             }
 
             // Generates a class for each sprited image.
-            @mixin all-%(map_name)s-sprites($dimensions: $%(map_name)s-sprite-dimensions) {
-                @include %(map_name)s-sprites(%(sprites)s, $dimensions);
+            @mixin all-%(map_name)s-sprites() {
+                @include %(map_name)s-sprites(%(sprites)s);
             }
         ''' % {'map_name': map_name, 'sprites': ' '.join(names)}
         return ret
