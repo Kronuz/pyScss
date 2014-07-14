@@ -827,7 +827,9 @@ class SassExpression(Parser):
         if _token_ == 'LPAR':
             LPAR = self._scan('LPAR')
             _token_ = self._peek(self.atom_rsts)
-            if _token_ not in self.argspec_item_chks:
+            if _token_ == 'RPAR':
+                v = ListLiteral([], comma=False)
+            elif _token_ not in self.argspec_item_chks:
                 expr_map = self.expr_map()
                 v = expr_map
             else:  # in self.argspec_item_chks
@@ -915,7 +917,7 @@ class SassExpression(Parser):
     kwatom_rsts_ = set(['UNITS', '":"'])
     argspec_items_chks = set(['KWVAR', 'LPAR', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'BANG_IMPORTANT', 'ID'])
     argspec_rsts = set(['KWVAR', 'LPAR', 'BANG_IMPORTANT', 'END', 'SLURPYVAR', 'COLOR', 'DOTDOTDOT', 'RPAR', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'QSTR', 'SIGN', 'ID'])
-    atom_rsts = set(['KWVAR', 'KWID', 'KWSTR', 'BANG_IMPORTANT', 'LPAR', 'COLOR', 'KWQSTR', 'SIGN', 'KWCOLOR', 'VAR', 'ADD', 'NUM', '":"', 'STR', 'NOT', 'QSTR', 'KWNUM', 'ID', 'FNCT'])
+    atom_rsts = set(['KWVAR', 'KWID', 'KWSTR', 'BANG_IMPORTANT', 'LPAR', 'COLOR', 'KWQSTR', 'SIGN', 'RPAR', 'KWCOLOR', 'VAR', 'ADD', 'NUM', '":"', 'STR', 'NOT', 'QSTR', 'KWNUM', 'ID', 'FNCT'])
     argspec_chks_ = set(['END', 'RPAR'])
     argspec_rsts_ = set(['KWVAR', 'LPAR', 'BANG_IMPORTANT', 'END', 'COLOR', 'QSTR', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'STR', 'NOT', 'RPAR', 'ID'])
 

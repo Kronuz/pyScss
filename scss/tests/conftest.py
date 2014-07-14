@@ -6,6 +6,11 @@ import re
 
 import pytest
 
+try:
+    import fontforge
+except ImportError:
+    fontforge = None
+
 FILES_DIR = os.path.relpath(os.path.join(os.path.dirname(__file__), 'files'))
 
 # Globals, yuck!  Populated below.
@@ -47,9 +52,11 @@ def pytest_configure(config):
         if relfn.startswith(('from-sassc' + os.sep, 'from-ruby' + os.sep)):
             pytest_trigger = pytest.mark.skipif(
                 not include_ruby, reason="skipping ruby tests by default")
-
         elif relfn.startswith('xfail' + os.sep):
             pytest_trigger = pytest.mark.xfail
+        elif relfn.startswith('fonts' + os.sep):
+            pytest_trigger = pytest.mark.skipif(
+                not fontforge, reason="font tests require fontforge")
 
         if file_filters and not any(rx.search(relfn) for rx in file_filters):
             pytest_trigger = pytest.mark.skipif(
