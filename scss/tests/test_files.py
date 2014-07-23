@@ -8,7 +8,7 @@ This limitation is completely arbitrary. Files starting with '_' are skipped.
 
 """
 
-from __future__ import absolute_import
+from __future__ import absolute_import, unicode_literals
 
 import os.path
 import logging
@@ -29,7 +29,7 @@ def test_pair_programmatic(scss_file_pair):
         source = fh.read()
     try:
         with open(css_fn) as fh:
-            expected = fh.read()
+            expected = fh.read().decode('utf-8')
     except IOError:
         expected = ''
 
