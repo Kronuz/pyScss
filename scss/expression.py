@@ -617,7 +617,7 @@ class SassExpressionScanner(Scanner):
         ('KWID', '[-a-zA-Z_][-a-zA-Z0-9_]*(?=\\s*:)'),
         ('ID', '[-a-zA-Z_][-a-zA-Z0-9_]*'),
         ('BANG_IMPORTANT', '!important'),
-        ('URL', '(?:[\\\\].|[^\'"()\\x00-\\x08\\x0b\\x0e-\\x1f\\x7f])*'),
+        ('URL', '(?:[\\\\].|[^$\'"()\\x00-\\x08\\x0b\\x0e-\\x1f\\x7f])*'),
     ]
 
     def __init__(self, input=None):

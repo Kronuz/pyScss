@@ -43,7 +43,8 @@ parser SassExpression:
     # http://dev.w3.org/csswg/css-syntax-3/#consume-a-url-token0
     # URLs may not contain quotes, parentheses, or unprintables
     # TODO reify escapes, for this and for strings
-    token URL: "(?:[\\\\].|[^'\"()\\x00-\\x08\\x0b\\x0e-\\x1f\\x7f])*"
+    # FIXME: Also, URLs may not contain $ as it breaks urls with variables?
+    token URL: "(?:[\\\\].|[^$'\"()\\x00-\\x08\\x0b\\x0e-\\x1f\\x7f])*"
 
     # Goals:
     rule goal:          expr_lst END                {{ return expr_lst }}
