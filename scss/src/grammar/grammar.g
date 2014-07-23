@@ -177,7 +177,6 @@ parser SassExpression:
         | COLOR                     {{ return Literal(Color.from_hex(COLOR, literal=True)) }}
         | VAR                       {{ return Variable(VAR) }}
 
-
     rule kwatom:
         # nothing
         | KWID                      {{ return Literal(parse_bareword(KWID)) }}
@@ -185,7 +184,7 @@ parser SassExpression:
             [ UNITS ]               {{ return Literal(Number(float(KWNUM), unit=UNITS)) }}
         | KWSTR                     {{ return Literal(String(dequote(KWSTR), quotes="'")) }}
         | KWQSTR                    {{ return Literal(String(dequote(KWQSTR), quotes='"')) }}
-        | KWCOLOR                   {{ return Literal(Color.from_hex(COLOR, literal=True)) }}
+        | KWCOLOR                   {{ return Literal(Color.from_hex(KWCOLOR, literal=True)) }}
         | KWVAR                     {{ return Variable(KWVAR) }}
 
 %%

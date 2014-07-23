@@ -912,7 +912,7 @@ class SassExpression(Parser):
             return Literal(String(dequote(KWQSTR), quotes='"'))
         elif _token_ == 'KWCOLOR':
             KWCOLOR = self._scan('KWCOLOR')
-            return Literal(Color.from_hex(COLOR, literal=True))
+            return Literal(Color.from_hex(KWCOLOR, literal=True))
         else:  # == 'KWVAR'
             KWVAR = self._scan('KWVAR')
             return Variable(KWVAR)
