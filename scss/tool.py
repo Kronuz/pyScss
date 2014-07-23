@@ -178,8 +178,6 @@ def do_build(options, args):
             SourceFile.from_filename(path, is_sass=options.is_sass)
             for path in args
         ]
-        for path in args:
-            out.write(css.compile(scss_file=path, is_sass=options.is_sass))
     else:
         source_files = [
             SourceFile.from_file(sys.stdin, "<stdin>", is_sass=options.is_sass)]
