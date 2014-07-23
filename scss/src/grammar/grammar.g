@@ -24,10 +24,10 @@ parser SassExpression:
     token LT: "<"
     token GT: ">"
     token DOTDOTDOT: '[.]{3}'
-    token KWSTR: "'[^']*'(?=\s*:)"
-    token STR: "'[^']*'"
-    token KWQSTR: '"[^"]*"(?=\s*:)'
-    token QSTR: '"[^"]*"'
+    token KWSTR: "'[^'\\\\]*(?:\\\\.[^'\\\\]*)*'(?=\s*:)"
+    token STR: "'[^'\\\\]*(?:\\\\.[^'\\\\]*)*'"
+    token KWQSTR: '"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"(?=\s*:)'
+    token QSTR: '"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"'
     token UNITS: "(?<!\s)(?:[a-zA-Z]+|%)(?![-\w])"
     token KWNUM: "(?:\d+(?:\.\d*)?|\.\d+)(?=\s*:)"
     token NUM: "(?:\d+(?:\.\d*)?|\.\d+)"
@@ -172,20 +172,22 @@ parser SassExpression:
         | ID                        {{ return Literal(parse_bareword(ID)) }}
         | NUM                       {{ UNITS = None }}
             [ UNITS ]               {{ return Literal(Number(float(NUM), unit=UNITS)) }}
-        | STR                       {{ return Literal(String(STR[1:-1], quotes="'")) }}
-        | QSTR                      {{ return Literal(String(QSTR[1:-1], quotes='"')) }}
+        | STR                       {{ return Literal(String(dequote(STR), quotes="'")) }}
+        | QSTR                      {{ return Literal(String(dequote(QSTR), quotes='"')) }}
         | COLOR                     {{ return Literal(Color.from_hex(COLOR, literal=True)) }}
         | VAR                       {{ return Variable(VAR) }}
+
 
     rule kwatom:
         # nothing
         | KWID                      {{ return Literal(parse_bareword(KWID)) }}
         | KWNUM                     {{ UNITS = None }}
             [ UNITS ]               {{ return Literal(Number(float(KWNUM), unit=UNITS)) }}
-        | KWSTR                     {{ return Literal(String(KWSTR[1:-1], quotes="'")) }}
-        | KWQSTR                    {{ return Literal(String(KWQSTR[1:-1], quotes='"')) }}
+        | KWSTR                     {{ return Literal(String(dequote(KWSTR), quotes="'")) }}
+        | KWQSTR                    {{ return Literal(String(dequote(KWQSTR), quotes='"')) }}
         | KWCOLOR                   {{ return Literal(Color.from_hex(COLOR, literal=True)) }}
         | KWVAR                     {{ return Variable(KWVAR) }}
+
 %%
 ### Grammar ends.
 ################################################################################

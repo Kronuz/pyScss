@@ -601,10 +601,10 @@ class SassExpressionScanner(Scanner):
         ('LT', '<'),
         ('GT', '>'),
         ('DOTDOTDOT', '[.]{3}'),
-        ('KWSTR', "'[^']*'(?=\\s*:)"),
-        ('STR', "'[^']*'"),
-        ('KWQSTR', '"[^"]*"(?=\\s*:)'),
-        ('QSTR', '"[^"]*"'),
+        ('KWSTR', "'[^'\\\\]*(?:\\\\.[^'\\\\]*)*'(?=\\s*:)"),
+        ('STR', "'[^'\\\\]*(?:\\\\.[^'\\\\]*)*'"),
+        ('KWQSTR', '"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"(?=\\s*:)'),
+        ('QSTR', '"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"'),
         ('UNITS', '(?<!\\s)(?:[a-zA-Z]+|%)(?![-\\w])'),
         ('KWNUM', '(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?=\\s*:)'),
         ('NUM', '(?:\\d+(?:\\.\\d*)?|\\.\\d+)'),
@@ -880,10 +880,10 @@ class SassExpression(Parser):
             return Literal(Number(float(NUM), unit=UNITS))
         elif _token_ == 'STR':
             STR = self._scan('STR')
-            return Literal(String(STR[1:-1], quotes="'"))
+            return Literal(String(dequote(STR), quotes="'"))
         elif _token_ == 'QSTR':
             QSTR = self._scan('QSTR')
-            return Literal(String(QSTR[1:-1], quotes='"'))
+            return Literal(String(dequote(QSTR), quotes='"'))
         elif _token_ == 'COLOR':
             COLOR = self._scan('COLOR')
             return Literal(Color.from_hex(COLOR, literal=True))
@@ -906,10 +906,10 @@ class SassExpression(Parser):
             return Literal(Number(float(KWNUM), unit=UNITS))
         elif _token_ == 'KWSTR':
             KWSTR = self._scan('KWSTR')
-            return Literal(String(KWSTR[1:-1], quotes="'"))
+            return Literal(String(dequote(KWSTR), quotes="'"))
         elif _token_ == 'KWQSTR':
             KWQSTR = self._scan('KWQSTR')
-            return Literal(String(KWQSTR[1:-1], quotes='"'))
+            return Literal(String(dequote(KWQSTR), quotes='"'))
         elif _token_ == 'KWCOLOR':
             KWCOLOR = self._scan('KWCOLOR')
             return Literal(Color.from_hex(COLOR, literal=True))
