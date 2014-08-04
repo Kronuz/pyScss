@@ -20,6 +20,6 @@ $font: font-sheet("fontsheet/*.svg", $cache-buster: false);
 
 @each $glyph in glyphs($font) {
     .icon-#{$glyph}:before {
-        content: glyph-code($font, $glyph);
+        content: "\\" + glyph-code($font, $glyph);
     }
 }

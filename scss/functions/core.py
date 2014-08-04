@@ -221,7 +221,7 @@ def lightness(color):
 @register('ie-hex-str', 1)
 def ie_hex_str(color):
     c = Color(color).value
-    return String(u'#%02X%02X%02X%02X' % (round(c[3] * 255), round(c[0]), round(c[1]), round(c[2])))
+    return String('#%02X%02X%02X%02X' % (round(c[3] * 255), round(c[0]), round(c[1]), round(c[2])))
 
 
 # ------------------------------------------------------------------------------

@@ -24,10 +24,10 @@ parser SassExpression:
     token LT: "<"
     token GT: ">"
     token DOTDOTDOT: '[.]{3}'
-    token KWSTR: "'[^']*'(?=\s*:)"
-    token STR: "'[^']*'"
-    token KWQSTR: '"[^"]*"(?=\s*:)'
-    token QSTR: '"[^"]*"'
+    token KWSTR: "'[^'\\\\]*(?:\\\\.[^'\\\\]*)*'(?=\s*:)"
+    token STR: "'[^'\\\\]*(?:\\\\.[^'\\\\]*)*'"
+    token KWQSTR: '"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"(?=\s*:)'
+    token QSTR: '"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"'
     token UNITS: "(?<!\s)(?:[a-zA-Z]+|%)(?![-\w])"
     token KWNUM: "(?:\d+(?:\.\d*)?|\.\d+)(?=\s*:)"
     token NUM: "(?:\d+(?:\.\d*)?|\.\d+)"
@@ -40,6 +40,11 @@ parser SassExpression:
     token KWID: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\s*:)"
     token ID: "[-a-zA-Z_][-a-zA-Z0-9_]*"
     token BANG_IMPORTANT: "!important"
+    # http://dev.w3.org/csswg/css-syntax-3/#consume-a-url-token0
+    # URLs may not contain quotes, parentheses, or unprintables
+    # TODO reify escapes, for this and for strings
+    # FIXME: Also, URLs may not contain $ as it breaks urls with variables?
+    token URL: "(?:[\\\\].|[^$'\"()\\x00-\\x08\\x0b\\x0e-\\x1f\\x7f])*"
 
     # Goals:
     rule goal:          expr_lst END                {{ return expr_lst }}
@@ -152,13 +157,24 @@ parser SassExpression:
             | expr_map              {{ v = expr_map }}
             | expr_lst              {{ v = expr_lst }}
         ) RPAR                      {{ return Parentheses(v) }}
+        # Special functions.  Note that these technically overlap with the
+        # regular function rule, which makes this not quite LL -- but they're
+        # different tokens so yapps can't tell, and it resolves the conflict by
+        # picking the first one.
+        | "url" LPAR
+            (
+                URL                 {{ quotes = None }}
+                | "\"" URL "\""     {{ quotes = '"' }}
+                | "'" URL "'"       {{ quotes = "'" }}
+            )
+            RPAR                    {{ return Literal(Url(URL, quotes=quotes)) }}
         | FNCT LPAR argspec RPAR    {{ return CallOp(FNCT, argspec) }}
         | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
         | ID                        {{ return Literal(parse_bareword(ID)) }}
         | NUM                       {{ UNITS = None }}
             [ UNITS ]               {{ return Literal(Number(float(NUM), unit=UNITS)) }}
-        | STR                       {{ return Literal(String(STR[1:-1], quotes="'")) }}
-        | QSTR                      {{ return Literal(String(QSTR[1:-1], quotes='"')) }}
+        | STR                       {{ return Literal(String(dequote(STR), quotes="'")) }}
+        | QSTR                      {{ return Literal(String(dequote(QSTR), quotes='"')) }}
         | COLOR                     {{ return Literal(Color.from_hex(COLOR, literal=True)) }}
         | VAR                       {{ return Variable(VAR) }}
 
@@ -167,10 +183,11 @@ parser SassExpression:
         | KWID                      {{ return Literal(parse_bareword(KWID)) }}
         | KWNUM                     {{ UNITS = None }}
             [ UNITS ]               {{ return Literal(Number(float(KWNUM), unit=UNITS)) }}
-        | KWSTR                     {{ return Literal(String(KWSTR[1:-1], quotes="'")) }}
-        | KWQSTR                    {{ return Literal(String(KWQSTR[1:-1], quotes='"')) }}
-        | KWCOLOR                   {{ return Literal(Color.from_hex(COLOR, literal=True)) }}
+        | KWSTR                     {{ return Literal(String(dequote(KWSTR), quotes="'")) }}
+        | KWQSTR                    {{ return Literal(String(dequote(KWQSTR), quotes='"')) }}
+        | KWCOLOR                   {{ return Literal(Color.from_hex(KWCOLOR, literal=True)) }}
         | KWVAR                     {{ return Variable(KWVAR) }}
+
 %%
 ### Grammar ends.
 ################################################################################

@@ -439,20 +439,23 @@ class BlockHeader(object):
                 directive = '@else if'
                 argument = prop[9:]
             else:
-                directive, _, argument = prop.partition(' ')
+                chunks = prop.split(None, 1)
+                if len(chunks) == 2:
+                    directive, argument = chunks
+                else:
+                    directive, argument = prop, None
                 directive = directive.lower()
 
             return BlockAtRuleHeader(directive, argument)
+        elif prop.split(None, 1)[0].endswith(':'):
+            # Syntax is "<scope>: [prop]" -- if the optional prop exists, it
+            # becomes the first rule with no suffix
+            scope, unscoped_value = prop.split(':', 1)
+            scope = scope.rstrip()
+            unscoped_value = unscoped_value.lstrip()
+            return BlockScopeHeader(scope, unscoped_value)
         else:
-            if prop.endswith(':') or ': ' in prop:
-                # Syntax is "<scope>: [prop]" -- if the optional prop exists,
-                # it becomes the first rule with no suffix
-                scope, unscoped_value = prop.split(':', 1)
-                scope = scope.rstrip()
-                unscoped_value = unscoped_value.lstrip()
-                return BlockScopeHeader(scope, unscoped_value)
-            else:
-                return BlockSelectorHeader(prop)
+            return BlockSelectorHeader(prop)
 
 
 class BlockAtRuleHeader(BlockHeader):

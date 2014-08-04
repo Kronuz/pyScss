@@ -1315,7 +1315,8 @@ class Scss(object):
         # TODO this seems like it should be done in the block header.  and more
         # generally?
         calculator = Calculator(rule.namespace)
-        block.header.argument = calculator.apply_vars(block.header.argument)
+        if block.header.argument:
+            block.header.argument = calculator.apply_vars(block.header.argument)
 
         # TODO merge into RuleAncestry
         new_ancestry = list(rule.ancestry.headers)
