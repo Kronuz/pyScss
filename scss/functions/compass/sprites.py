@@ -98,7 +98,7 @@ def sprite_map(g, **kwargs):
     Generates a sprite map from the files matching the glob pattern.
     Uses the keyword-style arguments passed in to control the placement.
 
-    $direction - Sprite map layout. Can be `vertical` (default), `horizontal`, `diagonal` or `smart`.
+    $direction, $layout - Sprite map layout. Can be `vertical` (default), `horizontal`, `diagonal` or `smart`.
 
     $position - For `horizontal` and `vertical` directions, the position of the sprite. (defaults to `0`)
     $<sprite>-position - Position of a given sprite.
@@ -203,7 +203,9 @@ def sprite_map(g, **kwargs):
 
         if sprite_map is None or asset is None:
             cache_buster = Boolean(kwargs.get('cache_buster', True))
-            direction = String.unquoted(kwargs.get('direction', config.SPRTE_MAP_DIRECTION)).value
+            direction = String.unquoted(kwargs.get('direction',
+                                        kwargs.get('layout',
+                                        config.SPRTE_MAP_DIRECTION))).value
             repeat = String.unquoted(kwargs.get('repeat', 'no-repeat')).value
             collapse = kwargs.get('collapse', Number(0))
             if isinstance(collapse, List):

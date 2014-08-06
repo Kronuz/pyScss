@@ -1045,6 +1045,7 @@ class Scss(object):
 
         setdefault('sprite-base-class', String('.' + map_name + '-sprite', quotes=None))
         setdefault('sprite-dimensions', Boolean(False))
+        setdefault('layout', String('vertical'))
         position = setdefault('position', Number(0, '%'))
         spacing = setdefault('spacing', Number(0))
         repeat = setdefault('repeat', String('no-repeat', quotes=None))
