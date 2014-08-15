@@ -52,6 +52,7 @@ import glob
 from itertools import product
 import logging
 import warnings
+import os
 import os.path
 import re
 import sys
@@ -78,9 +79,16 @@ log = logging.getLogger(__name__)
 
 ################################################################################
 # Load C acceleration modules
-try:
-    from scss._speedups import locate_blocks
-except ImportError:
+
+locate_blocks = None
+
+if 'PYSCSS_DISABLE_SPEEDUPS' not in os.environ:
+    try:
+        from scss._speedups import locate_blocks
+    except ImportError:
+        pass
+
+if not locate_blocks:
     from scss._native import locate_blocks
 
 ################################################################################
