@@ -16,6 +16,9 @@ There's also an optional C speedup module, which requires having ``libpcre``
 and its development headers installed, with UTF-8 support enabled (which it is
 by default).
 
+When ``PYSCSS_DISABLE_SPEEDUPS`` environment variable is set when the package is
+imported speedup module will be disabled.
+
 
 Usage
 -----
