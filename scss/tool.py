@@ -11,8 +11,9 @@ from collections import deque
 
 from scss import config
 from scss.util import profiling
-from scss import Scss, SourceFile, log
-from scss import _prop_split_re
+from scss.legacy import Scss
+from scss.source import SourceFile
+from scss.compiler import _prop_split_re
 from scss.rule import SassRule
 from scss.rule import UnparsedBlock
 from scss.expression import Calculator
@@ -24,7 +25,8 @@ try:
 except NameError:
     raw_input = input
 
-log.setLevel(logging.INFO)
+log = logging.getLogger(__name__)
+logging.getLogger('scss').setLevel(logging.INFO)
 
 
 def main():
