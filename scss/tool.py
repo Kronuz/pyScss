@@ -176,14 +176,15 @@ def do_build(options, args):
         'style': options.style,
         'debug_info': options.debug_info,
     })
-    if args:
-        source_files = [
-            SourceFile.from_file(sys.stdin, "<stdin>", is_sass=options.is_sass) if path == '-' else SourceFile.from_filename(path, is_sass=options.is_sass)
-            for path in args
-        ]
-    else:
-        source_files = [
-            SourceFile.from_file(sys.stdin, "<stdin>", is_sass=options.is_sass)]
+    if not args:
+        args = ['-']
+    source_files = []
+    for path in args:
+        if path == '-':
+            source = SourceFile.from_file(sys.stdin, "<stdin>", is_sass=options.is_sass)
+        else:
+            source = SourceFile.from_filename(path, is_sass=options.is_sass)
+        source_files.append(source)
 
     encodings = set(source.encoding for source in source_files)
     if len(encodings) > 1:
@@ -322,7 +323,7 @@ class SassRepl(object):
         self.namespace = self.compiler.namespace
         self.compilation = self.compiler.make_compilation()
         self.legacy_compiler_options = {}
-        self.source_file = SourceFile.from_string('', '<shell>', line_numbers=False, is_sass=is_sass)
+        self.source_file = SourceFile.from_string('', '<shell>', is_sass=is_sass)
         self.calculator = Calculator(self.namespace)
 
     def __call__(self, s):

@@ -160,14 +160,16 @@ class Namespace(object):
             raise TypeError("Expected a Sass type, while setting %s got %r" % (name, value,))
         self._variables.set(name, value, force_local=local_only)
 
-    def has_import(self, import_key):
-        return import_key in self._imports
+    def has_import(self, source):
+        return source.path in self._imports
 
-    def add_import(self, import_key, parent_import_key, file_and_line):
+    def add_import(self, source, parent_rule):
         self._assert_mutable()
-        if import_key:
-            imports = [0, parent_import_key, file_and_line]
-            self._imports[import_key] = imports
+        self._imports[source.path] = [
+            0,
+            parent_rule.source_file.path,
+            parent_rule.file_and_line,
+        ]
 
     def use_import(self, import_key):
         self._assert_mutable()

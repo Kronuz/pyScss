@@ -23,7 +23,9 @@ from scss.errors import SassError
 from scss.expression import Calculator
 from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
+from scss.rule import BlockAtRuleHeader
 from scss.rule import Namespace
+from scss.rule import RuleAncestry
 from scss.rule import SassRule
 from scss.rule import UnparsedBlock
 from scss.selector import Selector
@@ -34,6 +36,7 @@ from scss.types import String
 from scss.types import List
 from scss.types import Null
 from scss.types import Undefined
+from scss.types import Url
 from scss.util import dequote
 from scss.util import normalize_var  # TODO put in...  namespace maybe?
 
@@ -93,8 +96,13 @@ class Compiler(object):
             the Namespace documentation for details.
         :type namespace: :class:`Namespace`
         """
-        self.root = root
-        self.search_path = search_path
+        # normpath() will (textually) eliminate any use of ..
+        self.root = os.path.normpath(os.path.abspath(root))
+        self.search_path = tuple(
+            os.path.normpath(os.path.join(self.root, path))
+            for path in search_path
+        )
+
         self.namespace = namespace
         self.output_style = output_style
         self.generate_source_map = generate_source_map
@@ -123,13 +131,14 @@ class Compilation(object):
 
         self.sources = []
         self.source_index = {}
+        self.dependency_map = defaultdict(frozenset)
         self.rules = []
 
     def add_source(self, source):
-        if source.filename in self.source_index:
-            raise KeyError("Duplicate filename %r" % source.filename)
+        if source.path in self.source_index:
+            raise KeyError("Duplicate source %r" % source.path)
         self.sources.append(source)
-        self.source_index[source.filename] = source
+        self.source_index[source.path] = source
 
     def run(self):
         # this will compile and manage rule: child objects inside of a node
@@ -157,7 +166,7 @@ class Compilation(object):
                 exceeded = " (IE exceeded!)"
                 log.error("Maximum number of supported selectors in Internet Explorer (4095) exceeded!")
             if files > 1 and self.compiler.generate_source_map:
-                if source_file.is_string:
+                if not source_file.is_real_file:
                     final_cont += "/* %s %s generated add up to a total of %s %s accumulated%s */\n" % (
                         total_selectors,
                         'selector' if total_selectors == 1 else 'selectors',
@@ -168,7 +177,7 @@ class Compilation(object):
                     final_cont += "/* %s %s generated from '%s' add up to a total of %s %s accumulated%s */\n" % (
                         total_selectors,
                         'selector' if total_selectors == 1 else 'selectors',
-                        source_file.filename,
+                        source_file.path,
                         all_selectors,
                         'selector' if all_selectors == 1 else 'selectors',
                         exceeded)
@@ -523,7 +532,7 @@ class Compilation(object):
 
         # TODO a function or mixin is re-parsed every time it's called; there's
         # no AST for anything but expressions  :(
-        mixin = [rule.source_file, block.lineno, block.unparsed_contents, rule.namespace, argspec_node, rule.import_key]
+        mixin = [rule.source_file, block.lineno, block.unparsed_contents, rule.namespace, argspec_node, rule.source_file]
         if block.directive == '@function':
             def _call(mixin):
                 def __call(namespace, *args, **kwargs):
@@ -673,44 +682,64 @@ class Compilation(object):
         Implements @import
         Load and import mixins and functions and rules
         """
-        full_filename = None
-        names = block.argument.split(',')
-        for name in names:
-            name = dequote(name.strip())
+        # TODO it would be neat to opt into warning that you're using
+        # values/functions from a file you didn't explicitly import
+        # TODO base-level directives, like @mixin or @charset, aren't allowed
+        # to be @imported into a nested block
+        # TODO i'm not sure we disallow them nested in the first place
+        # TODO @import is disallowed within mixins, control directives
+        # TODO @import doesn't take a block -- that's probably an issue with a
+        # lot of our directives
 
-            # Protect against going to prohibited places...
-            if any(scary_token in name for scary_token in ('..', '://', 'url(')):
-                rule.properties.append((block.prop, None))
-                warnings.warn("Ignored import: %s" % name, RuntimeWarning)
+        # TODO if there's any #{}-interpolation in the AST, this should become
+        # a CSS import (though in practice Ruby only even evaluates it in url()
+        # -- in a string it's literal!)
+
+        sass_paths = calculator.evaluate_expression(block.argument)
+        css_imports = []
+
+        for sass_path in sass_paths:
+            # These are the rules for when an @import is interpreted as a CSS
+            # import:
+            if (
+                    # If it's a url()
+                    isinstance(sass_path, Url) or
+                    # If it's not a string (including `"foo" screen`, a List)
+                    not isinstance(sass_path, String) or
+                    # If the filename begins with an http protocol
+                    sass_path.value.startswith(('http://', 'https://')) or
+                    # If the filename ends with .css
+                    sass_path.value.endswith('.css')):
+                css_imports.append(sass_path.render(compress=False))
                 continue
 
+            # Should be left with a plain String
+            name = sass_path.value
+
             source = None
-            full_filename, seen_paths = self._find_import(rule, name, skip=rule.source_file.full_filename)
+            try:
+                path = self._find_import(rule, name)
+            except IOError:
+                # Maybe do a special import instead
+                generated_code = self._at_magic_import(
+                    calculator, rule, scope, block)
+                if generated_code is None:
+                    raise
 
-            if full_filename is None:
-                i_codestr = self._at_magic_import(calculator, rule, scope, block)
-
-                if i_codestr is not None:
-                    source = SourceFile.from_string(i_codestr)
-
-            elif full_filename in self.source_index:
-                source = self.source_index[full_filename]
+                source = SourceFile.from_string(generated_code)
             else:
-                source = SourceFile.from_filename(full_filename)
-                self.add_source(source)
+                if path not in self.source_index:
+                    self.add_source(SourceFile.from_filename(path))
+                source = self.source_index[path]
 
-            if source is None:
-                load_paths_msg = "\nLoad paths:\n\t%s" % "\n\t".join(seen_paths)
-                raise IOError("File to import not found or unreadable: '%s' (%s)%s" % (name, rule.file_and_line, load_paths_msg))
-
-            import_key = (name, source.parent_dir)
-            if rule.namespace.has_import(import_key):
+            if rule.namespace.has_import(source):
                 # If already imported in this scope, skip
+                # TODO this might not be right -- consider if you @import a
+                # file at top level, then @import it inside a selector block!
                 continue
 
             _rule = SassRule(
                 source_file=source,
-                import_key=import_key,
                 lineno=block.lineno,
                 unparsed_contents=source.contents,
 
@@ -722,8 +751,15 @@ class Compilation(object):
                 ancestry=rule.ancestry,
                 namespace=rule.namespace,
             )
-            rule.namespace.add_import(import_key, rule.import_key, rule.file_and_line)
+            rule.namespace.add_import(source, rule)
             self.manage_children(_rule, scope)
+
+        # Create a new @import rule for each import determined to be CSS
+        for import_ in css_imports:
+            # TODO this seems extremely janky (surely we should create an
+            # actual new Rule), but the CSS rendering doesn't understand how to
+            # print rules without blocks
+            rule.properties.append(('@import ' + import_, None))
 
     def _find_import(self, rule, name, skip=None):
         """Find the file referred to by an @import.
@@ -736,26 +772,44 @@ class Compilation(object):
         else:
             search_exts = ['.scss', '.sass']
 
-        dirname, name = os.path.split(name)
+        dirname, basename = os.path.split(name)
 
-        seen_paths = []
+        # Search relative to the importing file first
+        search_path = [os.path.dirname(rule.source_file.path)]
+        search_path.extend(self.compiler.search_path)
 
-        for path in self.compiler.search_path:
-            for basepath in [rule.source_file.parent_dir, '.']:
-                full_path = os.path.realpath(os.path.join(basepath, path, dirname))
+        for prefix, suffix in product(('_', ''), search_exts):
+            filename = prefix + basename + suffix
+            for directory in search_path:
+                path = os.path.normpath(
+                    os.path.join(directory, dirname, filename))
 
-                if full_path in seen_paths:
+                if path == rule.source_file.path:
+                    # Avoid self-import
+                    # TODO is this what ruby does?
                     continue
-                seen_paths.append(full_path)
 
-                for prefix, suffix in product(('_', ''), search_exts):
-                    full_filename = os.path.join(full_path, prefix + name + suffix)
-                    if os.path.exists(full_filename):
-                        if full_filename == skip:
-                            continue
-                        return full_filename, seen_paths
+                if not os.path.exists(path):
+                    continue
 
-        return None, seen_paths
+                # Ensure that no one used .. to escape the search path
+                for valid_path in self.compiler.search_path:
+                    rel = os.path.relpath(path, start=valid_path)
+                    if not rel.startswith('../'):
+                        break
+                else:
+                    continue
+
+                # All good!
+                return path
+
+        raise IOError(
+            "Can't find a file to import for {0!r}\n"
+            "Search path:\n{1}".format(
+                name,
+                ''.join("    " + dir_ + "\n" for dir_ in search_path),
+            )
+        )
 
     # @print_timing(10)
     def _at_magic_import(self, calculator, rule, scope, block):
@@ -1068,7 +1122,6 @@ class Compilation(object):
                 if header.is_selector:
                     continue
                 elif header.directive == '@media':
-                    from scss.rule import BlockAtRuleHeader
                     new_ancestry[i] = BlockAtRuleHeader(
                         '@media',
                         "%s and %s" % (header.argument, block.argument))
@@ -1080,7 +1133,6 @@ class Compilation(object):
         else:
             new_ancestry.append(block.header)
 
-        from scss.rule import RuleAncestry
         rule.descendants += 1
         new_rule = SassRule(
             source_file=rule.source_file,
@@ -1098,7 +1150,7 @@ class Compilation(object):
             nested=rule.nested + 1,
         )
         self.rules.append(new_rule)
-        rule.namespace.use_import(rule.import_key)
+        rule.namespace.use_import(rule.source_file)
         self.manage_children(new_rule, scope)
 
         self._warn_unused_imports(new_rule)
@@ -1133,7 +1185,7 @@ class Compilation(object):
             nested=rule.nested + 1,
         )
         self.rules.append(new_rule)
-        rule.namespace.use_import(rule.import_key)
+        rule.namespace.use_import(rule.source_file)
         self.manage_children(new_rule, scope)
 
         self._warn_unused_imports(new_rule)
@@ -1383,11 +1435,11 @@ class Compilation(object):
                             result = tb * (i + nesting) + "@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}" % (filename, lineno) + nl
                         return result
 
-                    if rule.lineno and rule.source_file and not rule.source_file.is_string:
-                        result += _print_debug_info(rule.source_file.filename, rule.lineno)
+                    if rule.lineno and rule.source_file and rule.source_file.is_real_file:
+                        result += _print_debug_info(rule.source_file.path, rule.lineno)
 
-                    if rule.from_lineno and rule.from_source_file and not rule.from_source_file.is_string:
-                        result += _print_debug_info(rule.from_source_file.filename, rule.from_lineno)
+                    if rule.from_lineno and rule.from_source_file and rule.from_source_file.is_real_file:
+                        result += _print_debug_info(rule.from_source_file.path, rule.from_lineno)
 
                 if header.is_selector:
                     header_string = header.render(sep=',' + sp, super_selector=super_selector)

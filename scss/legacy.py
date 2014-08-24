@@ -136,30 +136,29 @@ class Scss(object):
         compilation = compiler.make_compilation()
 
         # Inject the files we know about
+        # TODO how does this work with the expectation of absoluteness
         if source_files is not None:
             for source in source_files:
                 compilation.add_source(source)
         elif scss_string is not None:
             source = SourceFile.from_string(
                 scss_string,
-                filename=filename,
+                path=filename,
                 is_sass=is_sass,
-                line_numbers=line_numbers,
             )
             compilation.add_source(source)
         elif scss_file is not None:
             source = SourceFile.from_filename(
                 scss_file,
-                filename=filename,
+                path=filename,
                 is_sass=is_sass,
-                line_numbers=line_numbers,
             )
             compilation.add_source(source)
 
         # Plus the ones from the constructor
         if self._scss_files is not None:
             for name, contents in list(self._scss_files.items()):
-                source = SourceFile.from_string(contents, filename=name)
+                source = SourceFile.from_string(contents, path=name)
                 compilation.add_source(source)
 
         return compilation.run()

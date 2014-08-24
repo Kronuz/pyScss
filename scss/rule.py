@@ -92,9 +92,9 @@ class SassRule(object):
         """Return the filename and line number where this rule originally
         appears, in the form "foo.scss:3".  Used for error messages.
         """
-        ret = "%s:%d" % (self.source_file.filename, self.lineno)
+        ret = "%s:%d" % (self.source_file.path, self.lineno)
         if self.from_source_file:
-            ret += " (%s:%d)" % (self.from_source_file.filename, self.from_lineno)
+            ret += " (%s:%d)" % (self.from_source_file.path, self.from_lineno)
         return ret
 
     @property
