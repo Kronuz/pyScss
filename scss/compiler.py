@@ -117,6 +117,8 @@ class Compilation(object):
     def __init__(self, compiler):
         self.compiler = compiler
 
+        # TODO this needs a write barrier, so assignment can't overwrite what's
+        # in the original namespace
         self.root_namespace = compiler.namespace
 
         self.sources = []
@@ -258,12 +260,14 @@ class Compilation(object):
                 code = block.directive
                 code = '_at_' + code.lower().replace(' ', '_')[1:]
                 try:
-                    getattr(self, code)(calculator, rule, scope, block)
+                    method = getattr(self, code)
                 except AttributeError:
                     if block.unparsed_contents is None:
                         rule.properties.append((block.prop, None))
                     elif scope is None:  # needs to have no scope to crawl down the nested rules
                         self._nest_at_rules(rule, scope, block)
+                else:
+                    method(calculator, rule, scope, block)
 
             ####################################################################
             # Properties
@@ -689,8 +693,8 @@ class Compilation(object):
                 if i_codestr is not None:
                     source = SourceFile.from_string(i_codestr)
 
-            elif full_filename in self.source_file_index:
-                source = self.source_file_index[full_filename]
+            elif full_filename in self.source_index:
+                source = self.source_index[full_filename]
             else:
                 source = SourceFile.from_filename(full_filename)
                 self.add_source(source)
