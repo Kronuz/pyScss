@@ -19,7 +19,7 @@ import scss
 
 
 if six.PY2:
-    from codecs import open
+    from io import open
 
 
 console = logging.StreamHandler()
