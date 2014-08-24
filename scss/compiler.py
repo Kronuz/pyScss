@@ -72,6 +72,20 @@ class OutputStyle(Enum):
     legacy = ()  # ???
 
 
+class SassDeprecationWarning(UserWarning):
+    # Note: DO NOT inherit from DeprecationWarning; it's turned off by default
+    # in 2.7 and later!
+    pass
+
+
+def warn_deprecated(rule, message):
+    warnings.warn(
+        "{0} (at {1})".format(message, rule.file_and_line),
+        SassDeprecationWarning,
+        stacklevel=2,
+    )
+
+
 class Compiler(object):
     """A Sass compiler.  Stores settings and knows how to fire off a
     compilation.  Main entry point into compiling Sass.
@@ -421,12 +435,20 @@ class Compilation(object):
                 value = True
 
             if key == 'compress':
-                log.warn("The 'compress' @option is deprecated.  Please use 'style' instead.")
+                warn_deprecated(
+                    rule,
+                    "The 'compress' @option is deprecated.  "
+                    "Please use 'style' instead."
+                )
                 key = 'style'
                 value = 'compressed' if value else 'legacy'
 
             if key in ('short_colors', 'reverse_colors'):
-                log.warn("The '{0}' @option no longer has any effect.".format(key))
+                warn_deprecated(
+                    rule,
+                    "The '{0}' @option no longer has any effect."
+                    .format(key),
+                )
                 return
             elif key == 'style':
                 try:
