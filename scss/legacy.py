@@ -128,6 +128,7 @@ class Scss(object):
             namespace=root_namespace,
             search_path=search_paths,
             live_errors=self.live_errors,
+            generate_source_map=self._scss_opts.get('debug_info', False),
             output_style=output_style,
             warn_unused_imports=self._scss_opts.get('warn_unused', False),
             super_selector=super_selector or self.super_selector,
@@ -161,7 +162,7 @@ class Scss(object):
                 source = SourceFile.from_string(contents, path=name)
                 compilation.add_source(source)
 
-        return compilation.run()
+        return compiler.call_and_catch_errors(compilation.run)
 
     # Old, old alias
     Compilation = compile

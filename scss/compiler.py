@@ -115,9 +115,24 @@ class Compiler(object):
     def make_compilation(self):
         return Compilation(self)
 
+    def call_and_catch_errors(self, f, *args, **kwargs):
+        """Call the given function with the given arguments.  If it succeeds,
+        return its return value.  If it raises a :class:`scss.errors.SassError`
+        and `live_errors` is turned on, return CSS containing a traceback and
+        error message.
+        """
+        try:
+            return f(*args, **kwargs)
+        except SassError as e:
+            if self.live_errors:
+                # TODO should this setting also capture and display warnings?
+                return e.to_css()
+            else:
+                raise
+
     def compile(self):
         compilation = self.make_compilation()
-        compilation.run()
+        return self.call_and_catch_errors(compilation.run)
 
 
 class Compilation(object):
@@ -184,16 +199,6 @@ class Compilation(object):
             final_cont += fcont
 
         return final_cont
-
-    def compile(self, *args, **kwargs):
-        try:
-            return self.Compilation(*args, **kwargs)
-        except SassError as e:
-            if self.live_errors:
-                # TODO should this setting also capture and display warnings?
-                return e.to_css()
-            else:
-                raise
 
     def parse_selectors(self, raw_selectors):
         """
@@ -1435,10 +1440,10 @@ class Compilation(object):
                             result = tb * (i + nesting) + "@media -sass-debug-info{filename{font-family:file\:\/\/%s}line{font-family:\\00003%s}}" % (filename, lineno) + nl
                         return result
 
-                    if rule.lineno and rule.source_file and rule.source_file.is_real_file:
+                    if rule.lineno and rule.source_file:
                         result += _print_debug_info(rule.source_file.path, rule.lineno)
 
-                    if rule.from_lineno and rule.from_source_file and rule.from_source_file.is_real_file:
+                    if rule.from_lineno and rule.from_source_file:
                         result += _print_debug_info(rule.from_source_file.path, rule.from_lineno)
 
                 if header.is_selector:
