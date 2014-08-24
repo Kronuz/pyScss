@@ -2,23 +2,24 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
+from collections import deque
 from contextlib import contextmanager
 import logging
 import os
 import re
 import sys
-from collections import deque
 
 from scss import config
-from scss.util import profiling
-from scss.legacy import Scss
-from scss.source import SourceFile
 from scss.compiler import _prop_split_re
+from scss.compiler import Compiler
+from scss.errors import SassEvaluationError
+from scss.expression import Calculator
+from scss.legacy import Scss
 from scss.rule import SassRule
 from scss.rule import UnparsedBlock
-from scss.expression import Calculator
 from scss.scss_meta import BUILD_INFO
-from scss.errors import SassEvaluationError
+from scss.source import SourceFile
+from scss.util import profiling
 
 try:
     raw_input
@@ -317,13 +318,16 @@ def run_repl(is_sass=False):
 
 class SassRepl(object):
     def __init__(self, is_sass=False):
-        self.css = Scss()
-        self.namespace = self.css.root_namespace
-        self.options = self.css.scss_opts
+        self.compiler = Compiler()
+        self.namespace = self.compiler.namespace
+        self.compilation = self.compiler.make_compilation()
+        self.legacy_compiler_options = {}
         self.source_file = SourceFile.from_string('', '<shell>', line_numbers=False, is_sass=is_sass)
         self.calculator = Calculator(self.namespace)
 
     def __call__(self, s):
+        # TODO this is kind of invasive; surely it's possible to do this
+        # without calling only private methods
         from pprint import pformat
 
         if s in ('exit', 'quit'):
@@ -337,25 +341,25 @@ class SassRepl(object):
                 scope = None
                 properties = []
                 children = deque()
-                rule = SassRule(self.source_file, namespace=self.namespace, options=self.options, properties=properties)
+                rule = SassRule(self.source_file, namespace=self.namespace, legacy_compiler_options=self.legacy_compiler_options, properties=properties)
                 block = UnparsedBlock(rule, 1, s, None)
                 code, name = (s.split(None, 1) + [''])[:2]
                 if code == '@option':
-                    self.css._at_options(self.calculator, rule, scope, block)
+                    self.compilation._at_options(self.calculator, rule, scope, block)
                     continue
                 elif code == '@import':
-                    self.css._at_import(self.calculator, rule, scope, block)
+                    self.compilation._at_import(self.calculator, rule, scope, block)
                     continue
                 elif code == '@include':
                     final_cont = ''
-                    self.css._at_include(self.calculator, rule, scope, block)
-                    code = self.css._print_properties(properties).rstrip('\n')
+                    self.compilation._at_include(self.calculator, rule, scope, block)
+                    code = self.compilation._print_properties(properties).rstrip('\n')
                     if code:
                         final_cont += code
                     if children:
-                        self.css.children.extendleft(children)
-                        self.css.parse_children()
-                        code = self.css._create_css(self.css.rules).rstrip('\n')
+                        self.compilation.children.extendleft(children)
+                        self.compilation.parse_children()
+                        code = self.compilation._create_css(self.compilation.rules).rstrip('\n')
                         if code:
                             final_cont += code
                     yield final_cont
@@ -369,7 +373,7 @@ class SassRepl(object):
                     code = code and code.strip()
                     ns = self.namespace
                     if not name:
-                        yield pformat(sorted(['vars', 'options', 'mixins', 'functions']))
+                        yield pformat(list(sorted(['vars', 'options', 'mixins', 'functions'])))
                     elif name in ('v', 'var', 'variable'):
                         variables = dict(ns._variables)
                         if code == '*':
@@ -381,13 +385,13 @@ class SassRepl(object):
                         yield pformat(variables)
 
                     elif name in ('o', 'opt', 'option'):
-                        opts = self.options
+                        opts = self.legacy_compiler_options
                         if code == '*':
                             pass
                         elif code:
                             opts = dict((k, v) for k, v in opts.items() if code in k)
                         else:
-                            opts = dict((k, v) for k, v in opts.items() if not k.startswith('@'))
+                            opts = dict((k, v) for k, v in opts.items())
                         yield pformat(opts)
 
                     elif name in ('m', 'mix', 'mixin', 'f', 'func', 'funct', 'function'):
