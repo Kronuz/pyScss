@@ -35,10 +35,6 @@ _default_scss_vars = {
     '$--semicolon': String.unquoted(';'),
     '$--curlybracketopen': String.unquoted('{'),
     '$--curlybracketclosed': String.unquoted('}'),
-
-    # shortcuts (it's "a hidden feature" for now)
-    'bg:': String.unquoted('background:'),
-    'bgc:': String.unquoted('background-color:'),
 }
 
 
@@ -157,7 +153,7 @@ class Scss(object):
             compilation.add_source(source)
 
         # Plus the ones from the constructor
-        if self._scss_files is not None:
+        if self._scss_files:
             for name, contents in list(self._scss_files.items()):
                 source = SourceFile.from_string(contents, path=name)
                 compilation.add_source(source)
