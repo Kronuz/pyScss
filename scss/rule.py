@@ -32,8 +32,9 @@ class SassRule(object):
     metadata, like `@extend` rules and `@media` nesting.
     """
 
-    def __init__(self, source_file, import_key=None, unparsed_contents=None,
-            options=None, properties=None,
+    def __init__(
+            self, source_file, import_key=None, unparsed_contents=None,
+            options=None, legacy_compiler_options=None, properties=None,
             namespace=None,
             lineno=0, extends_selectors=frozenset(),
             ancestry=None,
@@ -48,6 +49,7 @@ class SassRule(object):
         self.lineno = lineno
 
         self.unparsed_contents = unparsed_contents
+        self.legacy_compiler_options = legacy_compiler_options or {}
         self.options = options or {}
         self.extends_selectors = extends_selectors
 
@@ -135,6 +137,7 @@ class SassRule(object):
 
             unparsed_contents=self.unparsed_contents,
 
+            legacy_compiler_options=self.legacy_compiler_options,
             options=self.options,
             #properties=list(self.properties),
             properties=self.properties,

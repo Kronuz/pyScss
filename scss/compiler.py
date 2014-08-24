@@ -44,6 +44,8 @@ except ImportError:
     from scss._native import locate_blocks
 
 
+# TODO should mention logging for the programmatic interface in the
+# documentation
 log = logging.getLogger(__name__)
 
 
@@ -94,11 +96,9 @@ class Compiler(object):
         self.root = root
         self.search_path = search_path
         self.namespace = namespace
-        # TODO: we support this in @option, but this approach breaks it
         self.output_style = output_style
         self.generate_source_map = generate_source_map
         self.live_errors = live_errors
-        # TODO: we support this in @option, but this approach breaks it
         self.warn_unused_imports = warn_unused_imports
         self.super_selector = super_selector
 
@@ -224,9 +224,15 @@ class Compilation(object):
         for rule in children:
             self.manage_children(rule, scope)
 
-        if self.compiler.warn_unused_imports:
-            for name, file_and_line in root_namespace.unused_imports():
-                log.warn("Unused @import: '%s' (%s)", name, file_and_line)
+        self._warn_unused_imports(self.rules[0])
+
+    def _warn_unused_imports(self, rule):
+        if not rule.legacy_compiler_options.get(
+                'warn_unused', self.compiler.warn_unused_imports):
+            return
+
+        for name, file_and_line in rule.namespace.unused_imports():
+            log.warn("Unused @import: '%s' (%s)", name, file_and_line)
 
     # @print_timing(4)
     def manage_children(self, rule, scope):
@@ -376,28 +382,47 @@ class Compilation(object):
         """
         Implements @option
         """
-        # TODO i have no idea what's /supposed/ to be allowed here.
-        # compress: bool (convert to style)
-        # style: one of the output styles
-        # warn_unused: bool
-        # short_colors: bool, ignored
-        # reverse_colors: bool, ignored
-        # and of course _/- are interchangeable
-        # TODO this is completely incompatible with ruby also
+        # TODO This only actually supports "style" (which only really makes
+        # sense as the first thing in a single input file) or "warn_unused"
+        # (which only makes sense at file level /at best/).  Explore either
+        # replacing this with a better mechanism or dropping it entirely.
+        # Note also that all rules share the same underlying legacy option
+        # dict, so the rules aren't even lexically scoped like you might think,
+        # and @importing a file can change the compiler!  That seems totally
+        # wrong.
         for option in block.argument.split(','):
-            option, value = (option.split(':', 1) + [''])[:2]
-            option = option.strip().lower()
-            value = value.strip()
-            if option:
-                if value.lower() in ('1', 'true', 't', 'yes', 'y', 'on'):
-                    value = True
-                elif value.lower() in ('0', 'false', 'f', 'no', 'n', 'off', 'undefined'):
-                    value = False
-                option = option.replace('-', '_')
-                if option == 'compress':
-                    option = 'style'
-                    log.warn("The option 'compress' is deprecated. Please use 'style' instead.")
-                rule.options[option] = value
+            key, colon, value = option.partition(':')
+            key = key.strip().lower().replace('-', '_')
+            value = value.strip().lower()
+
+            if value in ('1', 'true', 't', 'yes', 'y', 'on'):
+                value = True
+            elif value in ('0', 'false', 'f', 'no', 'n', 'off', 'undefined'):
+                value = False
+            elif not colon:
+                value = True
+
+            if key == 'compress':
+                log.warn("The 'compress' @option is deprecated.  Please use 'style' instead.")
+                key = 'style'
+                value = 'compressed' if value else 'legacy'
+
+            if key in ('short_colors', 'reverse_colors'):
+                log.warn("The '{0}' @option no longer has any effect.".format(key))
+                return
+            elif key == 'style':
+                try:
+                    OutputStyle[value]
+                except KeyError:
+                    raise SassError("No such output style: {0}".format(value))
+            elif key in ('warn_unused', 'control_scoping'):
+                # TODO deprecate control_scoping?  or add it to compiler?
+                if not isinstance(value, bool):
+                    raise SassError("The '{0}' @option requires a bool, not {1!r}".format(key, value))
+            else:
+                raise SassError("Unknown @option: {0}".format(key))
+
+            rule.legacy_compiler_options[key] = value
 
     def _get_funct_def(self, rule, calculator, argument):
         funct, lpar, argstr = argument.partition('(')
@@ -523,6 +548,7 @@ class Compilation(object):
 
                         # rule
                         import_key=rule.import_key,
+                        legacy_compiler_options=rule.legacy_compiler_options,
                         options=rule.options,
                         properties=rule.properties,
                         extends_selectors=rule.extends_selectors,
@@ -616,6 +642,7 @@ class Compilation(object):
 
             # rule
             import_key=rule.import_key,
+            legacy_compiler_options=rule.legacy_compiler_options,
             options=rule.options,
             properties=rule.properties,
             extends_selectors=rule.extends_selectors,
@@ -684,6 +711,7 @@ class Compilation(object):
                 unparsed_contents=source.contents,
 
                 # rule
+                legacy_compiler_options=rule.legacy_compiler_options,
                 options=rule.options,
                 properties=rule.properties,
                 extends_selectors=rule.extends_selectors,
@@ -821,7 +849,7 @@ class Compilation(object):
         if condition:
             inner_rule = rule.copy()
             inner_rule.unparsed_contents = block.unparsed_contents
-            if not rule.options.get('control_scoping', config.CONTROL_SCOPING):  # TODO: maybe make this scoping mode for contol structures as the default as a default deviation
+            if not rule.legacy_compiler_options.get('control_scoping', config.CONTROL_SCOPING):  # TODO: maybe make this scoping mode for contol structures as the default as a default deviation
                 # DEVIATION: Allow not creating a new namespace
                 inner_rule.namespace = rule.namespace
             self.manage_children(inner_rule, scope)
@@ -872,7 +900,7 @@ class Compilation(object):
 
         inner_rule = rule.copy()
         inner_rule.unparsed_contents = block.unparsed_contents
-        if not rule.options.get('control_scoping', config.CONTROL_SCOPING):  # TODO: maybe make this scoping mode for contol structures as the default as a default deviation
+        if not rule.legacy_compiler_options.get('control_scoping', config.CONTROL_SCOPING):  # TODO: maybe make this scoping mode for contol structures as the default as a default deviation
             # DEVIATION: Allow not creating a new namespace
             inner_rule.namespace = rule.namespace
 
@@ -903,7 +931,7 @@ class Compilation(object):
 
         inner_rule = rule.copy()
         inner_rule.unparsed_contents = block.unparsed_contents
-        if not rule.options.get('control_scoping', config.CONTROL_SCOPING):  # TODO: maybe make this scoping mode for contol structures as the default as a default deviation
+        if not rule.legacy_compiler_options.get('control_scoping', config.CONTROL_SCOPING):  # TODO: maybe make this scoping mode for contol structures as the default as a default deviation
             # DEVIATION: Allow not creating a new namespace
             inner_rule.namespace = rule.namespace
 
@@ -929,7 +957,7 @@ class Compilation(object):
         while condition:
             inner_rule = rule.copy()
             inner_rule.unparsed_contents = block.unparsed_contents
-            if not rule.options.get('control_scoping', config.CONTROL_SCOPING):  # TODO: maybe make this scoping mode for contol structures as the default as a default deviation
+            if not rule.legacy_compiler_options.get('control_scoping', config.CONTROL_SCOPING):  # TODO: maybe make this scoping mode for contol structures as the default as a default deviation
                 # DEVIATION: Allow not creating a new namespace
                 inner_rule.namespace = rule.namespace
             self.manage_children(inner_rule, scope)
@@ -1009,7 +1037,8 @@ class Compilation(object):
                 # TODO kill this branch
                 pass
             else:
-                style = self.compiler.output_style
+                style = rule.legacy_compiler_options.get(
+                    'style', self.compiler.output_style)
                 compress = style == 'compressed'
                 value = value.render(compress=compress)
 
@@ -1055,6 +1084,7 @@ class Compilation(object):
             lineno=block.lineno,
             unparsed_contents=block.unparsed_contents,
 
+            legacy_compiler_options=rule.legacy_compiler_options,
             options=rule.options.copy(),
             #properties
             #extends_selectors
@@ -1067,10 +1097,7 @@ class Compilation(object):
         rule.namespace.use_import(rule.import_key)
         self.manage_children(new_rule, scope)
 
-        # TODO: if new_rule.options.get('warn_unused'):
-        if self.compiler.warn_unused_imports:
-            for name, file_and_line in new_rule.namespace.unused_imports():
-                log.warn("Unused @import: '%s' (%s)", name, file_and_line)
+        self._warn_unused_imports(new_rule)
 
     # @print_timing(10)
     def _nest_rules(self, rule, scope, block):
@@ -1092,6 +1119,7 @@ class Compilation(object):
             lineno=block.lineno,
             unparsed_contents=block.unparsed_contents,
 
+            legacy_compiler_options=rule.legacy_compiler_options,
             options=rule.options.copy(),
             #properties
             extends_selectors=c_parents,
@@ -1104,10 +1132,7 @@ class Compilation(object):
         rule.namespace.use_import(rule.import_key)
         self.manage_children(new_rule, scope)
 
-        # TODO: if new_rule.options.get('warn_unused'):
-        if self.compiler.warn_unused_imports:
-            for name, file_and_line in new_rule.namespace.unused_imports():
-                log.warn("Unused @import: '%s' (%s)", name, file_and_line)
+        self._warn_unused_imports(new_rule)
 
     # @print_timing(3)
     def apply_extends(self):
@@ -1219,7 +1244,8 @@ class Compilation(object):
         """
         Generate the final CSS string
         """
-        style = self.compiler.output_style
+        style = rules[0].legacy_compiler_options.get(
+            'style', self.compiler.output_style)
         debug_info = self.compiler.generate_source_map
 
         if style == 'legacy':
