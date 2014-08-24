@@ -941,7 +941,10 @@ class Compilation(object):
         """
         var, _, name = block.argument.partition(' from ')
         frm, _, through = name.partition(' through ')
-        if not through:
+        if through:
+            inclusive = True
+        else:
+            inclusive = False
             frm, _, through = frm.partition(' to ')
         frm = calculator.calculate(frm)
         through = calculator.calculate(through)
@@ -967,7 +970,9 @@ class Compilation(object):
             # DEVIATION: Allow not creating a new namespace
             inner_rule.namespace = rule.namespace
 
-        for i in rev(range(frm, through + 1)):
+        if inclusive:
+            through += 1
+        for i in rev(range(frm, through)):
             inner_rule.namespace.set_variable(var, Number(i))
             self.manage_children(inner_rule, scope)
 
