@@ -84,13 +84,13 @@ def test_extend_across_files():
     '''
     actual = compiler.compile()
     expected = """\
-.basicClass, .specialClass {
-  padding: 20px;
-  background-color: #FF0000;
-}
 .specialClass {
   padding: 10px;
   font-size: 14px;
+}
+.basicClass, .specialClass {
+  padding: 20px;
+  background-color: #FF0000;
 }
 """
 

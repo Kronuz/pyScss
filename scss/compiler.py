@@ -1197,6 +1197,12 @@ class Compilation(object):
         # DEVIATION: ruby sass doesn't support bare variables in selectors
         raw_selectors = calculator.apply_vars(raw_selectors)
         c_selectors, c_parents = self.parse_selectors(raw_selectors)
+        if c_parents:
+            warn_deprecated(
+                rule,
+                "The XCSS 'a extends b' syntax is deprecated.  "
+                "Use 'a { @extend b; }' instead."
+            )
 
         new_ancestry = rule.ancestry.with_nested_selectors(c_selectors)
 
@@ -1236,19 +1242,7 @@ class Compilation(object):
         # them as a rough key.  Ignore order and duplication for now.
         key_to_selectors = defaultdict(set)
         selector_to_rules = defaultdict(list)
-        # DEVIATION: These are used to rearrange rules in dependency order, so
-        # an @extended parent appears in the output before a child.  Sass does
-        # not do this, and the results may be unexpected.  Pending removal.
-        rule_order = dict()
-        rule_dependencies = dict()
-        order = 0
         for rule in self.rules:
-            rule_order[rule] = order
-            # Rules are ultimately sorted by the earliest rule they must
-            # *precede*, so every rule should "depend" on the next one
-            rule_dependencies[rule] = [order + 1]
-            order += 1
-
             for selector in rule.selectors:
                 for key in selector.lookup_key():
                     key_to_selectors[key].add(selector)
@@ -1267,6 +1261,7 @@ class Compilation(object):
                     if candidate.is_superset_of(selector)]
 
                 if not extendable_selectors:
+                    # TODO should be fatal, unless !optional given
                     log.warn(
                         "Can't find any matching rules to extend: %s"
                         % selector.render())
@@ -1302,11 +1297,9 @@ class Compilation(object):
                         parent_rule.ancestry = (
                             parent_rule.ancestry.with_more_selectors(
                                 more_parent_selectors))
-                        rule_dependencies[parent_rule].append(rule_order[rule])
 
-        # clean up placeholder only rules
+        # Remove placeholder-only rules
         self.rules = [rule for rule in self.rules if not rule.is_pure_placeholder]
-        self.rules.sort(key=lambda rule: min(rule_dependencies[rule]))
 
     # @print_timing(3)
     def parse_properties(self):

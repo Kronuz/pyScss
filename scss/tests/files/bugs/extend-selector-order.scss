@@ -1,0 +1,17 @@
+.nav-tabs {
+  &.nav-justified {
+    @extend .nav-justified;
+  }
+}
+
+.nav-pills {
+  > li {
+    float: left;
+  }
+}
+
+.nav-justified {
+  > li {
+    float: none;
+  }
+}
