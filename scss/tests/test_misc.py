@@ -101,6 +101,7 @@ def test_unicode_files():
     compiler = Scss(scss_opts=dict(style='expanded'))
     unicode_input = u"""q {
   quotes: "“" "”" "‘" "’";
+  content: "•";
 }
 """
     output = compiler.compile(unicode_input)
