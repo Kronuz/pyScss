@@ -13,7 +13,13 @@ from __future__ import absolute_import, unicode_literals
 import os.path
 import logging
 
+import six
+
 import scss
+
+
+if six.PY2:
+    from codecs import open
 
 
 console = logging.StreamHandler()
@@ -25,13 +31,10 @@ logger.addHandler(console)
 def test_pair_programmatic(scss_file_pair):
     scss_fn, css_fn = scss_file_pair
 
-    with open(scss_fn) as fh:
+    with open(scss_fn, 'rb') as fh:
         source = fh.read()
-    try:
-        with open(css_fn) as fh:
-            expected = fh.read().decode('utf-8')
-    except IOError:
-        expected = ''
+    with open(css_fn, 'r', encoding='utf8') as fh:
+        expected = fh.read()
 
     directory, _ = os.path.split(scss_fn)
     include_dir = os.path.join(directory, 'include')

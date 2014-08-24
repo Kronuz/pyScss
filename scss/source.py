@@ -143,7 +143,7 @@ class SourceFile(object):
         if path is None:
             m = hashlib.sha256()
             m.update(byte_contents)
-            path = 'string:' + m.hexdigest().decode('ascii')
+            path = 'string:' + m.hexdigest()
         elif os.path.exists(path):
             path = os.path.normpath(os.path.abspath(path))
             is_real_file = True

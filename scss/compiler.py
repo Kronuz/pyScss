@@ -844,6 +844,7 @@ class Compilation(object):
         Implements @import for sprite-maps
         Imports magic sprite map directories
         """
+        # TODO check that the found file is actually under the root
         if callable(config.STATIC_ROOT):
             files = sorted(config.STATIC_ROOT(block.argument))
         else:
