@@ -15,6 +15,8 @@ from scss.compiler import Compiler
 from scss.errors import SassEvaluationError
 from scss.expression import Calculator
 from scss.legacy import Scss
+from scss.legacy import _default_scss_vars
+from scss.namespace import Namespace
 from scss.rule import SassRule
 from scss.rule import UnparsedBlock
 from scss.scss_meta import BUILD_INFO
@@ -319,8 +321,10 @@ def run_repl(is_sass=False):
 
 class SassRepl(object):
     def __init__(self, is_sass=False):
-        self.compiler = Compiler()
-        self.namespace = self.compiler.namespace
+        # TODO it would be lovely to get these out of here, somehow
+        self.namespace = Namespace(variables=_default_scss_vars)
+
+        self.compiler = Compiler(namespace=self.namespace)
         self.compilation = self.compiler.make_compilation()
         self.legacy_compiler_options = {}
         self.source_file = SourceFile.from_string('', '<shell>', is_sass=is_sass)
