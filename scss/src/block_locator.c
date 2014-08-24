@@ -325,7 +325,7 @@ BlockLocator_new(PyUnicodeObject* codestr)
 		self->start = NULL;
 		self->end = NULL;
 		#ifdef DEBUG
-			fprintf(stderr, "\tScss BlockLocator object created (%d bytes)!\n", codestr_sz);
+			fprintf(stderr, "\tScss BlockLocator object created (%ld units)!\n", self->codestr_sz);
 		#endif
 	}
 	return self;
@@ -373,7 +373,7 @@ Block*
 BlockLocator_iternext(BlockLocator *self)
 {
 	_BlockLocator_Callback *fn;
-	unsigned char c = 0;
+	unsigned long c = 0;
 	Py_UNICODE *codestr_end = self->codestr + self->codestr_sz;
 
 	#ifdef DEBUG

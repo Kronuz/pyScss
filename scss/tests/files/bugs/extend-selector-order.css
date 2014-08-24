@@ -1,0 +1,7 @@
+.nav-pills > li {
+  float: left;
+}
+
+.nav-justified > li, .nav-tabs.nav-justified > li {
+  float: none;
+}
