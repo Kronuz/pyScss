@@ -44,6 +44,8 @@ xCSS:
 """
 from __future__ import unicode_literals
 
+import sys
+
 VERSION_INFO = (1, 3, 0, 'dev1')
 DATE_INFO = (2013, 10, 8)  # YEAR, MONTH, DAY
 VERSION = '.'.join(str(i) for i in VERSION_INFO)
@@ -55,6 +57,12 @@ URL = 'http://github.com/Kronuz/pyScss'
 DOWNLOAD_URL = 'http://github.com/Kronuz/pyScss/tarball/v' + VERSION
 LICENSE = "MIT"
 PROJECT = "pyScss"
+INSTALL_REQUIRES = [
+    'six',
+]
+
+if sys.version_info < (3, 4):
+    INSTALL_REQUIRES.append('enum34')
 
 if __name__ == "__main__":
     print('VERSION      = ' + VERSION)
