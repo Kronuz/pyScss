@@ -15,6 +15,8 @@ import tempfile
 import subprocess
 import warnings
 
+import six
+
 try:
     import cPickle as pickle
 except ImportError:
@@ -277,11 +279,11 @@ def font_sheet(g, **kwargs):
                     try:
                         if type_ == 'eot':
                             ttf_path = asset_paths['ttf']
-                            with open(ttf_path) as ttf_fh, open(asset_path, 'wb') as asset_fh:
+                            with open(ttf_path) as ttf_fh:
                                 contents = ttf2eot(ttf_fh.read())
-                                if contents is None:
-                                    continue
-                                asset_fh.write(contents)
+                                if contents is not None:
+                                    with open(asset_path, 'wb') as asset_fh:
+                                        asset_fh.write(contents)
                         else:
                             font.generate(asset_path)
                             if type_ == 'ttf':
