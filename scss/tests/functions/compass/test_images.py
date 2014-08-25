@@ -48,7 +48,7 @@ def test_inline_image(calc):
     assert 'url(data:image/png;base64,%s)' % font_base64 == calc('inline_image("/test-qr.png")').render()
 
 
-@pytest.mark.skipif(sys.platform=='win32', reason='cur mimetype is defined on windows')
+@pytest.mark.skipif(sys.platform == 'win32', reason='cur mimetype is defined on windows')
 def test_inline_cursor(calc):
     monkeypatch().setattr(config, 'IMAGES_ROOT', os.path.join(config.PROJECT_ROOT, 'tests/files/cursors'))
 
