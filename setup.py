@@ -7,12 +7,10 @@ import platform
 import sys
 
 from setuptools import setup, Extension, Feature
-from setuptools.dist import Distribution
 
-# Need to install `six` to be able to import from the scss namespace
-Distribution(dict(setup_requires='six'))
-
-from scss.scss_meta import PROJECT, URL, VERSION, AUTHOR, AUTHOR_EMAIL, LICENSE, DOWNLOAD_URL
+# this imports PROJECT, URL, VERSION, AUTHOR, AUTHOR_EMAIL, LICENSE,
+# DOWNLOAD_URL, INSTALL_REQUIRES
+exec(open('scss/scss_meta.py').read())
 
 # fail safe compilation shamelessly stolen from the simplejson
 # setup.py file.  Original author: Bob Ippolito
