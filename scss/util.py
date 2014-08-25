@@ -81,11 +81,11 @@ def to_float(num):
 
 
 def escape(s):
-    return re.sub(r'''(["'])''', r'\\\1', s)
+    return re.sub(r'''(["'])''', r'\\\1', s)  # do not escape '\'
 
 
 def unescape(s):
-    return re.sub(r'''\\(['"])''', r'\1', s)
+    return re.sub(r'''\\(['"\\])''', r'\1', s)  # do unescape '\'
 
 
 def normalize_var(var):

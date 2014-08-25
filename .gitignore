@@ -9,3 +9,5 @@
 build/
 dist/
 docs/_build/
+*_flymake*
+.sass-cache

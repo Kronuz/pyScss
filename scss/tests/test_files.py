@@ -8,14 +8,20 @@ This limitation is completely arbitrary. Files starting with '_' are skipped.
 
 """
 
-from __future__ import absolute_import
+from __future__ import absolute_import, unicode_literals
 
 import os
 import logging
 import sys
 from importlib import import_module
 
+import six
+
 import scss
+
+
+if six.PY2:
+    from io import open
 
 
 console = logging.StreamHandler()
@@ -38,11 +44,8 @@ def test_pair_programmatic(scss_file_pair):
 
     with open(scss_fn) as fh:
         source = fh.read()
-    try:
-        with open(css_fn) as fh:
-            expected = fh.read()
-    except IOError:
-        expected = ''
+    with open(css_fn, 'r', encoding='utf8') as fh:
+        expected = fh.read()
 
     directory, _ = os.path.split(scss_fn)
     include_dir = os.path.join(directory, 'include')

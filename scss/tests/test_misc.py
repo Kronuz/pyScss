@@ -84,13 +84,13 @@ def test_extend_across_files():
     '''
     actual = compiler.compile()
     expected = """\
-.basicClass, .specialClass {
-  padding: 20px;
-  background-color: #FF0000;
-}
 .specialClass {
   padding: 10px;
   font-size: 14px;
+}
+.basicClass, .specialClass {
+  padding: 20px;
+  background-color: #FF0000;
 }
 """
 
@@ -101,6 +101,7 @@ def test_unicode_files():
     compiler = Scss(scss_opts=dict(style='expanded'))
     unicode_input = u"""q {
   quotes: "“" "”" "‘" "’";
+  content: "•";
 }
 """
     output = compiler.compile(unicode_input)
