@@ -1,0 +1,10 @@
+.squares-sprite, .squares-ten-by-ten, .squares-twenty-by-twenty {
+  background: url(static/assets/squares-frdGCNpwVAfawnKv35k2NA.png) no-repeat;
+}
+.squares-ten-by-ten {
+  background-position: 0px 0px;
+}
+
+.squares-twenty-by-twenty {
+  background-position: -10px 0px;
+}

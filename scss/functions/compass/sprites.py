@@ -99,7 +99,7 @@ def sprite_map(g, **kwargs):
     Generates a sprite map from the files matching the glob pattern.
     Uses the keyword-style arguments passed in to control the placement.
 
-    $direction - Sprite map layout. Can be `vertical` (default), `horizontal`, `diagonal` or `smart`.
+    $direction, $layout - Sprite map layout. Can be `vertical` (default), `horizontal`, `diagonal` or `smart`.
 
     $position - For `horizontal` and `vertical` directions, the position of the sprite. (defaults to `0`)
     $<sprite>-position - Position of a given sprite.
@@ -123,7 +123,7 @@ def sprite_map(g, **kwargs):
     now_time = time.time()
 
     globs = String(g, quotes=None).value
-    globs = sorted(g.strip() for g in globs.split(','))
+    globs = sorted(g.strip(' "') for g in globs.split(','))
 
     _k_ = ','.join(globs)
 
@@ -151,7 +151,7 @@ def sprite_map(g, **kwargs):
                 if _files:
                     files.extend(_files)
                     rfiles.extend(_rfiles)
-                    base_name = os.path.normpath(os.path.dirname(_glob)).replace('\\', '_').replace('/', '_')
+                    base_name = os.path.normpath(os.path.dirname(_glob)).replace(os.sep, '_')
                     _map_name, _, _map_type = base_name.partition('.')
                     if _map_type:
                         _map_type += '-'
@@ -166,7 +166,13 @@ def sprite_map(g, **kwargs):
             log.error("Nothing found at '%s'", glob_path)
             return String.unquoted('')
 
-        key = [f for (f, s) in files] + [repr(kwargs), config.ASSETS_URL]
+        # sorting kwargs representation to ensure hash repeatability
+        kwargs_repr = ""
+        for k in sorted(kwargs.keys()):
+            kwargs_repr += ("'%s': %s, " % (k, repr(kwargs[k])))
+        kwargs_repr = str("{%s}" % kwargs_repr.strip(', '))
+
+        key = [f for (f, s) in files] + [kwargs_repr, config.ASSETS_URL]
         key = map_name + '-' + make_filename_hash(key)
         asset_file = key + '.png'
         ASSETS_ROOT = config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets')
@@ -204,7 +210,9 @@ def sprite_map(g, **kwargs):
 
         if sprite_map is None or asset is None:
             cache_buster = Boolean(kwargs.get('cache_buster', True))
-            direction = String.unquoted(kwargs.get('direction', config.SPRTE_MAP_DIRECTION)).value
+            direction = String.unquoted(kwargs.get('direction',
+                                        kwargs.get('layout',
+                                        config.SPRTE_MAP_DIRECTION))).value
             repeat = String.unquoted(kwargs.get('repeat', 'no-repeat')).value
             collapse = kwargs.get('collapse', Number(0))
             if isinstance(collapse, List):
@@ -326,6 +334,7 @@ def sprite_map(g, **kwargs):
 
             offsets_x = []
             offsets_y = []
+            selectors = []
             for i, image in enumerate(images()):
                 x, y, width, height, cssx, cssy, cssw, cssh = layout_positions[i]
                 iwidth, iheight = image.size
@@ -359,6 +368,13 @@ def sprite_map(g, **kwargs):
                 offsets_x.append(cssx)
                 offsets_y.append(cssy)
 
+                # extracting selector for compass spriting's magic selectors
+                # http://compass-style.org/help/tutorials/spriting/magic-selectors/
+                name = os.path.splitext(os.path.basename(image.filename))[0]
+                spl = name.split('_')
+                selector = spl[-1] if len(spl) > 1 else None
+                selectors.append(selector)
+
             if useless_dst_color:
                 log.warning("Useless use of $dst-color in sprite map for files at '%s' (never used for)" % glob_path)
 
@@ -388,7 +404,7 @@ def sprite_map(g, **kwargs):
                 asset = file_asset = List([String.unquoted(url), String.unquoted(repeat)])
 
             # Add the new object:
-            sprite_map = dict(zip(tnames, zip(sizes, rfiles, offsets_x, offsets_y)))
+            sprite_map = dict(zip(tnames, zip(sizes, rfiles, offsets_x, offsets_y, selectors)))
             sprite_map['*'] = now_time
             sprite_map['*f*'] = asset_file
             sprite_map['*k*'] = key
@@ -564,3 +580,22 @@ def sprite_position(map, sprite, offset_x=None, offset_y=None):
                 y -= Number(sprite[3], 'px')
         return List([x, y])
     return List([Number(0), Number(0)])
+
+
+@register('sprite-does-not-have-parent', 2)
+def sprite_does_not_have_parent(map, sprite):
+    map = map.render()
+    sprite_map = sprite_maps.get(map)
+    sprite_name = String.unquoted(sprite).value
+    sprite = sprite_map and sprite_map.get(sprite_name)
+    # if there is no selector, the sprite does not have any parents
+    return Boolean(not sprite[4])
+
+
+@register('sprite-has-selector', 3)
+def sprite_has_selector(map, sprite, selector):
+    map = map.render()
+    sprite_map = sprite_maps.get(map)
+    sprite_name = String.unquoted(sprite).value
+    sprite = sprite_map and sprite_map.get(sprite_name + '_' + selector.value)
+    return Boolean(sprite)

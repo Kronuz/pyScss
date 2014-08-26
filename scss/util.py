@@ -160,17 +160,17 @@ def profile(fn):
             profiler.disable()
             stats = pstats.Stats(profiler, stream=stream)
             stats.sort_stats('time')
-            print >>stream, ""
-            print >>stream, "=" * 100
-            print >>stream, "Stats:"
+            print >> stream, ""
+            print >> stream, "=" * 100
+            print >> stream, "Stats:"
             stats.print_stats()
-            print >>stream, "=" * 100
-            print >>stream, "Callers:"
+            print >> stream, "=" * 100
+            print >> stream, "Callers:"
             stats.print_callers()
-            print >>stream, "=" * 100
-            print >>stream, "Callees:"
+            print >> stream, "=" * 100
+            print >> stream, "Callees:"
             stats.print_callees()
-            print >>sys.stderr, stream.getvalue()
+            print >> sys.stderr, stream.getvalue()
             stream.close()
         return res
     return wrapper
