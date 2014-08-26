@@ -13,6 +13,7 @@ import logging
 import os.path
 import tempfile
 import time
+import sys
 
 try:
     import cPickle as pickle
@@ -165,7 +166,13 @@ def sprite_map(g, **kwargs):
             log.error("Nothing found at '%s'", glob_path)
             return String.unquoted('')
 
-        key = [f for (f, s) in files] + [repr(kwargs), config.ASSETS_URL]
+        # sorting kwargs representation to ensure hash repeatability
+        kwargs_repr = ""
+        for k in sorted(kwargs.keys()):
+            kwargs_repr += ("'%s': %s, " % (k, repr(kwargs[k])))
+        kwargs_repr = str("{%s}" % kwargs_repr.strip(', '))
+
+        key = [f for (f, s) in files] + [kwargs_repr, config.ASSETS_URL]
         key = map_name + '-' + make_filename_hash(key)
         asset_file = key + '.png'
         ASSETS_ROOT = config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets')
@@ -408,8 +415,9 @@ def sprite_map(g, **kwargs):
             cache_tmp = tempfile.NamedTemporaryFile(delete=False, dir=ASSETS_ROOT)
             pickle.dump((now_time, file_asset, inline_asset, sprite_map, sizes), cache_tmp)
             cache_tmp.close()
-            if os.path.exists(cache_path):
-                # renaming when replacing an existing file causes an error on windows
+            if sys.platform == 'win32' and os.path.isfile(cache_path):
+                # on windows, cannot rename a file to a path that matches
+                # an existing file, we have to remove it first
                 os.remove(cache_path)
             os.rename(cache_tmp.name, cache_path)
 

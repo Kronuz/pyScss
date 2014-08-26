@@ -275,8 +275,12 @@ class Number(Value):
     def __hash__(self):
         return hash((self.value, self.unit_numer, self.unit_denom))
 
-    def __nonzero__(self):
+    def __bool__(self):
         return bool(self.value)
+
+    def __nonzero__(self):
+        # Py 2's name for __bool__
+        return self.__bool__()
 
     def __int__(self):
         return int(self.value)
