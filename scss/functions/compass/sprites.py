@@ -13,6 +13,7 @@ import logging
 import os.path
 import tempfile
 import time
+import sys
 
 try:
     import cPickle as pickle
@@ -398,6 +399,10 @@ def sprite_map(g, **kwargs):
             cache_tmp = tempfile.NamedTemporaryFile(delete=False, dir=ASSETS_ROOT)
             pickle.dump((now_time, file_asset, inline_asset, sprite_map, sizes), cache_tmp)
             cache_tmp.close()
+            if sys.platform == 'win32' and os.path.isfile(cache_path):
+                # on windows, cannot rename a file to a path that matches
+                # an existing file, we have to remove it first
+                os.remove(cache_path)
             os.rename(cache_tmp.name, cache_path)
 
             # Use the sorted list to remove older elements (keep only 500 objects):
