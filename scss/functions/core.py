@@ -11,7 +11,7 @@ import math
 from six.moves import xrange
 
 from scss.functions.library import FunctionLibrary
-from scss.types import Boolean, Color, List, Null, Number, String, Map, expect_type
+from scss.types import Arglist, Boolean, Color, List, Null, Number, String, Map, expect_type
 
 log = logging.getLogger(__name__)
 
@@ -781,6 +781,13 @@ def comparable(number1, number2):
     return Boolean(
         left.unit_numer == right.unit_numer
         and left.unit_denom == right.unit_denom)
+
+
+@register('keywords', 1)
+def keywords(value):
+    """Extract named arguments, as a map, from an argument list."""
+    expect_type(value, Arglist)
+    return value.extract_keywords()
 
 
 # ------------------------------------------------------------------------------

@@ -30,11 +30,12 @@ from scss.rule import SassRule
 from scss.rule import UnparsedBlock
 from scss.selector import Selector
 from scss.source import SourceFile
-from scss.types import Number
+from scss.types import Arglist
 from scss.types import Boolean
-from scss.types import String
 from scss.types import List
 from scss.types import Null
+from scss.types import Number
+from scss.types import String
 from scss.types import Undefined
 from scss.types import Url
 from scss.util import dequote
@@ -518,10 +519,15 @@ class Compilation(object):
 
         if callee_argspec.slurp:
             # Slurpy var gets whatever is left
+            # TODO should preserve the order of extra kwargs
+            sass_kwargs = []
+            for key, value in kwargs.items():
+                sass_kwargs.append((String(key[1:]), value))
             callee_namespace.set_variable(
                 callee_argspec.slurp.name,
-                List(args, use_comma=True))
+                Arglist(args, sass_kwargs))
             args = []
+            kwargs = {}
         elif callee_argspec.inject:
             # Callee namespace gets all the extra kwargs whether declared or
             # not
@@ -595,6 +601,8 @@ class Compilation(object):
                         ancestry=rule.ancestry,
                         nested=rule.nested,
                     )
+                    # TODO supposed to throw an error if there's a slurpy arg
+                    # but keywords() is never called on it
                     try:
                         self.manage_children(_rule, scope)
                     except SassReturn as e:

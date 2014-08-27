@@ -733,6 +733,23 @@ class List(Value):
         return List([-item for item in self], use_comma=self.use_comma)
 
 
+class Arglist(List):
+    """An argument list.  Acts mostly like a list, with keyword arguments sort
+    of tacked on separately, and only accessible via Python (or the Sass
+    `keywords` function).
+    """
+    sass_type_name = 'arglist'
+    keywords_retrieved = False
+
+    def __init__(self, args, kwargs):
+        self._kwargs = Map(kwargs)
+        super(Arglist, self).__init__(args, use_comma=True)
+
+    def extract_keywords(self):
+        self.keywords_retrieved = True
+        return self._kwargs
+
+
 def _constrain(value, lb=0, ub=1):
     """Helper for Color constructors.  Constrains a value to a range."""
     if value < lb:

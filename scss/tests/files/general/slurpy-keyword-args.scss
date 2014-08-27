@@ -1,0 +1,12 @@
+@mixin accepts-basically-anything($args...) {
+    @each $key, $value in keywords($args) {
+        #{$key}: $value;
+    }
+    @if length($args) {
+        leftovers: $args;
+    }
+}
+
+p {
+    @include accepts-basically-anything(red, blue, $left: 5px, $right: 10px);
+}

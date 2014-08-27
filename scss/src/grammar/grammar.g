@@ -52,8 +52,8 @@ parser SassExpression:
     rule goal_argspec:  argspec END                 {{ return argspec }}
 
     # Arguments:
-    # Note that at the moment, named arguments and slurpy arguments appear to
-    # be incompatible.
+    # TODO should support multiple slurpies, and enforce (probably not in the
+    # parser) that positional args come first
     rule argspec:
         [
             argspec_items           {{ args, slurpy = argspec_items }}
