@@ -16,12 +16,15 @@ import warnings
 import six
 
 import scss.config as config
+from scss.core import CoreExtension
 from scss.cssdefs import _spaces_re
 from scss.cssdefs import _escape_chars_re
 from scss.cssdefs import _prop_split_re
 from scss.errors import SassError
 from scss.expression import Calculator
-from scss.functions import ALL_BUILTINS_LIBRARY
+from scss.extension import Extension
+from scss.extension import NamespaceAdapterExtension
+from scss.functions import COMPASS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
 from scss.rule import BlockAtRuleHeader
 from scss.rule import Namespace
@@ -50,14 +53,8 @@ except ImportError:
 
 # TODO should mention logging for the programmatic interface in the
 # documentation
+# TODO or have a little helper (or compiler setting) to turn it on
 log = logging.getLogger(__name__)
-
-
-# TODO produce this
-# TODO is this a Library (can't define values), a Namespace (lot of
-# semi-private functionality, no support for magic imports), or an Extension
-# (doesn't exist yet)?
-DEFAULT_NAMESPACE = Namespace(functions=ALL_BUILTINS_LIBRARY)
 
 
 _default_rule_re = re.compile(r'(?i)\s+!default\Z')
@@ -87,14 +84,17 @@ def warn_deprecated(rule, message):
     )
 
 
+# TODO it's probably still kind of weird to go Compiler().compile('a/b/c') and
+# not have stuff in a/b/ importable.  maybe need a top-level compile_sass()
+# function that takes a single file?  (compile_file?  compile_string?)
 class Compiler(object):
     """A Sass compiler.  Stores settings and knows how to fire off a
     compilation.  Main entry point into compiling Sass.
     """
     def __init__(
             self, root='', search_path=('',),
-            namespace=DEFAULT_NAMESPACE, output_style='nested',
-            generate_source_map=False,
+            namespace=None, extensions=(CoreExtension, Namespace(functions=COMPASS_LIBRARY)),
+            output_style='nested', generate_source_map=False,
             live_errors=False, warn_unused_imports=False,
             super_selector='',
         ):
@@ -107,18 +107,36 @@ class Compiler(object):
             to ``root``.  Absolute and parent paths are allowed here, but
             ``@import`` will refuse to load files that aren't in one of the
             directories here.  Defaults to only the root.
-        :param namespace: Global namespace to inject into compiled Sass.  See
-            the Namespace documentation for details.
-        :type namespace: :class:`Namespace`
         """
-        # normpath() will (textually) eliminate any use of ..
-        self.root = os.path.normpath(os.path.abspath(root))
+        if root is None:
+            self.root = None
+        else:
+            # normpath() will (textually) eliminate any use of ..
+            self.root = os.path.normpath(os.path.abspath(root))
+
         self.search_path = tuple(
-            os.path.normpath(os.path.join(self.root, path))
+            self.normalize_path(path)
             for path in search_path
         )
 
-        self.namespace = namespace
+        self.extensions = []
+        if namespace is not None:
+            self.extensions.append(NamespaceAdapterExtension(namespace))
+        for extension in extensions:
+            if isinstance(extension, Extension):
+                self.extensions.append(extension)
+            elif (isinstance(extension, type) and
+                    issubclass(extension, Extension)):
+                self.extensions.append(extension())
+            elif isinstance(extension, Namespace):
+                self.extensions.append(
+                    NamespaceAdapterExtension(extension))
+            else:
+                raise TypeError(
+                    "Expected an Extension or Namespace, got: {0!r}"
+                    .format(extension)
+                )
+
         self.output_style = output_style
         self.generate_source_map = generate_source_map
         self.live_errors = live_errors
@@ -126,6 +144,15 @@ class Compiler(object):
         self.super_selector = super_selector
 
         self.calculator = Calculator()
+
+    def normalize_path(self, path):
+        if self.root is None:
+            if not os.path.isabs(path):
+                raise IOError("Can't make absolute path when root is None")
+        else:
+            path = os.path.join(self.root, path)
+
+        return os.path.normpath(path)
 
     def make_compilation(self):
         return Compilation(self)
@@ -145,8 +172,11 @@ class Compiler(object):
             else:
                 raise
 
-    def compile(self):
+    def compile(self, *filenames):
         compilation = self.make_compilation()
+        for filename in filenames:
+            source = SourceFile.from_filename(self.normalize_path(filename))
+            compilation.add_source(source)
         return self.call_and_catch_errors(compilation.run)
 
 
@@ -156,8 +186,13 @@ class Compilation(object):
         self.compiler = compiler
 
         # TODO this needs a write barrier, so assignment can't overwrite what's
-        # in the original namespace
-        self.root_namespace = compiler.namespace
+        # in the original namespaces
+        # TODO or maybe the extensions themselves should take care of that, so
+        # it IS possible to overwrite from within sass, but only per-instance?
+        self.root_namespace = Namespace.derive_from(*(
+            ext.namespace for ext in compiler.extensions
+            if ext.namespace
+        ))
 
         self.sources = []
         self.source_index = {}

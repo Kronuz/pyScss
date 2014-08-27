@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import inspect
 import logging
 
 import six
@@ -144,6 +145,42 @@ class Namespace(object):
         new scope.
         """
         return type(self).derive_from(self)
+
+    def declare(self, function):
+        """Insert a Python function into this Namespace, detecting its name and
+        argument count automatically.
+        """
+        self._auto_register_function(function, function.__name__)
+        return function
+
+    def declare_alias(self, name):
+        """Insert a Python function into this Namespace with an
+        explicitly-given name, but detect its argument count automatically.
+        """
+        def decorator(f):
+            self._auto_register_function(f, name)
+            return f
+
+        return decorator
+
+    def _auto_register_function(self, function, name):
+        name = name.replace('_', '-').rstrip('-')
+        argspec = inspect.getargspec(function)
+
+        if argspec.varargs or argspec.keywords:
+            # Accepts some arbitrary number of arguments
+            arities = [None]
+        else:
+            # Accepts a fixed range of arguments
+            if argspec.defaults:
+                num_optional = len(argspec.defaults)
+            else:
+                num_optional = 0
+            num_args = len(argspec.args)
+            arities = range(num_args - num_optional, num_args + 1)
+
+        for arity in arities:
+            self.set_function(name, arity, function)
 
     @property
     def variables(self):

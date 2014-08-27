@@ -7,7 +7,6 @@ import six
 
 from scss.compiler import Compiler
 import scss.config as config
-from scss.functions import ALL_BUILTINS_LIBRARY
 from scss.expression import Calculator
 from scss.namespace import Namespace
 from scss.scss_meta import (
@@ -49,7 +48,7 @@ class Scss(object):
     def __init__(
             self, scss_vars=None, scss_opts=None, scss_files=None,
             super_selector='', live_errors=False,
-            library=ALL_BUILTINS_LIBRARY, func_registry=None,
+            library=None,
             search_paths=None):
 
         self.super_selector = super_selector
@@ -69,9 +68,7 @@ class Scss(object):
 
         self._scss_opts = scss_opts or {}
         self._scss_files = scss_files
-        # NOTE: func_registry is backwards-compatibility for only one user and
-        # has never existed in a real release
-        self._library = func_registry or library
+        self._library = library
         self._search_paths = search_paths
 
         # If true, swallow compile errors and embed them in the output instead
@@ -92,7 +89,6 @@ class Scss(object):
 
         root_namespace = Namespace(
             variables=self.scss_vars,
-            functions=self._library,
         )
 
         # Figure out search paths.  Fall back from provided explicitly to

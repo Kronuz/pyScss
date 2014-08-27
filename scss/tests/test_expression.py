@@ -4,9 +4,9 @@ contains a variety of expression-related tests.
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+from scss.core import CoreExtension
 from scss.errors import SassEvaluationError
 from scss.expression import Calculator
-from scss.functions.core import CORE_LIBRARY
 from scss.rule import Namespace
 from scss.types import Color, List, Null, Number, String
 
@@ -33,7 +33,7 @@ def test_reference_operations():
     # Need to build the calculator manually to get at its namespace, and need
     # to use calculate() instead of evaluate_expression() so interpolation
     # works
-    ns = Namespace(functions=CORE_LIBRARY)
+    ns = CoreExtension.namespace.derive()
     calc = Calculator(ns).calculate
 
     # Simple example
@@ -81,8 +81,7 @@ def test_parse(calc):
 
 
 def test_functions(calc):
-    ns = Namespace(functions=CORE_LIBRARY)
-    calc = Calculator(ns).calculate
+    calc = Calculator(CoreExtension.namespace).calculate
 
     assert calc('grayscale(red)') == Color.from_rgb(0.5, 0.5, 0.5)
     assert calc('grayscale(1)') == String('grayscale(1)', quotes=None)  # Misusing css built-in functions (with scss counterpart)

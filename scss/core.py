@@ -1,22 +1,25 @@
-"""Functions from the Sass "standard library", i.e., built into the original
-Ruby implementation.
-"""
+"""Extension for built-in Sass functionality."""
 from __future__ import absolute_import
 from __future__ import division
-from __future__ import unicode_literals
+from __future__ import print_function
 
-import logging
 import math
 
 from six.moves import xrange
 
-from scss.functions.library import FunctionLibrary
-from scss.types import Arglist, Boolean, Color, List, Null, Number, String, Map, expect_type
+from scss.extension import Extension
+from scss.namespace import Namespace
+from scss.types import (
+    Arglist, Boolean, Color, List, Null, Number, String, Map, expect_type)
 
-log = logging.getLogger(__name__)
 
-CORE_LIBRARY = FunctionLibrary()
-register = CORE_LIBRARY.register
+class CoreExtension(Extension):
+    name = 'core'
+    namespace = Namespace()
+
+
+# Alias to make the below declarations less noisy
+ns = CoreExtension.namespace
 
 
 # ------------------------------------------------------------------------------
@@ -39,7 +42,7 @@ def _interpret_percentage(n, relto=1., clamp=True):
     return ret
 
 
-@register('rgba', 4)
+@ns.declare
 def rgba(r, g, b, a):
     r = _interpret_percentage(r, relto=255)
     g = _interpret_percentage(g, relto=255)
@@ -49,14 +52,13 @@ def rgba(r, g, b, a):
     return Color.from_rgb(r, g, b, a)
 
 
-@register('rgb', 3)
+@ns.declare
 def rgb(r, g, b, type='rgb'):
     return rgba(r, g, b, Number(1.0))
 
 
-@register('rgba', 1)
-@register('rgba', 2)
-def rgba2(color, a=None):
+@ns.declare
+def rgba_(color, a=None):
     if a is None:
         alpha = 1
     else:
@@ -65,12 +67,12 @@ def rgba2(color, a=None):
     return Color.from_rgb(*color.rgba[:3], alpha=alpha)
 
 
-@register('rgb', 1)
-def rgb1(color):
+@ns.declare
+def rgb_(color):
     return rgba2(color, a=Number(1))
 
 
-@register('hsla', 4)
+@ns.declare
 def hsla(h, s, l, a):
     return Color.from_hsl(
         h.value / 360 % 1,
@@ -82,24 +84,22 @@ def hsla(h, s, l, a):
     )
 
 
-@register('hsl', 3)
+@ns.declare
 def hsl(h, s, l):
     return hsla(h, s, l, Number(1))
 
 
-@register('hsla', 1)
-@register('hsla', 2)
-def hsla2(color, a=None):
+@ns.declare
+def hsla_(color, a=None):
     return rgba2(color, a)
 
 
-@register('hsl', 1)
-def hsl1(color):
+@ns.declare
+def hsl_(color):
     return rgba2(color, a=Number(1))
 
 
-@register('mix', 2)
-@register('mix', 3)
+@ns.declare
 def mix(color1, color2, weight=Number(50, "%")):
     """
     Mixes together two colors. Specifically, takes the average of each of the
@@ -136,8 +136,9 @@ def mix(color1, color2, weight=Number(50, "%")):
     # to get the combined weight (in [-1, 1]) of color1.
     # This formula has two especially nice properties:
     #
-    #   * When either w or a are -1 or 1, the combined weight is also that number
-    #     (cases where w * a == -1 are undefined, and handled as a special case).
+    #   * When either w or a are -1 or 1, the combined weight is also that
+    #     number (cases where w * a == -1 are undefined, and handled as a
+    #     special case).
     #
     #   * When a is 0, the combined weight is w, and vice versa
     #
@@ -176,60 +177,65 @@ def mix(color1, color2, weight=Number(50, "%")):
 # ------------------------------------------------------------------------------
 # Color inspection
 
-@register('red', 1)
+@ns.declare
 def red(color):
     r, g, b, a = color.rgba
     return Number(r * 255)
 
 
-@register('green', 1)
+@ns.declare
 def green(color):
     r, g, b, a = color.rgba
     return Number(g * 255)
 
 
-@register('blue', 1)
+@ns.declare
 def blue(color):
     r, g, b, a = color.rgba
     return Number(b * 255)
 
 
-@register('opacity', 1)
-@register('alpha', 1)
+@ns.declare_alias('opacity')
+@ns.declare
 def alpha(color):
     return Number(color.alpha)
 
 
-@register('hue', 1)
+@ns.declare
 def hue(color):
     h, s, l = color.hsl
     return Number(h * 360, "deg")
 
 
-@register('saturation', 1)
+@ns.declare
 def saturation(color):
     h, s, l = color.hsl
     return Number(s * 100, "%")
 
 
-@register('lightness', 1)
+@ns.declare
 def lightness(color):
     h, s, l = color.hsl
     return Number(l * 100, "%")
 
 
-@register('ie-hex-str', 1)
+@ns.declare
 def ie_hex_str(color):
     c = Color(color).value
-    return String('#%02X%02X%02X%02X' % (round(c[3] * 255), round(c[0]), round(c[1]), round(c[2])))
+    return String("#{3:02X}{0:02X}{1:02X}{2:02X}".format(
+        int(round(c[0])),
+        int(round(c[1])),
+        int(round(c[2])),
+        int(round(c[3] * 255)),
+    ))
 
 
 # ------------------------------------------------------------------------------
 # Color modification
 
-@register('fade-in', 2)
-@register('fadein', 2)
-@register('opacify', 2)
+@ns.declare_alias('fade-in')
+@ns.declare_alias('fadein')
+@ns.declare
 def opacify(color, amount):
     r, g, b, a = color.rgba
     if amount.is_simple_unit('%'):
@@ -241,9 +247,9 @@ def opacify(color, amount):
         alpha=a + amt)
 
 
-@register('fade-out', 2)
-@register('fadeout', 2)
-@register('transparentize', 2)
+@ns.declare_alias('fade-out')
+@ns.declare_alias('fadeout')
+@ns.declare
 def transparentize(color, amount):
     r, g, b, a = color.rgba
     if amount.is_simple_unit('%'):
@@ -255,92 +261,94 @@ def transparentize(color, amount):
         alpha=a - amt)
 
 
-@register('lighten', 2)
+@ns.declare
 def lighten(color, amount):
     return adjust_color(color, lightness=amount)
 
 
-@register('darken', 2)
+@ns.declare
 def darken(color, amount):
     return adjust_color(color, lightness=-amount)
 
 
-@register('saturate', 2)
+@ns.declare
 def saturate(color, amount):
     return adjust_color(color, saturation=amount)
 
 
-@register('desaturate', 2)
+@ns.declare
 def desaturate(color, amount):
     return adjust_color(color, saturation=-amount)
 
 
-@register('greyscale', 1)
+@ns.declare
 def greyscale(color):
     h, s, l = color.hsl
     return Color.from_hsl(h, 0, l, alpha=color.alpha)
 
 
-@register('grayscale', 1)
+@ns.declare
 def grayscale(color):
     if isinstance(color, Number):
-        # grayscale(n) and grayscale(n%) are CSS3 filters and should be left intact, but only
-        # when using the "a" spelling
+        # grayscale(n) and grayscale(n%) are CSS3 filters and should be left
+        # intact, but only when using the "a" spelling
         return String.unquoted("grayscale(%s)" % (color.render(),))
     else:
         return greyscale(color)
 
 
-@register('spin', 2)
-@register('adjust-hue', 2)
+@ns.declare_alias('spin')
+@ns.declare
 def adjust_hue(color, degrees):
     h, s, l = color.hsl
     delta = degrees.value / 360
     return Color.from_hsl((h + delta) % 1, s, l, alpha=color.alpha)
 
 
-@register('complement', 1)
+@ns.declare
 def complement(color):
     h, s, l = color.hsl
     return Color.from_hsl((h + 0.5) % 1, s, l, alpha=color.alpha)
 
 
-@register('invert', 1)
+@ns.declare
 def invert(color):
-    """
-    Returns the inverse (negative) of a color.
-    The red, green, and blue values are inverted, while the opacity is left alone.
+    """Returns the inverse (negative) of a color.  The red, green, and blue
+    values are inverted, while the opacity is left alone.
     """
     r, g, b, a = color.rgba
     return Color.from_rgb(1 - r, 1 - g, 1 - b, alpha=a)
 
 
-@register('adjust-lightness', 2)
+@ns.declare
 def adjust_lightness(color, amount):
     return adjust_color(color, lightness=amount)
 
 
-@register('adjust-saturation', 2)
+@ns.declare
 def adjust_saturation(color, amount):
     return adjust_color(color, saturation=amount)
 
 
-@register('scale-lightness', 2)
+@ns.declare
 def scale_lightness(color, amount):
     return scale_color(color, lightness=amount)
 
 
-@register('scale-saturation', 2)
+@ns.declare
 def scale_saturation(color, amount):
     return scale_color(color, saturation=amount)
 
 
-@register('adjust-color')
-def adjust_color(color, red=None, green=None, blue=None, hue=None, saturation=None, lightness=None, alpha=None):
+@ns.declare
+def adjust_color(
+        color, red=None, green=None, blue=None,
+        hue=None, saturation=None, lightness=None, alpha=None):
     do_rgb = red or green or blue
     do_hsl = hue or saturation or lightness
     if do_rgb and do_hsl:
-        raise ValueError("Can't adjust both RGB and HSL channels at the same time")
+        raise ValueError(
+            "Can't adjust both RGB and HSL channels at the same time")
 
     zero = Number(0)
     a = color.alpha + (alpha or zero).value
@@ -378,12 +386,15 @@ def _scale_channel(channel, scaleby):
         return channel * (1 + factor)
 
 
-@register('scale-color')
-def scale_color(color, red=None, green=None, blue=None, saturation=None, lightness=None, alpha=None):
+@ns.declare
+def scale_color(
+        color, red=None, green=None, blue=None,
+        saturation=None, lightness=None, alpha=None):
     do_rgb = red or green or blue
     do_hsl = saturation or lightness
     if do_rgb and do_hsl:
-        raise ValueError("Can't scale both RGB and HSL channels at the same time")
+        raise ValueError(
+            "Can't scale both RGB and HSL channels at the same time")
 
     scaled_alpha = _scale_channel(color.alpha, alpha)
 
@@ -396,16 +407,20 @@ def scale_color(color, red=None, green=None, blue=None, saturation=None, lightne
     else:
         channels = [
             _scale_channel(channel, scaleby)
-            for channel, scaleby in zip(color.hsl, (None, saturation, lightness))]
+            for channel, scaleby
+            in zip(color.hsl, (None, saturation, lightness))]
         return Color.from_hsl(*channels, alpha=scaled_alpha)
 
 
-@register('change-color')
-def change_color(color, red=None, green=None, blue=None, hue=None, saturation=None, lightness=None, alpha=None):
+@ns.declare
+def change_color(
+        color, red=None, green=None, blue=None,
+        hue=None, saturation=None, lightness=None, alpha=None):
     do_rgb = red or green or blue
     do_hsl = hue or saturation or lightness
     if do_rgb and do_hsl:
-        raise ValueError("Can't change both RGB and HSL channels at the same time")
+        raise ValueError(
+            "Can't change both RGB and HSL channels at the same time")
 
     if alpha is None:
         alpha = color.alpha
@@ -441,9 +456,9 @@ def change_color(color, red=None, green=None, blue=None, hue=None, saturation=No
 # ------------------------------------------------------------------------------
 # String functions
 
-@register('e', 1)
-@register('escape', 1)
-@register('unquote')
+@ns.declare_alias('e')
+@ns.declare_alias('escape')
+@ns.declare
 def unquote(*args):
     arg = List.from_maybe_starargs(args).maybe()
 
@@ -453,7 +468,7 @@ def unquote(*args):
         return String(arg.render(), quotes=None)
 
 
-@register('quote')
+@ns.declare
 def quote(*args):
     arg = List.from_maybe_starargs(args).maybe()
 
@@ -463,7 +478,7 @@ def quote(*args):
         return String(arg.render(), quotes='"')
 
 
-@register('str-length', 1)
+@ns.declare
 def str_length(string):
     expect_type(string, String)
 
@@ -474,7 +489,7 @@ def str_length(string):
 
 # TODO this and several others should probably also require integers
 # TODO and assert that the indexes are valid
-@register('str-insert', 3)
+@ns.declare
 def str_insert(string, insert, index):
     expect_type(string, String)
     expect_type(insert, String)
@@ -482,13 +497,11 @@ def str_insert(string, insert, index):
 
     py_index = index.to_python_index(len(string.value), check_bounds=False)
     return String(
-        string.value[:py_index] +
-            insert.value +
-            string.value[py_index:],
+        string.value[:py_index] + insert.value + string.value[py_index:],
         quotes=string.quotes)
 
 
-@register('str-index', 2)
+@ns.declare
 def str_index(string, substring):
     expect_type(string, String)
     expect_type(substring, String)
@@ -497,8 +510,7 @@ def str_index(string, substring):
     return Number(string.value.find(substring.value) + 1)
 
 
-@register('str-slice', 2)
-@register('str-slice', 3)
+@ns.declare
 def str_slice(string, start_at, end_at=None):
     expect_type(string, String)
     expect_type(start_at, Number, unit=None)
@@ -516,14 +528,14 @@ def str_slice(string, start_at, end_at=None):
         quotes=string.quotes)
 
 
-@register('to-upper-case', 1)
+@ns.declare
 def to_upper_case(string):
     expect_type(string, String)
 
     return String(string.value.upper(), quotes=string.quotes)
 
 
-@register('to-lower-case', 1)
+@ns.declare
 def to_lower_case(string):
     expect_type(string, String)
 
@@ -533,15 +545,16 @@ def to_lower_case(string):
 # ------------------------------------------------------------------------------
 # Number functions
 
-@register('percentage', 1)
+@ns.declare
 def percentage(value):
     expect_type(value, Number, unit=None)
     return value * Number(100, unit='%')
 
-CORE_LIBRARY.add(Number.wrap_python_function(abs), 'abs', 1)
-CORE_LIBRARY.add(Number.wrap_python_function(round), 'round', 1)
-CORE_LIBRARY.add(Number.wrap_python_function(math.ceil), 'ceil', 1)
-CORE_LIBRARY.add(Number.wrap_python_function(math.floor), 'floor', 1)
+
+ns.set_function('abs', 1, Number.wrap_python_function(abs))
+ns.set_function('round', 1, Number.wrap_python_function(round))
+ns.set_function('ceil', 1, Number.wrap_python_function(math.ceil))
+ns.set_function('floor', 1, Number.wrap_python_function(math.floor))
 
 
 # ------------------------------------------------------------------------------
@@ -568,15 +581,15 @@ def __parse_separator(separator, default_from=None):
 
 
 # TODO get the compass bit outta here
-@register('-compass-list-size')
-@register('length')
-def _length(*lst):
+@ns.declare_alias('-compass-list-size')
+@ns.declare
+def length(*lst):
     if len(lst) == 1 and isinstance(lst[0], (list, tuple, List)):
         lst = lst[0]
     return Number(len(lst))
 
 
-@register('set-nth', 3)
+@ns.declare
 def set_nth(list, n, value):
     expect_type(n, Number, unit=None)
 
@@ -587,8 +600,8 @@ def set_nth(list, n, value):
 
 
 # TODO get the compass bit outta here
-@register('-compass-nth', 2)
-@register('nth', 2)
+@ns.declare_alias('-compass-nth')
+@ns.declare
 def nth(lst, n):
     """Return the nth item in the list."""
     expect_type(n, (String, Number), unit=None)
@@ -607,8 +620,7 @@ def nth(lst, n):
     return lst[i]
 
 
-@register('join', 2)
-@register('join', 3)
+@ns.declare
 def join(lst1, lst2, separator=None):
     ret = []
     ret.extend(List.from_maybe(lst1))
@@ -618,22 +630,21 @@ def join(lst1, lst2, separator=None):
     return List(ret, use_comma=use_comma)
 
 
-@register('min')
+@ns.declare
 def min_(*lst):
     if len(lst) == 1 and isinstance(lst[0], (list, tuple, List)):
         lst = lst[0]
     return min(lst)
 
 
-@register('max')
+@ns.declare
 def max_(*lst):
     if len(lst) == 1 and isinstance(lst[0], (list, tuple, List)):
         lst = lst[0]
     return max(lst)
 
 
-@register('append', 2)
-@register('append', 3)
+@ns.declare
 def append(lst, val, separator=None):
     ret = []
     ret.extend(List.from_maybe(lst))
@@ -643,7 +654,7 @@ def append(lst, val, separator=None):
     return List(ret, use_comma=use_comma)
 
 
-@register('index', 2)
+@ns.declare
 def index(lst, val):
     for i in xrange(len(lst)):
         if lst.value[i] == val:
@@ -651,7 +662,7 @@ def index(lst, val):
     return Boolean(False)
 
 
-@register('zip')
+@ns.declare
 def zip_(*lists):
     return List(
         [List(zipped) for zipped in zip(*lists)],
@@ -659,7 +670,7 @@ def zip_(*lists):
 
 
 # TODO need a way to use "list" as the arg name without shadowing the builtin
-@register('list-separator', 1)
+@ns.declare
 def list_separator(list):
     if list.use_comma:
         return String.unquoted('comma')
@@ -670,12 +681,12 @@ def list_separator(list):
 # ------------------------------------------------------------------------------
 # Map functions
 
-@register('map-get', 2)
+@ns.declare
 def map_get(map, key):
     return map.to_dict().get(key, Null())
 
 
-@register('map-merge', 2)
+@ns.declare
 def map_merge(*maps):
     key_order = []
     index = {}
@@ -690,34 +701,33 @@ def map_merge(*maps):
     return Map(pairs, index=index)
 
 
-@register('map-keys', 1)
+@ns.declare
 def map_keys(map):
     return List(
         [k for (k, v) in map.to_pairs()],
         use_comma=True)
 
 
-@register('map-values', 1)
+@ns.declare
 def map_values(map):
     return List(
         [v for (k, v) in map.to_pairs()],
         use_comma=True)
 
 
-@register('map-has-key', 2)
+@ns.declare
 def map_has_key(map, key):
     return Boolean(key in map.to_dict())
 
 
 # DEVIATIONS: these do not exist in ruby sass
 
-@register('map-get', 3)
+@ns.declare
 def map_get3(map, key, default):
     return map.to_dict().get(key, default)
 
 
-@register('map-get-nested', 2)
-@register('map-get-nested', 3)
+@ns.declare
 def map_get_nested3(map, keys, default=Null()):
     for key in keys:
         map = map.to_dict().get(key, None)
@@ -727,7 +737,7 @@ def map_get_nested3(map, keys, default=Null()):
     return map
 
 
-@register('map-merge-deep', 2)
+@ns.declare
 def map_merge_deep(*maps):
     pairs = []
     keys = set()
@@ -749,12 +759,12 @@ def map_merge_deep(*maps):
 # ------------------------------------------------------------------------------
 # Meta functions
 
-@register('type-of', 1)
-def _type_of(obj):  # -> bool, number, string, color, list
+@ns.declare
+def type_of(obj):  # -> bool, number, string, color, list
     return String(obj.sass_type_name)
 
 
-@register('unit', 1)
+@ns.declare
 def unit(number):  # -> px, em, cm, etc.
     numer = '*'.join(sorted(number.unit_numer))
     denom = '*'.join(sorted(number.unit_denom))
@@ -766,7 +776,7 @@ def unit(number):  # -> px, em, cm, etc.
     return String.unquoted(ret)
 
 
-@register('unitless', 1)
+@ns.declare
 def unitless(value):
     if not isinstance(value, Number):
         raise TypeError("Expected number, got %r" % (value,))
@@ -774,7 +784,7 @@ def unitless(value):
     return Boolean(value.is_unitless)
 
 
-@register('comparable', 2)
+@ns.declare
 def comparable(number1, number2):
     left = number1.to_base_units()
     right = number2.to_base_units()
@@ -783,7 +793,7 @@ def comparable(number1, number2):
         and left.unit_denom == right.unit_denom)
 
 
-@register('keywords', 1)
+@ns.declare
 def keywords(value):
     """Extract named arguments, as a map, from an argument list."""
     expect_type(value, Arglist)
@@ -793,7 +803,6 @@ def keywords(value):
 # ------------------------------------------------------------------------------
 # Miscellaneous
 
-@register('if', 2)
-@register('if', 3)
+@ns.declare
 def if_(condition, if_true, if_false=Null()):
     return if_true if condition else if_false

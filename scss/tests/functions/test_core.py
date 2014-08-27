@@ -7,9 +7,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
+from scss.core import CoreExtension
 from scss.expression import Calculator
-from scss.functions.core import CORE_LIBRARY
-from scss.rule import Namespace
 from scss.types import Color, Number, String
 
 import pytest
@@ -20,8 +19,7 @@ xfail = pytest.mark.xfail
 
 @pytest.fixture
 def calc():
-    ns = Namespace(functions=CORE_LIBRARY)
-    return Calculator(ns).evaluate_expression
+    return Calculator(CoreExtension.namespace).evaluate_expression
 
 
 # ------------------------------------------------------------------------------
