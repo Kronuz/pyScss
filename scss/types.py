@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+from collections import Iterable
 import colorsys
 import operator
 from warnings import warn
@@ -23,7 +24,7 @@ class Value(object):
     sass_type_name = 'unknown'
 
     def __repr__(self):
-        return '<%s(%s)>' % (self.__class__.__name__, repr(self.value))
+        return "<{0}: {1!r}>".format(type(self).__name__, self.value)
 
     # Sass values are all true, except for booleans and nulls
     def __bool__(self):
@@ -136,7 +137,7 @@ class Null(Value):
         return self.sass_type_name
 
     def __repr__(self):
-        return "<%s()>" % (self.__class__.__name__,)
+        return "<{0}>".format(type(self).__name__)
 
     def __hash__(self):
         return hash(None)
@@ -262,6 +263,11 @@ class Number(Value):
         self.value = amount * (numer_factor / denom_factor)
 
     def __repr__(self):
+        value = self.value
+        int_value = int(value)
+        if value == int_value:
+            value = int_value
+
         full_unit = ' * '.join(self.unit_numer)
         if self.unit_denom:
             full_unit += ' / '
@@ -270,7 +276,7 @@ class Number(Value):
             if full_unit:
                 full_unit = ' ' + full_unit
 
-        return '<%s(%r%s)>' % (self.__class__.__name__, self.value, full_unit)
+        return "<{0} {1}{2}>".format(type(self).__name__, value, full_unit)
 
     def __hash__(self):
         return hash((self.value, self.unit_numer, self.unit_denom))
@@ -557,7 +563,8 @@ class List(Value):
         if isinstance(iterable, List):
             iterable = iterable.value
 
-        if not isinstance(iterable, (list, tuple)):
+        if (not isinstance(iterable, Iterable) or
+                isinstance(iterable, six.string_types)):
             raise TypeError("Expected list, got %r" % (iterable,))
 
         self.value = list(iterable)
@@ -620,9 +627,9 @@ class List(Value):
         return cls(args, use_comma=use_comma)
 
     def __repr__(self):
-        return "<List(%r, %r)>" % (
-            self.value,
-            self.delimiter(compress=True),
+        return "<{0} {1}>".format(
+            type(self).__name__,
+            self.delimiter().join(repr(item) for item in self),
         )
 
     def __hash__(self):
@@ -857,7 +864,7 @@ class Color(Value):
         )
 
     def __repr__(self):
-        return '<%s(%s)>' % (self.__class__.__name__, repr(self.value))
+        return "<{0} {1}>".format(type(self).__name__, self.render())
 
     def __hash__(self):
         return hash(self.value)
@@ -1024,11 +1031,12 @@ class String(Value):
             return self.value
 
     def __repr__(self):
-        if self.quotes != '"':
-            quotes = ', quotes=%r' % self.quotes
+        if self.quotes:
+            quotes = '(' + self.quotes + ')'
         else:
             quotes = ''
-        return '<%s(%s%s)>' % (self.__class__.__name__, repr(self.value), quotes)
+        return "<{0}{1} {2!r}>".format(
+            type(self).__name__, quotes, self.value)
 
     def __eq__(self, other):
         return Boolean(isinstance(other, String) and self.value == other.value)
