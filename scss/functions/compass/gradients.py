@@ -2,6 +2,7 @@
 the same.
 """
 from __future__ import absolute_import
+from __future__ import print_function
 from __future__ import unicode_literals
 
 import base64
@@ -91,7 +92,7 @@ def __color_stops(percentages, *args):
     else:
         stops = [s if s.is_simple_unit('%') else s * max_stops for s in stops]
 
-    return list(zip(stops, colors))
+    return List(List(pair) for pair in zip(stops, colors))
 
 
 def _render_standard_color_stops(color_stops):
@@ -214,32 +215,65 @@ def _get_gradient_color_stops(args):
     return color_stops or None
 
 
+# TODO these functions need to be
+# 1. well-defined
+# 2. guaranteed to never wreck css3 syntax
+# 3. updated to whatever current compass does
+# 4. fixed to use a custom type instead of monkeypatching
+
+
 @register('radial-gradient')
 def radial_gradient(*args):
     args = List.from_maybe_starargs(args)
 
-    position_and_angle = _get_gradient_position_and_angle(args)
-    shape_and_size = _get_gradient_shape_and_size(args)
+    try:
+        # Do a rough check for standard syntax first -- `shape at position`
+        at_position = list(args[0]).index(String('at'))
+    except (IndexError, ValueError):
+        shape_and_size = _get_gradient_shape_and_size(args)
+        position_and_angle = _get_gradient_position_and_angle(args)
+    else:
+        shape_and_size = List.maybe_new(args[0][:at_position])
+        position_and_angle = List.maybe_new(args[0][at_position + 1:])
+
     color_stops = _get_gradient_color_stops(args)
     if color_stops is None:
         raise Exception('No color stops provided to radial-gradient function')
     color_stops = __color_stops(False, *color_stops)
 
-    args = [
-        position(position_and_angle) if position_and_angle is not None else None,
-        shape_and_size if shape_and_size is not None else None,
-    ]
-    args.extend(_render_standard_color_stops(color_stops))
+    if position_and_angle:
+        rendered_position = position(position_and_angle)
+    else:
+        rendered_position = None
+    rendered_color_stops = _render_standard_color_stops(color_stops)
 
-    to__s = 'radial-gradient(' + ', '.join(to_str(a) for a in args or [] if a is not None) + ')'
-    ret = String.unquoted(to__s)
+    args = []
+    if shape_and_size and rendered_position:
+        args.append(List([shape_and_size, String.unquoted('at'), rendered_position], use_comma=False))
+    elif rendered_position:
+        args.append(rendered_position)
+    elif shape_and_size:
+        args.append(shape_and_size)
+    args.extend(rendered_color_stops)
+
+    legacy_args = []
+    if rendered_position:
+        legacy_args.append(rendered_position)
+    if shape_and_size:
+        legacy_args.append(shape_and_size)
+    legacy_args.extend(rendered_color_stops)
+
+    ret = String.unquoted(
+        'radial-gradient(' + ', '.join(a.render() for a in args) + ')')
+
+    legacy_ret = 'radial-gradient(' + ', '.join(a.render() for a in legacy_args) + ')'
 
     def to__css2():
         return String.unquoted('')
     ret.to__css2 = to__css2
 
     def to__moz():
-        return String.unquoted('-moz-' + to__s)
+        return String.unquoted('-moz-' + legacy_ret)
     ret.to__moz = to__moz
 
     def to__pie():
@@ -248,15 +282,15 @@ def radial_gradient(*args):
     ret.to__pie = to__pie
 
     def to__webkit():
-        return String.unquoted('-webkit-' + to__s)
+        return String.unquoted('-webkit-' + legacy_ret)
     ret.to__webkit = to__webkit
 
     def to__owg():
         args = [
             'radial',
-            grad_point(position_and_angle) if position_and_angle is not None else 'center',
+            grad_point(*position_and_angle) if position_and_angle is not None else 'center',
             '0',
-            grad_point(position_and_angle) if position_and_angle is not None else 'center',
+            grad_point(*position_and_angle) if position_and_angle is not None else 'center',
             __grad_end_position(True, color_stops),
         ]
         args.extend('color-stop(%s, %s)' % (s.render(), c.render()) for s, c in color_stops)
@@ -265,7 +299,7 @@ def radial_gradient(*args):
     ret.to__owg = to__owg
 
     def to__svg():
-        return radial_svg_gradient(color_stops, position_and_angle or 'center')
+        return radial_svg_gradient(*(list(color_stops) + list(position_and_angle or [String('center')])))
     ret.to__svg = to__svg
 
     return ret
@@ -336,11 +370,11 @@ def radial_svg_gradient(*args):
     args = List.from_maybe_starargs(args)
     color_stops = args
     center = None
-    if isinstance(args[-1], (String, Number, six.string_types)):
+    if isinstance(args[-1], (String, Number)):
         center = args[-1]
         color_stops = args[:-1]
     color_stops = __color_stops(False, *color_stops)
-    cx, cy = zip(*grad_point(center).items())[1]
+    cx, cy = grad_point(center)
     r = __grad_end_position(True, color_stops)
     svg = __radial_svg(color_stops, cx, cy, r)
     url = 'data:' + 'image/svg+xml' + ';base64,' + base64.b64encode(svg)
@@ -353,12 +387,12 @@ def linear_svg_gradient(*args):
     args = List.from_maybe_starargs(args)
     color_stops = args
     start = None
-    if isinstance(args[-1], (String, Number, six.string_types)):
+    if isinstance(args[-1], (String, Number)):
         start = args[-1]
         color_stops = args[:-1]
     color_stops = __color_stops(False, *color_stops)
-    x1, y1 = zip(*grad_point(start).items())[1]
-    x2, y2 = zip(*grad_point(opposite_position(start)).items())[1]
+    x1, y1 = grad_point(start)
+    x2, y2 = grad_point(opposite_position(start))
     svg = _linear_svg(color_stops, x1, y1, x2, y2)
     url = 'data:' + 'image/svg+xml' + ';base64,' + base64.b64encode(svg)
     inline = 'url("%s")' % escape(url)

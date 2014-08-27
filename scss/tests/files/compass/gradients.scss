@@ -1,5 +1,3 @@
-@option style:legacy;
-
 // Borrowed from Compass's actual test suite, but cut down to just the gradient
 // calls, and with some editing to e.g. preserve color formatting:
 // https://github.com/chriseppstein/compass/blob/stable/test/fixtures/stylesheets/compass/sass/gradients.sass
@@ -82,4 +80,16 @@
 
 .cross-fade {
   background-image: cross-fade(radial-gradient(#ddd, #aaa 100px), url("4x6.png"));
+}
+
+
+/* New tests of our own */
+
+// Valid CSS3, used to come out with the first argument doubled
+.bg-radial-gradient-at {
+    background: radial-gradient(circle at center, red 0%, green 100%);
+}
+
+.bg-linear-gradient-to {
+  background: linear-gradient(to right, red 0%, green 100%);
 }
