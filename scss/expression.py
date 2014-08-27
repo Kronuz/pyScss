@@ -88,8 +88,7 @@ class Calculator(object):
                         if config.FATAL_UNDEFINED:
                             raise SyntaxError("Undefined variable: '%s'." % n)
                         else:
-                            if config.VERBOSITY > 1:
-                                log.error("Undefined variable '%s'", n, extra={'stack': True})
+                            log.error("Undefined variable '%s'", n, extra={'stack': True})
                             return n
                     else:
                         if v:
@@ -380,8 +379,7 @@ class Variable(Expression):
             if config.FATAL_UNDEFINED:
                 raise SyntaxError("Undefined variable: '%s'." % self.name)
             else:
-                if config.VERBOSITY > 1:
-                    log.error("Undefined variable '%s'", self.name, extra={'stack': True})
+                log.error("Undefined variable '%s'", self.name, extra={'stack': True})
                 return Undefined()
         else:
             if isinstance(value, six.string_types):

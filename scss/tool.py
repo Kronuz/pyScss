@@ -51,7 +51,7 @@ def main():
     parser.add_option("-s", "--suffix", metavar="STRING",
                       help="If using watch, a suffix added to the output filename (i.e. filename.STRING.css)")
     parser.add_option("--time", action="store_true",
-                      help="Display compliation times")
+                      help="Ignored, will be removed in 2.0")
     parser.add_option("--debug-info", action="store_true",
                       help="Turns on scss's debugging information")
     parser.add_option("--no-debug-info", action="store_false",
@@ -98,10 +98,6 @@ def main():
     options, args = parser.parse_args()
 
     # General runtime configuration
-    config.VERBOSITY = 0
-    if options.time:
-        config.VERBOSITY = 2
-
     if options.static_root is not None:
         config.STATIC_ROOT = options.static_root
     if options.assets_root is not None:
