@@ -101,8 +101,8 @@ def run_setup(with_binary):
         install_requires=INSTALL_REQUIRES,
         packages=[
             'scss',
-            'scss.functions',
-            'scss.functions.compass',
+            'scss.extension',
+            'scss.extension.compass',
         ],
         cmdclass={'build_ext': ve_build_ext},
         features=features,
