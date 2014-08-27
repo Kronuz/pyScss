@@ -136,6 +136,7 @@ class Scss(object):
             generate_source_map=self._scss_opts.get('debug_info', False),
             output_style=output_style,
             warn_unused_imports=self._scss_opts.get('warn_unused', False),
+            ignore_parse_errors=config.DEBUG,
             super_selector=super_selector or self.super_selector,
         )
         # Gonna add the source files manually

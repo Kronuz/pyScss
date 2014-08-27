@@ -95,6 +95,7 @@ class Compiler(object):
             namespace=None, extensions=(CoreExtension,),
             output_style='nested', generate_source_map=False,
             live_errors=False, warn_unused_imports=False,
+            ignore_parse_errors=False,
             super_selector='',
         ):
         """Configure a compiler.
@@ -140,9 +141,8 @@ class Compiler(object):
         self.generate_source_map = generate_source_map
         self.live_errors = live_errors
         self.warn_unused_imports = warn_unused_imports
+        self.ignore_parse_errors = ignore_parse_errors
         self.super_selector = super_selector
-
-        self.calculator = Calculator()
 
     def normalize_path(self, path):
         if self.root is None:
@@ -183,6 +183,7 @@ class Compilation(object):
     """A single run of a compiler."""
     def __init__(self, compiler):
         self.compiler = compiler
+        self.ignore_parse_errors = compiler.ignore_parse_errors
 
         # TODO this needs a write barrier, so assignment can't overwrite what's
         # in the original namespaces
@@ -299,6 +300,12 @@ class Compilation(object):
         for name, file_and_line in rule.namespace.unused_imports():
             log.warn("Unused @import: '%s' (%s)", name, file_and_line)
 
+    def _make_calculator(self, namespace):
+        return Calculator(
+            namespace,
+            ignore_parse_errors=self.ignore_parse_errors,
+        )
+
     # @print_timing(4)
     def manage_children(self, rule, scope):
         try:
@@ -312,7 +319,7 @@ class Compilation(object):
             raise SassError(e, rule=rule)
 
     def _manage_children_impl(self, rule, scope):
-        calculator = Calculator(rule.namespace)
+        calculator = self._make_calculator(rule.namespace)
 
         for c_lineno, c_property, c_codestr in locate_blocks(rule.unparsed_contents):
             block = UnparsedBlock(rule, c_lineno, c_property, c_codestr)
@@ -412,8 +419,8 @@ class Compilation(object):
             setting = True
         elif setting.lower() in ('0', 'false', 'f', 'no', 'n', 'off', 'undefined'):
             setting = False
-        config.DEBUG = setting
-        log.info("Debug mode is %s", 'On' if config.DEBUG else 'Off')
+        self.ignore_parse_errors = setting
+        log.info("Debug mode is %s", 'On' if self.ignore_parse_errors else 'Off')
 
     def _at_pdb(self, calculator, rule, scope, block):
         """
@@ -530,7 +537,7 @@ class Compilation(object):
         callee_argspec = mixin[4]
         import_key = mixin[5]
 
-        callee_calculator = Calculator(callee_namespace)
+        callee_calculator = self._make_calculator(callee_namespace)
 
         # Populate the mixin/function's namespace with its arguments
         for var_name, node in callee_argspec.iter_def_argspec():
@@ -672,7 +679,7 @@ class Compilation(object):
         Implements @include, for @mixins
         """
         caller_namespace = rule.namespace
-        caller_calculator = Calculator(caller_namespace)
+        caller_calculator = self._make_calculator(caller_namespace)
         funct, caller_argspec = self._get_funct_def(rule, caller_calculator, block.argument)
 
         # Render the passed arguments, using the caller's namespace
@@ -1121,7 +1128,7 @@ class Compilation(object):
             is_var = (block.prop[len(prop)] == '=')
         except IndexError:
             is_var = False
-        calculator = Calculator(rule.namespace)
+        calculator = self._make_calculator(rule.namespace)
         prop = prop.strip()
         prop = calculator.do_glob_math(prop)
         if not prop:
@@ -1186,7 +1193,7 @@ class Compilation(object):
         # Interpolate the current block
         # TODO this seems like it should be done in the block header.  and more
         # generally?
-        calculator = Calculator(rule.namespace)
+        calculator = self._make_calculator(rule.namespace)
         if block.header.argument:
             block.header.argument = calculator.apply_vars(block.header.argument)
 
@@ -1235,7 +1242,7 @@ class Compilation(object):
         """
         Implements Nested CSS rules
         """
-        calculator = Calculator(rule.namespace)
+        calculator = self._make_calculator(rule.namespace)
         raw_selectors = calculator.do_glob_math(block.prop)
         # DEVIATION: ruby sass doesn't support bare variables in selectors
         raw_selectors = calculator.apply_vars(raw_selectors)

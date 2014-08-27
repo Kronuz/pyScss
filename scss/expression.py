@@ -34,11 +34,13 @@ class Calculator(object):
 
     ast_cache = {}
 
-    def __init__(self, namespace=None):
+    def __init__(self, namespace=None, ignore_parse_errors=False):
         if namespace is None:
             self.namespace = Namespace()
         else:
             self.namespace = namespace
+
+        self.ignore_parse_errors = ignore_parse_errors
 
     def _pound_substitute(self, result):
         expr = result.group(1)
@@ -130,10 +132,9 @@ class Calculator(object):
         try:
             ast = self.parse_expression(expr)
         except SassError as e:
-            if config.DEBUG:
-                raise
-            else:
+            if self.ignore_parse_errors:
                 return None
+            raise
 
         try:
             return ast.evaluate(self, divide=divide)
