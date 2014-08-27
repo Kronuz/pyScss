@@ -4,9 +4,9 @@ contains a variety of expression-related tests.
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from scss.core import CoreExtension
 from scss.errors import SassEvaluationError
 from scss.expression import Calculator
+from scss.extension.core import CoreExtension
 from scss.rule import Namespace
 from scss.types import Color, List, Null, Number, String
 

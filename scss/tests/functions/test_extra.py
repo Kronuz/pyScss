@@ -7,11 +7,8 @@ tested, rather than the parsing or type system.
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import scss.functions.extra as libextra
+import scss.extra as libextra
 from scss.types import Boolean, Color, Number
-
-import pytest
-xfail = pytest.mark.xfail
 
 
 # TODO: currently these all just call the functions and make sure they pass.
@@ -27,7 +24,7 @@ def test_background_brushed():
 
 def test_grid_image():
     # TODO this should accept sass values only  :|
-    libextra._grid_image(5, 100, 5, 100)
+    libextra.grid_image(5, 100, 5, 100)
 
 
 def test_image_color():

@@ -16,13 +16,13 @@ import warnings
 import six
 
 import scss.config as config
-from scss.core import CoreExtension
 from scss.cssdefs import _spaces_re
 from scss.cssdefs import _escape_chars_re
 from scss.cssdefs import _prop_split_re
 from scss.errors import SassError
 from scss.expression import Calculator
 from scss.extension import Extension
+from scss.extension.core import CoreExtension
 from scss.extension import NamespaceAdapterExtension
 from scss.functions import COMPASS_LIBRARY
 from scss.functions.compass.sprites import sprite_map
@@ -93,7 +93,7 @@ class Compiler(object):
     """
     def __init__(
             self, root='', search_path=('',),
-            namespace=None, extensions=(CoreExtension, Namespace(functions=COMPASS_LIBRARY)),
+            namespace=None, extensions=(CoreExtension,),
             output_style='nested', generate_source_map=False,
             live_errors=False, warn_unused_imports=False,
             super_selector='',

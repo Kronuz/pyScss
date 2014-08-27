@@ -8,6 +8,10 @@ import six
 from scss.compiler import Compiler
 import scss.config as config
 from scss.expression import Calculator
+from scss.extension.core import CoreExtension
+from scss.extension.extra import ExtraExtension
+from scss.extension.fonts import FontsExtension
+from scss.functions import COMPASS_LIBRARY
 from scss.namespace import Namespace
 from scss.scss_meta import (
     BUILD_INFO, PROJECT, VERSION, REVISION, URL, AUTHOR, AUTHOR_EMAIL, LICENSE,
@@ -48,7 +52,7 @@ class Scss(object):
     def __init__(
             self, scss_vars=None, scss_opts=None, scss_files=None,
             super_selector='', live_errors=False,
-            library=None,
+            library=None, func_registry=None,
             search_paths=None):
 
         self.super_selector = super_selector
@@ -68,7 +72,7 @@ class Scss(object):
 
         self._scss_opts = scss_opts or {}
         self._scss_files = scss_files
-        self._library = library
+        self._library = func_registry or library
         self._search_paths = search_paths
 
         # If true, swallow compile errors and embed them in the output instead
@@ -89,6 +93,7 @@ class Scss(object):
 
         root_namespace = Namespace(
             variables=self.scss_vars,
+            functions=self._library,
         )
 
         # Figure out search paths.  Fall back from provided explicitly to
@@ -118,6 +123,12 @@ class Scss(object):
         # Build the compiler
         compiler = Compiler(
             namespace=root_namespace,
+            extensions=[
+                CoreExtension,
+                ExtraExtension,
+                FontsExtension,
+                Namespace(functions=COMPASS_LIBRARY),
+            ],
             search_path=search_paths,
             live_errors=self.live_errors,
             generate_source_map=self._scss_opts.get('debug_info', False),

@@ -7,8 +7,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
-from scss.core import CoreExtension
 from scss.expression import Calculator
+from scss.extension.core import CoreExtension
 from scss.types import Color, Number, String
 
 import pytest

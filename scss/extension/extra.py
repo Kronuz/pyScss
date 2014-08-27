@@ -1,5 +1,7 @@
 """Functions new to the pyScss library."""
 from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 from __future__ import unicode_literals
 
 import logging
@@ -10,7 +12,8 @@ import six
 from six.moves import xrange
 
 from scss import config
-from scss.functions.library import FunctionLibrary
+from scss.extension import Extension
+from scss.namespace import Namespace
 from scss.types import Color, Number, String, List
 from scss.util import escape, make_data_url, make_filename_hash
 
@@ -20,17 +23,27 @@ except ImportError:
     try:
         import Image
         import ImageDraw
-    except:
+    except ImportError:
         Image = None
+        ImageDraw = None
+
 
 log = logging.getLogger(__name__)
 
-EXTRA_LIBRARY = FunctionLibrary()
-register = EXTRA_LIBRARY.register
+
+class ExtraExtension(Extension):
+    """Extra functions unique to the pyScss library."""
+    name = 'extra'
+    namespace = Namespace()
+
+
+# Alias to make the below declarations less noisy
+ns = ExtraExtension.namespace
 
 
 # ------------------------------------------------------------------------------
 # Image stuff
+
 def _image_noise(pixdata, size, density=None, intensity=None, color=None, opacity=None, monochrome=None, background=None):
     if not density:
         density = [0.8]
@@ -259,14 +272,7 @@ def _image_brushed(pixdata, size, density=None, intensity=None, color=None, opac
             pixdata[pos] = tuple(int(round(c)) for c in (col[0] / ca, col[1] / ca, col[2] / ca, ca * 255))
 
 
-@register('background-noise', 0)
-@register('background-noise', 1)
-@register('background-noise', 2)
-@register('background-noise', 3)
-@register('background-noise', 4)
-@register('background-noise', 5)
-@register('background-noise', 6)
-@register('background-noise', 7)
+@ns.declare
 def background_noise(density=None, opacity=None, size=None, monochrome=False, intensity=(), color=None, background=None, inline=False):
     if not Image:
         raise Exception("Images manipulation require PIL")
@@ -316,16 +322,7 @@ def background_noise(density=None, opacity=None, size=None, monochrome=False, in
     return String.unquoted(inline)
 
 
-@register('background-brushed', 0)
-@register('background-brushed', 1)
-@register('background-brushed', 2)
-@register('background-brushed', 3)
-@register('background-brushed', 4)
-@register('background-brushed', 5)
-@register('background-brushed', 6)
-@register('background-brushed', 7)
-@register('background-brushed', 8)
-@register('background-brushed', 9)
+@ns.declare
 def background_brushed(density=None, intensity=None, color=None, opacity=None, size=None, monochrome=False, direction=(), spread=(), background=None, inline=False):
     if not Image:
         raise Exception("Images manipulation require PIL")
@@ -378,9 +375,8 @@ def background_brushed(density=None, intensity=None, color=None, opacity=None, s
     return String.unquoted(inline)
 
 
-@register('grid-image', 4)
-@register('grid-image', 5)
-def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=None, baseline_color=None, background_color=None, inline=False):
+@ns.declare
+def grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=None, baseline_color=None, background_color=None, inline=False):
     if not Image:
         raise Exception("Images manipulation require PIL")
     if grid_color is None:
@@ -444,9 +440,7 @@ def _grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=
     return String.unquoted(inline)
 
 
-@register('image-color', 1)
-@register('image-color', 2)
-@register('image-color', 3)
+@ns.declare
 def image_color(color, width=1, height=1):
     if not Image:
         raise Exception("Images manipulation require PIL")

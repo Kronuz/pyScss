@@ -2,9 +2,6 @@ from __future__ import absolute_import
 
 from scss.functions.library import FunctionLibrary
 
-from scss.functions.core import CORE_LIBRARY
-from scss.functions.extra import EXTRA_LIBRARY
-from scss.functions.fonts import FONTS_LIBRARY
 from scss.functions.compass.configuration import ns
 from scss.functions.compass.sprites import COMPASS_SPRITES_LIBRARY
 from scss.functions.compass.gradients import COMPASS_GRADIENTS_LIBRARY

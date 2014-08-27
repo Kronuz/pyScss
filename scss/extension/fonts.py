@@ -1,8 +1,7 @@
-"""
-Functions used for generating custom fonts from SVG files.
-
-"""
+"""Functions used for generating custom fonts from SVG files."""
 from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 from __future__ import unicode_literals
 
 import re
@@ -15,8 +14,6 @@ import tempfile
 import subprocess
 import warnings
 
-import six
-
 try:
     import cPickle as pickle
 except ImportError:
@@ -28,7 +25,8 @@ except:
     fontforge = None
 
 from scss import config
-from scss.functions.library import FunctionLibrary
+from scss.extension import Extension
+from scss.namespace import Namespace
 from scss.types import String, Boolean, List
 from scss.util import getmtime, escape, make_data_url, make_filename_hash
 
@@ -39,9 +37,6 @@ TTF2EOT_EXECUTABLE = 'ttf2eot'
 
 MAX_FONT_SHEETS = 4096
 KEEP_FONT_SHEETS = int(MAX_FONT_SHEETS * 0.8)
-
-FONTS_LIBRARY = FunctionLibrary()
-register = FONTS_LIBRARY.register
 
 FONT_TYPES = ('eot', 'woff', 'ttf', 'svg')  # eot should be first for IE support
 
@@ -69,6 +64,16 @@ GLYPH_WIDTH = GLYPH_HEIGHT
 
 # Offset to work around Chrome Windows bug
 GLYPH_START = 0xf100
+
+
+class FontsExtension(Extension):
+    """Functions for creating and manipulating fonts."""
+    name = 'fonts'
+    namespace = Namespace()
+
+
+# Alias to make the below declarations less noisy
+ns = FontsExtension.namespace
 
 font_sheets = {}
 _font_sheet_cache = {}
@@ -114,7 +119,7 @@ def ttf2eot(ttf):
     return output
 
 
-@register('font-sheet')
+@ns.declare
 def font_sheet(g, **kwargs):
     if not fontforge:
         raise Exception("Fonts manipulation require fontforge")
@@ -371,21 +376,20 @@ def font_sheet(g, **kwargs):
     return asset
 
 
-@register('glyphs', 1)
-@register('glyph-names', 1)
+@ns.declare_alias('glyph-names')
+@ns.declare
 def glyphs(sheet, remove_suffix=False):
     sheet = sheet.render()
     font_sheet = font_sheets.get(sheet, {})
     return List([String.unquoted(f) for f in sorted(set(f.rsplit('-', 1)[0] if remove_suffix else f for f in font_sheet if not f.startswith('*')))])
 
 
-@register('glyph-classes', 1)
+@ns.declare
 def glyph_classes(sheet):
     return glyphs(sheet, True)
 
 
-@register('font-url', 2)
-@register('font-url', 3)
+@ns.declare
 def font_url(sheet, type_, only_path=False, cache_buster=True):
     font_sheet = font_sheets.get(sheet.render())
     type_ = String.unquoted(type_).render()
@@ -409,7 +413,7 @@ def font_url(sheet, type_, only_path=False, cache_buster=True):
     return String.unquoted('')
 
 
-@register('font-format', 3)
+@ns.declare
 def font_format(type_):
     type_ = type_.render()
     if type_ in FONT_FORMATS:
@@ -417,7 +421,7 @@ def font_format(type_):
     return String.unquoted('')
 
 
-@register('has-glyph', 2)
+@ns.declare
 def has_glyph(sheet, glyph):
     sheet = sheet.render()
     font_sheet = font_sheets.get(sheet)
@@ -428,7 +432,7 @@ def has_glyph(sheet, glyph):
     return Boolean(bool(glyph))
 
 
-@register('glyph-code', 2)
+@ns.declare
 def glyph_code(sheet, glyph):
     sheet = sheet.render()
     font_sheet = font_sheets.get(sheet)
