@@ -8,6 +8,7 @@ import six
 from scss.compiler import Compiler
 import scss.config as config
 from scss.expression import Calculator
+from scss.extension.bootstrap import BootstrapExtension
 from scss.extension.core import CoreExtension
 from scss.extension.extra import ExtraExtension
 from scss.extension.fonts import FontsExtension
@@ -128,6 +129,7 @@ class Scss(object):
                 ExtraExtension,
                 FontsExtension,
                 Namespace(functions=COMPASS_LIBRARY),
+                BootstrapExtension,
             ],
             search_path=search_paths,
             live_errors=self.live_errors,
