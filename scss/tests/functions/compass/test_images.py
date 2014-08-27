@@ -12,25 +12,21 @@ Ruby code.
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from scss.expression import Calculator
-from scss.functions.compass.images import COMPASS_IMAGES_LIBRARY
-from scss.rule import Namespace
-
-
-import pytest
-from scss import config
 import os
 import sys
-from _pytest.monkeypatch import monkeypatch
-xfail = pytest.mark.xfail
+
+import pytest
+
+from scss import config
+from scss.expression import Calculator
+from scss.extension.compass.images import images_namespace
+
 
 # TODO many of these tests could also stand to test for failure cases
 
-
 @pytest.fixture
 def calc():
-    ns = Namespace(functions=COMPASS_IMAGES_LIBRARY)
-    return Calculator(ns).evaluate_expression
+    return Calculator(images_namespace).evaluate_expression
 
 
 def test_image_url(calc):
@@ -40,8 +36,8 @@ def test_image_url(calc):
 
 
 # inline-image
-def test_inline_image(calc):
-    monkeypatch().setattr(config, 'IMAGES_ROOT', os.path.join(config.PROJECT_ROOT, 'tests/files/images'))
+def test_inline_image(calc, monkeypatch):
+    monkeypatch.setattr(config, 'IMAGES_ROOT', os.path.join(config.PROJECT_ROOT, 'tests/files/images'))
 
     with open(os.path.join(config.PROJECT_ROOT, 'tests/files/images/test-qr.base64.txt'), 'r') as f:
         font_base64 = f.read()
@@ -49,8 +45,8 @@ def test_inline_image(calc):
 
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='cur mimetype is defined on windows')
-def test_inline_cursor(calc):
-    monkeypatch().setattr(config, 'IMAGES_ROOT', os.path.join(config.PROJECT_ROOT, 'tests/files/cursors'))
+def test_inline_cursor(calc, monkeypatch):
+    monkeypatch.setattr(config, 'IMAGES_ROOT', os.path.join(config.PROJECT_ROOT, 'tests/files/cursors'))
 
     with open(os.path.join(config.PROJECT_ROOT, 'tests/files/cursors/fake.base64.txt'), 'r') as f:
         font_base64 = f.read()

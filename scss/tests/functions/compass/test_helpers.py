@@ -12,24 +12,21 @@ Ruby code.
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import os
+
+from scss import config
 from scss.expression import Calculator
-from scss.functions.compass.helpers import COMPASS_HELPERS_LIBRARY
+from scss.extension.compass.helpers import helpers_namespace
 from scss.rule import Namespace
 
-
 import pytest
-from scss import config
-import os
-from _pytest.monkeypatch import monkeypatch
-xfail = pytest.mark.xfail
 
 # TODO many of these tests could also stand to test for failure cases
 
 
 @pytest.fixture
 def calc():
-    ns = Namespace(functions=COMPASS_HELPERS_LIBRARY)
-    return Calculator(ns).evaluate_expression
+    return Calculator(helpers_namespace).evaluate_expression
 
 
 # ------------------------------------------------------------------------------
@@ -179,12 +176,12 @@ def test_font_files(calc):
 
 
 # inline-font-files
-def test_inline_font_files(calc):
+def test_inline_font_files(calc, monkeypatch):
     """
     @author: funvit
     @note: adapted from  compass / test / units / sass_extensions_test.rb
     """
-    monkeypatch().setattr(config, 'FONTS_ROOT', os.path.join(config.PROJECT_ROOT, 'tests/files/fonts'))
+    monkeypatch.setattr(config, 'FONTS_ROOT', os.path.join(config.PROJECT_ROOT, 'tests/files/fonts'))
 
     with open(os.path.join(config.PROJECT_ROOT, 'tests/files/fonts/bgrove.base64.txt'), 'r') as f:
         font_base64 = ''.join((f.readlines()))

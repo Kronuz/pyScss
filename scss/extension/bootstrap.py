@@ -4,9 +4,9 @@ from __future__ import unicode_literals
 from __future__ import division
 
 from scss.extension import Extension
+from scss.extension.compass.helpers import _font_url
+from scss.extension.compass.images import _image_url
 from scss.namespace import Namespace
-from scss.functions.compass.helpers import _font_url
-from scss.functions.compass.images import _image_url
 
 
 class BootstrapExtension(Extension):

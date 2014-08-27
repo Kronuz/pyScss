@@ -30,20 +30,19 @@ except ImportError:
 
 from six.moves import xrange
 
+from . import _image_size_cache
+from .layouts import PackedSpritesLayout, HorizontalSpritesLayout, VerticalSpritesLayout, DiagonalSpritesLayout
 from scss import config
-from scss.functions.compass import _image_size_cache
-from scss.functions.compass.layouts import PackedSpritesLayout, HorizontalSpritesLayout, VerticalSpritesLayout, DiagonalSpritesLayout
-from scss.functions.library import FunctionLibrary
+from scss.namespace import Namespace
 from scss.types import Color, List, Number, String, Boolean
 from scss.util import escape, getmtime, make_data_url, make_filename_hash
 
 log = logging.getLogger(__name__)
+ns = sprites_namespace = Namespace()
+__all__ = ['gradients_namespace']
 
 MAX_SPRITE_MAPS = 4096
 KEEP_SPRITE_MAPS = int(MAX_SPRITE_MAPS * 0.8)
-
-COMPASS_SPRITES_LIBRARY = FunctionLibrary()
-register = COMPASS_SPRITES_LIBRARY.register
 
 
 # ------------------------------------------------------------------------------
@@ -93,7 +92,7 @@ def alpha_composite(im1, im2, offset=None, box=None, opacity=1):
     return im1
 
 
-@register('sprite-map')
+@ns.declare
 def sprite_map(g, **kwargs):
     """
     Generates a sprite map from the files matching the glob pattern.
@@ -417,7 +416,7 @@ def sprite_map(g, **kwargs):
     return asset
 
 
-@register('sprite-map-name', 1)
+@ns.declare
 def sprite_map_name(map):
     """
     Returns the name of a sprite map The name is derived from the folder than
@@ -432,7 +431,7 @@ def sprite_map_name(map):
     return String.unquoted('')
 
 
-@register('sprite-file', 2)
+@ns.declare
 def sprite_file(map, sprite):
     """
     Returns the relative path (from the images directory) to the original file
@@ -452,23 +451,20 @@ def sprite_file(map, sprite):
     return String.unquoted('')
 
 
-@register('sprites', 1)
-@register('sprite-names', 1)
+@ns.declare_alias('sprite-names')
+@ns.declare
 def sprites(map, remove_suffix=False):
     map = map.render()
     sprite_map = sprite_maps.get(map, {})
     return List([String.unquoted(s) for s in sorted(set(s.rsplit('-', 1)[0] if remove_suffix else s for s in sprite_map if not s.startswith('*')))])
 
 
-@register('sprite-classes', 1)
+@ns.declare
 def sprite_classes(map):
     return sprites(map, True)
 
 
-@register('sprite', 2)
-@register('sprite', 3)
-@register('sprite', 4)
-@register('sprite', 5)
+@ns.declare
 def sprite(map, sprite, offset_x=None, offset_y=None, cache_buster=True):
     """
     Returns the image and background position for use in a single shorthand
@@ -497,8 +493,7 @@ def sprite(map, sprite, offset_x=None, offset_y=None, cache_buster=True):
     return List([Number(0), Number(0)])
 
 
-@register('sprite-url', 1)
-@register('sprite-url', 2)
+@ns.declare
 def sprite_url(map, cache_buster=True):
     """
     Returns a url to the sprite image.
@@ -516,7 +511,7 @@ def sprite_url(map, cache_buster=True):
     return String.unquoted('')
 
 
-@register('has-sprite', 2)
+@ns.declare
 def has_sprite(map, sprite):
     map = map.render()
     sprite_map = sprite_maps.get(map)
@@ -527,9 +522,7 @@ def has_sprite(map, sprite):
     return Boolean(bool(sprite))
 
 
-@register('sprite-position', 2)
-@register('sprite-position', 3)
-@register('sprite-position', 4)
+@ns.declare
 def sprite_position(map, sprite, offset_x=None, offset_y=None):
     """
     Returns the position for the original image in the sprite.

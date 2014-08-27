@@ -24,8 +24,7 @@ from scss.expression import Calculator
 from scss.extension import Extension
 from scss.extension.core import CoreExtension
 from scss.extension import NamespaceAdapterExtension
-from scss.functions import COMPASS_LIBRARY
-from scss.functions.compass.sprites import sprite_map
+from scss.extension.compass.sprites import sprite_map
 from scss.rule import BlockAtRuleHeader
 from scss.rule import Namespace
 from scss.rule import RuleAncestry

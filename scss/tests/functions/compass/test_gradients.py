@@ -3,7 +3,8 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 from scss.expression import Calculator
-from scss.functions.compass.gradients import COMPASS_GRADIENTS_LIBRARY, linear_gradient
+from scss.extension.compass.gradients import gradients_namespace
+from scss.extension.compass.gradients import linear_gradient
 from scss.rule import Namespace
 from scss.types import String, List, Number, Color
 
@@ -12,8 +13,7 @@ import pytest
 
 @pytest.fixture
 def calc():
-    ns = Namespace(functions=COMPASS_GRADIENTS_LIBRARY)
-    return Calculator(ns).evaluate_expression
+    return Calculator(gradients_namespace).evaluate_expression
 
 
 def test_linear_gradient():

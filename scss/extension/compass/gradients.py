@@ -10,18 +10,15 @@ import logging
 
 import six
 
-from scss.functions.library import FunctionLibrary
-from scss.functions.compass.helpers import opposite_position, position
+from .helpers import opposite_position, position
+from scss.namespace import Namespace
 from scss.types import Color, List, Number, String
 from scss.util import escape, split_params, to_float, to_str
 
 log = logging.getLogger(__name__)
+ns = gradients_namespace = Namespace()
+__all__ = ['gradients_namespace']
 
-COMPASS_GRADIENTS_LIBRARY = FunctionLibrary()
-register = COMPASS_GRADIENTS_LIBRARY.register
-
-
-# ------------------------------------------------------------------------------
 
 def __color_stops(percentages, *args):
     if len(args) == 1:
@@ -107,7 +104,7 @@ def _render_standard_color_stops(color_stops):
     return List(pairs, use_comma=True)
 
 
-@register('grad-color-stops')
+@ns.declare
 def grad_color_stops(*args):
     args = List.from_maybe_starargs(args)
     color_stops = __color_stops(True, *args)
@@ -119,7 +116,7 @@ def __grad_end_position(radial, color_stops):
     return __grad_position(-1, 100, radial, color_stops)
 
 
-@register('grad-point')
+@ns.declare
 def grad_point(*p):
     pos = set()
     hrz = vrt = Number(0.5, '%')
@@ -146,13 +143,13 @@ def __grad_position(index, default, radial, color_stops):
     return stops
 
 
-@register('grad-end-position')
+@ns.declare
 def grad_end_position(*color_stops):
     color_stops = __color_stops(False, *color_stops)
     return Number(__grad_end_position(False, color_stops))
 
 
-@register('color-stops')
+@ns.declare
 def color_stops(*args):
     args = List.from_maybe_starargs(args)
     color_stops = __color_stops(False, *args)
@@ -160,7 +157,7 @@ def color_stops(*args):
     return String.unquoted(ret)
 
 
-@register('color-stops-in-percentages')
+@ns.declare
 def color_stops_in_percentages(*args):
     args = List.from_maybe_starargs(args)
     color_stops = __color_stops(True, *args)
@@ -222,7 +219,7 @@ def _get_gradient_color_stops(args):
 # 4. fixed to use a custom type instead of monkeypatching
 
 
-@register('radial-gradient')
+@ns.declare
 def radial_gradient(*args):
     args = List.from_maybe_starargs(args)
 
@@ -305,7 +302,7 @@ def radial_gradient(*args):
     return ret
 
 
-@register('linear-gradient')
+@ns.declare
 def linear_gradient(*args):
     args = List.from_maybe_starargs(args)
 
@@ -365,7 +362,7 @@ def linear_gradient(*args):
     return ret
 
 
-@register('radial-svg-gradient')
+@ns.declare
 def radial_svg_gradient(*args):
     args = List.from_maybe_starargs(args)
     color_stops = args
@@ -382,7 +379,7 @@ def radial_svg_gradient(*args):
     return String.unquoted(inline)
 
 
-@register('linear-svg-gradient')
+@ns.declare
 def linear_svg_gradient(*args):
     args = List.from_maybe_starargs(args)
     color_stops = args

@@ -14,16 +14,14 @@ import os.path
 import six
 
 from scss import config
-from scss.functions.library import FunctionLibrary
+from scss.namespace import Namespace
 from scss.types import Boolean, List, Null, Number, String
 from scss.util import escape, to_str, getmtime, make_data_url
 import re
 
 log = logging.getLogger(__name__)
-
-
-COMPASS_HELPERS_LIBRARY = FunctionLibrary()
-register = COMPASS_HELPERS_LIBRARY.register
+ns = helpers_namespace = Namespace()
+__all__ = ['gradients_namespace']
 
 FONT_TYPES = {
     'woff': 'woff',
@@ -53,7 +51,7 @@ def add_cache_buster(url, mtime):
 # ------------------------------------------------------------------------------
 # Data manipulation
 
-@register('blank')
+@ns.declare
 def blank(*objs):
     """Returns true when the object is false, an empty string, or an empty list"""
     for o in objs:
@@ -72,7 +70,7 @@ def blank(*objs):
     return Boolean(True)
 
 
-@register('compact')
+@ns.declare
 def compact(*args):
     """Returns a new list after removing any non-true values"""
     use_comma = True
@@ -86,7 +84,7 @@ def compact(*args):
     )
 
 
-@register('reject')
+@ns.declare
 def reject(lst, *values):
     """Removes the given values from the list"""
     lst = List.from_maybe(lst)
@@ -99,7 +97,7 @@ def reject(lst, *values):
     return List(ret, use_comma=lst.use_comma)
 
 
-@register('first-value-of')
+@ns.declare
 def first_value_of(*args):
     if len(args) == 1 and isinstance(args[0], String):
         first = args[0].value.split()[0]
@@ -112,12 +110,12 @@ def first_value_of(*args):
         return Null()
 
 
-@register('-compass-list')
+@ns.declare_alias('-compass-list')
 def dash_compass_list(*args):
     return List.from_maybe_starargs(args)
 
 
-@register('-compass-space-list')
+@ns.declare_alias('-compass-space-list')
 def dash_compass_space_list(*lst):
     """
     If the argument is a list, it will return a new list that is space delimited
@@ -128,7 +126,7 @@ def dash_compass_space_list(*lst):
     return ret
 
 
-@register('-compass-slice', 3)
+@ns.declare_alias('-compass-slice')
 def dash_compass_slice(lst, start_index, end_index=None):
     start_index = Number(start_index).value
     end_index = Number(end_index).value if end_index is not None else None
@@ -144,7 +142,7 @@ def dash_compass_slice(lst, start_index, end_index=None):
 # ------------------------------------------------------------------------------
 # Property prefixing
 
-@register('prefixed')
+@ns.declare
 def prefixed(prefix, *args):
     to_fnct_str = 'to_' + to_str(prefix).replace('-', '_')
     for arg in List.from_maybe_starargs(args):
@@ -153,7 +151,7 @@ def prefixed(prefix, *args):
     return Boolean(False)
 
 
-@register('prefix')
+@ns.declare
 def prefix(prefix, *args):
     to_fnct_str = 'to_' + to_str(prefix).replace('-', '_')
     args = list(args)
@@ -175,47 +173,47 @@ def prefix(prefix, *args):
     return List.maybe_new(args, use_comma=True)
 
 
-@register('-moz')
+@ns.declare_alias('-moz')
 def dash_moz(*args):
     return prefix('_moz', *args)
 
 
-@register('-svg')
+@ns.declare_alias('-svg')
 def dash_svg(*args):
     return prefix('_svg', *args)
 
 
-@register('-css2')
+@ns.declare_alias('-css2')
 def dash_css2(*args):
     return prefix('_css2', *args)
 
 
-@register('-pie')
+@ns.declare_alias('-pie')
 def dash_pie(*args):
     return prefix('_pie', *args)
 
 
-@register('-webkit')
+@ns.declare_alias('-webkit')
 def dash_webkit(*args):
     return prefix('_webkit', *args)
 
 
-@register('-owg')
+@ns.declare_alias('-owg')
 def dash_owg(*args):
     return prefix('_owg', *args)
 
 
-@register('-khtml')
+@ns.declare_alias('-khtml')
 def dash_khtml(*args):
     return prefix('_khtml', *args)
 
 
-@register('-ms')
+@ns.declare_alias('-ms')
 def dash_ms(*args):
     return prefix('_ms', *args)
 
 
-@register('-o')
+@ns.declare_alias('-o')
 def dash_o(*args):
     return prefix('_o', *args)
 
@@ -223,7 +221,7 @@ def dash_o(*args):
 # ------------------------------------------------------------------------------
 # Selector generation
 
-@register('append-selector', 2)
+@ns.declare
 def append_selector(selector, to_append):
     if isinstance(selector, List):
         lst = selector.value
@@ -264,7 +262,7 @@ _elements_of_type = {
 }
 
 
-@register('elements-of-type', 1)
+@ns.declare
 def elements_of_type(display):
     d = String.unquoted(display)
     ret = _elements_of_type.get(d.value, None)
@@ -273,8 +271,7 @@ def elements_of_type(display):
     return List(map(String, ret), use_comma=True)
 
 
-@register('enumerate', 3)
-@register('enumerate', 4)
+@ns.declare
 def enumerate_(prefix, frm, through, separator='-'):
     separator = String.unquoted(separator).value
     try:
@@ -302,12 +299,8 @@ def enumerate_(prefix, frm, through, separator='-'):
     return List(ret, use_comma=True)
 
 
-@register('headers', 0)
-@register('headers', 1)
-@register('headers', 2)
-@register('headings', 0)
-@register('headings', 1)
-@register('headings', 2)
+@ns.declare_alias('headings')
+@ns.declare
 def headers(frm=None, to=None):
     if frm and to is None:
         if isinstance(frm, String) and frm.value.lower() == 'all':
@@ -332,7 +325,7 @@ def headers(frm=None, to=None):
     return List(ret, use_comma=True)
 
 
-@register('nest')
+@ns.declare
 def nest(*arguments):
     if isinstance(arguments[0], List):
         lst = arguments[0]
@@ -393,8 +386,7 @@ def nest(*arguments):
 
 # This isn't actually from Compass, but it's just a shortcut for enumerate().
 # DEVIATION: allow reversed ranges (range() uses enumerate() which allows reversed values, like '@for .. from .. through')
-@register('range', 1)
-@register('range', 2)
+@ns.declare
 def range_(frm, through=None):
     if through is None:
         through = frm
@@ -457,12 +449,12 @@ def _position(opposite, positions):
     return List(ret, use_comma=False).maybe()
 
 
-@register('position')
+@ns.declare
 def position(p):
     return _position(False, p)
 
 
-@register('opposite-position')
+@ns.declare
 def opposite_position(p):
     return _position(True, p)
 
@@ -470,18 +462,17 @@ def opposite_position(p):
 # ------------------------------------------------------------------------------
 # Math
 
-@register('pi', 0)
+@ns.declare
 def pi():
     return Number(math.pi)
 
 
-@register('e', 0)
+@ns.declare
 def e():
     return Number(math.e)
 
 
-@register('log', 1)
-@register('log', 2)
+@ns.declare
 def log_(number, base=None):
     if not isinstance(number, Number):
         raise TypeError("Expected number, got %r" % (number,))
@@ -503,15 +494,15 @@ def log_(number, base=None):
     return Number(ret)
 
 
-@register('pow', 2)
+@ns.declare
 def pow(number, exponent):
     return number ** exponent
 
 
-COMPASS_HELPERS_LIBRARY.add(Number.wrap_python_function(math.sqrt), 'sqrt', 1)
-COMPASS_HELPERS_LIBRARY.add(Number.wrap_python_function(math.sin), 'sin', 1)
-COMPASS_HELPERS_LIBRARY.add(Number.wrap_python_function(math.cos), 'cos', 1)
-COMPASS_HELPERS_LIBRARY.add(Number.wrap_python_function(math.tan), 'tan', 1)
+ns.set_function('sqrt', 1, Number.wrap_python_function(math.sqrt))
+ns.set_function('sin', 1, Number.wrap_python_function(math.sin))
+ns.set_function('cos', 1, Number.wrap_python_function(math.cos))
+ns.set_function('tan', 1, Number.wrap_python_function(math.tan))
 
 
 # ------------------------------------------------------------------------------
@@ -599,8 +590,7 @@ def _font_files(args, inline):
     return List(fonts, separator=',')
 
 
-@register('font-url', 1)
-@register('font-url', 2)
+@ns.declare
 def font_url(path, only_path=False, cache_buster=True):
     """
     Generates a path to an asset found relative to the project's font directory.
@@ -610,12 +600,12 @@ def font_url(path, only_path=False, cache_buster=True):
     return _font_url(path, only_path, cache_buster, False)
 
 
-@register('font-files')
+@ns.declare
 def font_files(*args):
     return _font_files(args, inline=False)
 
 
-@register('inline-font-files')
+@ns.declare
 def inline_font_files(*args):
     return _font_files(args, inline=True)
 
@@ -623,8 +613,7 @@ def inline_font_files(*args):
 # ------------------------------------------------------------------------------
 # External stylesheets
 
-@register('stylesheet-url', 1)
-@register('stylesheet-url', 2)
+@ns.declare
 def stylesheet_url(path, only_path=False, cache_buster=True):
     """
     Generates a path to an asset found relative to the project's css directory.

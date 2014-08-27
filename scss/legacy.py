@@ -10,9 +10,9 @@ import scss.config as config
 from scss.expression import Calculator
 from scss.extension.bootstrap import BootstrapExtension
 from scss.extension.core import CoreExtension
+from scss.extension.compass import CompassExtension
 from scss.extension.extra import ExtraExtension
 from scss.extension.fonts import FontsExtension
-from scss.functions import COMPASS_LIBRARY
 from scss.namespace import Namespace
 from scss.scss_meta import (
     BUILD_INFO, PROJECT, VERSION, REVISION, URL, AUTHOR, AUTHOR_EMAIL, LICENSE,
@@ -128,7 +128,7 @@ class Scss(object):
                 CoreExtension,
                 ExtraExtension,
                 FontsExtension,
-                Namespace(functions=COMPASS_LIBRARY),
+                CompassExtension,
                 BootstrapExtension,
             ],
             search_path=search_paths,

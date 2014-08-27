@@ -10,10 +10,10 @@ import os.path
 import six
 from six.moves import xrange
 
+from . import _image_size_cache
+from .helpers import add_cache_buster
 from scss import config
-from scss.functions.compass import _image_size_cache
-from scss.functions.compass.helpers import add_cache_buster
-from scss.functions.library import FunctionLibrary
+from scss.namespace import Namespace
 from scss.types import Color, List, Number, String
 from scss.util import escape, getmtime, make_data_url, make_filename_hash
 
@@ -26,12 +26,9 @@ except ImportError:
         Image = None
 
 log = logging.getLogger(__name__)
+ns = images_namespace = Namespace()
+__all__ = ['gradients_namespace']
 
-COMPASS_IMAGES_LIBRARY = FunctionLibrary()
-register = COMPASS_IMAGES_LIBRARY.register
-
-
-# ------------------------------------------------------------------------------
 
 def _images_root():
     return config.STATIC_ROOT if config.IMAGES_ROOT is None else config.IMAGES_ROOT
@@ -188,11 +185,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
     return String.unquoted(url)
 
 
-@register('inline-image', 1)
-@register('inline-image', 2)
-@register('inline-image', 3)
-@register('inline-image', 4)
-@register('inline-image', 5)
+@ns.declare
 def inline_image(image, mime_type=None, dst_color=None, src_color=None, spacing=None, collapse_x=None, collapse_y=None):
     """
     Embeds the contents of a file directly inside your stylesheet, eliminating
@@ -203,12 +196,7 @@ def inline_image(image, mime_type=None, dst_color=None, src_color=None, spacing=
     return _image_url(image, False, False, dst_color, src_color, True, mime_type, spacing, collapse_x, collapse_y)
 
 
-@register('image-url', 1)
-@register('image-url', 2)
-@register('image-url', 3)
-@register('image-url', 4)
-@register('image-url', 5)
-@register('image-url', 6)
+@ns.declare
 def image_url(path, only_path=False, cache_buster=True, dst_color=None, src_color=None, spacing=None, collapse_x=None, collapse_y=None):
     """
     Generates a path to an asset found relative to the project's images
@@ -219,7 +207,7 @@ def image_url(path, only_path=False, cache_buster=True, dst_color=None, src_colo
     return _image_url(path, only_path, cache_buster, dst_color, src_color, False, None, spacing, collapse_x, collapse_y)
 
 
-@register('image-width', 1)
+@ns.declare
 def image_width(image):
     """
     Returns the width of the image found at the path supplied by `image`
@@ -253,7 +241,7 @@ def image_width(image):
     return Number(width, 'px')
 
 
-@register('image-height', 1)
+@ns.declare
 def image_height(image):
     """
     Returns the height of the image found at the path supplied by `image`
