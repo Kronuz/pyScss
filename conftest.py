@@ -88,6 +88,11 @@ class SassItem(pytest.Item):
             self.fspath.relto(self.session.fspath),
         )
 
+    def _prunetraceback(self, excinfo):
+        # Traceback implements __getitem__, but list implements __getslice__,
+        # which wins in Python 2
+        excinfo.traceback = excinfo.traceback.cut(__file__)
+
     def runtest(self):
         scss_file = self.fspath
         css_file = scss_file.new(ext='css')
@@ -113,5 +118,4 @@ class SassItem(pytest.Item):
         actual = actual.strip('\n')
         expected = expected.strip('\n')
 
-        # TODO how do i make py.test not show the traceback here
         assert expected == actual
