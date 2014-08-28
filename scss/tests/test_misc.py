@@ -4,6 +4,8 @@ own files, maybe.
 """
 
 from scss import Scss
+from scss.compiler import compile_string
+from scss.errors import SassImportError
 
 
 def test_super_selector():
@@ -107,3 +109,10 @@ def test_unicode_files():
     output = compiler.compile(unicode_input)
 
     assert output == unicode_input
+
+
+def test_missing_import():
+    with pytest.raises(SassImportError):
+        compile_string("""
+            @import "bogus-file";
+        """)

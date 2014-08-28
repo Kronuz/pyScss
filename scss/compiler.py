@@ -85,15 +85,12 @@ def warn_deprecated(rule, message):
     )
 
 
-# TODO it's probably still kind of weird to go Compiler().compile('a/b/c') and
-# not have stuff in a/b/ importable.  maybe need a top-level compile_sass()
-# function that takes a single file?  (compile_file?  compile_string?)
 class Compiler(object):
     """A Sass compiler.  Stores settings and knows how to fire off a
     compilation.  Main entry point into compiling Sass.
     """
     def __init__(
-            self, root='', search_path=('',),
+            self, root='', search_path=(),
             namespace=None, extensions=(CoreExtension,),
             output_style='nested', generate_source_map=False,
             live_errors=False, warn_unused_imports=False,
@@ -180,9 +177,48 @@ class Compiler(object):
     def compile(self, *filenames):
         compilation = self.make_compilation()
         for filename in filenames:
+            # TODO maybe SourceFile should not be exposed to the end user, and
+            # instead Compilation should have methods for add_string etc. that
+            # can call normalize_path.
+            # TODO it's not possible to inject custom files into the
+            # /compiler/ as persistent across compiles, nor to provide "fake"
+            # imports.  do we want the former?  is the latter better suited to
+            # an extension?
             source = SourceFile.from_filename(self.normalize_path(filename))
             compilation.add_source(source)
         return self.call_and_catch_errors(compilation.run)
+
+    def compile_string(self, string):
+        source = SourceFile.from_string(string)
+        compilation = self.make_compilation()
+        compilation.add_source(source)
+        return self.call_and_catch_errors(compilation.run)
+
+
+def compile_file(filename, compiler_class=Compiler, **kwargs):
+    """Compile a single file, and return a string of CSS.
+
+    Keyword arguments are passed along to the underlying `Compiler`.
+
+    Note that the search path is set to the file's containing directory by
+    default, unless you explicitly pass a ``search_path`` kwarg.
+    """
+    if 'search_path' not in kwargs:
+        kwargs['search_path'] = [
+            os.path.abspath(os.path.dirname(filename)),
+        ]
+
+    compiler = compiler_class(**kwargs)
+    return compiler.compile(filename)
+
+
+def compile_string(string, compiler_class=Compiler, **kwargs):
+    """Compile a single string, and return a string of CSS.
+
+    Keyword arguments are passed along to the underlying `Compiler`.
+    """
+    compiler = compiler_class(**kwargs)
+    return compiler.compile_string(string)
 
 
 class Compilation(object):

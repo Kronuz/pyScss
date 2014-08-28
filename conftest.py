@@ -8,7 +8,12 @@ import logging
 import pytest
 
 import scss
+from scss.compiler import compile_file
 import scss.config
+from scss.extension.core import CoreExtension
+from scss.extension.extra import ExtraExtension
+from scss.extension.fonts import FontsExtension
+from scss.extension.compass import CompassExtension
 
 try:
     import fontforge
@@ -97,22 +102,26 @@ class SassItem(pytest.Item):
         scss_file = self.fspath
         css_file = scss_file.new(ext='css')
 
-        with scss_file.open('rb') as fh:
-            source = fh.read()
         with css_file.open('rb') as fh:
             # Output is Unicode, so decode this here
             expected = fh.read().decode('utf8')
 
         scss.config.STATIC_ROOT = str(scss_file.dirpath('static'))
 
-        compiler = scss.Scss(
-            scss_opts=dict(style='expanded'),
-            search_paths=[
+        actual = compile_file(
+            str(scss_file),
+            output_style='expanded',
+            search_path=[
                 str(scss_file.dirpath('include')),
                 str(scss_file.dirname),
             ],
+            extensions=[
+                CoreExtension,
+                ExtraExtension,
+                FontsExtension,
+                CompassExtension,
+            ],
         )
-        actual = compiler.compile(source)
 
         # Normalize leading and trailing newlines
         actual = actual.strip('\n')
