@@ -37,6 +37,19 @@ def main():
 
     from optparse import OptionGroup, OptionParser, SUPPRESS_HELP
 
+    if hasattr(config.LOAD_PATHS, 'split'):
+        initial_load_paths = [p.strip() for p in config.LOAD_PATHS.split(',')]
+    else:
+        initial_load_paths = list(config.LOAD_PATHS)
+
+    def append_load_path(option, opt_str, value, parser):
+        dest = getattr(parser.values, option.dest)
+        paths = value.replace(os.pathsep, ',').replace(';', ',').split(',')
+        for path in paths:
+            path = path.strip()
+            if path and path not in dest:
+                dest.append(path)
+
     parser = OptionParser(usage="Usage: %prog [options] [file]",
                           description="Converts Scss files to CSS.",
                           add_help_option=False)
@@ -70,8 +83,9 @@ def main():
                       help="Print version and exit")
 
     paths_group = OptionGroup(parser, "Resource Paths")
-    paths_group.add_option("-I", "--load-path", metavar="PATH",
-                      action="append", dest="load_paths",
+    paths_group.add_option("-I", "--load-path", metavar="PATH", type="string",
+                      action="callback", callback=append_load_path, dest="load_paths",
+                      default=initial_load_paths,
                       help="Add a scss import path, may be given multiple times")
     paths_group.add_option("-S", "--static-root", metavar="PATH", dest="static_root",
                       help="Static root path (Where images and static resources are located)")
@@ -115,25 +129,6 @@ def main():
 
     if options.cache_root is not None:
         config.CACHE_ROOT = options.cache_root
-    if options.load_paths is not None:
-        # TODO: Convert global LOAD_PATHS to a list. Use it directly.
-        # Doing the above will break backwards compatibility!
-        if hasattr(config.LOAD_PATHS, 'split'):
-            load_path_list = [p.strip() for p in config.LOAD_PATHS.split(',')]
-        else:
-            load_path_list = list(config.LOAD_PATHS)
-
-        for path_param in options.load_paths:
-            for p in path_param.replace(os.pathsep, ',').replace(';', ',').split(','):
-                p = p.strip()
-                if p and p not in load_path_list:
-                    load_path_list.append(p)
-
-        # TODO: Remove this once global LOAD_PATHS is a list.
-        if hasattr(config.LOAD_PATHS, 'split'):
-            config.LOAD_PATHS = ','.join(load_path_list)
-        else:
-            config.LOAD_PATHS = load_path_list
     if options.assets_url is not None:
         config.ASSETS_URL = options.assets_url
 
@@ -173,7 +168,9 @@ def do_build(options, args):
     css = Scss(scss_opts={
         'style': options.style,
         'debug_info': options.debug_info,
-    })
+    },
+        search_paths=options.load_paths,
+    )
     if not args:
         args = ['-']
     source_files = []
@@ -218,7 +215,9 @@ def watch_sources(options):
             self.css = Scss(scss_opts={
                 'style': options.style,
                 'debug_info': options.debug_info,
-            })
+            },
+                search_paths=options.load_paths,
+            )
             self.output = options.output
             self.suffix = options.suffix
 

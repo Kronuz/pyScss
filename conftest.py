@@ -113,4 +113,5 @@ class SassItem(pytest.Item):
         actual = actual.strip('\n')
         expected = expected.strip('\n')
 
+        # TODO how do i make py.test not show the traceback here
         assert expected == actual
