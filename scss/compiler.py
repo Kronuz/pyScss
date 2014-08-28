@@ -339,6 +339,9 @@ class Compilation(object):
             ####################################################################
             # At (@) blocks
             if block.is_atrule:
+                # TODO particularly wild idea: allow extensions to handle
+                # unrecognized blocks, and get the pyscss stuff out of the
+                # core?  even move the core stuff into the core extension?
                 code = block.directive
                 code = '_at_' + code.lower().replace(' ', '_')[1:]
                 try:
@@ -1121,6 +1124,10 @@ class Compilation(object):
         """
         Implements @variables and @vars
         """
+        warn_deprecated(
+            rule,
+            "@variables and @vars are deprecated.  "
+            "Just assign variables at top-level.")
         _rule = rule.copy()
         _rule.unparsed_contents = block.unparsed_contents
         _rule.namespace = rule.namespace
@@ -1138,6 +1145,7 @@ class Compilation(object):
         prop, raw_value = (_prop_split_re.split(block.prop, 1) + [None])[:2]
         try:
             is_var = (block.prop[len(prop)] == '=')
+            warn_deprecated(rule, "Assignment with = is deprecated; use :.")
         except IndexError:
             is_var = False
         calculator = self._make_calculator(rule.namespace)

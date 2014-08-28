@@ -1,7 +1,7 @@
 @option style:legacy, short_colors:yes, reverse_colors:yes;
 @variables {
-    $ie6 = *html;
-    $ie7 = *:first-child+html;
+    $ie6 = unquote("*html");
+    $ie7 = unquote("*:first-child+html");
 }
 $ie6 {
     .a  { color:#fff; }
