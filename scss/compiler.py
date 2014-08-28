@@ -20,6 +20,8 @@ from scss.cssdefs import _spaces_re
 from scss.cssdefs import _escape_chars_re
 from scss.cssdefs import _prop_split_re
 from scss.errors import SassError
+from scss.errors import SassBaseError
+from scss.errors import SassImportError
 from scss.expression import Calculator
 from scss.extension import Extension
 from scss.extension.core import CoreExtension
@@ -322,9 +324,7 @@ class Compilation(object):
     def manage_children(self, rule, scope):
         try:
             self._manage_children_impl(rule, scope)
-        except SassReturn:
-            raise
-        except SassError as e:
+        except SassBaseError as e:
             e.add_rule(rule)
             raise
         except Exception as e:
@@ -815,7 +815,7 @@ class Compilation(object):
                 generated_code = self._at_magic_import(
                     calculator, rule, scope, block)
                 if generated_code is None:
-                    raise
+                    raise SassImportError(sass_path, self.compiler, rule=rule)
 
                 source = SourceFile.from_string(generated_code)
             else:
@@ -1587,15 +1587,13 @@ class Compilation(object):
         return result
 
 
-# TODO: this should inherit from SassError, but can't, because that assumes
-# it's wrapping another error.  fix this with the exception hierarchy
-class SassReturn(Exception):
+class SassReturn(SassBaseError):
     """Special control-flow exception used to hop up the stack from a Sass
     function's ``@return``.
     """
     def __init__(self, retval):
+        super(SassReturn, self).__init__()
         self.retval = retval
-        Exception.__init__(self)
 
     def __str__(self):
         return "Returning {0!r}".format(self.retval)

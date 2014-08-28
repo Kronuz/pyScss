@@ -30,6 +30,7 @@ body:before {{
 }}
 """
 
+
 def add_error_marker(text, position, start_line=1):
     """Add a caret marking a given position in a string of input.
 
@@ -52,27 +53,92 @@ def add_error_marker(text, position, start_line=1):
     return "\n".join(lines), caret_line
 
 
-class SassError(Exception):
-    """Error class that wraps another exception and attempts to bolt on some
-    useful context.
+class SassBaseError(Exception):
+    """Base class for all errors caused by Sass code.
+
+    Shouldn't be raising this directly; use or create a subclass instead.
     """
-    def __init__(self, exc, rule=None, expression=None, expression_pos=None):
-        self.exc = exc
+
+    def __init__(self, rule=None):
+        super(SassBaseError, self).__init__()
 
         self.rule_stack = []
-        if rule:
-            self.rule_stack.append(rule)
-
-        self.expression = expression
-        self.expression_pos = expression_pos
-
-        _, _, self.original_traceback = sys.exc_info()
+        if rule is not None:
+            self.add_rule(rule)
 
     def add_rule(self, rule):
         """Add a new rule to the "stack" of rules -- this is used to track,
         e.g., how a file was ultimately imported.
         """
         self.rule_stack.append(rule)
+
+    def format_file_and_line(self, rule):
+        return "line {rule.lineno} of {rule.source_file.path}".format(
+            rule=rule,
+        )
+
+    def format_sass_stack(self):
+        """Return a "traceback" of Sass imports."""
+        if not self.rule_stack:
+            return ""
+
+        ret = ["on ", self.format_file_and_line(self.rule_stack[0]), "\n"]
+        last_file = self.rule_stack[0].source_file
+
+        # TODO this could go away if rules knew their import chains...
+        # TODO mixins and the like here too?
+        # TODO the line number is wrong here, since this doesn't include the
+        # *block* being parsed!
+        for rule in self.rule_stack[1:]:
+            if rule.source_file is not last_file:
+                ret.extend((
+                    "imported from ", self.format_file_and_line(rule), "\n"))
+            last_file = rule.source_file
+
+        return "".join(ret)
+
+    def format_message(self):
+        return ""
+
+    def __str__(self):
+        return "{message}\n{sass_stack}".format(
+            message=self.format_message(),
+            sass_stack=self.format_sass_stack(),
+        )
+
+
+class SassImportError(SassBaseError):
+    """Error raised when unable to resolve an @import."""
+
+    def __init__(self, bad_name, compiler, **kwargs):
+        super(SassImportError, self).__init__(**kwargs)
+
+        self.bad_name = bad_name
+        self.compiler = compiler
+
+    def format_message(self):
+        return (
+            "Couldn't find anything to import: {0}\n"
+            "Search path:\n  {1}"
+            .format(
+                self.bad_name,
+                "\n  ".join(self.compiler.search_path),
+            )
+        )
+
+
+class SassError(SassBaseError):
+    """Error class that wraps another exception and attempts to bolt on some
+    useful context.
+    """
+    def __init__(self, exc, expression=None, expression_pos=None, **kwargs):
+        super(SassError, self).__init__(**kwargs)
+
+        self.exc = exc
+        self.expression = expression
+        self.expression_pos = expression_pos
+
+        _, _, self.original_traceback = sys.exc_info()
 
     def format_prefix(self):
         """Return the general name of the error and the contents of the rule or
@@ -87,22 +153,6 @@ class SassError(Exception):
             )
         else:
             return "Unknown error\n"
-
-    def format_sass_stack(self):
-        """Return a "traceback" of Sass imports."""
-        if not self.rule_stack:
-            return ""
-
-        ret = ["From ", self.rule_stack[0].file_and_line, "\n"]
-        last_file = self.rule_stack[0].source_file
-
-        # TODO this could go away if rules knew their import chains...
-        for rule in self.rule_stack[1:]:
-            if rule.source_file is not last_file:
-                ret.extend(("...imported from ", rule.file_and_line, "\n"))
-            last_file = rule.source_file
-
-        return "".join(ret)
 
     def format_python_stack(self):
         """Return a traceback of Python frames, from where the error occurred
@@ -170,6 +220,7 @@ class SassEvaluationError(SassError):
     """Error raised when evaluating a parsed expression fails."""
 
     def format_prefix(self):
+        # TODO boy this is getting repeated a lot
         # TODO would be nice for the AST to have position information
         # TODO might be nice to print the AST and indicate where the failure
         # was?
