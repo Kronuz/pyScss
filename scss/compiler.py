@@ -97,6 +97,7 @@ class Compiler(object):
             live_errors=False, warn_unused_imports=False,
             ignore_parse_errors=False,
             loops_have_own_scopes=True,
+            undefined_variables_fatal=True,
             super_selector='',
         ):
         """Configure a compiler.
@@ -144,6 +145,7 @@ class Compiler(object):
         self.warn_unused_imports = warn_unused_imports
         self.ignore_parse_errors = ignore_parse_errors
         self.loops_have_own_scopes = loops_have_own_scopes
+        self.undefined_variables_fatal = undefined_variables_fatal
         self.super_selector = super_selector
 
     def normalize_path(self, path):
@@ -313,6 +315,7 @@ class Compilation(object):
         return Calculator(
             namespace,
             ignore_parse_errors=self.ignore_parse_errors,
+            undefined_variables_fatal=self.compiler.undefined_variables_fatal,
         )
 
     # @print_timing(4)

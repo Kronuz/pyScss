@@ -34,13 +34,18 @@ class Calculator(object):
 
     ast_cache = {}
 
-    def __init__(self, namespace=None, ignore_parse_errors=False):
+    def __init__(
+            self, namespace=None,
+            ignore_parse_errors=False,
+            undefined_variables_fatal=True,
+            ):
         if namespace is None:
             self.namespace = Namespace()
         else:
             self.namespace = namespace
 
         self.ignore_parse_errors = ignore_parse_errors
+        self.undefined_variables_fatal = undefined_variables_fatal
 
     def _pound_substitute(self, result):
         expr = result.group(1)
@@ -85,7 +90,7 @@ class Calculator(object):
                     try:
                         v = self.namespace.variable(n)
                     except KeyError:
-                        if config.FATAL_UNDEFINED:
+                        if self.undefined_variables_fatal:
                             raise SyntaxError("Undefined variable: '%s'." % n)
                         else:
                             log.error("Undefined variable '%s'", n, extra={'stack': True})
@@ -356,12 +361,13 @@ class Literal(Expression):
         return '<%s(%s)>' % (self.__class__.__name__, repr(self.value))
 
     def __init__(self, value):
-        if isinstance(value, Undefined) and config.FATAL_UNDEFINED:
-            raise SyntaxError("Undefined literal.")
-        else:
-            self.value = value
+        self.value = value
 
     def evaluate(self, calculator, divide=False):
+        if (isinstance(self.value, Undefined) and
+                calculator.undefined_variables_fatal):
+            raise SyntaxError("Undefined literal.")
+
         return self.value
 
 
@@ -376,7 +382,7 @@ class Variable(Expression):
         try:
             value = calculator.namespace.variable(self.name)
         except KeyError:
-            if config.FATAL_UNDEFINED:
+            if calculator.undefined_variables_fatal:
                 raise SyntaxError("Undefined variable: '%s'." % self.name)
             else:
                 log.error("Undefined variable '%s'", self.name, extra={'stack': True})
