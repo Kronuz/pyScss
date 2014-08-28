@@ -137,6 +137,7 @@ class Scss(object):
             output_style=output_style,
             warn_unused_imports=self._scss_opts.get('warn_unused', False),
             ignore_parse_errors=config.DEBUG,
+            loops_have_own_scopes=config.CONTROL_SCOPING,
             super_selector=super_selector or self.super_selector,
         )
         # Gonna add the source files manually

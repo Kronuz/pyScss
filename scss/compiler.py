@@ -96,6 +96,7 @@ class Compiler(object):
             output_style='nested', generate_source_map=False,
             live_errors=False, warn_unused_imports=False,
             ignore_parse_errors=False,
+            loops_have_own_scopes=True,
             super_selector='',
         ):
         """Configure a compiler.
@@ -142,6 +143,7 @@ class Compiler(object):
         self.live_errors = live_errors
         self.warn_unused_imports = warn_unused_imports
         self.ignore_parse_errors = ignore_parse_errors
+        self.loops_have_own_scopes = loops_have_own_scopes
         self.super_selector = super_selector
 
     def normalize_path(self, path):
@@ -198,6 +200,13 @@ class Compilation(object):
         self.source_index = {}
         self.dependency_map = defaultdict(frozenset)
         self.rules = []
+
+    def should_scope_loop_in_rule(self, rule):
+        """Return True iff a looping construct (@each, @for, @while, @if)
+        should get its own scope, as is standard Sass behavior.
+        """
+        return rule.legacy_compiler_options.get(
+            'control_scoping', self.compiler.loops_have_own_scopes)
 
     def add_source(self, source):
         if source.path in self.source_index:
@@ -984,7 +993,7 @@ class Compilation(object):
         if condition:
             inner_rule = rule.copy()
             inner_rule.unparsed_contents = block.unparsed_contents
-            if not rule.legacy_compiler_options.get('control_scoping', config.CONTROL_SCOPING):  # TODO: maybe make this scoping mode for contol structures as the default as a default deviation
+            if not self.should_scope_loop_in_rule(inner_rule):
                 # DEVIATION: Allow not creating a new namespace
                 inner_rule.namespace = rule.namespace
             self.manage_children(inner_rule, scope)
@@ -1038,7 +1047,7 @@ class Compilation(object):
 
         inner_rule = rule.copy()
         inner_rule.unparsed_contents = block.unparsed_contents
-        if not rule.legacy_compiler_options.get('control_scoping', config.CONTROL_SCOPING):  # TODO: maybe make this scoping mode for contol structures as the default as a default deviation
+        if not self.should_scope_loop_in_rule(inner_rule):
             # DEVIATION: Allow not creating a new namespace
             inner_rule.namespace = rule.namespace
 
@@ -1071,7 +1080,7 @@ class Compilation(object):
 
         inner_rule = rule.copy()
         inner_rule.unparsed_contents = block.unparsed_contents
-        if not rule.legacy_compiler_options.get('control_scoping', config.CONTROL_SCOPING):  # TODO: maybe make this scoping mode for contol structures as the default as a default deviation
+        if not self.should_scope_loop_in_rule(inner_rule):
             # DEVIATION: Allow not creating a new namespace
             inner_rule.namespace = rule.namespace
 
@@ -1097,7 +1106,7 @@ class Compilation(object):
         while condition:
             inner_rule = rule.copy()
             inner_rule.unparsed_contents = block.unparsed_contents
-            if not rule.legacy_compiler_options.get('control_scoping', config.CONTROL_SCOPING):  # TODO: maybe make this scoping mode for contol structures as the default as a default deviation
+            if not self.should_scope_loop_in_rule(inner_rule):
                 # DEVIATION: Allow not creating a new namespace
                 inner_rule.namespace = rule.namespace
             self.manage_children(inner_rule, scope)
