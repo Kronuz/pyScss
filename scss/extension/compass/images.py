@@ -27,7 +27,7 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 ns = images_namespace = Namespace()
-__all__ = ['gradients_namespace']
+__all__ = ['images_namespace']
 
 
 def _images_root():

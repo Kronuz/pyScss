@@ -39,7 +39,7 @@ from scss.util import escape, getmtime, make_data_url, make_filename_hash
 
 log = logging.getLogger(__name__)
 ns = sprites_namespace = Namespace()
-__all__ = ['gradients_namespace']
+__all__ = ['sprites_namespace']
 
 MAX_SPRITE_MAPS = 4096
 KEEP_SPRITE_MAPS = int(MAX_SPRITE_MAPS * 0.8)

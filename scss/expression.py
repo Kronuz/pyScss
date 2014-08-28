@@ -11,7 +11,6 @@ from warnings import warn
 
 import six
 
-import scss.config as config
 from scss.cssdefs import COLOR_NAMES, is_builtin_css_function, _expr_glob_re, _interpolate_re
 from scss.errors import SassError, SassEvaluationError, SassParseError
 from scss.rule import Namespace

@@ -21,7 +21,7 @@ import re
 
 log = logging.getLogger(__name__)
 ns = helpers_namespace = Namespace()
-__all__ = ['gradients_namespace']
+__all__ = ['helpers_namespace']
 
 FONT_TYPES = {
     'woff': 'woff',
