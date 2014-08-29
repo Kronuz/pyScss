@@ -97,7 +97,7 @@ scss_BlockLocator_iternext(scss_BlockLocator *self)
 			);
 		}
 
-		if (block->error > 0) {
+		if (block->error < 0) {
 			PyErr_SetString(PyExc_Exception, self->locator->exc);
 			return NULL;
 		}
