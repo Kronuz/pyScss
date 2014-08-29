@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 from __future__ import division
 
 from collections import defaultdict
+from contextlib import contextmanager
 from enum import Enum
 import glob
 from itertools import product
@@ -51,6 +52,7 @@ from scss.types import Undefined
 from scss.types import Url
 from scss.util import normalize_var  # TODO put in...  namespace maybe?
 
+from .blockast import *
 
 # TODO should mention logging for the programmatic interface in the
 # documentation
@@ -335,6 +337,32 @@ class Compilation(object):
             self.rules.append(rule)
             children.append(rule)
 
+        # TODO would be neat to cache the ASTs for files in the compiler
+        file_block = self.parse_blocks(source_file.contents)
+
+        # The compilation doubles as the evaluation context, keeping track of
+        # running state while evaluating the AST here
+        # TODO maybe stateless stuff, like parsing, should go exclusively on
+        # the compiler then?
+        # TODO in which case maybe evaluation should go here and Calculator
+        # should vanish?  (but then it's awkward to use programmatically, hmm)
+        self._ancestry_stack = [RuleAncestry()]
+        self.current_namespace = root_namespace
+        self.current_calculator = self._make_calculator(self.current_namespace)
+        self.declarations = []
+
+        file_block.evaluate(self)
+
+        for ancestry, properties in self.declarations:
+            for header in ancestry.headers:
+                print(header.render(), end=' ')
+            print("{")
+            for prop, value in properties:
+                print("  {0}: {1};".format(prop, value.render()))
+            print("}")
+        return
+
+
         for rule in children:
             self.manage_children(rule, scope)
 
@@ -354,6 +382,127 @@ class Compilation(object):
             ignore_parse_errors=self.ignore_parse_errors,
             undefined_variables_fatal=self.compiler.undefined_variables_fatal,
         )
+
+    def parse_blocks(self, string, scope=''):
+        # TODO eliminate scope by making it a block attribute
+        from collections import deque
+        remaining = deque()
+
+        # TODO i guess root should be a node too?  what kind?
+        root = FileBlock()
+
+        remaining.append((root, string))
+        while remaining:
+            parent, string = remaining.popleft()
+            for lineno, header_string, child_string in locate_blocks(string):
+                if child_string is None:
+                    # No actual block here; either a simple declaration (like
+                    # @import) or a property assignment
+                    pass
+                # TODO include source in these
+                # TODO classes, obv.
+
+                is_block = child_string is not None
+                node = self.parse_header(parent, header_string, is_block)
+                parent.add_child(node)
+                if is_block:
+                    remaining.append((node, child_string))
+
+                print(lineno, repr(header_string), repr(node))
+        from pprint import pprint
+        print()
+        pprint(root)
+
+        return root
+
+    def parse_header(self, parent_block, header_string, is_block):
+        """Given a line number, header string, and whether or not this is a
+        block as opposed to a declaration (roughly the output of
+        `locate_blocks`), return an appropriate AST node.  Note that this does
+        NOT actually parse the children; it returns an empty container.
+        """
+        # TODO how do the rest of the properties like source_file get in here?
+        # just pass in the parent, maybe, and let each of the AST classes
+        # figure out what to do at runtime?  i do kinda like that.
+        header_string = header_string.strip()
+
+        # Simple pre-processing
+        if header_string.startswith('+') and not is_block:
+            # Expand '+' at the beginning of a rule as @include.  But not if
+            # there's a block, because that's probably a CSS selector.
+            # DEVIATION: this is some semi hybrid of Sass and xCSS syntax
+            # TODO: warn_deprecated
+            header_string = '@include ' + header_string[1:]
+            try:
+                if '(' not in header_string or header_string.index(':') < header_string.index('('):
+                    header_string = header_string.replace(':', '(', 1)
+                    if '(' in header_string:
+                        header_string += ')'
+            except ValueError:
+                pass
+        elif header_string.startswith('='):
+            # Expand '=' at the beginning of a rule as @mixin
+            header_string = '@mixin ' + header_string[1:]
+        elif header_string.startswith('@prototype '):
+            # Remove '@prototype '
+            # TODO what is @prototype??
+            # TODO warn_deprecated(...)
+            header_string = header_string[11:]
+
+        # Now we decide what kind of thing we actually have.
+        if header_string.startswith('@'):
+            if header_string.lower().startswith('@else if '):
+                directive = '@else if'
+                argument = header_string[9:]
+            else:
+                chunks = header_string.split(None, 1)
+                if len(chunks) == 2:
+                    directive, argument = chunks
+                else:
+                    directive, argument = header_string, None
+                directive = directive.lower()
+
+            if is_block:
+                # TODO need some real registration+dispatch here
+                if directive == '@each':
+                    return AtEachBlock.parse(argument)
+                else:
+                    return AtRuleBlock(directive, argument)
+            else:
+                return AtRule(directive, argument)
+
+        # Try splitting this into "name : value"
+        # TODO strictly speaking this isn't right -- consider foo#{":"}bar.
+        # the right fix is probably to shift this into the grammar as its own
+        # goal rule...  but that doesn't work in a selector, argh!
+        name, colon, value = header_string.partition(':')
+        if colon:
+            name = name.rstrip()
+            value = value.lstrip()
+            if is_block:
+                # This is a "scope" block.  Syntax is `<scope>: [value]` -- if
+                # the optional value exists, it becomes the first declaration,
+                # with no suffix.
+                scope = name
+                unscoped_value = value
+                # TODO parse value
+                return ScopeBlock(scope, unscoped_value)
+            elif name.startswith('$'):
+                # Sass variable assignment
+                # TODO parse value, pull off !default and !global
+                return Assignment(name, value)
+            else:
+                # Regular old CSS property declaration
+                return CSSDeclaration.parse(name, value)
+
+        # If it's nothing else special, it must be a plain old selector block
+        # TODO need the xcss parsing here
+        if is_block:
+            return SelectorBlock(header_string)
+
+        # TODO this should (a) not be a syntax error, (b) get the right stack
+        # trace
+        raise SyntaxError("Couldn't figure out what kind of block this is")
 
     # @print_timing(4)
     def manage_children(self, rule, scope):
@@ -1052,8 +1201,9 @@ class Compilation(object):
         if not val:
             inner_rule = rule.copy()
             inner_rule.unparsed_contents = block.unparsed_contents
-            inner_rule.namespace = rule.namespace  # DEVIATION: Commenting this line gives the Sass bahavior
-            inner_rule.unparsed_contents = block.unparsed_contents
+            if not self.should_scope_loop_in_rule(inner_rule):
+                # DEVIATION: Allow not creating a new namespace
+                inner_rule.namespace = rule.namespace
             self.manage_children(inner_rule, scope)
 
     # @print_timing(10)
@@ -1436,6 +1586,28 @@ class Compilation(object):
                 css_files.append(source_file)
 
         return rules_by_file, css_files
+
+    # State-munging helpers
+
+    @property
+    def current_ancestry(self):
+        return self._ancestry_stack[-1]
+
+    @contextmanager
+    def nest_selector(self, selector):
+        new_ancestry = self._ancestry_stack[-1].with_nested_selectors(selector)
+        self._ancestry_stack.append(new_ancestry)
+        try:
+            yield new_ancestry
+        finally:
+            self._ancestry_stack.pop()
+
+    def add_declaration(self, prop, value):
+        if self.declarations and self.declarations[-1][0] == self.current_ancestry:
+            self.declarations[-1][1].append((prop, value))
+        else:
+            self.declarations.append((self.current_ancestry, [(prop, value)]))
+
 
     # @print_timing(3)
     def create_css(self, rules):

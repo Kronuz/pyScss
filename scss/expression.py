@@ -181,4 +181,5 @@ class Calculator(object):
             return Literal(String.unquoted(string))
         return self.parse_expression(string, 'goal_interpolated_anything')
 
+
 __all__ = ('Calculator',)
