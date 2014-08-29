@@ -1782,16 +1782,18 @@ class Compilation(object):
         for i, (name, value) in enumerate(properties):
             if value is None:
                 prop = name
-            elif value:
+            else:
+                if value.is_null:
+                    continue
                 value = value.render()  # TODO compress or no
+                if not value:
+                    # Don't render values that evaluate to nothing
+                    # TODO when can this happen?
+                    continue
+
                 if nl:
                     value = (nl + tb + tb).join(self._textwrap(value))
                 prop = name + ':' + sp + value
-            else:
-                # Empty string means there's supposed to be a value but it
-                # evaluated to nothing; skip this
-                # TODO interacts poorly with last_prop_index
-                continue
 
             if i == last_prop_index:
                 if sc:
