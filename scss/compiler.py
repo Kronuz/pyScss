@@ -1709,11 +1709,12 @@ class Compilation(object):
                 nesting += 1
 
             ancestry_len = len(ancestry)
-            first_mismatch = 0
             for i, (old_header, new_header) in enumerate(zip(prev_ancestry_headers, ancestry.headers)):
                 if old_header != new_header:
                     first_mismatch = i
                     break
+            else:
+                first_mismatch = min(ancestry_len, len(prev_ancestry_headers))
 
             # When sc is False, sets of properties are printed without a
             # trailing semicolon.  If the previous block isn't being closed,
