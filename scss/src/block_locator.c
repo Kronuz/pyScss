@@ -222,6 +222,11 @@ init_function_map(void) {
 	for (i = 0; i < 256 * 256 * 2 * 3; i++) {
 		scss_function_map[i] = NULL;
 	}
+	/* TODO this seems unnecessarily complicated */
+	/* TODO why does this care about parentheses? */
+	/* TODO it's possible to nest a string inside another string, using #{!
+	 * should just have a general stack of the current context i think
+	 */
 	scss_function_map[(int)'\"' + 256*0 + 256*256*0 + 256*256*2*0] = _BlockLocator_start_string;
 	scss_function_map[(int)'\'' + 256*0 + 256*256*0 + 256*256*2*0] = _BlockLocator_start_string;
 	scss_function_map[(int)'\"' + 256*0 + 256*256*1 + 256*256*2*0] = _BlockLocator_start_string;
@@ -384,18 +389,18 @@ BlockLocator_iternext(BlockLocator *self)
 
 	while (self->codestr_ptr < codestr_end) {
 		c = *(self->codestr_ptr);
-		if (!c) {
-			self->codestr_ptr++;
-			continue;
-		}
 		if (c == '\n') {
 			self->lineno++;
 		}
 
 		repeat:
 
+		if (c == '\\') {
+			/* Start of an escape sequence; ignore next character */
+			self->codestr_ptr++;
+		}
 		/* only ASCII is special syntactically */
-		if (c < 256) {
+		else if (c < 256) {
 			fn = scss_function_map[
 				(int)c +
 				256 * self->instr +
