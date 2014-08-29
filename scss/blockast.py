@@ -37,9 +37,25 @@ class Declaration(Node):
     pass
 
 class Assignment(Declaration):
-    def __init__(self, name, value):
+    def __init__(self, name, value_expression):
         self.name = name
-        self.value = value
+        self.value_expression = value_expression
+
+    @classmethod
+    def parse(cls, name, value):
+        # TODO pull off !default, !global
+        # TODO interp-parse the name
+
+        # TODO this is a bit naughty, but uses no state except the ast_cache --
+        # which should maybe be in the Compiler anyway...?
+        value_expression = Calculator().parse_expression(value)
+
+        return cls(name, value_expression)
+
+    def evaluate(self, compilation):
+        value = self.value_expression.evaluate(compilation.current_calculator)
+        compilation.current_namespace.set_variable(self.name, value)
+
 
 class CSSDeclaration(Declaration):
     def __init__(self, prop, value_expression):

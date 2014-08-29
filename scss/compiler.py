@@ -483,8 +483,7 @@ class Compilation(object):
                 return ScopeBlock(scope, unscoped_value)
             elif name.startswith('$'):
                 # Sass variable assignment
-                # TODO parse value, pull off !default and !global
-                return Assignment(name, value)
+                return Assignment.parse(name, value)
             else:
                 # Regular old CSS property declaration
                 return CSSDeclaration.parse(name, value)
