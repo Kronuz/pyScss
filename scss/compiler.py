@@ -258,6 +258,7 @@ class Compilation(object):
     def run(self):
         # this will compile and manage rule: child objects inside of a node
         self.parse_children()
+        return self.create_css(self.declarations)[0]
 
         # this will manage @extends
         self.apply_extends()
@@ -353,13 +354,6 @@ class Compilation(object):
 
         file_block.evaluate(self)
 
-        for ancestry, properties in self.declarations:
-            for header in ancestry.headers:
-                print(header.render(), end=' ')
-            print("{")
-            for prop, value in properties:
-                print("  {0}: {1};".format(prop, value.render()))
-            print("}")
         return
 
 
@@ -1603,6 +1597,8 @@ class Compilation(object):
             self._ancestry_stack.pop()
 
     def add_declaration(self, prop, value):
+        self.declarations.append((self.current_ancestry, [(prop, value)]))
+        return
         if self.declarations and self.declarations[-1][0] == self.current_ancestry:
             self.declarations[-1][1].append((prop, value))
         else:
@@ -1614,8 +1610,8 @@ class Compilation(object):
         """
         Generate the final CSS string
         """
-        style = rules[0].legacy_compiler_options.get(
-            'style', self.compiler.output_style)
+        # TODO restore `@option style` here (not like it works atm anyway)
+        style = self.compiler.output_style
         debug_info = self.compiler.generate_source_map
 
         if style == 'legacy':
@@ -1690,8 +1686,8 @@ class Compilation(object):
         separate = False
         nesting = current_nesting = last_nesting = -1 if nst else 0
         nesting_stack = []
-        for rule in rules:
-            nested = rule.nested
+        for ancestry, properties in rules:
+            nested = len(ancestry)
             if nested <= 1:
                 separate = True
 
@@ -1706,15 +1702,13 @@ class Compilation(object):
                     nesting_stack = nesting_stack[:delta_nesting]
                     nesting = nesting_stack[-1]
 
-            if rule.is_empty:
+            if properties is None:
                 continue
 
             if nst:
                 nesting += 1
 
-            ancestry = rule.ancestry
             ancestry_len = len(ancestry)
-
             first_mismatch = 0
             for i, (old_header, new_header) in enumerate(zip(prev_ancestry_headers, ancestry.headers)):
                 if old_header != new_header:
@@ -1740,7 +1734,8 @@ class Compilation(object):
                     if result:
                         result += srnl
                     separate = False
-                if debug_info:
+                # TODO can restore this from source map stuff
+                if False and debug_info:
                     def _print_debug_info(filename, lineno):
                         if debug_info == 'comments':
                             result = tb * (i + nesting) + "/* file: %s, line: %s */" % (filename, lineno) + nl
@@ -1771,7 +1766,7 @@ class Compilation(object):
             dangling_property = False
 
             if not skip_selectors:
-                result += self._print_properties(rule.properties, sc, sp, tb * (ancestry_len + nesting), nl, lnl)
+                result += self._print_properties(properties, sc, sp, tb * (ancestry_len + nesting), nl, lnl)
                 dangling_property = True
 
         # Close all remaining blocks
@@ -1787,6 +1782,7 @@ class Compilation(object):
             if value is None:
                 prop = name
             elif value:
+                value = value.render()  # TODO compress or no
                 if nl:
                     value = (nl + tb + tb).join(self._textwrap(value))
                 prop = name + ':' + sp + value
