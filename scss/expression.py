@@ -4,19 +4,16 @@ from __future__ import unicode_literals
 
 import sys
 import logging
-import operator
-import re
 from warnings import warn
 
 import six
 
 from scss.cssdefs import _expr_glob_re, _interpolate_re
 from scss.errors import SassError, SassEvaluationError, SassParseError
+from scss.grammar.expression import SassExpression, SassExpressionScanner
 from scss.rule import Namespace
 from scss.types import String
 from scss.util import dequote
-
-from scss._grammar import SassExpression, SassExpressionScanner
 
 
 log = logging.getLogger(__name__)

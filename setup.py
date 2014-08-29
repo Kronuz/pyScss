@@ -22,7 +22,7 @@ speedups = Feature(
         # NOTE: header files are included by MANIFEST.in; Extension does not
         # include headers in an sdist (since they're typically in /usr/lib)
         Extension(
-            'scss._speedups',
+            'scss.grammar._scanner',
             sources=['scss/src/_speedups.c', 'scss/src/block_locator.c', 'scss/src/scanner.c'],
             libraries=['pcre']
         ),

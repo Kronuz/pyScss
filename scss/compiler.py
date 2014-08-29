@@ -27,6 +27,7 @@ from scss.extension import Extension
 from scss.extension.core import CoreExtension
 from scss.extension import NamespaceAdapterExtension
 from scss.extension.compass.sprites import sprite_map
+from scss.grammar import locate_blocks
 from scss.rule import BlockAtRuleHeader
 from scss.rule import Namespace
 from scss.rule import RuleAncestry
@@ -44,12 +45,6 @@ from scss.types import Undefined
 from scss.types import Url
 from scss.util import dequote
 from scss.util import normalize_var  # TODO put in...  namespace maybe?
-
-try:
-    # Use C version if available
-    from scss._speedups import locate_blocks
-except ImportError:
-    from scss._native import locate_blocks
 
 
 # TODO should mention logging for the programmatic interface in the

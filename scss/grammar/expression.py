@@ -1,7 +1,8 @@
 """Grammar for parsing Sass expressions."""
 # This is a GENERATED FILE -- DO NOT EDIT DIRECTLY!
-# Edit scss/src/grammar/grammar.g, then run:
-#     python2 scss/src/grammar/yapps2.py scss/src/grammar/grammar.g scss/_grammar.py
+# Edit scss/grammar/expression.g, then run:
+#
+#     python2 yapps2.py scss/grammar/expression.g
 
 import operator
 import re
@@ -24,11 +25,8 @@ from scss.types import String
 from scss.types import Url
 from scss.util import dequote
 
-from scss._native import Parser
-try:
-    from scss._speedups import Scanner
-except ImportError:
-    from scss._native import Scanner
+from scss.grammar import Parser
+from scss.grammar import Scanner
 
 
 

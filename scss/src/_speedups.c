@@ -566,7 +566,7 @@ static PyMethodDef scss_methods[] = {
 
 static struct PyModuleDef speedups_module_def = {
     PyModuleDef_HEAD_INIT,
-    "_speedups",         /* m_name */
+    "_scanner",          /* m_name */
     NULL,                /* m_doc */
     (Py_ssize_t) -1,     /* m_size */
     scss_methods,        /* m_methods */
@@ -586,12 +586,12 @@ static struct PyModuleDef speedups_module_def = {
     #define MOD_INIT(name) PyMODINIT_FUNC init##name(void)
 #endif
 
-MOD_INIT(_speedups)
+MOD_INIT(_scanner)
 {
 #if PY_MAJOR_VERSION >= 3
 	PyObject* m = PyModule_Create(&speedups_module_def);
 #else
-	PyObject* m = Py_InitModule("_speedups", scss_methods);
+	PyObject* m = Py_InitModule("_scanner", scss_methods);
 #endif
 
 	scss_BlockLocatorType.tp_new = PyType_GenericNew;
@@ -613,7 +613,7 @@ MOD_INIT(_speedups)
 	Py_INCREF(&scss_ScannerType);
 	PyModule_AddObject(m, "Scanner", (PyObject *)&scss_ScannerType);
 
-	PyExc_scss_NoMoreTokens = PyErr_NewException("_speedups.NoMoreTokens", NULL, NULL);
+	PyExc_scss_NoMoreTokens = PyErr_NewException("_scanner.NoMoreTokens", NULL, NULL);
 	Py_INCREF(PyExc_scss_NoMoreTokens);
 	PyModule_AddObject(m, "NoMoreTokens", (PyObject *)PyExc_scss_NoMoreTokens);
 #if PY_MAJOR_VERSION >= 3
