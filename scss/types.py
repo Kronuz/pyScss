@@ -6,6 +6,8 @@ from __future__ import unicode_literals
 from collections import Iterable
 import colorsys
 import operator
+import re
+import string
 from warnings import warn
 
 import six
@@ -1006,6 +1008,8 @@ class String(Value):
 
     sass_type_name = 'string'
 
+    bad_identifier_rx = re.compile('[^-_a-zA-Z\x80-\U0010FFFF]')
+
     def __init__(self, value, quotes='"'):
         if isinstance(value, String):
             # TODO unclear if this should be here, but many functions rely on
@@ -1040,12 +1044,6 @@ class String(Value):
 
     def __hash__(self):
         return hash(self.value)
-
-    def __str__(self):
-        if self.quotes:
-            return self.quotes + escape(self.value) + self.quotes
-        else:
-            return self.value
 
     def __repr__(self):
         if self.quotes:
@@ -1083,15 +1081,76 @@ class String(Value):
 
         return String(self.value * int(other.value), quotes=self.quotes)
 
+    def _escape_character(self, match):
+        """Given a single character, return it appropriately CSS-escaped."""
+        # TODO is there any case where we'd want to use unicode escaping?
+        # TODO unsure if this works with newlines
+        return '\\' + match.group(0)
+
+    def _is_name_start(self, ch):
+        if ch == '_':
+            return True
+        if ord(ch) >= 128:
+            return True
+        if ch in string.ascii_letters:
+            return True
+        return False
+
     def render(self, compress=False):
-        return self.__str__()
+        # TODO should preserve original literals here too -- even the quotes.
+        # or at least that's what sass does.
+        # Escape and add quotes as appropriate.
+        if self.quotes is None:
+            return self._render_bareword()
+        else:
+            return self._render_quoted()
+
+    def _render_bareword(self):
+        # This is a bareword, so almost anything outside \w needs escaping
+        ret = self.value
+        ret = self.bad_identifier_rx.sub(self._escape_character, ret)
+
+        # Also apply some minor quibbling rules about how barewords can
+        # start: with a "name start", an escape, a hyphen followed by one
+        # of those, or two hyphens.
+        if ret[0] == '-':
+            if ret[1] in '-\\' or self._is_name_start(ret[1]):
+                pass
+            else:
+                # Escape the second character
+                # TODO what if it's a digit, oops
+                ret = ret[0] + '\\' + ret[1:]
+        elif ret[0] == '\\' or self._is_name_start(ret[0]):
+            pass
+        else:
+            # Escape the first character
+            # TODO what if it's a digit, oops
+            ret = '\\' + ret
+
+        return ret
+
+    def _render_quoted(self):
+        # Strictly speaking, the only things we need to quote are the quotes
+        # themselves, backslashes, and newlines.
+        # Note: We ignore the original quotes and always use double quotes, to
+        # match Ruby Sass's behavior.  This isn't particularly well-specified,
+        # though.
+        quote = '"'
+        ret = self.value
+        ret = ret.replace('\\', '\\\\')
+        ret = ret.replace(quote, '\\' + quote)
+        # Note that a literal newline is ignored when escaped, so we have to
+        # use the codepoint instead.  But we'll leave the newline as well, to
+        # aid readability.
+        ret = ret.replace('\n', '\\a\\\n')
+        return quote + ret + quote
 
 
 class Url(String):
     def render(self, compress=False):
         # TODO url-escape whatever needs escaping
         # TODO does that mean we should un-url-escape when parsing?  probably
-        return "url({0})".format(super(String, self).render(compress))
+        return "url({0})".format(super(Url, self).render(compress))
 
 
 class Map(Value):

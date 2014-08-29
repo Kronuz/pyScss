@@ -8,6 +8,7 @@ from warnings import warn
 
 import six
 
+from scss.ast import Literal
 from scss.cssdefs import _expr_glob_re, _interpolate_re
 from scss.errors import SassError, SassEvaluationError, SassParseError
 from scss.grammar.expression import SassExpression, SassExpressionScanner
@@ -163,5 +164,15 @@ class Calculator(object):
 
         self.ast_cache[key] = ast
         return ast
+
+    def parse_interpolations(self, string):
+        """Parse a string for interpolations, but don't treat anything else as
+        Sass syntax.  Returns an AST node.
+        """
+        # Shortcut: if there are no #s in the string in the first place, it
+        # must not have any interpolations, right?
+        if '#' not in string:
+            return Literal(String.unquoted(string))
+        return self.parse_expression(string, 'goal_interpolated_anything')
 
 __all__ = ('Calculator',)

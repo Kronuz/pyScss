@@ -9,13 +9,14 @@ import re
 
 DEBUG = False
 
-# TODO copied from __init__
-_blocks_re = re.compile(r'[{},;()\'"\n]')
-
 
 try:
     from ._scanner import locate_blocks
 except ImportError:
+    # Regex for finding a minimum set of characters that might affect where a
+    # block starts or ends
+    _blocks_re = re.compile(r'[{},;()\'"\n]|\\.', re.DOTALL)
+
     def locate_blocks(codestr):
         """
         For processing CSS like strings.
@@ -41,7 +42,10 @@ except ImportError:
             if c == '\n':
                 lineno += 1
 
-            if instr is not None:
+            if c == '\\':
+                # Escape, also consumes the next character
+                pass
+            elif instr is not None:
                 if c == instr:
                     instr = None  # A string ends (FIXME: needs to accept escaped characters)
             elif c in ('"', "'"):
@@ -93,11 +97,17 @@ except ImportError:
                 if _selectors:
                     yield lineno, _selectors, _codestr
                 if par:
-                    raise Exception("Missing closing parenthesis somewhere in block: '%s'" % _selectors)
+                    error = "Parentheses never closed"
                 elif instr:
-                    raise Exception("Missing closing string somewhere in block: '%s'" % _selectors)
+                    error = "String literal never terminated"
                 else:
-                    raise Exception("Block never closed: '%s'" % _selectors)
+                    error = "Block never closed"
+                # TODO should remember the line + position of the actual
+                # problem, and show it in a SassError
+                raise SyntaxError(
+                    "Couldn't parse block starting on line {0}: {1}"
+                    .format(lineno, error)
+                )
         losestr = codestr[lose:]
         for _property in losestr.split(';'):
             _property = _property.strip()

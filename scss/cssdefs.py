@@ -425,9 +425,32 @@ def determine_encoding(buf):
     return encoding
 
 
-
 # ------------------------------------------------------------------------------
-# Bits and pieces of grammar, as regexen
+# Bits and pieces of grammar, mostly as regexen
+
+# CSS escape sequences are either a backslash followed by a single character,
+# or a backslash followed by one to six hex digits and a single optional
+# whitespace.  Escaped newlines become nothing.
+# Ref: http://dev.w3.org/csswg/css-syntax-3/#consume-an-escaped-code-point
+unescape_rx = re.compile(
+    r"\\(.)|\\([0-9a-fA-F]{1,6})[\n\t ]?|\\\n", re.DOTALL)
+
+
+def _unescape_one(match):
+    if match.group(1) is not None:
+        return match.group(1)
+    elif match.group(2) is not None:
+        return six.chr(int(match.group(2), 16))
+    else:
+        return six.text_type()
+
+
+def unescape(string):
+    """Given a raw CSS string (i.e. taken directly from CSS source with no
+    processing), eliminate all backslash escapes.
+    """
+    return unescape_rx.sub(_unescape_one, string)
+
 
 _expr_glob_re = re.compile(r'''
     \#\{(.*?)\}                   # Global Interpolation only

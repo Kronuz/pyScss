@@ -207,6 +207,66 @@ class CallOp(Expression):
             quotes=None)
 
 
+# TODO this class should delegate the unescaping to the type, rather than
+# burying it in the parser
+class Interpolation(Expression):
+    """A string that may contain any number of interpolations:
+
+        foo#{...}bar#{...}baz
+    """
+    def __init__(self, parts, quotes=None, type=String):
+        self.parts = parts
+        self.quotes = quotes
+        self.type = type
+
+    @classmethod
+    def maybe(cls, parts, quotes=None, type=String):
+        """Returns an interpolation if there are multiple parts, otherwise a
+        plain Literal.  This keeps the AST somewhat simpler, but also is the
+        only way `Literal.from_bareword` gets called.
+        """
+        if len(parts) > 1:
+            return cls(parts, quotes=quotes, type=type)
+
+        if quotes is None and type is String:
+            return Literal.from_bareword(parts[0])
+
+        return Literal(type(parts[0], quotes=quotes))
+
+    def _render_interpolated(self, value):
+        """Return the result of interpolating `value`, which is slightly
+        different than just rendering it, since it's an intermediate thing.
+        """
+        # Strings are taken literally
+        if isinstance(value, String):
+            return value.value
+
+        # Lists are joined recursively
+        if isinstance(value, List):
+            # TODO Ruby /immediately/ respects `compress` here -- need to
+            # inspect the compilation for whether to pass it in (probably in
+            # other places too)
+            return value.delimiter().join(
+                self._render_interpolated(item) for item in value)
+        else:
+            # TODO like here
+            return value.render()
+
+    def evaluate(self, calculator, divide=False):
+        result = []
+        for i, part in enumerate(self.parts):
+            if i % 2 == 0:
+                # First part and other odd parts are literal string
+                result.append(part)
+            else:
+                # Interspersed (even) parts are nodes
+                value = part.evaluate(calculator, divide)
+                result.append(self._render_interpolated(value))
+
+        return self.type(''.join(result), quotes=self.quotes)
+
+
+
 class Literal(Expression):
     def __repr__(self):
         return '<%s(%s)>' % (self.__class__.__name__, repr(self.value))

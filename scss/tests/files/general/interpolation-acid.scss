@@ -1,0 +1,15 @@
+$foo: foo;
+
+.#{$foo} #{$foo}-#{$foo} {
+    one#{$foo}three: $foo;
+
+    string: hello#{$foo}goodbye;
+    string-single: 'he\'llo#{$foo}good"bye';
+    string-double: "he\"llo#{$foo}good'bye";
+
+    url: url(hello#{$foo}goodbye);
+    url-single: url('he\'llo#{$foo}good"bye');
+    url-double: url("he\"llo#{$foo}good'bye");
+
+    nested: "#{"type-of(f#{"o"}o)" "bar"}";
+}

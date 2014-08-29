@@ -213,7 +213,7 @@ class SassParseError(SassError):
 
     def format_prefix(self):
         decorated_expr, line = add_error_marker(self.expression, self.expression_pos or -1)
-        return """Error parsing expression:\n{0}\n""".format(decorated_expr)
+        return """Error parsing expression at {1}:\n{0}\n""".format(decorated_expr, self.expression_pos)
 
 
 class SassEvaluationError(SassError):

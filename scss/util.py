@@ -84,6 +84,7 @@ def escape(s):
     return re.sub(r'''(["'])''', r'\\\1', s)  # do not escape '\'
 
 
+# Deprecated; use the unescape() from cssdefs instead
 def unescape(s):
     return re.sub(r'''\\(['"\\])''', r'\1', s)  # do unescape '\'
 
