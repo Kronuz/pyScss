@@ -15,7 +15,6 @@
 #include <string.h>
 #include "block_locator.h"
 
-#define DEBUG
 int _strip(Py_UNICODE *begin, Py_UNICODE *end, int *lineno, Py_UNICODE **out) {
 	while (begin < end && (*begin == '\n' || *begin == '\t' || *begin == ' ')) begin++;
 	if (out != NULL) {
