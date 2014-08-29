@@ -220,11 +220,6 @@ class Generator:
 
         self.calculate()
         self.write(self.preparser)
-        # TODO: remove "import *" construct
-        self.write("import re\n")
-        self.write("from string import *\n")
-        self.write("from yappsrt import *\n")
-        self.write("\n\n")
         self.write("class ", self.name, "Scanner(Scanner):\n")
         self.write("    patterns = None\n")
         self.write("    _patterns = [\n")

@@ -106,6 +106,41 @@ def locate_blocks(codestr):
 ################################################################################
 # Parser
 
+class Parser(object):
+    # NOTE: This class has no C equivalent
+    def __init__(self, scanner):
+        self._scanner = scanner
+        self._pos = 0
+        self._char_pos = 0
+
+    def reset(self, input):
+        self._scanner.reset(input)
+        self._pos = 0
+        self._char_pos = 0
+
+    def _peek(self, types):
+        """
+        Returns the token type for lookahead; if there are any args
+        then the list of args is the set of token types to allow
+        """
+        try:
+            tok = self._scanner.token(self._pos, types)
+            return tok[2]
+        except SyntaxError:
+            return None
+
+    def _scan(self, type):
+        """
+        Returns the matched text, and moves to the next token
+        """
+        tok = self._scanner.token(self._pos, set([type]))
+        self._char_pos = tok[0]
+        if tok[2] != type:
+            raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(tok[0]), "Trying to find " + type))
+        self._pos += 1
+        return tok[3]
+
+
 class NoMoreTokens(Exception):
     """
     Another exception object, for when we run out of tokens

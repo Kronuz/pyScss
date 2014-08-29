@@ -1,7 +1,36 @@
-# python yapps2.py grammar.g grammar.py
+"""Grammar for parsing Sass expressions."""
+# This is a GENERATED FILE -- DO NOT EDIT DIRECTLY!
+# Edit scss/src/grammar/grammar.g, then run:
+#     python2 scss/src/grammar/yapps2.py scss/src/grammar/grammar.g scss/_grammar.py
 
-################################################################################
-## Grammar compiled using Yapps:
+import operator
+import re
+
+from scss.ast import Parentheses
+from scss.ast import UnaryOp
+from scss.ast import BinaryOp
+from scss.ast import AnyOp
+from scss.ast import AllOp
+from scss.ast import NotOp
+from scss.ast import CallOp
+from scss.ast import Variable
+from scss.ast import Literal
+from scss.ast import ListLiteral
+from scss.ast import MapLiteral
+from scss.ast import ArgspecLiteral
+from scss.types import Color
+from scss.types import Number
+from scss.types import String
+from scss.types import Url
+from scss.util import dequote
+
+from scss._native import Parser
+try:
+    from scss._speedups import Scanner
+except ImportError:
+    from scss._native import Scanner
+
+
 %%
 parser SassExpression:
     ignore: "[ \r\t\n]+"
@@ -170,7 +199,7 @@ parser SassExpression:
             RPAR                    {{ return Literal(Url(URL, quotes=quotes)) }}
         | FNCT LPAR argspec RPAR    {{ return CallOp(FNCT, argspec) }}
         | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
-        | ID                        {{ return Literal(parse_bareword(ID)) }}
+        | ID                        {{ return Literal.from_bareword(ID) }}
         | NUM                       {{ UNITS = None }}
             [ UNITS ]               {{ return Literal(Number(float(NUM), unit=UNITS)) }}
         | STR                       {{ return Literal(String(dequote(STR), quotes="'")) }}
@@ -180,7 +209,7 @@ parser SassExpression:
 
     rule kwatom:
         # nothing
-        | KWID                      {{ return Literal(parse_bareword(KWID)) }}
+        | KWID                      {{ return Literal.from_bareword(KWID) }}
         | KWNUM                     {{ UNITS = None }}
             [ UNITS ]               {{ return Literal(Number(float(KWNUM), unit=UNITS)) }}
         | KWSTR                     {{ return Literal(String(dequote(KWSTR), quotes="'")) }}
@@ -189,5 +218,3 @@ parser SassExpression:
         | KWVAR                     {{ return Variable(KWVAR) }}
 
 %%
-### Grammar ends.
-################################################################################
