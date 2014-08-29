@@ -89,26 +89,11 @@ Pattern_match(Pattern *regex, char *string, int string_sz, int start_at, Token *
 }
 
 static void Pattern_initialize(Pattern *, int);
-static void Pattern_setup(Pattern *, int);
 static void Pattern_finalize(void);
 
 
 static void
 Pattern_initialize(Pattern *patterns, int patterns_sz) {
-	#ifdef DEBUG
-		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
-	#endif
-
-	if (!Pattern_patterns_initialized) {
-		if (patterns_sz) {
-			Pattern_patterns_initialized = 1;
-			Pattern_setup(patterns, patterns_sz);
-		}
-	}
-}
-
-static void
-Pattern_setup(Pattern *patterns, int patterns_sz) {
 	int i;
 	Pattern *regex;
 
@@ -116,18 +101,20 @@ Pattern_setup(Pattern *patterns, int patterns_sz) {
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
 	#endif
 
-	if (!Pattern_patterns_initialized) {
-		Pattern_initialize(patterns, patterns_sz);
-	} else {
-		for (i = 0; i < patterns_sz; i++) {
-			regex = Pattern_regex(patterns[i].tok, patterns[i].expr);
-			#ifdef DEBUG
-			if (regex) {
-				fprintf(stderr, "\tAdded regex pattern %s: %s\n", repr(regex->tok), repr(regex->expr));
-			}
-			#endif
-		}
+	if (Pattern_patterns_initialized || !patterns_sz) {
+		return;
 	}
+
+	for (i = 0; i < patterns_sz; i++) {
+		regex = Pattern_regex(patterns[i].tok, patterns[i].expr);
+		#ifdef DEBUG
+		if (regex) {
+			fprintf(stderr, "\tAdded regex pattern %s: %s\n", repr(regex->tok), repr(regex->expr));
+		}
+		#endif
+	}
+
+	Pattern_patterns_initialized = 1;
 }
 
 static void
