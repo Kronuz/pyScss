@@ -44,7 +44,7 @@ class Assignment(Declaration):
     @classmethod
     def parse(cls, name, value):
         # TODO pull off !default, !global
-        # TODO interp-parse the name
+        # TODO interp-parse the name?  is that a thing?
 
         # TODO this is a bit naughty, but uses no state except the ast_cache --
         # which should maybe be in the Compiler anyway...?
@@ -58,25 +58,24 @@ class Assignment(Declaration):
 
 
 class CSSDeclaration(Declaration):
-    def __init__(self, prop, value_expression):
-        self.prop = prop
+    def __init__(self, prop_expression, value_expression):
+        self.prop_expression = prop_expression
         self.value_expression = value_expression
 
     @classmethod
     def parse(cls, prop, value):
-        # TODO prop needs parsing too, but interp-only!
-
         # TODO this is a bit naughty, but uses no state except the ast_cache --
         # which should maybe be in the Compiler anyway...?
+        prop_expression = Calculator().parse_interpolations(prop)
         value_expression = Calculator().parse_expression(value)
 
-        return cls(prop, value_expression)
+        return cls(prop_expression, value_expression)
 
     def evaluate(self, compilation):
-        prop = self.prop
+        prop = self.prop_expression.evaluate(compilation.current_calculator)
         value = self.value_expression.evaluate(compilation.current_calculator)
         # TODO this is where source maps would need to get their info
-        compilation.add_declaration(prop, value)
+        compilation.add_declaration(prop.value, value)
 
 
 class _AtRuleMixin(object):
