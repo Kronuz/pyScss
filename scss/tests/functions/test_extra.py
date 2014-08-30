@@ -7,7 +7,7 @@ tested, rather than the parsing or type system.
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import scss.functions.extra as libextra
+import scss.extension.extra as libextra
 from scss.types import Boolean, Color, Number
 
 
