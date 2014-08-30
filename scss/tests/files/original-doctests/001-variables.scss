@@ -4,7 +4,7 @@
     $color1 = #FF00FF;
 }
 .selector {
-    background-image: url($path + '/head_bg.png');
+    background-image: url(#{$path}/head_bg.png);
     background-color: $color1;
     border-top: 1px solid $color1;
 }
