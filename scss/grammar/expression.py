@@ -368,12 +368,12 @@ class SassExpression(Parser):
 
     def interpolated_bare_url(self):
         BAREURL = self._scan('BAREURL')
-        parts = [unescape(BAREURL)]
+        parts = [BAREURL]
         while self._peek(self.interpolated_bare_url_rsts) == 'INTERP_START':
             interpolation = self.interpolation()
             parts.append(interpolation)
             BAREURL = self._scan('BAREURL')
-            parts.append(unescape(BAREURL))
+            parts.append(BAREURL)
         return parts
 
     def interpolated_string(self):
@@ -411,12 +411,12 @@ class SassExpression(Parser):
 
     def interpolated_bareword(self):
         BAREWORD = self._scan('BAREWORD')
-        parts = [unescape(BAREWORD)]
+        parts = [BAREWORD]
         while self._peek(self.interpolated_bareword_rsts) == 'INTERP_START':
             interpolation = self.interpolation()
             parts.append(interpolation)
             BAREWORD = self._scan('BAREWORD')
-            parts.append(unescape(BAREWORD))
+            parts.append(BAREWORD)
         return parts
 
     def goal_interpolated_anything(self):

@@ -241,10 +241,10 @@ parser SassExpression:
             {{ return Interpolation.maybe(interpolated_string_double, type=Url, quotes='"') }}
 
     rule interpolated_bare_url:
-        BAREURL                     {{ parts = [unescape(BAREURL)] }}
+        BAREURL                     {{ parts = [BAREURL] }}
         (
             interpolation           {{ parts.append(interpolation) }}
-            BAREURL                 {{ parts.append(unescape(BAREURL)) }}
+            BAREURL                 {{ parts.append(BAREURL) }}
         )*                          {{ return parts }}
 
     rule interpolated_string:
@@ -273,10 +273,10 @@ parser SassExpression:
         
     rule interpolated_bareword:
         # Again, a bareword has a fairly limited set of allowed characters
-        BAREWORD                    {{ parts = [unescape(BAREWORD)] }}
+        BAREWORD                    {{ parts = [BAREWORD] }}
         (
             interpolation           {{ parts.append(interpolation) }}
-            BAREWORD                {{ parts.append(unescape(BAREWORD)) }}
+            BAREWORD                {{ parts.append(BAREWORD) }}
         )*                          {{ return parts }}
 
 
