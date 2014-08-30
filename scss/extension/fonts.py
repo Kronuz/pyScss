@@ -27,8 +27,8 @@ except:
 from scss import config
 from scss.extension import Extension
 from scss.namespace import Namespace
-from scss.types import String, Boolean, List
-from scss.util import getmtime, escape, make_data_url, make_filename_hash
+from scss.types import Boolean, List, String, Url
+from scss.util import getmtime, make_data_url, make_filename_hash
 
 log = logging.getLogger(__name__)
 
@@ -343,11 +343,10 @@ def font_sheet(g, **kwargs):
             assets = {}
             for type_, url in urls.items():
                 format_ = FONT_FORMATS[type_]
-                url = "url('%s')" % escape(url)
                 if inline:
-                    assets[type_] = inline_assets[type_] = List([String.unquoted(url), String.unquoted(format_)])
+                    assets[type_] = inline_assets[type_] = List([Url.unquoted(url), String.unquoted(format_)])
                 else:
-                    assets[type_] = file_assets[type_] = List([String.unquoted(url), String.unquoted(format_)])
+                    assets[type_] = file_assets[type_] = List([Url.unquoted(url), String.unquoted(format_)])
             asset = List([assets[type_] for type_ in FONT_TYPES if type_ in assets], separator=",")
 
             # Add the new object:
@@ -407,9 +406,10 @@ def font_url(sheet, type_, only_path=False, cache_buster=True):
                 params.append('#' + font_sheet['*n*'])
             if params:
                 url += '?' + '&'.join(params)
-            if not only_path:
-                url = "url('%s')" % escape(url)
-            return String.unquoted(url)
+            if only_path:
+                return String.unquoted(url)
+            else:
+                return Url.unquoted(url)
     return String.unquoted('')
 
 

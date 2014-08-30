@@ -62,20 +62,15 @@ parser SassExpression:
     # Don't allow quotes or # unless they're escaped (or the # is alone)
     token SINGLE_STRING_GUTS: '([^\'\\\\#]|[\\\\].|#(?![{]))*'
     token DOUBLE_STRING_GUTS: "([^\"\\\\#]|[\\\\].|#(?![{]))*"
-    token KWSTR: "'[^'\\\\]*(?:\\\\.[^'\\\\]*)*'(?=\s*:)"
     token STR: "'[^'\\\\]*(?:\\\\.[^'\\\\]*)*'"
-    token KWQSTR: '"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"(?=\s*:)'
     token QSTR: '"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"'
     token UNITS: "(?<!\s)(?:[a-zA-Z]+|%)(?![-\w])"
-    token KWNUM: "(?:\d+(?:\.\d*)?|\.\d+)(?=\s*:)"
     token NUM: "(?:\d+(?:\.\d*)?|\.\d+)"
-    token KWCOLOR: "#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])(?=\s*:)"
     token COLOR: "#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])"
     token KWVAR: "\$[-a-zA-Z0-9_]+(?=\s*:)"
     token SLURPYVAR: "\$[-a-zA-Z0-9_]+(?=[.][.][.])"
     token VAR: "\$[-a-zA-Z0-9_]+"
     token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
-    token KWID: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\s*:)"
     # TODO Ruby is a bit more flexible here, for example allowing 1#{2}px
     token BAREWORD: "[-a-zA-Z_][-a-zA-Z0-9_]*"
     token BANG_IMPORTANT: "!important"
@@ -121,20 +116,31 @@ parser SassExpression:
         | expr_slst                 {{ return (None, expr_slst) }}
 
 
-    # Maps:
-    rule expr_map:
-        map_item                    {{ pairs = [map_item] }}
-        (
-            ","                     {{ map_item = (None, None) }}
-            [ map_item ]            {{ pairs.append(map_item) }}
-        )*                          {{ return MapLiteral(pairs) }}
+    # Maps, which necessarily overlap with lists because LL(1):
+    rule expr_map_or_list:
+        expr_slst                   {{ first = expr_slst }}
+        (   # Colon means this is a map
+            ":"
+            expr_slst               {{ pairs = [(first, expr_slst)] }}
+            (
+                ","                 {{ map_item = None, None }}
+                [ map_item ]        {{ pairs.append(map_item) }}
+            )*                      {{ return MapLiteral(pairs) }}
+        |   # Comma means this is a comma-delimited list
+                                    {{ items = [first]; use_list = False }}
+            (
+                ","                 {{ use_list = True }}
+                expr_slst           {{ items.append(expr_slst) }}
+            )*                      {{ return ListLiteral(items) if use_list else items[0] }}
+        )
 
     rule map_item:
-        kwatom ":" expr_slst        {{ return (kwatom, expr_slst) }}
+        atom ":" expr_slst          {{ return (atom, expr_slst) }}
 
 
     # Lists:
     rule expr_lst:
+        # TODO a trailing comma makes a list now, i believe
         expr_slst                   {{ v = [expr_slst] }}
         (
             ","
@@ -198,8 +204,7 @@ parser SassExpression:
     rule atom:
         LPAR (
                                     {{ v = ListLiteral([], comma=False) }}
-            | expr_map              {{ v = expr_map }}
-            | expr_lst              {{ v = expr_lst }}
+            | expr_map_or_list      {{ v = expr_map_or_list }}
         ) RPAR                      {{ return Parentheses(v) }}
         # Special functions.  Note that these technically overlap with the
         # regular function rule, which makes this not quite LL -- but they're
@@ -215,18 +220,6 @@ parser SassExpression:
         | interpolated_string       {{ return interpolated_string }}
         | COLOR                     {{ return Literal(Color.from_hex(COLOR, literal=True)) }}
         | VAR                       {{ return Variable(VAR) }}
-
-    # TODO none of these things respect interpolation -- would love to not need
-    # to repeat all the rules
-    rule kwatom:
-        # nothing
-        | KWID                      {{ return Literal.from_bareword(KWID) }}
-        | KWNUM                     {{ UNITS = None }}
-            [ UNITS ]               {{ return Literal(Number(float(KWNUM), unit=UNITS)) }}
-        | KWSTR                     {{ return Literal(String(dequote(KWSTR), quotes="'")) }}
-        | KWQSTR                    {{ return Literal(String(dequote(KWQSTR), quotes='"')) }}
-        | KWCOLOR                   {{ return Literal(Color.from_hex(KWCOLOR, literal=True)) }}
-        | KWVAR                     {{ return Variable(KWVAR) }}
 
     # -------------------------------------------------------------------------
     # Interpolation, which is a right mess, because it depends very heavily on

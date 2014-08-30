@@ -1101,11 +1101,17 @@ class String(Value):
         # or at least that's what sass does.
         # Escape and add quotes as appropriate.
         if self.quotes is None:
-            return self._render_bareword()
+            # If you deliberately construct a bareword with bogus CSS in it,
+            # you're assumed to know what you're doing
+            return self.value
         else:
             return self._render_quoted()
 
     def _render_bareword(self):
+        # TODO this is currently unused, and only implemented due to an
+        # oversight, but would make for a much better implementation of
+        # escape()
+
         # This is a bareword, so almost anything outside \w needs escaping
         ret = self.value
         ret = self.bad_identifier_rx.sub(self._escape_character, ret)
@@ -1113,7 +1119,10 @@ class String(Value):
         # Also apply some minor quibbling rules about how barewords can
         # start: with a "name start", an escape, a hyphen followed by one
         # of those, or two hyphens.
-        if ret[0] == '-':
+        if not ret:
+            # TODO is an unquoted empty string allowed to be rendered?
+            pass
+        elif ret[0] == '-':
             if ret[1] in '-\\' or self._is_name_start(ret[1]):
                 pass
             else:
@@ -1132,10 +1141,11 @@ class String(Value):
     def _render_quoted(self):
         # Strictly speaking, the only things we need to quote are the quotes
         # themselves, backslashes, and newlines.
-        # Note: We ignore the original quotes and always use double quotes, to
-        # match Ruby Sass's behavior.  This isn't particularly well-specified,
-        # though.
-        quote = '"'
+        # TODO Ruby Sass's behavior is to always use double quotes (and
+        # otherwise preserve the original literal in uncompressed mode) for
+        # computed strings, whereas we preserve a single quote in some cases
+        quote = self.quotes
+
         ret = self.value
         ret = ret.replace('\\', '\\\\')
         ret = ret.replace(quote, '\\' + quote)
@@ -1146,11 +1156,42 @@ class String(Value):
         return quote + ret + quote
 
 
-class Url(String):
+# TODO this needs to pretend the url(...) is part of the string for all string
+# operations -- even the quotes!  alas.
+class Function(String):
+    """Function call pseudo-type, which crops up frequently in CSS as a string
+    marker.  Acts mostly like a string, but has a function name and parentheses
+    around it.
+    """
+    def __init__(self, string, function_name, quotes='"'):
+        super(Function, self).__init__(string, quotes=quotes)
+        self.function_name = function_name
+
     def render(self, compress=False):
-        # TODO url-escape whatever needs escaping
-        # TODO does that mean we should un-url-escape when parsing?  probably
-        return "url({0})".format(super(Url, self).render(compress))
+        return "{0}({1})".format(
+            self.function_name,
+            super(Function, self).render(compress),
+        )
+
+
+class Url(Function):
+    # Bare URLs may not contain quotes, parentheses, or unprintables.  Quoted
+    # URLs may, of course, contain whatever they like.
+    # Ref: http://dev.w3.org/csswg/css-syntax-3/#consume-a-url-token0
+    bad_identifier_rx = re.compile("[$'\"()\\x00-\\x08\\x0b\\x0e-\\x1f\\x7f]")
+
+    def __init__(self, string, quotes=None):
+        super(Url, self).__init__(string, 'url', quotes=quotes)
+
+    def render(self, compress=False):
+        if self.quotes is None:
+            # Need to escape some stuff to keep this as valid CSS
+            inside = self.bad_identifier_rx.sub(
+                self._escape_character, self.value)
+        else:
+            inside = self._render_quoted()
+
+        return "url(" + inside + ")"
 
 
 class Map(Value):

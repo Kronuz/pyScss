@@ -15,8 +15,8 @@ import six
 
 from scss import config
 from scss.namespace import Namespace
-from scss.types import Boolean, List, Null, Number, String
-from scss.util import escape, to_str, getmtime, make_data_url
+from scss.types import Boolean, Function, List, Null, Number, String, Url
+from scss.util import to_str, getmtime, make_data_url
 import re
 
 log = logging.getLogger(__name__)
@@ -541,7 +541,9 @@ def _font_url(path, only_path=False, cache_buster=True, inline=False):
         if re.match(r'^([^?]+)[.](.*)([?].*)?$', path.value):
             font_type = String.unquoted(re.match(r'^([^?]+)[.](.*)([?].*)?$', path.value).groups()[1]).value
 
-        if not FONT_TYPES.get(font_type):
+        try:
+            mime = FONT_TYPES[font_type]
+        except KeyError:
             raise Exception('Could not determine font type for "%s"' % path.value)
 
         mime = FONT_TYPES.get(font_type)
@@ -558,9 +560,10 @@ def _font_url(path, only_path=False, cache_buster=True, inline=False):
         if cache_buster and filetime != 'NA':
             url = add_cache_buster(url, filetime)
 
-    if not only_path:
-        url = 'url(%s)' % escape(url)
-    return String.unquoted(url)
+    if only_path:
+        return String.unquoted(url)
+    else:
+        return Url.unquoted(url)
 
 
 def _font_files(args, inline):
@@ -570,8 +573,7 @@ def _font_files(args, inline):
     fonts = []
     args_len = len(args)
     skip_next = False
-    for index in range(len(args)):
-        arg = args[index]
+    for index, arg in enumerate(args):
         if not skip_next:
             font_type = args[index + 1] if args_len > (index + 1) else None
             if font_type and font_type.value in FONT_TYPES:
@@ -581,7 +583,10 @@ def _font_files(args, inline):
                     font_type = String.unquoted(re.match(r'^([^?]+)[.](.*)([?].*)?$', arg.value).groups()[1])
 
             if font_type.value in FONT_TYPES:
-                fonts.append(String.unquoted('%s format("%s")' % (_font_url(arg, inline=inline), String.unquoted(FONT_TYPES[font_type.value]).value)))
+                fonts.append(List([
+                    _font_url(arg, inline=inline),
+                    Function(FONT_TYPES[font_type.value], 'format'),
+                ], use_comma=False))
             else:
                 raise Exception('Could not determine font type for "%s"' % arg.value)
         else:
@@ -640,6 +645,7 @@ def stylesheet_url(path, only_path=False, cache_buster=True):
     url = '%s%s' % (BASE_URL, filepath)
     if cache_buster:
         url = add_cache_buster(url, filetime)
-    if not only_path:
-        url = 'url("%s")' % (url)
-    return String.unquoted(url)
+    if only_path:
+        return String.unquoted(url)
+    else:
+        return Url.unquoted(url)

@@ -14,7 +14,7 @@ from . import _image_size_cache
 from .helpers import add_cache_buster
 from scss import config
 from scss.namespace import Namespace
-from scss.types import Color, List, Number, String
+from scss.types import Color, List, Number, String, Url
 from scss.util import escape, getmtime, make_data_url, make_filename_hash
 
 try:
@@ -180,9 +180,10 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
     if not os.sep == '/':
         url = url.replace(os.sep, '/')
 
-    if not only_path:
-        url = 'url(%s)' % escape(url)
-    return String.unquoted(url)
+    if only_path:
+        return String.unquoted(url)
+    else:
+        return Url.unquoted(url)
 
 
 @ns.declare
