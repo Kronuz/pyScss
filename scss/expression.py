@@ -102,17 +102,13 @@ class Calculator(object):
         cont = self.do_glob_math(cont)
         return cont
 
-    def calculate(self, _base_str, divide=False):
-        better_expr_str = _base_str
+    def calculate(self, expression, divide=False):
+        expression = self.evaluate_expression(expression, divide=divide)
 
-        better_expr_str = self.do_glob_math(better_expr_str)
+        if expression is None:
+            return String.unquoted(self.apply_vars(expression))
 
-        better_expr_str = self.evaluate_expression(better_expr_str, divide=divide)
-
-        if better_expr_str is None:
-            better_expr_str = String.unquoted(self.apply_vars(_base_str))
-
-        return better_expr_str
+        return expression
 
     # TODO only used by magic-import...?
     def interpolate(self, var):
