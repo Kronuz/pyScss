@@ -59,7 +59,7 @@ def test_reference_operations():
     assert calc('opacify($translucent-red, 0.3)') == Color.from_rgb(1, 0, 0, 0.8)
     assert calc('transparentize($translucent-red, 0.25)') == Color.from_rgb(1, 0, 0, 0.25)
     assert calc("progid:DXImageTransform.Microsoft.gradient(enabled='false', startColorstr='#{ie-hex-str($green)}', endColorstr='#{ie-hex-str($translucent-red)}')"
-                ) == String.unquoted("progid:DXImageTransform.Microsoft.gradient(enabled='false', startColorstr='#FF00FF00', endColorstr='#80FF0000')")
+                ).render() == "progid:DXImageTransform.Microsoft.gradient(enabled='false', startColorstr='#FF00FF00', endColorstr='#80FF0000')"
 
     # String operations
     ns.set_variable('$value', Null())

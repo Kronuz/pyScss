@@ -71,6 +71,11 @@ parser SassExpression:
     token KWVAR: "\$[-a-zA-Z0-9_]+(?=\s*:)"
     token SLURPYVAR: "\$[-a-zA-Z0-9_]+(?=[.][.][.])"
     token VAR: "\$[-a-zA-Z0-9_]+"
+    # Cheating, to make sure these only match function names.
+    # The last of these is the IE filter nonsense
+    token LITERAL_FUNCTION: "(calc|expression|progid:[\w.]+)(?=[(])"
+    token URL_FUNCTION: "url(?=[(])"
+    # This must come AFTER the above two
     token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
     # TODO Ruby is a bit more flexible here, for example allowing 1#{2}px
     token BAREWORD: "[-a-zA-Z_][-a-zA-Z0-9_]*"
@@ -213,10 +218,10 @@ parser SassExpression:
         # different tokens so yapps can't tell, and it resolves the conflict by
         # picking the first one.
         # TODO Ruby sass somehow allows a full expression in here too
-        | "url" LPAR interpolated_url RPAR
+        | URL_FUNCTION LPAR interpolated_url RPAR
             {{ return interpolated_url }}
-        | "expression" LPAR interpolated_function RPAR
-            {{ return Interpolation.maybe(interpolated_function, type=Function, function_name='expression') }}
+        | LITERAL_FUNCTION LPAR interpolated_function RPAR
+            {{ return Interpolation.maybe(interpolated_function, type=Function, function_name=LITERAL_FUNCTION) }}
         | FNCT LPAR argspec RPAR    {{ return CallOp(FNCT, argspec) }}
         | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
         | interpolated_bareword     {{ return Interpolation.maybe(interpolated_bareword) }}
