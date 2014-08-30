@@ -1176,9 +1176,10 @@ class Compilation(object):
         prop, raw_value = (_prop_split_re.split(block.prop, 1) + [None])[:2]
         try:
             is_var = (block.prop[len(prop)] == '=')
-            warn_deprecated(rule, "Assignment with = is deprecated; use :.")
         except IndexError:
             is_var = False
+        if is_var:
+            warn_deprecated(rule, "Assignment with = is deprecated; use :.")
         calculator = self._make_calculator(rule.namespace)
         prop = prop.strip()
         prop = calculator.do_glob_math(prop)
