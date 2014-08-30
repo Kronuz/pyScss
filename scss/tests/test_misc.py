@@ -3,6 +3,8 @@
 own files, maybe.
 """
 
+import pytest
+
 from scss import Scss
 from scss.compiler import compile_string
 from scss.errors import SassImportError
