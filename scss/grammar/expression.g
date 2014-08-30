@@ -277,11 +277,18 @@ parser SassExpression:
         DOUBLE_QUOTE                {{ return parts }}
         
     rule interpolated_bareword:
-        # Again, a bareword has a fairly limited set of allowed characters
-        BAREWORD                    {{ parts = [BAREWORD] }}
+        # This one is slightly fiddly because it can't be /completely/ empty.
+        (
+            BAREWORD                {{ parts = [BAREWORD] }}
+            |
+            interpolation           {{ parts = ['', interpolation] }}
+                                    {{ BAREWORD = '' }}
+            [ BAREWORD ]            {{ parts.append(BAREWORD) }}
+        )
         (
             interpolation           {{ parts.append(interpolation) }}
-            BAREWORD                {{ parts.append(BAREWORD) }}
+                                    {{ BAREWORD = '' }}
+            [ BAREWORD ]            {{ parts.append(BAREWORD) }}
         )*                          {{ return parts }}
 
     rule interpolated_function:

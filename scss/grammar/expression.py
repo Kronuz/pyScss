@@ -338,7 +338,7 @@ class SassExpression(Parser):
         elif _token_ == 'BANG_IMPORTANT':
             BANG_IMPORTANT = self._scan('BANG_IMPORTANT')
             return Literal(String(BANG_IMPORTANT, quotes=None))
-        elif _token_ == 'BAREWORD':
+        elif _token_ in self.atom_chks:
             interpolated_bareword = self.interpolated_bareword()
             return Interpolation.maybe(interpolated_bareword)
         elif _token_ == 'NUM':
@@ -347,7 +347,7 @@ class SassExpression(Parser):
             if self._peek(self.atom_rsts_) == 'UNITS':
                 UNITS = self._scan('UNITS')
             return Literal(Number(float(NUM), unit=UNITS))
-        elif _token_ not in self.atom_chks:
+        elif _token_ not in self.atom_chks_:
             interpolated_string = self.interpolated_string()
             return interpolated_string
         elif _token_ == 'COLOR':
@@ -419,12 +419,23 @@ class SassExpression(Parser):
         return parts
 
     def interpolated_bareword(self):
-        BAREWORD = self._scan('BAREWORD')
-        parts = [BAREWORD]
-        while self._peek(self.interpolated_bareword_rsts) == 'INTERP_START':
+        _token_ = self._peek(self.atom_chks)
+        if _token_ == 'BAREWORD':
+            BAREWORD = self._scan('BAREWORD')
+            parts = [BAREWORD]
+        else:  # == 'INTERP_START'
+            interpolation = self.interpolation()
+            parts = ['', interpolation]
+            BAREWORD = ''
+            if self._peek(self.interpolated_bareword_rsts) == 'BAREWORD':
+                BAREWORD = self._scan('BAREWORD')
+            parts.append(BAREWORD)
+        while self._peek(self.interpolated_bareword_rsts_) == 'INTERP_START':
             interpolation = self.interpolation()
             parts.append(interpolation)
-            BAREWORD = self._scan('BAREWORD')
+            BAREWORD = ''
+            if self._peek(self.interpolated_bareword_rsts) == 'BAREWORD':
+                BAREWORD = self._scan('BAREWORD')
             parts.append(BAREWORD)
         return parts
 
@@ -461,41 +472,43 @@ class SassExpression(Parser):
         END = self._scan('END')
         return Interpolation.maybe(parts)
 
-    expr_map_or_list_rsts__ = set(['"url"', 'LPAR', 'DOUBLE_QUOTE', 'COLOR', '"expression"', 'RPAR', 'BAREWORD', 'NUM', 'FNCT', 'VAR', 'BANG_IMPORTANT', 'SINGLE_QUOTE', '","'])
-    u_expr_chks = set(['"url"', 'LPAR', 'DOUBLE_QUOTE', 'COLOR', '"expression"', 'BAREWORD', 'NUM', 'FNCT', 'VAR', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
-    m_expr_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'COLOR', '"expression"', 'NE', 'LT', 'NUM', '":"', 'BAREWORD', '"url"', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
+    atom_chks_ = set(['COLOR', 'VAR'])
+    expr_map_or_list_rsts__ = set(['"url"', 'LPAR', 'DOUBLE_QUOTE', 'INTERP_START', 'COLOR', '"expression"', 'RPAR', 'BAREWORD', 'NUM', 'FNCT', 'VAR', 'BANG_IMPORTANT', 'SINGLE_QUOTE', '","'])
+    u_expr_chks = set(['"url"', 'LPAR', 'DOUBLE_QUOTE', 'INTERP_START', 'COLOR', '"expression"', 'BAREWORD', 'NUM', 'FNCT', 'VAR', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
+    m_expr_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'INTERP_START', 'COLOR', '"expression"', 'NE', 'LT', 'NUM', '":"', 'BAREWORD', '"url"', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
     argspec_items_rsts = set(['RPAR', 'END', '","'])
     expr_slst_chks = set(['INTERP_END', 'RPAR', 'END', '":"', '","'])
     expr_lst_rsts = set(['INTERP_END', 'END', '","'])
     expr_map_or_list_rsts = set(['RPAR', '":"', '","'])
-    argspec_item_chks = set(['"url"', 'LPAR', 'DOUBLE_QUOTE', 'BAREWORD', 'COLOR', '"expression"', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
+    argspec_item_chks = set(['"url"', 'LPAR', 'DOUBLE_QUOTE', 'BAREWORD', 'INTERP_START', 'COLOR', '"expression"', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
     a_expr_chks = set(['ADD', 'SUB'])
     interpolated_function_parens_rsts = set(['LPAR', 'RPAR', 'INTERP_START'])
-    expr_slst_rsts = set(['"url"', 'LPAR', 'DOUBLE_QUOTE', 'BAREWORD', 'END', 'COLOR', '"expression"', 'FNCT', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', '":"', 'NOT', 'INTERP_END', 'BANG_IMPORTANT', 'SINGLE_QUOTE', '","'])
+    expr_slst_rsts = set(['"url"', 'LPAR', 'DOUBLE_QUOTE', 'BAREWORD', 'END', 'INTERP_START', 'COLOR', '"expression"', 'FNCT', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', '":"', 'NOT', 'INTERP_END', 'BANG_IMPORTANT', 'SINGLE_QUOTE', '","'])
     interpolated_bareword_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'INTERP_START', 'COLOR', '"expression"', 'NE', 'LT', 'NUM', '":"', 'BAREWORD', '"url"', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
-    or_expr_rsts = set(['"url"', 'LPAR', 'DOUBLE_QUOTE', 'BAREWORD', 'END', 'SINGLE_QUOTE', 'COLOR', '"expression"', 'FNCT', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', '":"', 'NOT', 'INTERP_END', 'BANG_IMPORTANT', 'OR', '","'])
+    or_expr_rsts = set(['"url"', 'LPAR', 'DOUBLE_QUOTE', 'BAREWORD', 'END', 'SINGLE_QUOTE', 'INTERP_START', 'COLOR', '"expression"', 'FNCT', 'SIGN', 'VAR', 'ADD', 'NUM', 'RPAR', '":"', 'NOT', 'INTERP_END', 'BANG_IMPORTANT', 'OR', '","'])
     argspec_chks_ = set(['END', 'RPAR'])
     interpolated_string_single_rsts = set(['SINGLE_QUOTE', 'INTERP_START'])
-    and_expr_rsts = set(['AND', 'LPAR', 'RPAR', 'BAREWORD', 'END', 'SINGLE_QUOTE', 'COLOR', '"expression"', 'DOUBLE_QUOTE', 'FNCT', 'SIGN', 'VAR', 'ADD', 'NUM', '"url"', '":"', 'NOT', 'INTERP_END', 'BANG_IMPORTANT', 'OR', '","'])
-    comparison_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'LE', 'COLOR', '"expression"', 'NE', 'LT', 'NUM', '":"', 'BAREWORD', '"url"', 'GT', 'END', 'SIGN', 'ADD', 'FNCT', 'VAR', 'EQ', 'AND', 'GE', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
+    interpolated_bareword_rsts_ = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'INTERP_START', 'COLOR', '"expression"', 'NE', 'LT', 'NUM', '":"', 'BAREWORD', '"url"', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
+    and_expr_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'INTERP_START', 'COLOR', '"expression"', 'NUM', '":"', 'BAREWORD', '"url"', 'END', 'SIGN', 'ADD', 'FNCT', 'VAR', 'AND', 'OR', 'NOT', 'SINGLE_QUOTE', '","'])
+    comparison_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'LE', 'INTERP_START', 'COLOR', '"expression"', 'NE', 'LT', 'NUM', '":"', 'BAREWORD', '"url"', 'GT', 'END', 'SIGN', 'ADD', 'FNCT', 'VAR', 'EQ', 'AND', 'GE', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
     argspec_chks = set(['DOTDOTDOT', 'SLURPYVAR'])
-    atom_rsts_ = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'RPAR', 'VAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'COLOR', '"expression"', 'NE', 'LT', 'NUM', '":"', 'BAREWORD', '"url"', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'UNITS', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
+    atom_rsts_ = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'RPAR', 'VAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'INTERP_START', 'COLOR', '"expression"', 'NE', 'LT', 'NUM', '":"', 'BAREWORD', '"url"', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'UNITS', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
     interpolated_string_double_rsts = set(['DOUBLE_QUOTE', 'INTERP_START'])
     expr_map_or_list_rsts_ = set(['RPAR', '","'])
-    u_expr_rsts = set(['"url"', 'LPAR', 'DOUBLE_QUOTE', 'COLOR', '"expression"', 'SIGN', 'BAREWORD', 'ADD', 'NUM', 'FNCT', 'VAR', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
-    atom_chks = set(['COLOR', 'VAR'])
+    u_expr_rsts = set(['"url"', 'LPAR', 'DOUBLE_QUOTE', 'INTERP_START', 'COLOR', '"expression"', 'SIGN', 'BAREWORD', 'ADD', 'NUM', 'FNCT', 'VAR', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
+    atom_chks = set(['BAREWORD', 'INTERP_START'])
     interpolated_url_rsts = set(['DOUBLE_QUOTE', 'BAREURL', 'SINGLE_QUOTE'])
     comparison_chks = set(['GT', 'GE', 'NE', 'LT', 'LE', 'EQ'])
-    argspec_items_rsts_ = set(['KWVAR', 'LPAR', 'RPAR', 'BAREWORD', 'END', 'SLURPYVAR', 'COLOR', 'DOTDOTDOT', 'DOUBLE_QUOTE', 'SIGN', 'VAR', 'ADD', 'NUM', '"url"', 'FNCT', 'NOT', 'SINGLE_QUOTE', 'BANG_IMPORTANT', '"expression"'])
-    a_expr_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'LE', 'COLOR', '"expression"', 'NE', 'LT', 'NUM', '":"', 'BAREWORD', '"url"', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
+    argspec_items_rsts_ = set(['KWVAR', 'LPAR', 'RPAR', 'BAREWORD', 'END', 'SLURPYVAR', 'INTERP_START', 'COLOR', 'DOTDOTDOT', 'DOUBLE_QUOTE', 'SIGN', 'VAR', 'ADD', 'NUM', '"url"', 'FNCT', 'NOT', 'SINGLE_QUOTE', 'BANG_IMPORTANT', '"expression"'])
+    a_expr_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'LE', 'INTERP_START', 'COLOR', '"expression"', 'NE', 'LT', 'NUM', '":"', 'BAREWORD', '"url"', 'GT', 'END', 'SIGN', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
     interpolated_string_rsts = set(['DOUBLE_QUOTE', 'SINGLE_QUOTE'])
     m_expr_chks = set(['MUL', 'DIV'])
     goal_interpolated_anything_rsts = set(['END', 'INTERP_START'])
     interpolated_bare_url_rsts = set(['RPAR', 'INTERP_START'])
-    argspec_items_chks = set(['KWVAR', '"url"', 'DOUBLE_QUOTE', 'BAREWORD', 'LPAR', 'COLOR', '"expression"', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
-    argspec_rsts = set(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'END', 'SLURPYVAR', 'COLOR', 'BAREWORD', 'DOTDOTDOT', 'RPAR', 'VAR', 'ADD', 'NUM', '"url"', 'FNCT', 'NOT', 'SINGLE_QUOTE', 'SIGN', '"expression"'])
-    atom_rsts = set(['"url"', 'LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'COLOR', 'BAREWORD', '"expression"', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'NOT', 'RPAR', 'SINGLE_QUOTE'])
-    argspec_items_rsts__ = set(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'BAREWORD', 'SLURPYVAR', 'COLOR', 'DOTDOTDOT', 'SIGN', 'VAR', 'ADD', 'NUM', '"url"', 'FNCT', 'NOT', 'SINGLE_QUOTE', 'BANG_IMPORTANT', '"expression"'])
-    argspec_rsts_ = set(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'END', 'COLOR', 'BAREWORD', '"expression"', 'SIGN', 'VAR', 'ADD', 'NUM', '"url"', 'FNCT', 'NOT', 'RPAR', 'SINGLE_QUOTE'])
+    argspec_items_chks = set(['KWVAR', '"url"', 'DOUBLE_QUOTE', 'BAREWORD', 'LPAR', 'COLOR', '"expression"', 'INTERP_START', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
+    argspec_rsts = set(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'END', 'SLURPYVAR', 'INTERP_START', 'COLOR', 'BAREWORD', 'DOTDOTDOT', 'RPAR', 'VAR', 'ADD', 'NUM', '"url"', 'FNCT', 'NOT', 'SINGLE_QUOTE', 'SIGN', '"expression"'])
+    atom_rsts = set(['"url"', 'LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'INTERP_START', 'COLOR', 'BAREWORD', '"expression"', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'NOT', 'RPAR', 'SINGLE_QUOTE'])
+    argspec_items_rsts__ = set(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'BAREWORD', 'SLURPYVAR', 'INTERP_START', 'COLOR', 'DOTDOTDOT', 'SIGN', 'VAR', 'ADD', 'NUM', '"url"', 'FNCT', 'NOT', 'SINGLE_QUOTE', 'BANG_IMPORTANT', '"expression"'])
+    argspec_rsts_ = set(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'END', 'INTERP_START', 'COLOR', 'BAREWORD', '"expression"', 'SIGN', 'VAR', 'ADD', 'NUM', '"url"', 'FNCT', 'NOT', 'RPAR', 'SINGLE_QUOTE'])
 
 
