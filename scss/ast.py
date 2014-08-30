@@ -214,24 +214,25 @@ class Interpolation(Expression):
 
         foo#{...}bar#{...}baz
     """
-    def __init__(self, parts, quotes=None, type=String):
+    def __init__(self, parts, quotes=None, type=String, **kwargs):
         self.parts = parts
         self.quotes = quotes
         self.type = type
+        self.kwargs = kwargs
 
     @classmethod
-    def maybe(cls, parts, quotes=None, type=String):
+    def maybe(cls, parts, quotes=None, type=String, **kwargs):
         """Returns an interpolation if there are multiple parts, otherwise a
         plain Literal.  This keeps the AST somewhat simpler, but also is the
         only way `Literal.from_bareword` gets called.
         """
         if len(parts) > 1:
-            return cls(parts, quotes=quotes, type=type)
+            return cls(parts, quotes=quotes, type=type, **kwargs)
 
         if quotes is None and type is String:
             return Literal.from_bareword(parts[0])
 
-        return Literal(type(parts[0], quotes=quotes))
+        return Literal(type(parts[0], quotes=quotes, **kwargs))
 
     def _render_interpolated(self, value):
         """Return the result of interpolating `value`, which is slightly
@@ -263,7 +264,7 @@ class Interpolation(Expression):
                 value = part.evaluate(calculator, divide)
                 result.append(self._render_interpolated(value))
 
-        return self.type(''.join(result), quotes=self.quotes)
+        return self.type(''.join(result), quotes=self.quotes, **self.kwargs)
 
 
 

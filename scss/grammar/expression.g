@@ -26,6 +26,7 @@ from scss.ast import MapLiteral
 from scss.ast import ArgspecLiteral
 from scss.cssdefs import unescape
 from scss.types import Color
+from scss.types import Function
 from scss.types import Number
 from scss.types import String
 from scss.types import Url
@@ -78,6 +79,7 @@ parser SassExpression:
     token INTERP_START: "#[{]"
     token INTERP_END: "[}]"
     token INTERP_ANYTHING: "([^#]|#(?![{]))*"
+    token INTERP_NO_PARENS: "([^#()]|#(?![{]))*"
     # http://dev.w3.org/csswg/css-syntax-3/#consume-a-url-token0
     # Bare URLs may not contain quotes, parentheses, or unprintables.  Quoted
     # URLs may, of course, contain whatever they like.
@@ -210,8 +212,11 @@ parser SassExpression:
         # regular function rule, which makes this not quite LL -- but they're
         # different tokens so yapps can't tell, and it resolves the conflict by
         # picking the first one.
+        # TODO Ruby sass somehow allows a full expression in here too
         | "url" LPAR interpolated_url RPAR
-                                    {{ print("url!"); return interpolated_url }}
+            {{ return interpolated_url }}
+        | "expression" LPAR interpolated_function RPAR
+            {{ return Interpolation.maybe(interpolated_function, type=Function, function_name='expression') }}
         | FNCT LPAR argspec RPAR    {{ return CallOp(FNCT, argspec) }}
         | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
         | interpolated_bareword     {{ return Interpolation.maybe(interpolated_bareword) }}
@@ -277,6 +282,23 @@ parser SassExpression:
         (
             interpolation           {{ parts.append(interpolation) }}
             BAREWORD                {{ parts.append(BAREWORD) }}
+        )*                          {{ return parts }}
+
+    rule interpolated_function:
+        # Completely arbitrary text, but with balanced parentheses.
+        interpolated_function_parens        {{ parts = interpolated_function_parens }}
+        (
+            interpolation                   {{ parts.append(interpolation) }}
+            interpolated_function_parens    {{ parts.extend(interpolated_function_parens) }}
+        )*                                  {{ return parts }}
+
+    rule interpolated_function_parens:
+        INTERP_NO_PARENS            {{ parts = [INTERP_NO_PARENS] }}
+        (
+            LPAR
+            interpolated_function   {{ parts = parts[:-1] + [parts[-1] + LPAR + interpolated_function[0]] + interpolated_function[0:] }}
+            RPAR
+            INTERP_NO_PARENS        {{ parts[-1] += RPAR + INTERP_NO_PARENS }}
         )*                          {{ return parts }}
 
 
