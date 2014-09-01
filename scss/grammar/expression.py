@@ -105,6 +105,28 @@ class SassExpression(Parser):
         END = self._scan('END')
         return argspec
 
+    def goal_function_call(self):
+        function_call = self.function_call()
+        END = self._scan('END')
+        return function_call
+
+    def goal_function_call_opt_parens(self):
+        BAREWORD = self._scan('BAREWORD')
+        argspec = ArgspecLiteral([])
+        if self._peek(self.goal_function_call_opt_parens_rsts) == 'LPAR':
+            LPAR = self._scan('LPAR')
+            argspec = self.argspec()
+            RPAR = self._scan('RPAR')
+        END = self._scan('END')
+        return CallOp(BAREWORD, argspec)
+
+    def function_call(self):
+        FNCT = self._scan('FNCT')
+        LPAR = self._scan('LPAR')
+        argspec = self.argspec()
+        RPAR = self._scan('RPAR')
+        return CallOp(FNCT, argspec)
+
     def argspec(self):
         _token_ = self._peek(self.argspec_rsts)
         if _token_ not in self.argspec_chks:
@@ -328,11 +350,8 @@ class SassExpression(Parser):
             RPAR = self._scan('RPAR')
             return Interpolation.maybe(interpolated_function, type=Function, function_name=LITERAL_FUNCTION)
         elif _token_ == 'FNCT':
-            FNCT = self._scan('FNCT')
-            LPAR = self._scan('LPAR')
-            argspec = self.argspec()
-            RPAR = self._scan('RPAR')
-            return CallOp(FNCT, argspec)
+            function_call = self.function_call()
+            return function_call
         elif _token_ == 'BANG_IMPORTANT':
             BANG_IMPORTANT = self._scan('BANG_IMPORTANT')
             return Literal(String(BANG_IMPORTANT, quotes=None))
@@ -475,7 +494,7 @@ class SassExpression(Parser):
     u_expr_chks = set(['LPAR', 'DOUBLE_QUOTE', 'BAREWORD', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'VAR', 'NUM', 'FNCT', 'LITERAL_FUNCTION', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
     m_expr_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
     argspec_items_rsts = set(['RPAR', 'END', '","'])
-    expr_slst_chks = set(['INTERP_END', 'RPAR', 'END', '":"', '","'])
+    argspec_items_chks = set(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'VAR', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'BAREWORD', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
     expr_lst_rsts = set(['INTERP_END', 'END', '","'])
     expr_map_or_list_rsts = set(['RPAR', '":"', '","'])
     argspec_item_chks = set(['LPAR', 'DOUBLE_QUOTE', 'VAR', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'BAREWORD', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
@@ -503,9 +522,10 @@ class SassExpression(Parser):
     m_expr_chks = set(['MUL', 'DIV'])
     goal_interpolated_anything_rsts = set(['END', 'INTERP_START'])
     interpolated_bare_url_rsts = set(['RPAR', 'INTERP_START'])
-    argspec_items_chks = set(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'VAR', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'BAREWORD', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
+    expr_slst_chks = set(['INTERP_END', 'RPAR', 'END', '":"', '","'])
     argspec_rsts = set(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'END', 'SLURPYVAR', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'BAREWORD', 'DOTDOTDOT', 'RPAR', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'VAR', 'FNCT', 'NOT', 'SIGN', 'SINGLE_QUOTE'])
     atom_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'BAREWORD', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'VAR', 'FNCT', 'NOT', 'RPAR', 'SINGLE_QUOTE'])
+    goal_function_call_opt_parens_rsts = set(['LPAR', 'END'])
     argspec_items_rsts__ = set(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'VAR', 'SLURPYVAR', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'BAREWORD', 'DOTDOTDOT', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
     argspec_rsts_ = set(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'END', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'BAREWORD', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'VAR', 'FNCT', 'NOT', 'RPAR', 'SINGLE_QUOTE'])
 

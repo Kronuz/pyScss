@@ -151,15 +151,15 @@ class NotOp(Expression):
 
 class CallOp(Expression):
     def __repr__(self):
-        return '<%s(%s, %s)>' % (self.__class__.__name__, repr(self.func_name), repr(self.argspec))
+        return '<%s(%s, %s)>' % (self.__class__.__name__, repr(self.function_name), repr(self.argspec))
 
-    def __init__(self, func_name, argspec):
-        self.func_name = func_name
+    def __init__(self, function_name, argspec):
+        self.function_name = function_name
         self.argspec = argspec
 
     def evaluate(self, calculator, divide=False):
         # TODO bake this into the context and options "dicts", plus library
-        func_name = normalize_var(self.func_name)
+        function_name = normalize_var(self.function_name)
 
         argspec_node = self.argspec
 
@@ -179,7 +179,7 @@ class CallOp(Expression):
         # TODO merge this with the library
         funct = None
         try:
-            funct = calculator.namespace.function(func_name, argspec_len)
+            funct = calculator.namespace.function(function_name, argspec_len)
             # @functions take a ns as first arg.  TODO: Python functions possibly
             # should too
             if getattr(funct, '__name__', None) == '__call':
@@ -187,11 +187,11 @@ class CallOp(Expression):
         except KeyError:
             try:
                 # DEVIATION: Fall back to single parameter
-                funct = calculator.namespace.function(func_name, 1)
+                funct = calculator.namespace.function(function_name, 1)
                 args = [List(args, use_comma=True)]
             except KeyError:
-                if not is_builtin_css_function(func_name):
-                    log.error("Function not found: %s:%s", func_name, argspec_len, extra={'stack': True})
+                if not is_builtin_css_function(function_name):
+                    log.error("Function not found: %s:%s", function_name, argspec_len, extra={'stack': True})
 
         if funct:
             ret = funct(*args, **kwargs)
@@ -203,13 +203,13 @@ class CallOp(Expression):
         # function call.  Slurpy arguments are expanded and named arguments are
         # unsupported.
         if kwargs:
-            raise TypeError("The CSS function %s doesn't support keyword arguments." % (func_name,))
+            raise TypeError("The CSS function %s doesn't support keyword arguments." % (function_name,))
 
         # TODO another candidate for a "function call" sass type
         rendered_args = [arg.render() for arg in args]
 
         return String(
-            "%s(%s)" % (func_name, ", ".join(rendered_args)),
+            "%s(%s)" % (function_name, ", ".join(rendered_args)),
             quotes=None)
 
 
@@ -423,6 +423,28 @@ class ArgspecLiteral(Expression):
             seen_vars.add(var.name)
 
             yield var.name, value
+
+    def iter_def_arities(self):
+        """Yield every possible arity this argspec (treated as a function or
+        mixin definition) might accept.
+        """
+        if self.slurp or self.inject:
+            # Accepting slurpy args means anything goes
+            yield None
+
+        # Iterate over the given arguments, counting from 1
+        required_args = 0
+        for arity, (name, default) in enumerate(self.iter_def_argspec(), start=1):
+            if default is None:
+                # This argument is required, so the number of required args is
+                # at least this arity (but might be more, if the next arg is
+                # also required)
+                required_args = arity
+            else:
+                # Every optional argument is an acceptable arity
+                yield arity
+
+        yield required_args
 
     def evaluate_call_args(self, calculator):
         """Interpreting this literal as a function call, return a 2-tuple of

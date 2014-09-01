@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 from __future__ import division
 
 from collections import defaultdict
+from collections import deque
 from contextlib import contextmanager
 from enum import Enum
 import glob
@@ -347,9 +348,8 @@ class Compilation(object):
         # the compiler then?
         # TODO in which case maybe evaluation should go here and Calculator
         # should vanish?  (but then it's awkward to use programmatically, hmm)
-        self._ancestry_stack = [RuleAncestry()]
-        self.current_namespace = root_namespace
-        self.current_calculator = self._make_calculator(self.current_namespace)
+        self._ancestry_stack = deque([RuleAncestry()])
+        self._namespace_stack = deque([root_namespace])
         self.declarations = []
 
         file_block.evaluate(self)
@@ -460,10 +460,15 @@ class Compilation(object):
                 # TODO need some real registration+dispatch here
                 if directive == '@each':
                     return AtEachBlock.parse(argument)
+                elif directive == '@mixin':
+                    return AtMixinBlock.parse(argument)
                 else:
                     return AtRuleBlock(directive, argument)
             else:
-                return AtRule(directive, argument)
+                if directive == '@include':
+                    return AtIncludeBlock.parse(argument)
+                else:
+                    return AtRule(directive, argument)
 
         # Try splitting this into "name : value"
         # TODO strictly speaking this isn't right -- consider foo#{":"}bar.
@@ -779,162 +784,6 @@ class Compilation(object):
         return callee_namespace
 
     # @print_timing(10)
-    def _at_function(self, calculator, rule, scope, block):
-        """
-        Implements @mixin and @function
-        """
-        if not block.argument:
-            raise SyntaxError("%s requires a function name (%s)" % (block.directive, rule.file_and_line))
-
-        funct, argspec_node = self._get_funct_def(rule, calculator, block.argument)
-
-        defaults = {}
-        new_params = []
-
-        for var_name, default in argspec_node.iter_def_argspec():
-            new_params.append(var_name)
-            if default is not None:
-                defaults[var_name] = default
-
-        # TODO a function or mixin is re-parsed every time it's called; there's
-        # no AST for anything but expressions  :(
-        mixin = [rule.source_file, block.lineno, block.unparsed_contents, rule.namespace, argspec_node, rule.source_file]
-        if block.directive == '@function':
-            def _call(mixin):
-                def __call(namespace, *args, **kwargs):
-                    source_file = mixin[0]
-                    lineno = mixin[1]
-                    m_codestr = mixin[2]
-                    pristine_callee_namespace = mixin[3]
-                    callee_namespace = pristine_callee_namespace.derive()
-
-                    # TODO CallOp converts Sass names to Python names, so we
-                    # have to convert them back to Sass names.  would be nice
-                    # to avoid this back-and-forth somehow
-                    kwargs = OrderedDict(
-                        (normalize_var('$' + key), value)
-                        for (key, value) in kwargs.items())
-
-                    self._populate_namespace_from_call(
-                        "Function {0}".format(funct),
-                        callee_namespace, mixin, args, kwargs)
-
-                    _rule = SassRule(
-                        source_file=source_file,
-                        lineno=lineno,
-                        unparsed_contents=m_codestr,
-                        namespace=callee_namespace,
-
-                        # rule
-                        import_key=rule.import_key,
-                        legacy_compiler_options=rule.legacy_compiler_options,
-                        options=rule.options,
-                        properties=rule.properties,
-                        extends_selectors=rule.extends_selectors,
-                        ancestry=rule.ancestry,
-                        nested=rule.nested,
-                    )
-                    # TODO supposed to throw an error if there's a slurpy arg
-                    # but keywords() is never called on it
-                    try:
-                        self.manage_children(_rule, scope)
-                    except SassReturn as e:
-                        return e.retval
-                    else:
-                        return Null()
-                return __call
-            _mixin = _call(mixin)
-            _mixin.mixin = mixin
-            mixin = _mixin
-
-        if block.directive == '@mixin':
-            add = rule.namespace.set_mixin
-        elif block.directive == '@function':
-            add = rule.namespace.set_function
-
-        # Register the mixin for every possible arity it takes
-        if argspec_node.slurp or argspec_node.inject:
-            add(funct, None, mixin)
-        else:
-            while len(new_params):
-                add(funct, len(new_params), mixin)
-                param = new_params.pop()
-                if param not in defaults:
-                    break
-            if not new_params:
-                add(funct, 0, mixin)
-    _at_mixin = _at_function
-
-    # @print_timing(10)
-    def _at_include(self, calculator, rule, scope, block):
-        """
-        Implements @include, for @mixins
-        """
-        caller_namespace = rule.namespace
-        caller_calculator = self._make_calculator(caller_namespace)
-        funct, caller_argspec = self._get_funct_def(rule, caller_calculator, block.argument)
-
-        # Render the passed arguments, using the caller's namespace
-        args, kwargs = caller_argspec.evaluate_call_args(caller_calculator)
-
-        argc = len(args) + len(kwargs)
-        try:
-            mixin = caller_namespace.mixin(funct, argc)
-        except KeyError:
-            try:
-                # TODO maybe? don't do this, once '...' works
-                # Fallback to single parameter:
-                mixin = caller_namespace.mixin(funct, 1)
-            except KeyError:
-                log.error("Mixin not found: %s:%d (%s)", funct, argc, rule.file_and_line, extra={'stack': True})
-                return
-            else:
-                args = [List(args, use_comma=True)]
-                # TODO what happens to kwargs?
-
-        source_file = mixin[0]
-        lineno = mixin[1]
-        m_codestr = mixin[2]
-        pristine_callee_namespace = mixin[3]
-        callee_argspec = mixin[4]
-        if caller_argspec.inject and callee_argspec.inject:
-            # DEVIATION: Pass the ENTIRE local namespace to the mixin (yikes)
-            callee_namespace = Namespace.derive_from(
-                caller_namespace,
-                pristine_callee_namespace)
-        else:
-            callee_namespace = pristine_callee_namespace.derive()
-
-        self._populate_namespace_from_call(
-            "Mixin {0}".format(funct),
-            callee_namespace, mixin, args, kwargs)
-
-        _rule = SassRule(
-            # These must be file and line in which the @include occurs
-            source_file=rule.source_file,
-            lineno=rule.lineno,
-
-            # These must be file and line in which the @mixin was defined
-            from_source_file=source_file,
-            from_lineno=lineno,
-
-            unparsed_contents=m_codestr,
-            namespace=callee_namespace,
-
-            # rule
-            import_key=rule.import_key,
-            legacy_compiler_options=rule.legacy_compiler_options,
-            options=rule.options,
-            properties=rule.properties,
-            extends_selectors=rule.extends_selectors,
-            ancestry=rule.ancestry,
-            nested=rule.nested,
-        )
-
-        _rule.options['@content'] = block.unparsed_contents
-        self.manage_children(_rule, scope)
-
-    # @print_timing(10)
     def _at_content(self, calculator, rule, scope, block):
         """
         Implements @content
@@ -1239,46 +1088,6 @@ class Compilation(object):
             through += 1
         for i in rev(range(frm, through)):
             inner_rule.namespace.set_variable(var, Number(i))
-            self.manage_children(inner_rule, scope)
-
-    # @print_timing(10)
-    def _at_each(self, calculator, rule, scope, block):
-        """
-        Implements @each
-        """
-        varstring, _, valuestring = block.argument.partition(' in ')
-        values = calculator.calculate(valuestring)
-        if not values:
-            return
-
-        varlist = [
-            normalize_var(calculator.do_glob_math(var.strip()))
-            # TODO use list parsing here
-            for var in varstring.split(",")
-        ]
-
-        # `@each $foo, in $bar` unpacks, but `@each $foo in $bar` does not!
-        unpack = len(varlist) > 1
-        if not varlist[-1]:
-            varlist.pop()
-
-        inner_rule = rule.copy()
-        inner_rule.unparsed_contents = block.unparsed_contents
-        if not self.should_scope_loop_in_rule(inner_rule):
-            # DEVIATION: Allow not creating a new namespace
-            inner_rule.namespace = rule.namespace
-
-        for v in List.from_maybe(values):
-            if unpack:
-                v = List.from_maybe(v)
-                for i, var in enumerate(varlist):
-                    if i >= len(v):
-                        value = Null()
-                    else:
-                        value = v[i]
-                    inner_rule.namespace.set_variable(var, value)
-            else:
-                inner_rule.namespace.set_variable(varlist[0], v)
             self.manage_children(inner_rule, scope)
 
     # @print_timing(10)
@@ -1594,6 +1403,23 @@ class Compilation(object):
             yield new_ancestry
         finally:
             self._ancestry_stack.pop()
+
+    @property
+    def current_namespace(self):
+        return self._namespace_stack[-1]
+
+    @property
+    def current_calculator(self):
+        return self._make_calculator(self.current_namespace)
+
+    @contextmanager
+    def push_namespace(self, namespace):
+        """Manually create a new scope with the given namespace."""
+        self._namespace_stack.append(namespace)
+        try:
+            yield namespace
+        finally:
+            self._namespace_stack.pop()
 
     def add_declaration(self, prop, value):
         self.declarations.append((self.current_ancestry, [(prop, value)]))

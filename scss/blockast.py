@@ -5,9 +5,20 @@ from __future__ import division
 
 import logging
 
+try:
+    from collections import OrderedDict
+except ImportError:
+    # Backport
+    from ordereddict import OrderedDict
+
+from scss.errors import SassParseError
 from scss.expression import Calculator
+from scss.namespace import Namespace
 from scss.types import List
 from scss.types import Null
+from scss.types import Arglist
+from scss.types import String
+from scss.types import Undefined
 from scss.util import normalize_var  # TODO put in...  namespace maybe?
 
 
@@ -35,6 +46,7 @@ class Node(object):
 
 class Declaration(Node):
     pass
+
 
 class Assignment(Declaration):
     def __init__(self, name, value_expression):
@@ -105,6 +117,7 @@ class _AtRuleMixin(object):
 
     def evaluate(*args):
         log.warn("Not yet implemented")
+
 
 class AtRule(_AtRuleMixin, Node):
     """An at-rule with no children, e.g. ``@import``."""
@@ -247,3 +260,189 @@ class AtEachBlock(AtRuleBlock):
             for child in self.children:
                 child.evaluate(compilation)
 
+
+# TODO make @-rules support both with and without blocks with the same class,
+# so this can be gotten rid of
+class AtIncludeBlock(AtRule):
+    def __init__(self, mixin_name, argspec):
+        self.mixin_name = mixin_name
+        self.argspec = argspec
+
+    @classmethod
+    def parse(cls, argument):
+        # TODO basically copy/pasted from @mixin
+        try:
+            callop = Calculator().parse_expression(
+                argument, 'goal_function_call_opt_parens')
+        except SassParseError:
+            # TODO exc.when("trying to parse a mixin inclusion")
+            raise
+
+        # Unpack the CallOp
+        mixin_name = callop.function_name
+        argspec = callop.argspec
+
+        return cls(mixin_name, argspec)
+
+    def evaluate(self, compilation):
+        caller_namespace = compilation.current_namespace
+        caller_calculator = compilation._make_calculator(caller_namespace)
+
+        # Render the passed arguments, using the caller's namespace
+        args, kwargs = self.argspec.evaluate_call_args(caller_calculator)
+
+        argc = len(args) + len(kwargs)
+        try:
+            mixin = caller_namespace.mixin(self.mixin_name, argc)
+        except KeyError:
+            try:
+                # TODO should really get rid of this; ... works now
+                # Fallback to single parameter:
+                mixin = caller_namespace.mixin(self.mixin_name, 1)
+            except KeyError:
+                # TODO track source line/file
+                # TODO hang on this should be fatal
+                log.error("Mixin not found: %s:%d (%s)", self.mixin_name, argc, "lol idk", extra={'stack': True})
+                return
+            else:
+                args = [List(args, use_comma=True)]
+                # TODO what happens to kwargs?
+
+        # TODO source_file = mixin[0]
+        # TODO lineno = mixin[1]
+
+        # Put the arguments in their own namespace, and let the mixin derive
+        # from it
+        local_namespace = Namespace()
+        self._populate_namespace_from_call(
+            compilation, local_namespace, mixin.argspec, args, kwargs)
+
+        namespaces = [local_namespace]
+        if self.argspec.inject and mixin.argspec.inject:
+            # DEVIATION: Pass the ENTIRE local namespace to the mixin (yikes)
+            namespaces.append(compilation.current_namespace)
+
+        mixin.evaluate(compilation, namespaces)
+
+        # TODO the old SassRule defined from_source_etc here
+        # TODO _rule.options['@content'] = block.unparsed_contents
+
+    def _populate_namespace_from_call(self, compilation, namespace, argspec, args, kwargs):
+        """Populate a temporary @mixin namespace with the arguments passed to
+        an @include.
+        """
+        # Mutation protection
+        args = list(args)
+        kwargs = OrderedDict(kwargs)
+
+        calculator = compilation._make_calculator(namespace)
+
+        # Populate the mixin/function's namespace with its arguments
+        for var_name, node in argspec.iter_def_argspec():
+            if args:
+                # If there are positional arguments left, use the first
+                value = args.pop(0)
+            elif var_name in kwargs:
+                # Try keyword arguments
+                value = kwargs.pop(var_name)
+            elif node is not None:
+                # OK, there's a default argument; try that
+                # DEVIATION: this allows argument defaults to refer to earlier
+                # argument values
+                value = node.evaluate(calculator, divide=True)
+            else:
+                # TODO this should raise
+                # TODO in the meantime, warn_undefined(...)
+                value = Undefined()
+
+            namespace.set_variable(var_name, value, local_only=True)
+
+        if argspec.slurp:
+            # Slurpy var gets whatever is left
+            # TODO should preserve the order of extra kwargs
+            sass_kwargs = []
+            for key, value in kwargs.items():
+                sass_kwargs.append((String(key[1:]), value))
+            namespace.set_variable(
+                argspec.slurp.name,
+                Arglist(args, sass_kwargs))
+            args = []
+            kwargs = {}
+        elif argspec.inject:
+            # Callee namespace gets all the extra kwargs whether declared or
+            # not
+            for var_name, value in kwargs.items():
+                namespace.set_variable(var_name, value, local_only=True)
+            kwargs = {}
+
+        # TODO would be nice to say where the mixin/function came from
+        # TODO generally need more testing of error cases
+        # TODO
+        name = "This mixin"
+        if kwargs:
+            raise NameError("%s has no such argument %s" % (name, kwargs.keys()[0]))
+
+        if args:
+            raise NameError("%s received extra arguments: %r" % (name, args))
+
+        # TODO import_key = mixin[5]
+        # TODO pristine_callee_namespace = mixin[3]
+        # TODO pristine_callee_namespace.use_import(import_key)
+        return namespace
+
+
+class Mixin(object):
+    """Binds a parsed @mixin block to the runtime namespace it was defined in.
+    """
+    def __init__(self, mixin, namespace):
+        self.mixin = mixin
+        self.namespace = namespace
+
+    @property
+    def argspec(self):
+        return self.mixin.argspec
+
+    def evaluate(self, compilation, namespaces):
+        local_namespace = Namespace.derive_from(
+            self.namespace, *namespaces)
+
+        with compilation.push_namespace(local_namespace):
+            for child in self.mixin.children:
+                child.evaluate(compilation)
+
+
+class AtMixinBlock(AtRuleBlock):
+    directive = '@mixin'
+
+    def __init__(self, mixin_name, argspec):
+        # TODO fix parent to not assign to directive/argument and use super
+        # here
+        Block.__init__(self)
+
+        self.mixin_name = mixin_name
+        self.argspec = argspec
+
+    @classmethod
+    def parse(cls, argument):
+        # TODO the original _get_funct_def applied interpolations here before
+        # parsing anything; not sure that's right, but kronuz might rely on it?
+        try:
+            callop = Calculator().parse_expression(
+                argument, 'goal_function_call_opt_parens')
+        except SassParseError:
+            # TODO exc.when("trying to parse a mixin definition")
+            raise
+
+        # Unpack the CallOp
+        mixin_name = callop.function_name
+        argspec = callop.argspec
+
+        return cls(mixin_name, argspec)
+
+    def evaluate(self, compilation):
+        # Evaluating a @mixin just means making it exist; we already have its
+        # AST!
+        namespace = compilation.current_namespace
+        mixin = Mixin(self, namespace)
+        for arity in self.argspec.iter_def_arities():
+            namespace.set_mixin(self.mixin_name, arity, mixin)

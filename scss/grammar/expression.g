@@ -96,13 +96,27 @@ parser SassExpression:
 
     # -------------------------------------------------------------------------
     # Goals:
-    rule goal:          expr_lst END                {{ return expr_lst }}
+    rule goal:
+        expr_lst END                {{ return expr_lst }}
 
-    rule goal_argspec:  argspec END                 {{ return argspec }}
+    rule goal_argspec:
+        argspec END                 {{ return argspec }}
+
+    rule goal_function_call:
+        function_call END           {{ return function_call }}
+
+    rule goal_function_call_opt_parens:
+        # This is used for @mixin and @include, where the parens are optional
+        BAREWORD                    {{ argspec = ArgspecLiteral([]) }}
+        [ LPAR argspec RPAR ]
+        END                         {{ return CallOp(BAREWORD, argspec) }}
 
     # Arguments:
     # TODO should support multiple slurpies, and enforce (probably not in the
     # parser) that positional args come first
+    rule function_call:
+        FNCT LPAR argspec RPAR      {{ return CallOp(FNCT, argspec) }}
+
     rule argspec:
         [
             argspec_items           {{ args, slurpy = argspec_items }}
@@ -225,7 +239,7 @@ parser SassExpression:
             {{ return interpolated_url }}
         | LITERAL_FUNCTION LPAR interpolated_function RPAR
             {{ return Interpolation.maybe(interpolated_function, type=Function, function_name=LITERAL_FUNCTION) }}
-        | FNCT LPAR argspec RPAR    {{ return CallOp(FNCT, argspec) }}
+        | function_call             {{ return function_call }}
         | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
         | interpolated_bareword     {{ return Interpolation.maybe(interpolated_bareword) }}
         | NUM                       {{ UNITS = None }}
