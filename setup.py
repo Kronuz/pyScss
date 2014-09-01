@@ -9,8 +9,15 @@ import sys
 from setuptools import setup, Extension, Feature
 
 # this imports PROJECT, URL, VERSION, AUTHOR, AUTHOR_EMAIL, LICENSE,
-# DOWNLOAD_URL, INSTALL_REQUIRES
+# DOWNLOAD_URL
 exec(open('scss/scss_meta.py').read())
+
+# Dependencies
+install_requires = ['six']
+if sys.version_info < (3, 4):
+    install_requires.append('enum34')
+if sys.version_info < (2, 7):
+    install_requires.append('ordereddict')
 
 # fail safe compilation shamelessly stolen from the simplejson
 # setup.py file.  Original author: Bob Ippolito
@@ -98,7 +105,7 @@ def run_setup(with_binary):
             "Topic :: Text Processing :: Markup",
             "Topic :: Software Development :: Libraries :: Python Modules"
         ],
-        install_requires=INSTALL_REQUIRES,
+        install_requires=install_requires,
         packages=[
             'scss',
             'scss.extension',

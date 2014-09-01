@@ -3,6 +3,11 @@
 own files, maybe.
 """
 
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
+
 import pytest
 
 from scss import Scss
@@ -71,7 +76,7 @@ def test_live_errors():
 
 def test_extend_across_files():
     compiler = Scss(scss_opts=dict(compress=0))
-    compiler._scss_files = {}
+    compiler._scss_files = OrderedDict()
     compiler._scss_files['first.css'] = '''
     @option style:legacy, short_colors:yes, reverse_colors:yes;
     .specialClass extends .basicClass {

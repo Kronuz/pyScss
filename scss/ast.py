@@ -11,6 +11,12 @@ from functools import partial
 import logging
 import operator
 
+try:
+    from collections import OrderedDict
+except ImportError:
+    # Backport
+    from ordereddict import OrderedDict
+
 import six
 
 from scss.cssdefs import COLOR_NAMES
@@ -441,7 +447,7 @@ class ArgspecLiteral(Expression):
         ``(args, kwargs)``.
         """
         args = []
-        kwargs = {}
+        kwargs = OrderedDict()  # Sass kwargs preserve order
         for var_node, value_node in self.argpairs:
             value = value_node.evaluate(calculator, divide=True)
             if var_node is None:

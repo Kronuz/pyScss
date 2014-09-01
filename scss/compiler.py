@@ -13,6 +13,12 @@ import re
 import sys
 import warnings
 
+try:
+    from collections import OrderedDict
+except ImportError:
+    # Backport
+    from ordereddict import OrderedDict
+
 import six
 
 import scss.config as config
@@ -574,7 +580,7 @@ class Compilation(object):
     def _populate_namespace_from_call(self, name, callee_namespace, mixin, args, kwargs):
         # Mutation protection
         args = list(args)
-        kwargs = dict(kwargs)
+        kwargs = OrderedDict(kwargs)
 
         #m_params = mixin[0]
         #m_defaults = mixin[1]
@@ -665,7 +671,7 @@ class Compilation(object):
                     # TODO CallOp converts Sass names to Python names, so we
                     # have to convert them back to Sass names.  would be nice
                     # to avoid this back-and-forth somehow
-                    kwargs = dict(
+                    kwargs = OrderedDict(
                         (normalize_var('$' + key), value)
                         for (key, value) in kwargs.items())
 

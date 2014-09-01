@@ -57,12 +57,6 @@ URL = 'http://github.com/Kronuz/pyScss'
 DOWNLOAD_URL = 'http://github.com/Kronuz/pyScss/tarball/v' + VERSION
 LICENSE = "MIT"
 PROJECT = "pyScss"
-INSTALL_REQUIRES = [
-    'six',
-]
-
-if sys.version_info < (3, 4):
-    INSTALL_REQUIRES.append('enum34')
 
 if __name__ == "__main__":
     print('VERSION      = ' + VERSION)
