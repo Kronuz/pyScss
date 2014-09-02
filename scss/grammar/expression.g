@@ -38,6 +38,12 @@ from scss.grammar import Scanner
 
 %%
 parser SassExpression:
+    # These need to go before the ignore, so they match first, and we don't
+    # lose spaces inside a string!
+    # Don't allow quotes or # unless they're escaped (or the # is alone)
+    token SINGLE_STRING_GUTS: '([^\'\\\\#]|[\\\\].|#(?![{]))*'
+    token DOUBLE_STRING_GUTS: "([^\"\\\\#]|[\\\\].|#(?![{]))*"
+
     ignore: "[ \r\t\n]+"
     token LPAR: "\\(|\\["
     token RPAR: "\\)|\\]"
@@ -60,11 +66,7 @@ parser SassExpression:
     token DOTDOTDOT: '[.]{3}'
     token SINGLE_QUOTE: "'"
     token DOUBLE_QUOTE: '"'
-    # Don't allow quotes or # unless they're escaped (or the # is alone)
-    token SINGLE_STRING_GUTS: '([^\'\\\\#]|[\\\\].|#(?![{]))*'
-    token DOUBLE_STRING_GUTS: "([^\"\\\\#]|[\\\\].|#(?![{]))*"
-    token STR: "'[^'\\\\]*(?:\\\\.[^'\\\\]*)*'"
-    token QSTR: '"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"'
+
     token UNITS: "(?<!\s)(?:[a-zA-Z]+|%)(?![-\w])"
     token NUM: "(?:\d+(?:\.\d*)?|\.\d+)"
     token COLOR: "#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])"
@@ -92,6 +94,7 @@ parser SassExpression:
     # FIXME: Also, URLs may not contain $ as it breaks urls with variables?
     token BAREURL: "(?:[\\\\].|[^#$'\"()\\x00-\\x08\\x0b\\x0e-\\x1f\\x7f]|#(?![{]))*"
 
+    # -------------------------------------------------------------------------
     # Goals:
     rule goal:          expr_lst END                {{ return expr_lst }}
 

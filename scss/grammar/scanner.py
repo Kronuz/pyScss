@@ -206,6 +206,9 @@ except ImportError:
             and add the restriction to self.restrictions
             """
             # Keep looking for a token, ignoring any in self.ignore
+            if DEBUG:
+                print()
+                print("Being asked to match with restriction:", repr(restrict))
             token = None
             while True:
                 best_pat = None

@@ -14,6 +14,7 @@ from scss.errors import SassError, SassEvaluationError, SassParseError
 from scss.grammar.expression import SassExpression, SassExpressionScanner
 from scss.rule import Namespace
 from scss.types import String
+from scss.types import Value
 from scss.util import dequote
 
 
@@ -88,8 +89,13 @@ class Calculator(object):
                             return n
                     else:
                         if v:
-                            if not isinstance(v, six.string_types):
-                                v = v.render()
+                            if not isinstance(v, Value):
+                                raise TypeError(
+                                    "Somehow got a variable {0!r} "
+                                    "with a non-Sass value: {1!r}"
+                                    .format(n, v)
+                                )
+                            v = v.render()
                             # TODO this used to test for _dequote
                             if m.group(1):
                                 v = dequote(v)
@@ -98,6 +104,10 @@ class Calculator(object):
                         return v
 
                 cont = _interpolate_re.sub(_av, cont)
+
+            else:
+                # Variable succeeded, so we need to render it
+                cont = cont.render()
         # TODO this is surprising and shouldn't be here
         cont = self.do_glob_math(cont)
         return cont

@@ -125,7 +125,19 @@ class Value(object):
         raise ValueError("Not a map: {0!r}".format(self))
 
     def render(self, compress=False):
-        return self.__str__()
+        """Return this value's CSS representation as a string (text, i.e.
+        unicode!).
+
+        If `compress` is true, try hard to shorten the string at the cost of
+        readability.
+        """
+        raise NotImplementedError
+
+    def render_interpolated(self, compress=False):
+        """Return this value's string representation as appropriate for
+        returning from an interpolation.
+        """
+        return self.render(compress)
 
 
 class Null(Value):
@@ -155,6 +167,10 @@ class Null(Value):
 
     def render(self, compress=False):
         return self.sass_type_name
+
+    def render_interpolated(self, compress=False):
+        # Interpolating a null gives you nothing.
+        return ''
 
 
 class Undefined(Null):
@@ -692,6 +708,10 @@ class List(Value):
             for item in value
         )
 
+    def render_interpolated(self, compress=False):
+        return self.delimiter(compress).join(
+            item.render_interpolated(compress) for item in self)
+
     # DEVIATION: binary ops on lists and scalars act element-wise
     def __add__(self, other):
         if isinstance(other, List):
@@ -1107,6 +1127,10 @@ class String(Value):
         else:
             return self._render_quoted()
 
+    def render_interpolated(self, compress=False):
+        # Always render without quotes
+        return self.value
+
     def _render_bareword(self):
         # TODO this is currently unused, and only implemented due to an
         # oversight, but would make for a much better implementation of
@@ -1173,6 +1197,12 @@ class Function(String):
             super(Function, self).render(compress),
         )
 
+    def render_interpolated(self, compress=False):
+        return "{0}({1})".format(
+            self.function_name,
+            super(Function, self).render_interpolated(compress),
+        )
+
 
 class Url(Function):
     # Bare URLs may not contain quotes, parentheses, or unprintables.  Quoted
@@ -1185,11 +1215,17 @@ class Url(Function):
 
     def render(self, compress=False):
         if self.quotes is None:
-            # Need to escape some stuff to keep this as valid CSS
-            inside = self.bad_identifier_rx.sub(
-                self._escape_character, self.value)
+            return self.render_interpolated(compress)
         else:
             inside = self._render_quoted()
+            return "url(" + inside + ")"
+
+    def render_interpolated(self, compress=False):
+        # Always render without quotes.
+        # When doing that, we need to escape some stuff to make sure the result
+        # is valid CSS.
+        inside = self.bad_identifier_rx.sub(
+            self._escape_character, self.value)
 
         return "url(" + inside + ")"
 

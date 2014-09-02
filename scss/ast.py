@@ -240,25 +240,6 @@ class Interpolation(Expression):
 
         return Literal(type(parts[0], quotes=quotes, **kwargs))
 
-    def _render_interpolated(self, value):
-        """Return the result of interpolating `value`, which is slightly
-        different than just rendering it, since it's an intermediate thing.
-        """
-        # Strings are taken literally
-        if isinstance(value, String):
-            return value.value
-
-        # Lists are joined recursively
-        if isinstance(value, List):
-            # TODO Ruby /immediately/ respects `compress` here -- need to
-            # inspect the compilation for whether to pass it in (probably in
-            # other places too)
-            return value.delimiter().join(
-                self._render_interpolated(item) for item in value)
-        else:
-            # TODO like here
-            return value.render()
-
     def evaluate(self, calculator, divide=False):
         result = []
         for i, part in enumerate(self.parts):
@@ -268,7 +249,8 @@ class Interpolation(Expression):
             else:
                 # Interspersed (even) parts are nodes
                 value = part.evaluate(calculator, divide)
-                result.append(self._render_interpolated(value))
+                # TODO need to know whether to pass `compress` here
+                result.append(value.render_interpolated())
 
         return self.type(''.join(result), quotes=self.quotes, **self.kwargs)
 
