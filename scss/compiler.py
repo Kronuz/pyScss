@@ -49,7 +49,6 @@ from scss.types import Number
 from scss.types import String
 from scss.types import Undefined
 from scss.types import Url
-from scss.util import dequote
 from scss.util import normalize_var  # TODO put in...  namespace maybe?
 
 
@@ -59,7 +58,6 @@ from scss.util import normalize_var  # TODO put in...  namespace maybe?
 log = logging.getLogger(__name__)
 
 
-_default_rule_re = re.compile(r'(?i)\s+!default\Z')
 _xcss_extends_re = re.compile(r'\s+extends\s+')
 
 
@@ -1180,6 +1178,9 @@ class Compilation(object):
         Implements properties and variables extraction and assignment
         """
         prop, raw_value = (_prop_split_re.split(block.prop, 1) + [None])[:2]
+        if raw_value is not None:
+            raw_value = raw_value.strip()
+
         try:
             is_var = (block.prop[len(prop)] == '=')
         except IndexError:
@@ -1192,17 +1193,24 @@ class Compilation(object):
         if not prop:
             return
 
-        # Parse the value and determine whether it's a default assignment
-        is_default = False
-        if raw_value is not None:
-            raw_value = raw_value.strip()
-            if prop.startswith('$'):
-                raw_value, subs = _default_rule_re.subn('', raw_value)  # handle !default
-                if subs:
-                    is_default = True
-
         _prop = (scope or '') + prop
         if is_var or prop.startswith('$') and raw_value is not None:
+            # Pop off any flags: !default, !global
+            is_default = False
+            is_global = True  # eventually sass will default this to false
+            while True:
+                splits = raw_value.rsplit(None, 1)
+                if len(splits) < 2 or not splits[1].startswith('!'):
+                    break
+
+                raw_value, flag = splits
+                if flag == '!default':
+                    is_default = True
+                elif flag == '!global':
+                    is_global = True
+                else:
+                    raise ValueError("Unrecognized flag: {0}".format(flag))
+
             # Variable assignment
             _prop = normalize_var(_prop)
             try:
@@ -1220,7 +1228,8 @@ class Compilation(object):
                 # Variable assignment is an expression, so it always performs
                 # real division
                 value = calculator.calculate(raw_value, divide=True)
-                rule.namespace.set_variable(_prop, value)
+                rule.namespace.set_variable(
+                    _prop, value, local_only=not is_global)
         else:
             # Regular property destined for output
             _prop = calculator.apply_vars(_prop)
