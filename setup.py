@@ -110,6 +110,7 @@ def run_setup(with_binary):
             'scss',
             'scss.extension',
             'scss.extension.compass',
+            'scss.grammar',
         ],
         cmdclass={'build_ext': ve_build_ext},
         features=features,
