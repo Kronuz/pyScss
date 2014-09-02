@@ -49,22 +49,40 @@ class Declaration(Node):
 
 
 class Assignment(Declaration):
-    def __init__(self, name, value_expression):
+    KNOWN_FLAGS = frozenset(('!default', '!global'))
+
+    def __init__(self, name, value_expression, flags):
         self.name = name
         self.value_expression = value_expression
+        self.flags = flags
 
     @classmethod
     def parse(cls, name, value):
-        # TODO pull off !default, !global
+        # Pull off flags: default, global
+        flags = set()
+        while True:
+            value__flag = value.rsplit(None, 1)
+            if len(value__flag) < 2:
+                break
+            if not value__flag[1].startswith('!'):
+                break
+
+            value, flag = value__flag
+            if flag not in cls.KNOWN_FLAGS:
+                raise ValueError("Unrecognized flag: {0}".format(flag))
+
+            flags.add(flag)
+
         # TODO interp-parse the name?  is that a thing?
 
         # TODO this is a bit naughty, but uses no state except the ast_cache --
         # which should maybe be in the Compiler anyway...?
         value_expression = Calculator().parse_expression(value)
 
-        return cls(name, value_expression)
+        return cls(name, value_expression, flags)
 
     def evaluate(self, compilation):
+        # TODO actually make use of the flags
         value = self.value_expression.evaluate(compilation.current_calculator)
         compilation.current_namespace.set_variable(self.name, value)
 
