@@ -205,21 +205,8 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 		/* If we didn't find anything, raise an error */
 		if (best_token.regex == NULL) {
 			if (restrictions_sz) {
-				sprintf(self->exc, "SyntaxError[@ char %d: Bad token found while trying to find one of the restricted tokens: ", self->pos);
-				aux = self->exc + strlen(self->exc);
-				for (k=0; k<restrictions_sz; k++) {
-					len = strlen(restrictions[k].tok);
-					if (aux + len > self->exc + sizeof(self->exc) - 10) {
-						sprintf(aux, (k > 0) ? ", ..." : "...");
-						break;
-					}
-					sprintf(aux, (k > 0) ? ", %s" : "%s", repr(restrictions[k].tok));
-					aux += len + 2;
-				}
-				sprintf(aux, "]");
 				return SCANNER_EXC_RESTRICTED;
 			}
-			sprintf(self->exc, "SyntaxError[@ char %d: Bad token found]", self->pos);
 			return SCANNER_EXC_BAD_TOKEN;
 		}
 		/* If we found something that isn't to be ignored, return it */

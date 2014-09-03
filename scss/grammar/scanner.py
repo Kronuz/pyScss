@@ -4,8 +4,10 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 from collections import deque
-
 import re
+
+from scss.errors import SassSyntaxError
+
 
 DEBUG = False
 
@@ -136,11 +138,8 @@ class Parser(object):
         Returns the token type for lookahead; if there are any args
         then the list of args is the set of token types to allow
         """
-        try:
-            tok = self._scanner.token(self._pos, types)
-            return tok[2]
-        except SyntaxError:
-            return None
+        tok = self._scanner.token(self._pos, types)
+        return tok[2]
 
     def _scan(self, type):
         """
@@ -234,10 +233,7 @@ except ImportError:
 
                 # If we didn't find anything, raise an error
                 if best_pat is None:
-                    msg = "Bad token found"
-                    if restrict:
-                        msg = "Bad token found while trying to find one of the restricted tokens: %s" % (", ".join(repr(r) for r in restrict))
-                    raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(self.pos), msg))
+                    raise SassSyntaxError(self.input, self.pos, restrict)
 
                 # If we found something that isn't to be ignored, return it
                 if best_pat in self.ignore:

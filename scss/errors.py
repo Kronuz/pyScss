@@ -107,6 +107,41 @@ class SassBaseError(Exception):
         )
 
 
+class SassSyntaxError(SassBaseError):
+    """Generic syntax error thrown by the guts of the expression parser;
+    usually caught and wrapped later on.
+    """
+    def __init__(self, input_string, position, desired_tokens):
+        self.input_string = input_string
+        self.position = position
+        self.desired_tokens = desired_tokens
+
+    def __str__(self):
+        if self.position == 0:
+            after = "Syntax error"
+        else:
+            after = "Syntax error after {0!r}".format(
+                self.input_string[max(0, self.position - 20):self.position])
+
+        found = "Found {0!r}".format(
+            self.input_string[self.position:self.position + 10])
+
+        if not self.desired_tokens:
+            expected = "but can't figure out what that means"
+        elif len(self.desired_tokens) == 1:
+            expected = "but expected {0}".format(
+                ''.join(self.desired_tokens))
+        else:
+            expected = "but expected one of {0}".format(
+                ', '.join(sorted(self.desired_tokens)))
+
+        return "{after}: {found} {expected}".format(
+            after=after,
+            found=found,
+            expected=expected,
+        )
+
+
 class SassImportError(SassBaseError):
     """Error raised when unable to resolve an @import."""
 

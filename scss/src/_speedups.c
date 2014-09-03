@@ -158,6 +158,7 @@ static PyTypeObject scss_ScannerType;
 typedef struct {
 	PyObject_HEAD
 	Scanner *scanner;
+	PyObject *py_input;
 } scss_Scanner;
 
 
@@ -213,12 +214,19 @@ scss_Scanner_token(scss_Scanner *self, PyObject *args)
 
 			if (_restrictions != NULL) PyMem_Del(_restrictions);
 
-			if (p_token == (Token *)SCANNER_EXC_BAD_TOKEN) {
-				PyErr_SetString(PyExc_SyntaxError, self->scanner->exc);
-				return NULL;
-			}
-			if (p_token == (Token *)SCANNER_EXC_RESTRICTED) {
-				PyErr_SetString(PyExc_SyntaxError, self->scanner->exc);
+			if (p_token == (Token *)SCANNER_EXC_BAD_TOKEN
+				|| p_token == (Token *)SCANNER_EXC_RESTRICTED)
+			{
+				PyObject *scss_errors_module = PyImport_ImportModule("scss.errors");
+				PyObject *syntax_error_cls = PyObject_GetAttrString(scss_errors_module, "SassSyntaxError");
+				PyObject *position = PyLong_FromLong(self->scanner->pos);
+				PyObject *syntax_error = PyObject_CallFunctionObjArgs(
+					syntax_error_cls, self->py_input, position, restrictions, NULL);
+				Py_DECREF(scss_errors_module);
+				Py_DECREF(position);
+				PyErr_SetObject(syntax_error_cls, syntax_error);
+				Py_DECREF(syntax_error_cls);
+				Py_DECREF(syntax_error);
 				return NULL;
 			}
 			if (p_token == (Token *)SCANNER_EXC_UNIMPLEMENTED) {
@@ -368,6 +376,8 @@ scss_Scanner_init(scss_Scanner *self, PyObject *args, PyObject *kwds)
 		}
 	}
 
+	self->py_input = py_input;
+	Py_INCREF(py_input);
 	encoded_input = scss_pyunicode_to_utf8(py_input, &encoded_input_sz);
 	self->scanner = Scanner_new(
 		_patterns,
@@ -481,6 +491,8 @@ static void
 scss_Scanner_dealloc(scss_Scanner *self)
 {
 	if (self->scanner != NULL) Scanner_del(self->scanner);
+
+	Py_XDECREF(self->py_input);
 
 	Py_TYPE(self)->tp_free((PyObject*)self);
 
