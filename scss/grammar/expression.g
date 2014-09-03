@@ -30,7 +30,6 @@ from scss.types import Function
 from scss.types import Number
 from scss.types import String
 from scss.types import Url
-from scss.util import dequote
 
 from scss.grammar import Parser
 from scss.grammar import Scanner
@@ -78,8 +77,9 @@ parser SassExpression:
     # Cheating, to make sure these only match function names.
     # The last of these is the IE filter nonsense
     token LITERAL_FUNCTION: "(calc|expression|progid:[\w.]+)(?=[(])"
+    token ALPHA_FUNCTION: "alpha(?=[(])"
     token URL_FUNCTION: "url(?=[(])"
-    # This must come AFTER the above two
+    # This must come AFTER the above
     token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
     # TODO Ruby is a bit more flexible here, for example allowing 1#{2}px
     token BAREWORD: "[-a-zA-Z_][-a-zA-Z0-9_]*"
@@ -223,6 +223,13 @@ parser SassExpression:
         # TODO Ruby sass somehow allows a full expression in here too
         | URL_FUNCTION LPAR interpolated_url RPAR
             {{ return interpolated_url }}
+        # alpha() is a built-in Sass function, but it's also part of the old IE
+        # filter syntax, where it appears as alpha(opacity=NN).  Since = isn't
+        # normally valid Sass, we have to special-case it here
+        | ALPHA_FUNCTION LPAR (
+            "opacity" "=" NUM RPAR  {{ return Literal(Function("opacity=" + NUM, "alpha")) }}
+            | argspec RPAR          {{ return CallOp("alpha", argspec) }}
+            )
         | LITERAL_FUNCTION LPAR interpolated_function RPAR
             {{ return Interpolation.maybe(interpolated_function, type=Function, function_name=LITERAL_FUNCTION) }}
         | FNCT LPAR argspec RPAR    {{ return CallOp(FNCT, argspec) }}
