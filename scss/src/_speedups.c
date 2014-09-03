@@ -423,68 +423,6 @@ scss_Scanner_repr(scss_Scanner *self)
 	}
 
 	return (PyObject *)repr;
-
-/*
-	PyObject *repr, *tmp, *tmp2;
-	Token *p_token;
-	char *tok;
-	int i, start, first = 1, cur, max=0, pos;
-
-	if (self->scanner != NULL && self->scanner->tokens_sz) {
-		start = self->scanner->tokens_sz - 10;
-		repr = PyString_FromString("");
-		for (i = (start < 0) ? 0 : start; i < self->scanner->tokens_sz; i++) {
-			p_token = self->scanner->tokens[i];
-			PyString_ConcatAndDel(&repr, PyString_FromString("\n"));
-			pos = (int)(p_token->string - self->scanner->input);
-			PyString_ConcatAndDel(&repr, PyString_FromFormat("  (@%d)  %s  =  ",
-				pos, p_token->regex->tok));
-			tmp = PyString_FromString(p_token->string);
-			PyString_ConcatAndDel(&repr, PyObject_Repr(tmp));
-			Py_XDECREF(tmp);
-		}
-
-		start = self->scanner->tokens_sz - 10;
-		for (i = (start < 0) ? 0 : start; i < self->scanner->tokens_sz; i++) {
-			p_token = self->scanner->tokens[i];
-			cur = strlen(p_token->regex->tok) * 2;
-			if (cur > max) max = cur;
-		}
-		tok = PyMem_New(char, max + 4);
-		repr = PyString_FromString("");
-		for (i = (start < 0) ? 0 : start; i < self->scanner->tokens_sz; i++) {
-			p_token = self->scanner->tokens[i];
-			if (!first) PyString_ConcatAndDel(&repr, PyString_FromString("\n"));
-
-			pos = (int)(p_token->string - self->scanner->input);
-			if (pos < 10) PyString_ConcatAndDel(&repr, PyString_FromString(" "));
-			if (pos < 100) PyString_ConcatAndDel(&repr, PyString_FromString(" "));
-			if (pos < 1000) PyString_ConcatAndDel(&repr, PyString_FromString(" "));
-			PyString_ConcatAndDel(&repr, PyString_FromFormat("(@%d)  ",
-				pos));
-
-			tmp = PyString_FromString(p_token->regex->tok);
-			tmp2 = PyObject_Repr(tmp);
-			memset(tok, ' ', max + 4);
-			tok[max + 3 - PyString_Size(tmp2)] = '\0';
-			PyString_ConcatAndDel(&repr, PyString_FromString(tok));
-			PyString_ConcatAndDel(&repr, tmp2);
-			Py_XDECREF(tmp);
-
-			PyString_ConcatAndDel(&repr, PyString_FromString("  =  "));
-			tmp = PyString_FromString(p_token->string);
-			PyString_ConcatAndDel(&repr, PyObject_Repr(tmp));
-			Py_XDECREF(tmp);
-
-			first = 0;
-		}
-		PyMem_Del(tok);
-	} else {
-		repr = PyString_FromString("None");
-	}
-
-	return (PyObject *)repr;
-*/
 }
 
 static void
