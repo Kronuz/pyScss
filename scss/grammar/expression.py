@@ -44,6 +44,8 @@ class SassExpressionScanner(Scanner):
         ('","', ','),
         ('SINGLE_STRING_GUTS', "([^'\\\\#]|[\\\\].|#(?![{]))*"),
         ('DOUBLE_STRING_GUTS', '([^"\\\\#]|[\\\\].|#(?![{]))*'),
+        ('INTERP_ANYTHING', '([^#]|#(?![{]))*'),
+        ('INTERP_NO_PARENS', '([^#()]|#(?![{]))*'),
         ('[ \r\t\n]+', '[ \r\t\n]+'),
         ('LPAR', '\\(|\\['),
         ('RPAR', '\\)|\\]'),
@@ -79,8 +81,6 @@ class SassExpressionScanner(Scanner):
         ('BANG_IMPORTANT', '!important'),
         ('INTERP_START', '#[{]'),
         ('INTERP_END', '[}]'),
-        ('INTERP_ANYTHING', '([^#]|#(?![{]))*'),
-        ('INTERP_NO_PARENS', '([^#()]|#(?![{]))*'),
         ('BAREURL', '(?:[\\\\].|[^#$\'"()\\x00-\\x08\\x0b\\x0e-\\x1f\\x7f]|#(?![{]))*'),
     ]
 
@@ -453,7 +453,7 @@ class SassExpression(Parser):
         while self._peek(self.interpolated_function_parens_rsts) == 'LPAR':
             LPAR = self._scan('LPAR')
             interpolated_function = self.interpolated_function()
-            parts = parts[:-1] + [parts[-1] + LPAR + interpolated_function[0]] + interpolated_function[0:]
+            parts = parts[:-1] + [parts[-1] + LPAR + interpolated_function[0]] + interpolated_function[1:]
             RPAR = self._scan('RPAR')
             INTERP_NO_PARENS = self._scan('INTERP_NO_PARENS')
             parts[-1] += RPAR + INTERP_NO_PARENS

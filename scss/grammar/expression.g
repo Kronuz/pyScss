@@ -39,10 +39,12 @@ from scss.grammar import Scanner
 %%
 parser SassExpression:
     # These need to go before the ignore, so they match first, and we don't
-    # lose spaces inside a string!
+    # lose spaces inside a string or other interpolation!
     # Don't allow quotes or # unless they're escaped (or the # is alone)
     token SINGLE_STRING_GUTS: '([^\'\\\\#]|[\\\\].|#(?![{]))*'
     token DOUBLE_STRING_GUTS: "([^\"\\\\#]|[\\\\].|#(?![{]))*"
+    token INTERP_ANYTHING: "([^#]|#(?![{]))*"
+    token INTERP_NO_PARENS: "([^#()]|#(?![{]))*"
 
     ignore: "[ \r\t\n]+"
     token LPAR: "\\(|\\["
@@ -85,8 +87,6 @@ parser SassExpression:
 
     token INTERP_START: "#[{]"
     token INTERP_END: "[}]"
-    token INTERP_ANYTHING: "([^#]|#(?![{]))*"
-    token INTERP_NO_PARENS: "([^#()]|#(?![{]))*"
     # http://dev.w3.org/csswg/css-syntax-3/#consume-a-url-token0
     # Bare URLs may not contain quotes, parentheses, or unprintables.  Quoted
     # URLs may, of course, contain whatever they like.
@@ -311,7 +311,7 @@ parser SassExpression:
         INTERP_NO_PARENS            {{ parts = [INTERP_NO_PARENS] }}
         (
             LPAR
-            interpolated_function   {{ parts = parts[:-1] + [parts[-1] + LPAR + interpolated_function[0]] + interpolated_function[0:] }}
+            interpolated_function   {{ parts = parts[:-1] + [parts[-1] + LPAR + interpolated_function[0]] + interpolated_function[1:] }}
             RPAR
             INTERP_NO_PARENS        {{ parts[-1] += RPAR + INTERP_NO_PARENS }}
         )*                          {{ return parts }}
