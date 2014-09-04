@@ -577,7 +577,7 @@ class List(Value):
 
     sass_type_name = 'list'
 
-    def __init__(self, iterable, separator=None, use_comma=None, is_literal=False):
+    def __init__(self, iterable, separator=None, use_comma=None, literal=False):
         if isinstance(iterable, List):
             iterable = iterable.value
 
@@ -597,7 +597,7 @@ class List(Value):
         else:
             self.use_comma = use_comma
 
-        self.is_literal = is_literal
+        self.literal = literal
 
     @classmethod
     def maybe_new(cls, values, use_comma=True):
@@ -693,7 +693,7 @@ class List(Value):
 
         delim = self.delimiter(compress)
 
-        if self.is_literal:
+        if self.literal:
             value = self.value
         else:
             # Non-literal lists have nulls stripped
@@ -1030,7 +1030,7 @@ class String(Value):
 
     bad_identifier_rx = re.compile('[^-_a-zA-Z\x80-\U0010FFFF]')
 
-    def __init__(self, value, quotes='"'):
+    def __init__(self, value, quotes='"', literal=False):
         if isinstance(value, String):
             # TODO unclear if this should be here, but many functions rely on
             # it
@@ -1051,16 +1051,18 @@ class String(Value):
         if not isinstance(value, six.text_type):
             raise TypeError("Expected string, got {0!r}".format(value))
 
-        # TODO probably disallow creating an unquoted string outside a
-        # set of chars like [-a-zA-Z0-9]+
-
         self.value = value
         self.quotes = quotes
+        # TODO this isn't quite used yet
+        if literal:
+            self.original_literal = value
+        else:
+            self.original_literal = None
 
     @classmethod
-    def unquoted(cls, value):
+    def unquoted(cls, value, literal=False):
         """Helper to create a string with no quotes."""
-        return cls(value, quotes=None)
+        return cls(value, quotes=None, literal=literal)
 
     def __hash__(self):
         return hash(self.value)

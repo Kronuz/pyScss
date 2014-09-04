@@ -360,14 +360,14 @@ class ListLiteral(Expression):
 
         # Whether this is a "plain" literal matters for null removal: nulls are
         # left alone if this is a completely vanilla CSS property
-        is_literal = True
+        literal = True
         if divide:
             # TODO sort of overloading "divide" here...  rename i think
-            is_literal = False
+            literal = False
         elif not all(isinstance(item, Literal) for item in self.items):
-            is_literal = False
+            literal = False
 
-        return List(items, use_comma=self.comma, is_literal=is_literal)
+        return List(items, use_comma=self.comma, literal=literal)
 
 
 class MapLiteral(Expression):
