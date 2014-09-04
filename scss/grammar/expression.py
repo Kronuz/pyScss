@@ -85,7 +85,7 @@ class SassExpressionScanner(Scanner):
         ('URL_FUNCTION', 'url(?=[(])'),
         ('FNCT', '[-a-zA-Z_][-a-zA-Z0-9_]*(?=\\()'),
         ('BAREWORD', '[-a-zA-Z_][-a-zA-Z0-9_]*'),
-        ('BANG_IMPORTANT', '!important'),
+        ('BANG_IMPORTANT', '!\\s*important'),
         ('INTERP_END', '[}]'),
     ]
 
@@ -354,7 +354,7 @@ class SassExpression(Parser):
             return CallOp(FNCT, argspec)
         elif _token_ == 'BANG_IMPORTANT':
             BANG_IMPORTANT = self._scan('BANG_IMPORTANT')
-            return Literal(String(BANG_IMPORTANT, quotes=None))
+            return Literal(String.unquoted("!important"))
         elif _token_ in self.atom_chks_:
             interpolated_bareword = self.interpolated_bareword()
             return Interpolation.maybe(interpolated_bareword)

@@ -101,7 +101,7 @@ parser SassExpression:
 
     # TODO Ruby is a bit more flexible here, for example allowing 1#{2}px
     token BAREWORD: "[-a-zA-Z_][-a-zA-Z0-9_]*"
-    token BANG_IMPORTANT: "!important"
+    token BANG_IMPORTANT: "!\s*important"
 
     token INTERP_END: "[}]"
 
@@ -244,7 +244,7 @@ parser SassExpression:
         | LITERAL_FUNCTION LPAR interpolated_function RPAR
             {{ return Interpolation.maybe(interpolated_function, type=Function, function_name=LITERAL_FUNCTION) }}
         | FNCT LPAR argspec RPAR    {{ return CallOp(FNCT, argspec) }}
-        | BANG_IMPORTANT            {{ return Literal(String(BANG_IMPORTANT, quotes=None)) }}
+        | BANG_IMPORTANT            {{ return Literal(String.unquoted("!important")) }}
         | interpolated_bareword     {{ return Interpolation.maybe(interpolated_bareword) }}
         | NUM                       {{ UNITS = None }}
             [ UNITS ]               {{ return Literal(Number(float(NUM), unit=UNITS)) }}
