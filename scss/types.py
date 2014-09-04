@@ -1189,8 +1189,8 @@ class Function(String):
     marker.  Acts mostly like a string, but has a function name and parentheses
     around it.
     """
-    def __init__(self, string, function_name, quotes='"'):
-        super(Function, self).__init__(string, quotes=quotes)
+    def __init__(self, string, function_name, quotes='"', literal=False):
+        super(Function, self).__init__(string, quotes=quotes, literal=literal)
         self.function_name = function_name
 
     def render(self, compress=False):
@@ -1212,8 +1212,8 @@ class Url(Function):
     # Ref: http://dev.w3.org/csswg/css-syntax-3/#consume-a-url-token0
     bad_identifier_rx = re.compile("[$'\"()\\x00-\\x08\\x0b\\x0e-\\x1f\\x7f]")
 
-    def __init__(self, string, quotes=None):
-        super(Url, self).__init__(string, 'url', quotes=quotes)
+    def __init__(self, string, **kwargs):
+        super(Url, self).__init__(string, 'url', **kwargs)
 
     def render(self, compress=False):
         if self.quotes is None:
