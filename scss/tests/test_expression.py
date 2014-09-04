@@ -1,14 +1,18 @@
-"""Tests for expressions.  This test module is currently a bit ill-defined and
-contains a variety of expression-related tests.
+"""Tests for expressions -- both their evaluation and their general
+parsability.
 """
 from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 from __future__ import unicode_literals
 
 from scss.errors import SassEvaluationError
+from scss.errors import SassSyntaxError
 from scss.expression import Calculator
 from scss.extension.core import CoreExtension
 from scss.rule import Namespace
 from scss.types import Color, List, Null, Number, String
+from scss.types import Function
 
 import pytest
 
@@ -71,14 +75,6 @@ def test_reference_operations():
     assert_strict_string_eq(calc('"I ate #{$value} pies!"'), String('I ate  pies!', quotes='"'))
 
 
-def test_parse(calc):
-    # Tests for some general parsing.
-
-    assert calc('foo !important bar') == List([
-        String('foo'), String('!important'), String('bar'),
-    ])
-
-
 def test_functions(calc):
     calc = Calculator(CoreExtension.namespace).calculate
 
@@ -89,4 +85,74 @@ def test_functions(calc):
         calc('unitless("X")')  # Misusing non-css built-in scss funtions
 
 
+def test_parse_strings(calc):
+    # Test edge cases with string parsing.
+    assert calc('auto\\9') == String.unquoted('auto\\9')
+
+
+def test_parse_bang_important(calc):
+    # The !important flag is treated as part of a spaced list.
+    assert calc('40px !important') == List([
+        Number(40, 'px'), String.unquoted('!important'),
+    ], use_comma=False)
+
+    # And is allowed anywhere in the string.
+    assert calc('foo !important bar') == List([
+        String('foo'), String('!important'), String('bar'),
+    ], use_comma=False)
+
+    # And may have space before the !.
+    assert calc('40px ! important') == List([
+        Number(40, 'px'), String.unquoted('!important'),
+    ], use_comma=False)
+
+
+def test_parse_special_functions():
+    ns = CoreExtension.namespace.derive()
+    calc = Calculator(ns).calculate
+
+    # expression() allows absolutely any old garbage inside
+    # TODO we can't deal with an unmatched { due to the block locator, but ruby
+    # can
+    for gnarly_expression in (
+            "not ~* remotely *~ valid {syntax}",
+            "expression( ( -0 - floater.offsetHeight + ( document"
+            ".documentElement.clientHeight ? document.documentElement"
+            ".clientHeight : document.body.clientHeight ) + ( ignoreMe"
+            " = document.documentElement.scrollTop ? document"
+            ".documentElement.scrollTop : document.body.scrollTop ) ) +"
+            " 'px' )"):
+        expr = 'expression(' + gnarly_expression + ')'
+        assert calc(expr).render() == expr
+
+    # alpha() doubles as a special function if it contains opacity=n, the IE
+    # filter syntax
+    assert calc('alpha(black)') == Number(1)
+    assert calc('alpha(opacity = 5)') == Function('opacity=5', 'alpha')
+
+    # url() allows both an opaque URL and a Sass expression, based on some
+    # heuristics
+    ns.set_variable('$foo', String.unquoted('foo'))
+    assert calc('url($foo)').render() == "url(foo)"
+    assert calc('url(#{$foo}foo)').render() == "url(foofoo)"
+    assert calc('url($foo + $foo)').render() == "url(foofoo)"
+    # TODO this one doesn't work if $foo has quotes; Url.render() tries to
+    # escape them.  which i'm not sure is wrong, but we're getting into
+    # territory where it's obvious bad output...
+    assert calc('url($foo + #{$foo})').render() == "url(foo + foo)"
+    assert calc('url(foo #{$foo} foo)').render() == "url(foo foo foo)"
+    with pytest.raises(SassSyntaxError):
+        # Starting with #{} means it's a url, which can't contain spaces
+        calc('url(#{$foo} foo)')
+    with pytest.raises(SassSyntaxError):
+        # Or variables
+        calc('url(#{$foo}$foo)')
+    with pytest.raises(SassSyntaxError):
+        # This looks like a URL too
+        calc('url(foo#{$foo} foo)')
+
+
 # TODO write more!  i'm lazy.
+# TODO assert things about particular kinds of parse /errors/, too
+# TODO errors really need to be more understandable  :(  i think this requires
+# some additions to yapps

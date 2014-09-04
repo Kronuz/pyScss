@@ -45,6 +45,14 @@ parser SassExpression:
     token INTERP_ANYTHING: "([^#]|#(?![{]))*"
     token INTERP_NO_PARENS: "([^#()]|#(?![{]))*"
 
+    # This is a stupid lookahead used for diverting url(#{...}) to its own
+    # branch; otherwise it would collide with the atom rule.
+    token INTERP_START_URL_HACK:  "(?=[#][{])"
+    token INTERP_START: "#[{]"
+
+    token SPACE: "[ \r\t\n]+"
+
+    # Now we can list the ignore token and everything else.
     ignore: "[ \r\t\n]+"
     token LPAR: "\\(|\\["
     token RPAR: "\\)|\\]"
@@ -68,12 +76,21 @@ parser SassExpression:
     token SINGLE_QUOTE: "'"
     token DOUBLE_QUOTE: '"'
 
+    # Must appear before BAREWORD, so url(foo) parses as a URL
+    # http://dev.w3.org/csswg/css-syntax-3/#consume-a-url-token0
+    # Bare URLs may not contain quotes, parentheses, unprintables, or space.
+    # TODO reify escapes, for this and for strings
+    # FIXME: Also, URLs may not contain $ as it breaks urls with variables?
+    token BAREURL_HEAD_HACK: "((?:[\\\\].|[^#$'\"()\\x00-\\x08\\x0b\\x0e-\\x20\\x7f]|#(?![{]))+)(?=#[{]|\s*[)])"
+    token BAREURL: "(?:[\\\\].|[^#$'\"()\\x00-\\x08\\x0b\\x0e-\\x20\\x7f]|#(?![{]))+"
+
     token UNITS: "(?<!\s)(?:[a-zA-Z]+|%)(?![-\w])"
     token NUM: "(?:\d+(?:\.\d*)?|\.\d+)"
     token COLOR: "#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])"
     token KWVAR: "\$[-a-zA-Z0-9_]+(?=\s*:)"
     token SLURPYVAR: "\$[-a-zA-Z0-9_]+(?=[.][.][.])"
     token VAR: "\$[-a-zA-Z0-9_]+"
+
     # Cheating, to make sure these only match function names.
     # The last of these is the IE filter nonsense
     token LITERAL_FUNCTION: "(calc|expression|progid:[\w.]+)(?=[(])"
@@ -81,18 +98,12 @@ parser SassExpression:
     token URL_FUNCTION: "url(?=[(])"
     # This must come AFTER the above
     token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
+
     # TODO Ruby is a bit more flexible here, for example allowing 1#{2}px
     token BAREWORD: "[-a-zA-Z_][-a-zA-Z0-9_]*"
     token BANG_IMPORTANT: "!important"
 
-    token INTERP_START: "#[{]"
     token INTERP_END: "[}]"
-    # http://dev.w3.org/csswg/css-syntax-3/#consume-a-url-token0
-    # Bare URLs may not contain quotes, parentheses, or unprintables.  Quoted
-    # URLs may, of course, contain whatever they like.
-    # TODO reify escapes, for this and for strings
-    # FIXME: Also, URLs may not contain $ as it breaks urls with variables?
-    token BAREURL: "(?:[\\\\].|[^#$'\"()\\x00-\\x08\\x0b\\x0e-\\x1f\\x7f]|#(?![{]))*"
 
     # -------------------------------------------------------------------------
     # Goals:
@@ -252,19 +263,42 @@ parser SassExpression:
         INTERP_END                  {{ return expr_lst }}
 
     rule interpolated_url:
-        # Note: This rule DOES NOT include the url(...) delimiters
+        # Note: This rule DOES NOT include the url(...) delimiters.
+        # Parsing a URL is finnicky: it can wrap an expression like any other
+        # function call, OR it can wrap a literal URL (like regular ol' CSS
+        # syntax) but possibly with Sass interpolations.
+        # The string forms of url(), of course, are just special cases of
+        # expressions.
+        # The exact rules aren't documented, but after some experimentation, I
+        # think Sass assumes a literal if it sees either #{} or the end of the
+        # call before it sees a space, and an expression otherwise.
+        # Translating that into LL is tricky.  We can't look for
+        # interpolations, because interpolations are also expressions, and
+        # left-factoring this would be a nightmare.  So instead the first rule
+        # has some wacky lookahead tokens; see below.
         interpolated_bare_url
             {{ return Interpolation.maybe(interpolated_bare_url, type=Url, quotes=None) }}
-        | interpolated_string_single
-            {{ return Interpolation.maybe(interpolated_string_single, type=Url, quotes="'") }}
-        | interpolated_string_double
-            {{ return Interpolation.maybe(interpolated_string_double, type=Url, quotes='"') }}
+        | expr_lst
+            {{ return Interpolation(['', expr_lst], type=Url, quotes=None) }}
 
     rule interpolated_bare_url:
-        BAREURL                     {{ parts = [BAREURL] }}
+        (
+            # This token is identical to BASEURL, except that it ends with a
+            # lookahead asserting that the next thing is either an
+            # interpolation, OR optional whitespace and a closing paren.
+            BAREURL_HEAD_HACK       {{ parts = [BAREURL_HEAD_HACK] }}
+            # And this token merely checks that an interpolation comes next --
+            # because if it does, we want the grammar to come down THIS path
+            # rather than going down expr_lst and into atom (which also looks
+            # for INTERP_START).
+            | INTERP_START_URL_HACK  {{ parts = [''] }}
+        )
         (
             interpolation           {{ parts.append(interpolation) }}
-            BAREURL                 {{ parts.append(BAREURL) }}
+            ( BAREURL               {{ parts.append(BAREURL) }}
+                | SPACE             {{ return parts }}
+                |                   {{ parts.append('') }}
+            )
         )*                          {{ return parts }}
 
     rule interpolated_string:
@@ -292,18 +326,28 @@ parser SassExpression:
         DOUBLE_QUOTE                {{ return parts }}
         
     rule interpolated_bareword:
-        # This one is slightly fiddly because it can't be /completely/ empty.
+        # This one is slightly fiddly because it can't be /completely/ empty,
+        # and any space between tokens ends the bareword (via early return).
+        # TODO yapps2 is spitting out warnings for the BAREWORD shenanigans,
+        # because it's technically ambiguous with a spaced list of barewords --
+        # but SPACE will match first in practice and yapps2 doesn't know that
         (
             BAREWORD                {{ parts = [BAREWORD] }}
+            [ SPACE                 {{ return parts }}
+            ]
             |
             interpolation           {{ parts = ['', interpolation] }}
-                                    {{ BAREWORD = '' }}
-            [ BAREWORD ]            {{ parts.append(BAREWORD) }}
+            ( BAREWORD              {{ parts.append(BAREWORD) }}
+                | SPACE             {{ return parts }}
+                |                   {{ parts.append('') }}
+            )
         )
         (
             interpolation           {{ parts.append(interpolation) }}
-                                    {{ BAREWORD = '' }}
-            [ BAREWORD ]            {{ parts.append(BAREWORD) }}
+            ( BAREWORD              {{ parts.append(BAREWORD) }}
+                | SPACE             {{ return parts }}
+                |                   {{ parts.append('') }}
+            )
         )*                          {{ return parts }}
 
     rule interpolated_function:

@@ -78,6 +78,20 @@ class UnaryOp(Expression):
 
 
 class BinaryOp(Expression):
+    OPERATORS = {
+        operator.lt: '<',
+        operator.gt: '>',
+        operator.le: '<=',
+        operator.ge: '>=',
+        operator.eq: '==',
+        operator.eq: '!=',
+        operator.add: '+',
+        operator.sub: '-',
+        operator.mul: '*',
+        operator.truediv: '/',
+        operator.mod: '%',
+    }
+
     def __repr__(self):
         return '<%s(%s, %s, %s)>' % (self.__class__.__name__, repr(self.op), repr(self.left), repr(self.right))
 
@@ -90,19 +104,35 @@ class BinaryOp(Expression):
         left = self.left.evaluate(calculator, divide=True)
         right = self.right.evaluate(calculator, divide=True)
 
+        # Determine whether to actually evaluate, or just print the operator
+        # literally.
+        literal = False
+
+        # If either operand starts with an interpolation, treat the whole
+        # shebang as literal.
+        if any(isinstance(operand, Interpolation) and operand.parts[0] == ''
+                for operand in (self.left, self.right)):
+            literal = True
+
         # Special handling of division: treat it as a literal slash if both
-        # operands are literals, there are parentheses, or this is part of a
-        # bigger expression.
+        # operands are literals, there are no parentheses, and this isn't part
+        # of a bigger expression.
         # The first condition is covered by the type check.  The other two are
         # covered by the `divide` argument: other nodes that perform arithmetic
         # will pass in True, indicating that this should always be a division.
-        if (
+        elif (
             self.op is operator.truediv
             and not divide
             and isinstance(self.left, Literal)
             and isinstance(self.right, Literal)
         ):
-            return String(left.render() + ' / ' + right.render(), quotes=None)
+            literal = True
+
+        if literal:
+            # TODO we don't currently preserve the spacing, whereas Sass
+            # remembers whether there was space on either side
+            op = " {0} ".format(self.OPERATORS[self.op])
+            return String.unquoted(left.render() + op + right.render())
 
         return self.op(left, right)
 

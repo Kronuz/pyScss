@@ -47,6 +47,9 @@ class SassExpressionScanner(Scanner):
         ('DOUBLE_STRING_GUTS', '([^"\\\\#]|[\\\\].|#(?![{]))*'),
         ('INTERP_ANYTHING', '([^#]|#(?![{]))*'),
         ('INTERP_NO_PARENS', '([^#()]|#(?![{]))*'),
+        ('INTERP_START_URL_HACK', '(?=[#][{])'),
+        ('INTERP_START', '#[{]'),
+        ('SPACE', '[ \r\t\n]+'),
         ('[ \r\t\n]+', '[ \r\t\n]+'),
         ('LPAR', '\\(|\\['),
         ('RPAR', '\\)|\\]'),
@@ -69,6 +72,8 @@ class SassExpressionScanner(Scanner):
         ('DOTDOTDOT', '[.]{3}'),
         ('SINGLE_QUOTE', "'"),
         ('DOUBLE_QUOTE', '"'),
+        ('BAREURL_HEAD_HACK', '((?:[\\\\].|[^#$\'"()\\x00-\\x08\\x0b\\x0e-\\x20\\x7f]|#(?![{]))+)(?=#[{]|\\s*[)])'),
+        ('BAREURL', '(?:[\\\\].|[^#$\'"()\\x00-\\x08\\x0b\\x0e-\\x20\\x7f]|#(?![{]))+'),
         ('UNITS', '(?<!\\s)(?:[a-zA-Z]+|%)(?![-\\w])'),
         ('NUM', '(?:\\d+(?:\\.\\d*)?|\\.\\d+)'),
         ('COLOR', '#(?:[a-fA-F0-9]{6}|[a-fA-F0-9]{3})(?![a-fA-F0-9])'),
@@ -81,9 +86,7 @@ class SassExpressionScanner(Scanner):
         ('FNCT', '[-a-zA-Z_][-a-zA-Z0-9_]*(?=\\()'),
         ('BAREWORD', '[-a-zA-Z_][-a-zA-Z0-9_]*'),
         ('BANG_IMPORTANT', '!important'),
-        ('INTERP_START', '#[{]'),
         ('INTERP_END', '[}]'),
-        ('BAREURL', '(?:[\\\\].|[^#$\'"()\\x00-\\x08\\x0b\\x0e-\\x1f\\x7f]|#(?![{]))*'),
     ]
 
     def __init__(self, input=None):
@@ -379,24 +382,33 @@ class SassExpression(Parser):
 
     def interpolated_url(self):
         _token_ = self._peek(self.interpolated_url_rsts)
-        if _token_ == 'BAREURL':
+        if _token_ in self.interpolated_url_chks:
             interpolated_bare_url = self.interpolated_bare_url()
             return Interpolation.maybe(interpolated_bare_url, type=Url, quotes=None)
-        elif _token_ == 'SINGLE_QUOTE':
-            interpolated_string_single = self.interpolated_string_single()
-            return Interpolation.maybe(interpolated_string_single, type=Url, quotes="'")
-        else:  # == 'DOUBLE_QUOTE'
-            interpolated_string_double = self.interpolated_string_double()
-            return Interpolation.maybe(interpolated_string_double, type=Url, quotes='"')
+        else:  # in self.argspec_item_chks
+            expr_lst = self.expr_lst()
+            return Interpolation(['', expr_lst], type=Url, quotes=None)
 
     def interpolated_bare_url(self):
-        BAREURL = self._scan('BAREURL')
-        parts = [BAREURL]
+        _token_ = self._peek(self.interpolated_url_chks)
+        if _token_ == 'BAREURL_HEAD_HACK':
+            BAREURL_HEAD_HACK = self._scan('BAREURL_HEAD_HACK')
+            parts = [BAREURL_HEAD_HACK]
+        else:  # == 'INTERP_START_URL_HACK'
+            INTERP_START_URL_HACK = self._scan('INTERP_START_URL_HACK')
+            parts = ['']
         while self._peek(self.interpolated_bare_url_rsts) == 'INTERP_START':
             interpolation = self.interpolation()
             parts.append(interpolation)
-            BAREURL = self._scan('BAREURL')
-            parts.append(BAREURL)
+            _token_ = self._peek(self.interpolated_bare_url_rsts_)
+            if _token_ == 'BAREURL':
+                BAREURL = self._scan('BAREURL')
+                parts.append(BAREURL)
+            elif _token_ == 'SPACE':
+                SPACE = self._scan('SPACE')
+                return parts
+            else:  # in self.interpolated_bare_url_rsts
+                parts.append('')
         return parts
 
     def interpolated_string(self):
@@ -437,20 +449,33 @@ class SassExpression(Parser):
         if _token_ == 'BAREWORD':
             BAREWORD = self._scan('BAREWORD')
             parts = [BAREWORD]
+            if self._peek(self.interpolated_bareword_rsts) == 'SPACE':
+                SPACE = self._scan('SPACE')
+                return parts
         else:  # == 'INTERP_START'
             interpolation = self.interpolation()
             parts = ['', interpolation]
-            BAREWORD = ''
-            if self._peek(self.interpolated_bareword_rsts) == 'BAREWORD':
+            _token_ = self._peek(self.interpolated_bareword_rsts_)
+            if _token_ == 'BAREWORD':
                 BAREWORD = self._scan('BAREWORD')
-            parts.append(BAREWORD)
-        while self._peek(self.interpolated_bareword_rsts_) == 'INTERP_START':
+                parts.append(BAREWORD)
+            elif _token_ == 'SPACE':
+                SPACE = self._scan('SPACE')
+                return parts
+            elif 1:
+                parts.append('')
+        while self._peek(self.interpolated_bareword_rsts__) == 'INTERP_START':
             interpolation = self.interpolation()
             parts.append(interpolation)
-            BAREWORD = ''
-            if self._peek(self.interpolated_bareword_rsts) == 'BAREWORD':
+            _token_ = self._peek(self.interpolated_bareword_rsts_)
+            if _token_ == 'BAREWORD':
                 BAREWORD = self._scan('BAREWORD')
-            parts.append(BAREWORD)
+                parts.append(BAREWORD)
+            elif _token_ == 'SPACE':
+                SPACE = self._scan('SPACE')
+                return parts
+            elif 1:
+                parts.append('')
         return parts
 
     def interpolated_function(self):
@@ -490,20 +515,21 @@ class SassExpression(Parser):
     expr_map_or_list_rsts__ = set(['LPAR', 'DOUBLE_QUOTE', 'BAREWORD', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'ALPHA_FUNCTION', 'RPAR', 'VAR', 'NUM', 'FNCT', 'LITERAL_FUNCTION', 'BANG_IMPORTANT', 'SINGLE_QUOTE', '","'])
     u_expr_chks = set(['LPAR', 'DOUBLE_QUOTE', 'BAREWORD', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'ALPHA_FUNCTION', 'VAR', 'NUM', 'FNCT', 'LITERAL_FUNCTION', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
     m_expr_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
+    interpolated_bare_url_rsts_ = set(['RPAR', 'INTERP_START', 'BAREURL', 'SPACE'])
     argspec_items_rsts = set(['RPAR', 'END', '","'])
     expr_slst_chks = set(['INTERP_END', 'RPAR', 'END', '":"', '","'])
-    expr_lst_rsts = set(['INTERP_END', 'END', '","'])
+    expr_lst_rsts = set(['INTERP_END', 'RPAR', 'END', '","'])
     expr_map_or_list_rsts = set(['RPAR', '":"', '","'])
     argspec_item_chks = set(['LPAR', 'DOUBLE_QUOTE', 'VAR', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
     a_expr_chks = set(['ADD', 'SUB'])
     interpolated_function_parens_rsts = set(['LPAR', 'RPAR', 'INTERP_START'])
     expr_slst_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'VAR', 'END', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'FNCT', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'RPAR', '":"', 'NOT', 'INTERP_END', 'BANG_IMPORTANT', 'SINGLE_QUOTE', '","'])
-    interpolated_bareword_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'BAREWORD', 'GT', 'END', 'SIGN', 'LITERAL_FUNCTION', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
+    interpolated_bareword_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SPACE', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
     atom_rsts__ = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'VAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'UNITS', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
     or_expr_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'ALPHA_FUNCTION', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NUM', '":"', 'BAREWORD', 'END', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'FNCT', 'VAR', 'OR', 'NOT', 'SINGLE_QUOTE', '","'])
     argspec_chks_ = set(['END', 'RPAR'])
     interpolated_string_single_rsts = set(['SINGLE_QUOTE', 'INTERP_START'])
-    interpolated_bareword_rsts_ = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
+    interpolated_bareword_rsts_ = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'BAREWORD', 'GT', 'END', 'SPACE', 'SIGN', 'LITERAL_FUNCTION', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
     and_expr_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'ALPHA_FUNCTION', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NUM', '":"', 'BAREWORD', 'END', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'FNCT', 'VAR', 'AND', 'OR', 'NOT', 'SINGLE_QUOTE', '","'])
     comparison_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'ALPHA_FUNCTION', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'ADD', 'FNCT', 'VAR', 'EQ', 'AND', 'GE', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
     argspec_chks = set(['DOTDOTDOT', 'SLURPYVAR'])
@@ -512,12 +538,14 @@ class SassExpression(Parser):
     atom_chks__ = set(['COLOR', 'VAR'])
     expr_map_or_list_rsts_ = set(['RPAR', '","'])
     u_expr_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'BAREWORD', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'ALPHA_FUNCTION', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'LITERAL_FUNCTION', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
+    interpolated_url_chks = set(['INTERP_START_URL_HACK', 'BAREURL_HEAD_HACK'])
     atom_chks = set(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'END', 'SLURPYVAR', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'DOTDOTDOT', 'INTERP_START', 'RPAR', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'VAR', 'FNCT', 'NOT', 'SIGN', 'SINGLE_QUOTE'])
-    interpolated_url_rsts = set(['DOUBLE_QUOTE', 'BAREURL', 'SINGLE_QUOTE'])
+    interpolated_url_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'VAR', 'SINGLE_QUOTE', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'FNCT', 'NOT', 'INTERP_START_URL_HACK', 'BANG_IMPORTANT', 'BAREURL_HEAD_HACK'])
     comparison_chks = set(['GT', 'GE', 'NE', 'LT', 'LE', 'EQ'])
     argspec_items_rsts_ = set(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'VAR', 'END', 'SLURPYVAR', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'DOTDOTDOT', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'RPAR', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
     a_expr_rsts = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
     interpolated_string_rsts = set(['DOUBLE_QUOTE', 'SINGLE_QUOTE'])
+    interpolated_bareword_rsts__ = set(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
     m_expr_chks = set(['MUL', 'DIV'])
     goal_interpolated_anything_rsts = set(['END', 'INTERP_START'])
     interpolated_bare_url_rsts = set(['RPAR', 'INTERP_START'])

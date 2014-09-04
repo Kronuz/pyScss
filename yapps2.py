@@ -747,7 +747,9 @@ class Scanner(object):
                 msg = "Bad Token"
                 if restrict:
                     msg = "Trying to find one of " + ", ".join(restrict)
-                raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(self.pos), msg))
+                err = SyntaxError("SyntaxError[@ char %s: %s]" % (repr(self.pos), msg))
+                err.pos = self.pos
+                raise err
 
             # If we found something that isn't to be ignored, return it
             if best_pat in self.ignore:
@@ -875,7 +877,9 @@ class Parser(object):
         """
         tok = self._scanner.token(self._pos, set([type]))
         if tok[2] != type:
-            raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(tok[0]), "Trying to find " + type))
+            err = SyntaxError("SyntaxError[@ char %s: %s]" % (repr(tok[0]), "Trying to find " + type))
+            err.pos = tok[0]
+            raise err
         self._pos += 1
         return tok[3]
 

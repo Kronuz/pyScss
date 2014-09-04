@@ -112,11 +112,15 @@ class SassSyntaxError(SassBaseError):
     usually caught and wrapped later on.
     """
     def __init__(self, input_string, position, desired_tokens):
+        super(SassSyntaxError, self).__init__()
+
         self.input_string = input_string
         self.position = position
         self.desired_tokens = desired_tokens
 
     def __str__(self):
+        # TODO this doesn't show the rule stack; should inherit from SassError
+        # instead?
         if self.position == 0:
             after = "Syntax error"
         else:
