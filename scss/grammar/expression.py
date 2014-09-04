@@ -24,6 +24,7 @@ from scss.ast import Variable
 from scss.ast import ListLiteral
 from scss.ast import MapLiteral
 from scss.ast import ArgspecLiteral
+from scss.ast import FunctionLiteral
 from scss.cssdefs import unescape
 from scss.types import Color
 from scss.types import Function
@@ -387,7 +388,7 @@ class SassExpression(Parser):
             return Interpolation.maybe(interpolated_bare_url, type=Url, quotes=None)
         else:  # in self.argspec_item_chks
             expr_lst = self.expr_lst()
-            return Interpolation(['', expr_lst], type=Url, quotes=None)
+            return FunctionLiteral(expr_lst, "url")
 
     def interpolated_bare_url(self):
         _token_ = self._peek(self.interpolated_url_chks)

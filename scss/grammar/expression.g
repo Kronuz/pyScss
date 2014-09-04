@@ -24,6 +24,7 @@ from scss.ast import Variable
 from scss.ast import ListLiteral
 from scss.ast import MapLiteral
 from scss.ast import ArgspecLiteral
+from scss.ast import FunctionLiteral
 from scss.cssdefs import unescape
 from scss.types import Color
 from scss.types import Function
@@ -279,7 +280,7 @@ parser SassExpression:
         interpolated_bare_url
             {{ return Interpolation.maybe(interpolated_bare_url, type=Url, quotes=None) }}
         | expr_lst
-            {{ return Interpolation(['', expr_lst], type=Url, quotes=None) }}
+            {{ return FunctionLiteral(expr_lst, "url") }}
 
     rule interpolated_bare_url:
         (

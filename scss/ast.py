@@ -23,6 +23,7 @@ from scss.cssdefs import COLOR_NAMES
 from scss.cssdefs import is_builtin_css_function
 from scss.types import Boolean
 from scss.types import Color
+from scss.types import Function
 from scss.types import List
 from scss.types import Map
 from scss.types import Null
@@ -139,7 +140,7 @@ class BinaryOp(Expression):
 
 class AnyOp(Expression):
     def __repr__(self):
-        return '<%s(*%s)>' % (self.__class__.__name__, repr(self.op), repr(self.operands))
+        return '<%s(*%s)>' % (self.__class__.__name__, repr(self.operands))
 
     def __init__(self, *operands):
         self.operands = operands
@@ -255,6 +256,17 @@ class Interpolation(Expression):
         self.quotes = quotes
         self.type = type
         self.kwargs = kwargs
+
+    def __repr__(self):
+        repr_parts = []
+        for i, part in enumerate(self.parts):
+            if i % 2 == 0:
+                if part:
+                    repr_parts.append(repr(part))
+            else:
+                repr_parts.append('#{' + repr(part) + '}')
+
+        return "<{0} {1}>".format(type(self).__name__, " ".join(repr_parts))
 
     @classmethod
     def maybe(cls, parts, quotes=None, type=String, **kwargs):
@@ -468,7 +480,8 @@ class ArgspecLiteral(Expression):
             else:
                 # Named
                 if not isinstance(var_node, Variable):
-                    raise SyntaxError("Expected variable name, got %r" % (var_node,))
+                    raise TypeError(
+                        "Expected variable name, got {0!r}".format(var_node))
                 kwargs[var_node.name] = value
 
         # Slurpy arguments go on the end of the args
@@ -476,3 +489,21 @@ class ArgspecLiteral(Expression):
             args.extend(self.slurp.evaluate(calculator, divide=True))
 
         return args, kwargs
+
+
+class FunctionLiteral(Expression):
+    """Wraps an existing AST node in a literal (unevaluated) function call."""
+    def __init__(self, child, function_name):
+        self.child = child
+        self.function_name = function_name
+
+    def evaluate(self, calculator, divide=False):
+        child = self.child.evaluate(calculator, divide)
+        if isinstance(child, String):
+            contents = child.value
+            quotes = child.quotes
+        else:
+            # TODO compress
+            contents = child.render()
+            quotes = None
+        return Function(contents, self.function_name, quotes=quotes)

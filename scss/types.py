@@ -13,14 +13,14 @@ from warnings import warn
 import six
 
 from scss.cssdefs import COLOR_LOOKUP, COLOR_NAMES, ZEROABLE_UNITS, convert_units_to_base_units, cancel_base_units, count_base_units
-from scss.util import escape
 
 PRECISION = 8
 
 
-################################################################################
+###############################################################################
 # pyScss data types:
 
+# TODO make Value work as a string in every way?  i.e. have a .quotes...
 class Value(object):
     is_null = False
     sass_type_name = 'unknown'
@@ -1184,6 +1184,8 @@ class String(Value):
 
 # TODO this needs to pretend the url(...) is part of the string for all string
 # operations -- even the quotes!  alas.
+# TODO recasting a function to a String will lose the function part?  whoops.
+# maybe .value should just be, uh, the literal value instead of the insides???
 class Function(String):
     """Function call pseudo-type, which crops up frequently in CSS as a string
     marker.  Acts mostly like a string, but has a function name and parentheses
