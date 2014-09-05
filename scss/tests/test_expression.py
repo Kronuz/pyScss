@@ -10,7 +10,6 @@ from scss.errors import SassEvaluationError
 from scss.errors import SassSyntaxError
 from scss.expression import Calculator
 from scss.extension.core import CoreExtension
-from scss.rule import Namespace
 from scss.types import Color, List, Null, Number, String
 from scss.types import Function
 
@@ -87,8 +86,12 @@ def test_functions(calc):
 
 
 def test_parse_strings(calc):
-    # Test edge cases with string parsing.
+    # Escapes in barewords are preserved.
     assert calc('auto\\9') == String.unquoted('auto\\9')
+
+    # Escapes in quoted strings are expanded.
+    assert calc('"\\2022"') == String("•", quotes='"')
+    assert calc('"\\2022"').render() == '"•"'
 
 
 def test_parse_bang_important(calc):
