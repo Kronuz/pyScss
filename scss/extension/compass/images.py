@@ -11,9 +11,9 @@ import six
 from six.moves import xrange
 
 from . import _image_size_cache
+from . import CompassExtension
 from .helpers import add_cache_buster
 from scss import config
-from scss.namespace import Namespace
 from scss.types import Color, List, Number, String, Url
 from scss.util import escape, getmtime, make_data_url, make_filename_hash
 
@@ -26,8 +26,7 @@ except ImportError:
         Image = None
 
 log = logging.getLogger(__name__)
-ns = images_namespace = Namespace()
-__all__ = ['images_namespace']
+ns = CompassExtension.namespace
 
 
 def _images_root():

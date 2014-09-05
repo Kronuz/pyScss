@@ -16,8 +16,7 @@ import os
 
 from scss import config
 from scss.expression import Calculator
-from scss.extension.compass.helpers import helpers_namespace
-from scss.rule import Namespace
+from scss.extension.compass import CompassExtension
 
 import pytest
 
@@ -26,7 +25,7 @@ import pytest
 
 @pytest.fixture
 def calc():
-    return Calculator(helpers_namespace).evaluate_expression
+    return Calculator(CompassExtension.namespace).evaluate_expression
 
 
 # ------------------------------------------------------------------------------

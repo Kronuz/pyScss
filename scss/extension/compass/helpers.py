@@ -13,15 +13,14 @@ import os.path
 
 import six
 
+from . import CompassExtension
 from scss import config
-from scss.namespace import Namespace
 from scss.types import Boolean, Function, List, Null, Number, String, Url
 from scss.util import to_str, getmtime, make_data_url
 import re
 
 log = logging.getLogger(__name__)
-ns = helpers_namespace = Namespace()
-__all__ = ['helpers_namespace']
+ns = CompassExtension.namespace
 
 FONT_TYPES = {
     'woff': 'woff',

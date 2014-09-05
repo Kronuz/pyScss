@@ -31,15 +31,14 @@ except ImportError:
 from six.moves import xrange
 
 from . import _image_size_cache
+from . import CompassExtension
 from .layouts import PackedSpritesLayout, HorizontalSpritesLayout, VerticalSpritesLayout, DiagonalSpritesLayout
 from scss import config
-from scss.namespace import Namespace
 from scss.types import Color, List, Number, String, Boolean
 from scss.util import escape, getmtime, make_data_url, make_filename_hash
 
 log = logging.getLogger(__name__)
-ns = sprites_namespace = Namespace()
-__all__ = ['sprites_namespace']
+ns = CompassExtension.namespace
 
 MAX_SPRITE_MAPS = 4096
 KEEP_SPRITE_MAPS = int(MAX_SPRITE_MAPS * 0.8)

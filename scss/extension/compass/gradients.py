@@ -10,14 +10,13 @@ import logging
 
 import six
 
+from . import CompassExtension
 from .helpers import opposite_position, position
-from scss.namespace import Namespace
 from scss.types import Color, List, Number, String
 from scss.util import escape, split_params, to_float, to_str
 
 log = logging.getLogger(__name__)
-ns = gradients_namespace = Namespace()
-__all__ = ['gradients_namespace']
+ns = CompassExtension.namespace
 
 
 def __color_stops(percentages, *args):

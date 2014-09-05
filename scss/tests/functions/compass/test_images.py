@@ -19,14 +19,14 @@ import pytest
 
 from scss import config
 from scss.expression import Calculator
-from scss.extension.compass.images import images_namespace
+from scss.extension.compass import CompassExtension
 
 
 # TODO many of these tests could also stand to test for failure cases
 
 @pytest.fixture
 def calc():
-    return Calculator(images_namespace).evaluate_expression
+    return Calculator(CompassExtension.namespace).evaluate_expression
 
 
 def test_image_url(calc):

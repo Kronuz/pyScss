@@ -3,9 +3,8 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 from scss.expression import Calculator
-from scss.extension.compass.gradients import gradients_namespace
+from scss.extension.compass import CompassExtension
 from scss.extension.compass.gradients import linear_gradient
-from scss.rule import Namespace
 from scss.types import String, List, Number, Color
 
 import pytest
@@ -13,7 +12,7 @@ import pytest
 
 @pytest.fixture
 def calc():
-    return Calculator(gradients_namespace).evaluate_expression
+    return Calculator(CompassExtension.namespace).evaluate_expression
 
 
 def test_linear_gradient():
@@ -21,7 +20,6 @@ def test_linear_gradient():
     to = String.unquoted('to')
     bottom = String.unquoted('bottom')
     left = String.unquoted('left')
-    angle = Number(45, 'deg')
 
     red = Color.from_name('red')
     blue = Color.from_name('blue')
