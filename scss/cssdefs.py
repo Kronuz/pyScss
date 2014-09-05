@@ -449,8 +449,6 @@ def unescape(string):
     """Given a raw CSS string (i.e. taken directly from CSS source with no
     processing), eliminate all backslash escapes.
     """
-    print("unescaping!", repr(string))
-    print("and got!", repr(unescape_rx.sub(_unescape_one, string)))
     return unescape_rx.sub(_unescape_one, string)
 
 
