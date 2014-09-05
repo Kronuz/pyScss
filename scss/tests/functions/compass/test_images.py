@@ -18,7 +18,7 @@ import sys
 import pytest
 
 from scss import config
-from scss.expression import Calculator
+from scss.calculator import Calculator
 from scss.extension.compass import CompassExtension
 
 

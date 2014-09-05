@@ -15,7 +15,7 @@ from __future__ import unicode_literals
 import os
 
 from scss import config
-from scss.expression import Calculator
+from scss.calculator import Calculator
 from scss.extension.compass import CompassExtension
 
 import pytest

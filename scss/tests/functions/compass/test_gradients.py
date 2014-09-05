@@ -2,7 +2,7 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-from scss.expression import Calculator
+from scss.calculator import Calculator
 from scss.extension.compass import CompassExtension
 from scss.extension.compass.gradients import linear_gradient
 from scss.types import String, List, Number, Color

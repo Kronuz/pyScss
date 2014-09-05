@@ -21,6 +21,7 @@ except ImportError:
 
 import six
 
+from scss.calculator import Calculator
 import scss.config as config
 from scss.cssdefs import _spaces_re
 from scss.cssdefs import _escape_chars_re
@@ -28,7 +29,6 @@ from scss.cssdefs import _prop_split_re
 from scss.errors import SassError
 from scss.errors import SassBaseError
 from scss.errors import SassImportError
-from scss.expression import Calculator
 from scss.extension import Extension
 from scss.extension.core import CoreExtension
 from scss.extension import NamespaceAdapterExtension

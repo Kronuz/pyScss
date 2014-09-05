@@ -5,9 +5,9 @@ from __future__ import division
 
 import six
 
+from scss.calculator import Calculator
 from scss.compiler import Compiler
 import scss.config as config
-from scss.expression import Calculator
 from scss.extension.bootstrap import BootstrapExtension
 from scss.extension.core import CoreExtension
 from scss.extension.compass import CompassExtension

@@ -6,9 +6,9 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+from scss.calculator import Calculator
 from scss.errors import SassEvaluationError
 from scss.errors import SassSyntaxError
-from scss.expression import Calculator
 from scss.extension.core import CoreExtension
 from scss.types import Color, List, Null, Number, String
 from scss.types import Function

@@ -10,10 +10,10 @@ import re
 import sys
 
 from scss import config
+from scss.calculator import Calculator
 from scss.compiler import _prop_split_re
 from scss.compiler import Compiler
 from scss.errors import SassEvaluationError
-from scss.expression import Calculator
 from scss.legacy import Scss
 from scss.legacy import _default_scss_vars
 from scss.namespace import Namespace
