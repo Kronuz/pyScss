@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import re
+from warnings import warn
 
 # Super dumb little selector parser.
 
@@ -180,6 +181,12 @@ class SimpleSelector(object):
             if not did_replace and token in ('&', 'self'):
                 did_replace = True
                 new_tokens.extend(parent.tokens)
+                if token == 'self':
+                    warn(FutureWarning(
+                        "The xCSS 'self' selector is deprecated and will be "
+                        "removed in 2.0.  Use & instead.  ({0!r})"
+                        .format(self)
+                    ))
             else:
                 new_tokens.append(token)
 

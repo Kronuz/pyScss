@@ -488,10 +488,7 @@ class Compilation(object):
         """
         from scss.selector import Selector
         selectors = calculator.apply_vars(block.argument)
-        # XXX this no longer handles `&`, which is from xcss
         rule.extends_selectors.extend(Selector.parse_many(selectors))
-        #rule.extends_selectors.update(p.strip() for p in selectors.replace(',', '&').split('&'))
-        #rule.extends_selectors.discard('')
 
     def _at_return(self, calculator, rule, scope, block):
         """
@@ -1358,12 +1355,16 @@ class Compilation(object):
         # revolve around elements, classes, and IDs, so parse those out and use
         # them as a rough key.  Ignore order and duplication for now.
         key_to_selectors = defaultdict(set)
-        selector_to_rules = defaultdict(list)
+        selector_to_rules = defaultdict(set)
+        rule_selector_order = {}
+        order = 0
         for rule in self.rules:
             for selector in rule.selectors:
                 for key in selector.lookup_key():
                     key_to_selectors[key].add(selector)
-                selector_to_rules[selector].append(rule)
+                selector_to_rules[selector].add(rule)
+                rule_selector_order[rule, selector] = order
+                order += 1
 
         # Now go through all the rules with an @extends and find their parent
         # rules.
@@ -1378,45 +1379,58 @@ class Compilation(object):
                     if candidate.is_superset_of(selector)]
 
                 if not extendable_selectors:
-                    # TODO should be fatal, unless !optional given
-                    log.warn(
-                        "Can't find any matching rules to extend: %s"
-                        % selector.render())
+                    # TODO implement !optional
+                    warn_deprecated(
+                        rule,
+                        "Can't find any matching rules to extend {0!r} -- this"
+                        "will be fatal in 2.0, unless !optional is specified!"
+                        .format(selector.render()))
                     continue
 
                 # Armed with a set of selectors that this rule can extend, do
-                # some substitution and modify the appropriate parent rules
+                # some substitution and modify the appropriate parent rules.
+                # One tricky bit: it's possible we're extending two selectors
+                # that both exist in the same parent rule, in which case we
+                # want to extend in the order the original selectors appear in
+                # that rule.
+                known_parents = []
                 for extendable_selector in extendable_selectors:
-                    # list() shields us from problems mutating the list within
-                    # this loop, which can happen in the case of @extend loops
-                    parent_rules = list(selector_to_rules[extendable_selector])
+                    parent_rules = selector_to_rules[extendable_selector]
                     for parent_rule in parent_rules:
                         if parent_rule is rule:
                             # Don't extend oneself
                             continue
+                        known_parents.append(
+                            (parent_rule, extendable_selector))
+                # This will put our parents back in their original order
+                known_parents.sort(key=rule_selector_order.__getitem__)
 
-                        more_parent_selectors = []
+                for parent_rule, extendable_selector in known_parents:
+                    more_parent_selectors = []
 
-                        for rule_selector in rule.selectors:
-                            more_parent_selectors.extend(
-                                extendable_selector.substitute(
-                                    selector, rule_selector))
+                    for rule_selector in rule.selectors:
+                        more_parent_selectors.extend(
+                            extendable_selector.substitute(
+                                selector, rule_selector))
 
-                        for parent in more_parent_selectors:
-                            # Update indices, in case any later rules try to
-                            # extend this one
-                            for key in parent.lookup_key():
-                                key_to_selectors[key].add(parent)
-                            # TODO this could lead to duplicates?  maybe should
-                            # be a set too
-                            selector_to_rules[parent].append(parent_rule)
+                    for parent in more_parent_selectors:
+                        # Update indices, in case later rules try to extend
+                        # this one
+                        for key in parent.lookup_key():
+                            key_to_selectors[key].add(parent)
+                        selector_to_rules[parent].add(parent_rule)
+                        rule_selector_order[parent_rule, parent] = order
+                        order += 1
 
-                        parent_rule.ancestry = (
-                            parent_rule.ancestry.with_more_selectors(
-                                more_parent_selectors))
+                    parent_rule.ancestry = (
+                        parent_rule.ancestry.with_more_selectors(
+                            more_parent_selectors))
 
         # Remove placeholder-only rules
-        self.rules = [rule for rule in self.rules if not rule.is_pure_placeholder]
+        self.rules = [
+            rule for rule in self.rules
+            if not rule.is_pure_placeholder
+        ]
 
     # @print_timing(3)
     def parse_properties(self):
