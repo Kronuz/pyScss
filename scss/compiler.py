@@ -1620,6 +1620,10 @@ class Compilation(object):
         for i in reversed(range(len(prev_ancestry_headers))):
             result += tb * i + '}' + rnl
 
+        # Always end with a newline, even in compressed mode
+        if not result.endswith('\n'):
+            result += '\n'
+
         return (result, total_rules, total_selectors)
 
     def _print_properties(self, properties, sc=True, sp=' ', tb='', nl='\n', lnl=' '):
