@@ -1,10 +1,10 @@
 .foo foo-foo {
   onefoothree: foo;
   string: hellofoogoodbye;
-  string-single: "he'llofoogood\"bye";
+  string-single: 'he\'llofoogood"bye';
   string-double: "he\"llofoogood'bye";
   url: url(hellofoogoodbye);
-  url-single: url("he'llofoogood\"bye");
+  url-single: url('he\'llofoogood"bye');
   url-double: url("he\"llofoogood'bye");
   nested: "type-of(foo) bar";
 }

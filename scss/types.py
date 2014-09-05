@@ -1167,9 +1167,11 @@ class String(Value):
     def _render_quoted(self):
         # Strictly speaking, the only things we need to quote are the quotes
         # themselves, backslashes, and newlines.
-        # TODO Ruby Sass's behavior is to always use double quotes (and
-        # otherwise preserve the original literal in uncompressed mode) for
-        # computed strings, whereas we preserve a single quote in some cases
+        # TODO Ruby Sass takes backslashes in barewords literally, but treats
+        # backslashes in quoted strings as escapes -- their mistake?
+        # TODO In Ruby Sass, generated strings never have single quotes -- but
+        # neither do variable interpolations, so I'm not sure what they're
+        # doing
         quote = self.quotes
 
         ret = self.value

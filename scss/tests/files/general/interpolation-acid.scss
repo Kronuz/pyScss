@@ -3,6 +3,8 @@ $foo: foo;
 .#{$foo} #{$foo}-#{$foo} {
     one#{$foo}three: $foo;
 
+    // TODO Ruby Sass changes these single quotes into double quotes, which I
+    // guess we want to preserve
     string: hello#{$foo}goodbye;
     string-single: 'he\'llo#{$foo}good"bye';
     string-double: "he\"llo#{$foo}good'bye";
