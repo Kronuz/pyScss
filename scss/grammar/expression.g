@@ -239,7 +239,8 @@ parser SassExpression:
         # filter syntax, where it appears as alpha(opacity=NN).  Since = isn't
         # normally valid Sass, we have to special-case it here
         | ALPHA_FUNCTION LPAR (
-            "opacity" "=" NUM RPAR  {{ return Literal(Function("opacity=" + NUM, "alpha")) }}
+            "opacity" "=" NUM RPAR
+                {{ return FunctionLiteral(Literal(String.unquoted("opacity=" + NUM)), "alpha") }}
             | argspec RPAR          {{ return CallOp("alpha", argspec) }}
             )
         | LITERAL_FUNCTION LPAR interpolated_function RPAR

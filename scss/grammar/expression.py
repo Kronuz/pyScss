@@ -336,7 +336,7 @@ class SassExpression(Parser):
                 self._scan('"="')
                 NUM = self._scan('NUM')
                 RPAR = self._scan('RPAR')
-                return Literal(Function("opacity=" + NUM, "alpha"))
+                return FunctionLiteral(Literal(String.unquoted("opacity=" + NUM)), "alpha")
             else:  # in self.atom_chks
                 argspec = self.argspec()
                 RPAR = self._scan('RPAR')

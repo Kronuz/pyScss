@@ -133,6 +133,7 @@ def test_parse_special_functions():
     # filter syntax
     assert calc('alpha(black)') == Number(1)
     assert calc('alpha(opacity = 5)') == Function('opacity=5', 'alpha')
+    assert calc('alpha(opacity = 5)').render() == 'alpha(opacity=5)'
 
     # url() allows both an opaque URL and a Sass expression, based on some
     # heuristics
