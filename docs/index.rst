@@ -6,23 +6,27 @@
 pyScss, a Sass compiler for Python
 ==================================
 
-pyScss compiles Scss (Sass), a superset of CSS that is more powerful, elegant
-and easier to maintain than plain-vanilla CSS. The library acts as a CSS source
-code preprocesor which allows you to use variables, nested rules, mixins, and
-have inheritance of rules, all with a CSS-compatible syntax which the
-preprocessor then compiles to standard CSS.
+pyScss is a Python implementation of `Sass`_, a CSS preprocessing language that
+adds variables, expressions, nested rules, mixins, inheritance, and other
+features that help ease the maintenance of large stylesheets.
 
-Scss, as an extension of CSS, helps keep large stylesheets well-organized. It
-borrows concepts and functionality from projects such as OOCSS and other similar
-frameworks like as Sass. It's build on top of the original PHP xCSS codebase
-structure but it's been completely rewritten, many bugs have been fixed and it
-has been extensively extended to support almost the full range of Sass' Scss
-syntax and functionality.
+.. _Sass: http://sass-lang.com/
+
+pyScss also includes support for Compass, and has an extension mechanism for
+adding your own custom behavior.
+
+pyScss is not yet fully compatible with the canonical Ruby implementation, but
+we're getting there and constantly improving.  Please feel free to `file a
+GitHub issue`_ for anything pyScss gets wrong.
+
+.. _file a GitHub issue: https://github.com/Kronuz/pyScss/issues
 
 .. image:: http://pledgie.com/campaigns/16513.png?skin_name=chrome
    :alt: Click here to lend your support to pyScss and make a donation at pledgie.com!
    :target: http://pledgie.com/campaigns/16513
 
+.. TODO this first page should have some basic usage; there's currently nothing
+   particularly helpful on it.  also installation, deps, etc.
 
 Contents:
 
@@ -33,7 +37,6 @@ Contents:
     python-api
     syntax
     back-matter
-
 
 
 Indices and tables

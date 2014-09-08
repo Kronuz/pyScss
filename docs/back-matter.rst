@@ -27,10 +27,10 @@ from the root of a source checkout.
 
 Most of the tests are pairs of input/output files in ``scss/tests/files``; the
 test suite scans for these, compiles all the ``.scss`` files, and compares the
-output with the ``.css`` file of the same name.  You can limit which file tests
-run::
+output with the ``.css`` file of the same name.  To run only particular tests,
+you can pass them directly as filenames::
 
-    py.test --test-file-filter=REGEX,REGEX,REGEX...
+    py.test scss/tests/files/general/000-smoketest.scss
 
 There are also several tests borrowed from the Ruby and C implementations.
 Many of these don't work (due to missing features, different error messages,
@@ -39,8 +39,7 @@ by a test run, you must explicitly opt into them with ``--include-ruby``, even
 when using a file filter.  These files are in the ``from-ruby/`` and
 ``from-sassc/`` subdirectories.
 
-Additionally, test files in the ``xfail/`` subdirectory are assumed to fail.
-Other than these cases, the directory names are arbitrary.
+Other than the borrowed tests, the directory names are arbitrary.
 
 
 License and copyright
@@ -70,6 +69,76 @@ Changelog
 
 1.3.0 (unreleased)
 ^^^^^^^^^^^^^^^^^^
+
+This is a somewhat transitional release along the road to 2.0, which will
+remove a lot of deprecated features.
+
+Sass/CSS compatibility
+""""""""""""""""""""""
+
+* Importing files from a parent directory with ``../`` now works (as long as the imported file is still on the search path).
+* Multiple CSS imports on the same line are now left unchanged.  (Previously, the line would be repeated once for each import.)
+* CSS 3 character set detection is supported.
+* CSS escapes within strings are supported (though, unlike Sass, are usually printed literally rather than escaped).
+* Map keys may now be arbitrary expressions.
+* Slurpy named arguments are now supported.
+* ``!global`` on variable assignments is now supported (and does nothing, as in Sass).
+* `rebeccapurple`_ is understood as a color name.
+
+.. _rebeccapurple: http://meyerweb.com/eric/thoughts/2014/06/19/rebeccapurple/
+
+Additionally, a great many more constructs should now parse correctly.  By default, when pyScss encounters a parse error, it replaces any interpolations and variables, and treats the result as a single opaque string.
+
+This was the only way syntax like ``url(http://foo/bar)`` was recognized, since a colon is usually not allowed in the middle of a bareword.  As a result, code like ``background: url(...) scale-color(...);`` didn't work, because the url would fail to parse and so pyScss would never even know that ``scale-color`` is supposed to be a function call.
+
+Now, the parser understands most of the unusual quirks of CSS syntax:
+
+* ``()`` is recognized as an empty list.
+* ``url()`` is fully supported.
+* ``expression()``, ``alpha(opacity=...)``, and ``calc()`` are supported (and left alone, except for interpolation).
+* Interpolation is part of the parser, rather than being applied before parsing, so there should be far fewer bugs with it.
+* CSS escapes within barewords are recognized (and ignored).
+* ``!important`` may have whitespace after the ``!``.
+
+Glossing over a bad parse now spits out a deprecation warning, and will be
+removed entirely in 2.0.
+
+Bug fixes
+"""""""""
+
+* Old-style pseudo-element selectors (``:before`` and friends, written with only one colon) always stay at the end of the selector.
+* The CSS3 ``grayscale(90%)`` function is now left alone, rather than being treated as a Sass function.  (Previously, only unitless numbers would trigger this behavior.)
+* Placeholder selectors (``%foo``) no longer end up in the output.
+* Iterating over a list of lists with a single variable works (again).
+* File path handling is much more polite with Windows directory separators.
+* At-rules broken across several lines are now recognized correctly.
+* ``@for ... to`` now excludes the upper bound.
+* ``@extend`` no longer shuffles rules around, and should now produce rules in the same order as Ruby Sass.  It also produces rules in the correct order when extending from the same rule more than once.  Hopefully it's now correct, once and for all.
+* Fixed a couple more Compass gradient bugs.  Probably.
+
+
+New features
+""""""""""""
+
+* Compatibility with Python 3.2, allegedly.
+* Support for building SVG font sheets from within stylesheets.
+* Error messages have been improved once again: parse errors should be somewhat less cryptic, the source of mixins is included in a traceback, and missing closing braces are reported.
+
+Backwards-incompatible changes
+""""""""""""""""""""""""""""""
+
+* Missing imports are now fatal.
+* Much sloppy behavior or reliance on old xCSS features will now produce deprecation warnings.  All such behaviors will be removed in pyScss 2.0.
+
+Internals
+"""""""""
+
+* The C speedups module is now Unicode-aware, and works under CPython 3.
+* There's no longer a runtime warning if the speedups module is not found.
+* pyScss is now (a lot more) Unicode-clean; everything internally is treated as text, not bytes.
+* Compiling the grammar is now much less painful, and doesn't require copy-pasting anything.
+* Several large modules have been broken up further.  ``__init__`` is, at last, virtually empty.
+* All the built-in functions have been moved into built-in extensions.
 
 1.2.0 (Oct 8, 2013)
 ^^^^^^^^^^^^^^^^^^^

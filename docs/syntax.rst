@@ -424,7 +424,8 @@ syntax to work in the future.
 Operations on lists
 -------------------
 
-Binary operations with a list on the left-hand side are performed element-wise:
+Binary operations with a list on the left-hand side are performed
+element-wise::
 
     p {
         margin: (1em 0 3em) * 0.5;  // => 0.5em 0 1.5em
@@ -437,7 +438,7 @@ built-in list operations, the future of this feature is unclear.
 Mixin "injection"
 -----------------
 
-A mixin defined like this:
+A mixin defined like this::
 
     @mixin foo(...) {
         // ...
