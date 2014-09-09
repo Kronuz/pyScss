@@ -594,9 +594,9 @@ class Compilation(object):
                 # Try keyword arguments
                 value = kwargs.pop(var_name)
             elif node is not None:
-                # OK, there's a default argument; try that
-                # DEVIATION: this allows argument defaults to refer to earlier
-                # argument values
+                # OK, try the default argument.  Using callee_calculator means
+                # that default values of arguments can refer to earlier
+                # arguments' values; yes, that is how Sass works.
                 value = node.evaluate(callee_calculator, divide=True)
             else:
                 # TODO this should raise
