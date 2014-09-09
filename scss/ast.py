@@ -507,3 +507,20 @@ class FunctionLiteral(Expression):
             contents = child.render()
             quotes = None
         return Function(contents, self.function_name, quotes=quotes)
+
+
+class AlphaFunctionLiteral(Expression):
+    """Wraps an existing AST node in a literal (unevaluated) function call,
+    prepending "opacity=" to the contents.
+    """
+    def __init__(self, child):
+        self.child = child
+
+    def evaluate(self, calculator, divide=False):
+        child = self.child.evaluate(calculator, divide)
+        if isinstance(child, String):
+            contents = child.value
+        else:
+            # TODO compress
+            contents = child.render()
+        return Function('opacity=' + contents, 'alpha', quotes=None)

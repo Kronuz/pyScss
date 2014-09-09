@@ -25,6 +25,7 @@ from scss.ast import ListLiteral
 from scss.ast import MapLiteral
 from scss.ast import ArgspecLiteral
 from scss.ast import FunctionLiteral
+from scss.ast import AlphaFunctionLiteral
 from scss.cssdefs import unescape
 from scss.types import Color
 from scss.types import Function
@@ -239,8 +240,8 @@ parser SassExpression:
         # filter syntax, where it appears as alpha(opacity=NN).  Since = isn't
         # normally valid Sass, we have to special-case it here
         | ALPHA_FUNCTION LPAR (
-            "opacity" "=" NUM RPAR
-                {{ return FunctionLiteral(Literal(String.unquoted("opacity=" + NUM)), "alpha") }}
+            "opacity" "=" atom RPAR
+                {{ return AlphaFunctionLiteral(atom) }}
             | argspec RPAR          {{ return CallOp("alpha", argspec) }}
             )
         | LITERAL_FUNCTION LPAR interpolated_function RPAR

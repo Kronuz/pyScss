@@ -25,6 +25,7 @@ from scss.ast import ListLiteral
 from scss.ast import MapLiteral
 from scss.ast import ArgspecLiteral
 from scss.ast import FunctionLiteral
+from scss.ast import AlphaFunctionLiteral
 from scss.cssdefs import unescape
 from scss.types import Color
 from scss.types import Function
@@ -334,9 +335,9 @@ class SassExpression(Parser):
             if _token_ == '"opacity"':
                 self._scan('"opacity"')
                 self._scan('"="')
-                NUM = self._scan('NUM')
+                atom = self.atom()
                 RPAR = self._scan('RPAR')
-                return FunctionLiteral(Literal(String.unquoted("opacity=" + NUM)), "alpha")
+                return AlphaFunctionLiteral(atom)
             else:  # in self.atom_chks
                 argspec = self.argspec()
                 RPAR = self._scan('RPAR')
