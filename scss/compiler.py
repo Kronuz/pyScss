@@ -851,9 +851,11 @@ class Compilation(object):
 
                 source = SourceFile.from_string(generated_code)
             else:
-                if path not in self.source_index:
-                    self.add_source(SourceFile.from_filename(path))
-                source = self.source_index[path]
+                if path in self.source_index:
+                    source = self.source_index[path]
+                else:
+                    source = SourceFile.from_filename(path)
+                    self.add_source(source)
 
             if rule.namespace.has_import(source):
                 # If already imported in this scope, skip
@@ -898,7 +900,9 @@ class Compilation(object):
         dirname, basename = os.path.split(name)
 
         # Search relative to the importing file first
-        search_path = [os.path.dirname(rule.source_file.path)]
+        search_path = [
+            os.path.normpath(os.path.abspath(
+                os.path.dirname(rule.source_file.path)))]
         search_path.extend(self.compiler.search_path)
 
         for prefix, suffix in product(('_', ''), search_exts):
