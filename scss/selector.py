@@ -216,7 +216,16 @@ class SimpleSelector(object):
     # TODO just use set ops for these, once the constructor removes dupes
     def merge_with(self, other):
         new_tokens = self.tokens + tuple(token for token in other.tokens if token not in set(self.tokens))
-        return type(self)(self.combinator, new_tokens)
+        if self.combinator == ' ' or self.combinator == other.combinator:
+            combinator = other.combinator
+        elif other.combinator == ' ':
+            combinator = self.combinator
+        else:
+            raise ValueError(
+                "Don't know how to merge conflicting combinators: "
+                "{0!r} and {1!r}"
+                .format(self, other))
+        return type(self)(combinator, new_tokens)
 
     def difference(self, other):
         new_tokens = tuple(token for token in self.tokens if token not in set(other.tokens))
@@ -397,7 +406,6 @@ class Selector(object):
         returned, and the permutation of ancestors will never insert new simple
         selectors "inside" the target selector.
         """
-
         # Find the target in the parent selector, and split it into
         # before/after
         p_before, p_extras, p_after = self.break_around(target.simple_selectors)
