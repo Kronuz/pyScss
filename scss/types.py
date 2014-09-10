@@ -14,7 +14,7 @@ import six
 
 from scss.cssdefs import COLOR_LOOKUP, COLOR_NAMES, ZEROABLE_UNITS, convert_units_to_base_units, cancel_base_units, count_base_units
 
-PRECISION = 8
+PRECISION = 5
 
 
 ###############################################################################
