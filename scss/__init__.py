@@ -1330,10 +1330,11 @@ class Scss(object):
         # DEVIATION: These are used to rearrange rules in dependency order, so
         # an @extended parent appears in the output before a child.  Sass does
         # not do this, and the results may be unexpected.  Pending removal.
+        rules = list(self.rules)
         rule_order = dict()
         rule_dependencies = dict()
         order = 0
-        for rule in self.rules:
+        for rule in rules:
             rule_order[rule] = order
             # Rules are ultimately sorted by the earliest rule they must
             # *precede*, so every rule should "depend" on the next one
@@ -1347,7 +1348,7 @@ class Scss(object):
 
         # Now go through all the rules with an @extends and find their parent
         # rules.
-        for rule in self.rules:
+        for rule in rules:
             for selector in rule.extends_selectors:
                 # This is a little dirty.  intersection isn't a class method.
                 # Don't think about it too much.
@@ -1395,7 +1396,8 @@ class Scss(object):
                                 more_parent_selectors))
                         rule_dependencies[parent_rule].append(rule_order[rule])
 
-        self.rules.sort(key=lambda rule: min(rule_dependencies[rule]))
+        rules.sort(key=lambda rule: min(rule_dependencies[rule]))
+        self.rules = rules
 
     @print_timing(3)
     def parse_properties(self):
