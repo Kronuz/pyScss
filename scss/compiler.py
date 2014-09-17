@@ -255,7 +255,7 @@ class Compilation(object):
         self.parse_children()
 
         # this will manage @extends
-        self.apply_extends()
+        self.rules = self.apply_extends(self.rules)
 
         rules_by_file, css_files = self.parse_properties()
 
@@ -1209,7 +1209,7 @@ class Compilation(object):
         self._warn_unused_imports(new_rule)
 
     # @print_timing(3)
-    def apply_extends(self):
+    def apply_extends(self, rules):
         """Run through the given rules and translate all the pending @extends
         declarations into real selectors on parent rules.
 
@@ -1224,7 +1224,7 @@ class Compilation(object):
         selector_to_rules = defaultdict(set)
         rule_selector_order = {}
         order = 0
-        for rule in self.rules:
+        for rule in rules:
             for selector in rule.selectors:
                 for key in selector.lookup_key():
                     key_to_selectors[key].add(selector)
@@ -1234,7 +1234,7 @@ class Compilation(object):
 
         # Now go through all the rules with an @extends and find their parent
         # rules.
-        for rule in self.rules:
+        for rule in rules:
             for selector in rule.extends_selectors:
                 # This is a little dirty.  intersection isn't a class method.
                 # Don't think about it too much.
@@ -1293,10 +1293,7 @@ class Compilation(object):
                             more_parent_selectors))
 
         # Remove placeholder-only rules
-        self.rules = [
-            rule for rule in self.rules
-            if not rule.is_pure_placeholder
-        ]
+        return [rule for rule in rules if not rule.is_pure_placeholder]
 
     # @print_timing(3)
     def parse_properties(self):
