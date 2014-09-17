@@ -612,7 +612,7 @@ class Scss(object):
                     log.warn("The option 'compress' is deprecated. Please use 'style' instead.")
                 rule.options[option] = value
 
-    def _get_funct_def(self, rule, calculator, argument):
+    def _get_funct_def(self, rule, calculator, argument, do_interp=False):
         funct, lpar, argstr = argument.partition('(')
         funct = calculator.do_glob_math(funct)
         funct = normalize_var(funct.strip())
@@ -627,7 +627,8 @@ class Scss(object):
             # Whoops, no parens at all.  That's like calling with no arguments.
             argstr = ''
 
-        argstr = calculator.do_glob_math(argstr)
+        if do_interp:
+            argstr = calculator.do_glob_math(argstr)
         argspec_node = calculator.parse_expression(argstr, target='goal_argspec')
         return funct, argspec_node
 
@@ -658,6 +659,12 @@ class Scss(object):
                 # DEVIATION: this allows argument defaults to refer to earlier
                 # argument values
                 value = node.evaluate(callee_calculator, divide=True)
+                # XXX this is a grotesque hack to fix a default value that is a
+                # string containing an interpolation, which bootstrap 3.2 uses.
+                # in pyscss 1.3, we can parse this for real, but 1.2 only does
+                # cheap lexical substitution.
+                if isinstance(value, String):
+                    value.value = callee_calculator.do_glob_math(value.value)
             else:
                 # TODO this should raise
                 value = Undefined()
@@ -776,7 +783,7 @@ class Scss(object):
         """
         caller_namespace = rule.namespace
         caller_calculator = Calculator(caller_namespace)
-        funct, caller_argspec = self._get_funct_def(rule, caller_calculator, block.argument)
+        funct, caller_argspec = self._get_funct_def(rule, caller_calculator, block.argument, do_interp=True)
 
         # Render the passed arguments, using the caller's namespace
         args, kwargs = caller_argspec.evaluate_call_args(caller_calculator)
