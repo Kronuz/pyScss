@@ -3,12 +3,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from itertools import product
 import math
+import os.path
 
 from six.moves import xrange
 
 from scss.extension import Extension
 from scss.namespace import Namespace
+from scss.source import SourceFile
 from scss.types import (
     Arglist, Boolean, Color, List, Null, Number, String, Map, expect_type)
 
@@ -16,6 +19,49 @@ from scss.types import (
 class CoreExtension(Extension):
     name = 'core'
     namespace = Namespace()
+
+    def handle_import(self, name, compilation, rule):
+        """Implementation of the core Sass import mechanism, which just looks
+        for files on disk.
+        """
+        name, ext = os.path.splitext(name)
+        if ext:
+            search_exts = [ext]
+        else:
+            search_exts = ['.scss', '.sass']
+
+        dirname, basename = os.path.split(name)
+
+        # Search relative to the importing file first
+        search_path = [
+            os.path.normpath(os.path.abspath(
+                os.path.dirname(rule.source_file.path)))]
+        search_path.extend(compilation.compiler.search_path)
+
+        for prefix, suffix in product(('_', ''), search_exts):
+            filename = prefix + basename + suffix
+            for directory in search_path:
+                path = os.path.normpath(
+                    os.path.join(directory, dirname, filename))
+
+                if path == rule.source_file.path:
+                    # Avoid self-import
+                    # TODO is this what ruby does?
+                    continue
+
+                if not os.path.exists(path):
+                    continue
+
+                # Ensure that no one used .. to escape the search path
+                for valid_path in compilation.compiler.search_path:
+                    rel = os.path.relpath(path, start=valid_path)
+                    if not rel.startswith('../'):
+                        break
+                else:
+                    continue
+
+                # All good!
+                return SourceFile.from_filename(path)
 
 
 # Alias to make the below declarations less noisy

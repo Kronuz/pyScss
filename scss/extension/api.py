@@ -27,7 +27,26 @@ class Extension(object):
     def __init__(self):
         pass
 
-    def before_import(self):
+    def handle_import(self, name, compilation, rule):
+        """Attempt to resolve an import.  Called once for every Sass string
+        listed in an ``@import`` statement.  Imports that Sass dictates should
+        be converted to plain CSS imports do NOT trigger this hook.
+
+        So this::
+
+            @import url(foo), "bar", "baz";
+
+        would call `handle_import` twice: once with "bar", once with "baz".
+
+        Return a :class:`scss.source.SourceFile` if you want to handle the
+        import, or None if you don't.  (This method returns None by default, so
+        if you don't care about hooking imports, just don't implement it.)
+        This method is tried on every registered `Extension` in order, until
+        one of them returns successfully.
+
+        A good example is the core Sass import machinery, which is implemented
+        with this hook; see the source code of the core extension.
+        """
         pass
 
 

@@ -22,7 +22,6 @@ except ImportError:
 import six
 
 from scss.calculator import Calculator
-import scss.config as config
 from scss.cssdefs import _spaces_re
 from scss.cssdefs import _escape_chars_re
 from scss.cssdefs import _prop_split_re
@@ -32,7 +31,6 @@ from scss.errors import SassImportError
 from scss.extension import Extension
 from scss.extension.core import CoreExtension
 from scss.extension import NamespaceAdapterExtension
-from scss.extension.compass.sprites import sprite_map
 from scss.grammar import locate_blocks
 from scss.rule import BlockAtRuleHeader
 from scss.rule import Namespace
@@ -42,7 +40,6 @@ from scss.rule import UnparsedBlock
 from scss.selector import Selector
 from scss.source import SourceFile
 from scss.types import Arglist
-from scss.types import Boolean
 from scss.types import List
 from scss.types import Null
 from scss.types import Number
@@ -839,22 +836,17 @@ class Compilation(object):
             name = sass_path.value
 
             source = None
-            try:
-                path = self._find_import(rule, name)
-            except IOError:
-                # Maybe do a special import instead
-                generated_code = self._at_magic_import(
-                    calculator, rule, scope, block)
-                if generated_code is None:
-                    raise SassImportError(sass_path, self.compiler, rule=rule)
-
-                source = SourceFile.from_string(generated_code)
+            for extension in self.compiler.extensions:
+                source = extension.handle_import(name, self, rule)
+                if source:
+                    break
             else:
-                if path in self.source_index:
-                    source = self.source_index[path]
-                else:
-                    source = SourceFile.from_filename(path)
-                    self.add_source(source)
+                # Didn't find anything!
+                raise SassImportError(name, self.compiler, rule=rule)
+
+            if source.path not in self.source_index:
+                self.add_source(source)
+            source = self.source_index[source.path]
 
             if rule.namespace.has_import(source):
                 # If already imported in this scope, skip
@@ -883,138 +875,9 @@ class Compilation(object):
             # TODO this seems extremely janky (surely we should create an
             # actual new Rule), but the CSS rendering doesn't understand how to
             # print rules without blocks
+            # TODO if this ever creates a new Rule, shuffle stuff around so
+            # this is still hoisted to the top
             rule.properties.append(('@import ' + import_, None))
-
-    def _find_import(self, rule, name, skip=None):
-        """Find the file referred to by an @import.
-
-        Takes a name from an @import and returns an absolute path, or None.
-        """
-        name, ext = os.path.splitext(name)
-        if ext:
-            search_exts = [ext]
-        else:
-            search_exts = ['.scss', '.sass']
-
-        dirname, basename = os.path.split(name)
-
-        # Search relative to the importing file first
-        search_path = [
-            os.path.normpath(os.path.abspath(
-                os.path.dirname(rule.source_file.path)))]
-        search_path.extend(self.compiler.search_path)
-
-        for prefix, suffix in product(('_', ''), search_exts):
-            filename = prefix + basename + suffix
-            for directory in search_path:
-                path = os.path.normpath(
-                    os.path.join(directory, dirname, filename))
-
-                if path == rule.source_file.path:
-                    # Avoid self-import
-                    # TODO is this what ruby does?
-                    continue
-
-                if not os.path.exists(path):
-                    continue
-
-                # Ensure that no one used .. to escape the search path
-                for valid_path in self.compiler.search_path:
-                    rel = os.path.relpath(path, start=valid_path)
-                    if not rel.startswith('../'):
-                        break
-                else:
-                    continue
-
-                # All good!
-                return path
-
-        raise IOError(
-            "Can't find a file to import for {0!r}\n"
-            "Search path:\n{1}".format(
-                name,
-                ''.join("    " + dir_ + "\n" for dir_ in search_path),
-            )
-        )
-
-    # @print_timing(10)
-    def _at_magic_import(self, calculator, rule, scope, block):
-        """
-        Implements @import for sprite-maps
-        Imports magic sprite map directories
-        """
-        # TODO check that the found file is actually under the root
-        if callable(config.STATIC_ROOT):
-            files = sorted(config.STATIC_ROOT(block.argument))
-        else:
-            glob_path = os.path.join(config.STATIC_ROOT, block.argument)
-            files = glob.glob(glob_path)
-            files = sorted((file[len(config.STATIC_ROOT):], None) for file in files)
-
-        if not files:
-            return
-
-        # Build magic context
-        map_name = os.path.normpath(os.path.dirname(block.argument)).replace('\\', '_').replace('/', '_')
-        kwargs = {}
-
-        def setdefault(var, val):
-            _var = '$' + map_name + '-' + var
-            if _var in rule.context:
-                kwargs[var] = calculator.interpolate(rule.context[_var], rule, self._library)
-            else:
-                rule.context[_var] = val
-                kwargs[var] = calculator.interpolate(val, rule, self._library)
-            return rule.context[_var]
-
-        setdefault('sprite-base-class', String('.' + map_name + '-sprite', quotes=None))
-        setdefault('sprite-dimensions', Boolean(False))
-        position = setdefault('position', Number(0, '%'))
-        spacing = setdefault('spacing', Number(0))
-        repeat = setdefault('repeat', String('no-repeat', quotes=None))
-        names = tuple(os.path.splitext(os.path.basename(file))[0] for file, storage in files)
-        for n in names:
-            setdefault(n + '-position', position)
-            setdefault(n + '-spacing', spacing)
-            setdefault(n + '-repeat', repeat)
-        rule.context['$' + map_name + '-' + 'sprites'] = sprite_map(block.argument, **kwargs)
-        ret = '''
-            @import "compass/utilities/sprites/base";
-
-            // All sprites should extend this class
-            // The %(map_name)s-sprite mixin will do so for you.
-            #{$%(map_name)s-sprite-base-class} {
-                background: $%(map_name)s-sprites;
-            }
-
-            // Use this to set the dimensions of an element
-            // based on the size of the original image.
-            @mixin %(map_name)s-sprite-dimensions($name) {
-                @include sprite-dimensions($%(map_name)s-sprites, $name);
-            }
-
-            // Move the background position to display the sprite.
-            @mixin %(map_name)s-sprite-position($name, $offset-x: 0, $offset-y: 0) {
-                @include sprite-position($%(map_name)s-sprites, $name, $offset-x, $offset-y);
-            }
-
-            // Extends the sprite base class and set the background position for the desired sprite.
-            // It will also apply the image dimensions if $dimensions is true.
-            @mixin %(map_name)s-sprite($name, $dimensions: $%(map_name)s-sprite-dimensions, $offset-x: 0, $offset-y: 0) {
-                @extend #{$%(map_name)s-sprite-base-class};
-                @include sprite($%(map_name)s-sprites, $name, $dimensions, $offset-x, $offset-y);
-            }
-
-            @mixin %(map_name)s-sprites($sprite-names, $dimensions: $%(map_name)s-sprite-dimensions) {
-                @include sprites($%(map_name)s-sprites, $sprite-names, $%(map_name)s-sprite-base-class, $dimensions);
-            }
-
-            // Generates a class for each sprited image.
-            @mixin all-%(map_name)s-sprites($dimensions: $%(map_name)s-sprite-dimensions) {
-                @include %(map_name)s-sprites(%(sprites)s, $dimensions);
-            }
-        ''' % {'map_name': map_name, 'sprites': ' '.join(names)}
-        return ret
 
     # @print_timing(10)
     def _at_if(self, calculator, rule, scope, block):

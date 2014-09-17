@@ -158,9 +158,11 @@ class SassImportError(SassBaseError):
     def format_message(self):
         return (
             "Couldn't find anything to import: {0}\n"
-            "Search path:\n  {1}"
+            "Extensions: {1}\n"
+            "Search path:\n  {2}"
             .format(
                 self.bad_name,
+                ", ".join(repr(ext) for ext in self.compiler.extensions),
                 "\n  ".join(self.compiler.search_path),
             )
         )
