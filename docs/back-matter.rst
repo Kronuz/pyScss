@@ -68,6 +68,14 @@ working hours.  Yelp does not claim copyright.
 Changelog
 ---------
 
+1.2.1 (Sep 18, 2014)
+^^^^^^^^^^^^^^^^^^^
+
+Very minor bugfix release.
+
+* ``apply_extends`` is now threadsafe.
+* Default function arguments that are strings containing interpolations of earlier function arguments now work...  sort of.  This allows Bootstrap 3.2 to compile correctly.
+
 1.2.0 (Oct 8, 2013)
 ^^^^^^^^^^^^^^^^^^^
 
