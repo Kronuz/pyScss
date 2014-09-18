@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
 
 from itertools import product
 import math
@@ -115,7 +116,7 @@ def rgba_(color, a=None):
 
 @ns.declare
 def rgb_(color):
-    return rgba2(color, a=Number(1))
+    return rgba_(color, a=Number(1))
 
 
 @ns.declare
@@ -137,12 +138,12 @@ def hsl(h, s, l):
 
 @ns.declare
 def hsla_(color, a=None):
-    return rgba2(color, a)
+    return rgba_(color, a)
 
 
 @ns.declare
 def hsl_(color):
-    return rgba2(color, a=Number(1))
+    return rgba_(color, a=Number(1))
 
 
 @ns.declare
