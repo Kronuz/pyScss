@@ -1,0 +1,6 @@
+.child {
+    color: yellow;
+}
+.parent > .other-child {
+    @extend .child;
+}

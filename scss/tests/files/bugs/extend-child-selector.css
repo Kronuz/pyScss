@@ -1,0 +1,3 @@
+.child, .parent > .other-child {
+  color: yellow;
+}
