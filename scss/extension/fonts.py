@@ -13,6 +13,7 @@ import time
 import tempfile
 import subprocess
 import warnings
+import six
 
 try:
     import cPickle as pickle
@@ -442,4 +443,4 @@ def glyph_code(sheet, glyph):
         log.error("No font sheet found: %s", sheet, extra={'stack': True})
     elif not glyph:
         log.error("No glyph found: %s in %s", glyph_name, font_sheet['*n*'], extra={'stack': True})
-    return String('%x' % glyph[1])
+    return String(six.unichr(glyph[1]))
