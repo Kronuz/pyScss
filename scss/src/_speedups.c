@@ -22,7 +22,7 @@ typedef struct {
 } scss_BlockLocator;
 
 static char*
-scss_pyunicode_to_utf8(PyObject* obj, int *len)
+scss_pyunicode_to_utf8(PyObject* obj, int* len)
 {
 	char* internal_buffer;
 	char* ret;
@@ -31,7 +31,7 @@ scss_pyunicode_to_utf8(PyObject* obj, int *len)
 	intermediate_bytes = PyUnicode_AsUTF8String(obj);
 	assert(intermediate_bytes != NULL);
 	internal_buffer = PyBytes_AsString(intermediate_bytes);
-	*len = PyBytes_Size(intermediate_bytes);
+	*len = (int)PyBytes_Size(intermediate_bytes);
 	ret = PyMem_New(char, *len + 1);
 	memcpy(ret, internal_buffer, *len + 1);
 	Py_DECREF(intermediate_bytes);

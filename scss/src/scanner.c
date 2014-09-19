@@ -151,8 +151,6 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 	Restriction *p_restriction;
 	Pattern *regex;
 	int j, k, max, skip;
-	size_t len;
-	char *aux;
 
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
