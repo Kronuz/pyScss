@@ -14,6 +14,8 @@ import six
 
 from scss import config
 
+BASE_DIR = os.path.dirname(__file__)
+
 
 def split_params(params):
     params = params.split(',') or []
@@ -107,7 +109,7 @@ def make_filename_hash(key):
     """Convert the given key (a simple Python object) to a unique-ish hash
     suitable for a filename.
     """
-    key_repr = repr(key).encode('utf8')
+    key_repr = repr(key).replace(BASE_DIR, '').encode('utf8')
     # This is really stupid but necessary for making the repr()s be the same on
     # Python 2 and 3 and thus allowing the test suite to run on both.
     # TODO better solutions include: not using a repr, not embedding hashes in
