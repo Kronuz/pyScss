@@ -386,7 +386,6 @@ Token*
 Scanner_token(Scanner *self, int i, Pattern restrictions[], int restrictions_sz)
 {
 	int j, k, found;
-	Pattern *regex;
 	long result;
 
 	#ifdef DEBUG
@@ -403,7 +402,6 @@ Scanner_token(Scanner *self, int i, Pattern restrictions[], int restrictions_sz)
 			for (j = 0; j < restrictions_sz; j++) {
 				found = 0;
 				for (k = 0; k < self->restrictions[i].patterns_sz; k++) {
-					regex = Pattern_regex(restrictions[j].tok, restrictions[j].expr);
 					if (strcmp(restrictions[j].tok, self->restrictions[i].patterns[k]->tok) == 0) {
 						found = 1;
 						break;
