@@ -20,9 +20,9 @@
 }
 
 .icon-doctor:before {
-  content: "\f100";
+  content: "";
 }
 
 .icon-donative:before {
-  content: "\f101";
+  content: "";
 }
