@@ -1,10 +1,10 @@
 @font-face {
   font-family: 'FontSheet';
-  src: url('static/assets/fontsheet-GT3Ba2t8v8N4l1GTfTS07A.eot');
-  src: url('static/assets/fontsheet-GT3Ba2t8v8N4l1GTfTS07A.svg?#fontsheet') format('svg'),
-    url('static/assets/fontsheet-GT3Ba2t8v8N4l1GTfTS07A.woff') format('woff'),
-    url('static/assets/fontsheet-GT3Ba2t8v8N4l1GTfTS07A.ttf') format('truetype'),
-    url('static/assets/fontsheet-GT3Ba2t8v8N4l1GTfTS07A.eot?#iefix') format('embedded-opentype');
+  src: url(static/assets/fontsheet-GT3Ba2t8v8N4l1GTfTS07A.eot);
+  src: url(static/assets/fontsheet-GT3Ba2t8v8N4l1GTfTS07A.svg?#iefix&#fontsheet) format('svg'),
+    url(static/assets/fontsheet-GT3Ba2t8v8N4l1GTfTS07A.woff) format('woff'),
+    url(static/assets/fontsheet-GT3Ba2t8v8N4l1GTfTS07A.ttf) format('truetype'),
+    url(static/assets/fontsheet-GT3Ba2t8v8N4l1GTfTS07A.eot) format('embedded-opentype');
   font-weight: normal;
   font-style: normal;
 }
