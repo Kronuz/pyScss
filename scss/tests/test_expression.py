@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Tests for expressions -- both their evaluation and their general
 parsability.
 """
