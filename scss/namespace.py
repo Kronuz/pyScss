@@ -31,8 +31,6 @@ class Scope(object):
     """
     def __init__(self, maps=()):
         maps = list(maps)
-        # Check all passed maps are compatible with the current Scope
-        assert all(isinstance(m, (dict, type(self))) for m in maps)
         self.maps = [dict()] + maps
 
     def __repr__(self):
