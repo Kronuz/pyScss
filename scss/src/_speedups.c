@@ -181,38 +181,41 @@ scss_Scanner_token(scss_Scanner *self, PyObject *args)
 {
 	PyObject *iter;
 	PyObject *item;
-	long size;
+	long size, hash;
 
 	Token *p_token;
 	PyObject *py_tok;
 	PyObject *py_token;
 
-	int token_num;
+	char *tok;
+	int token_num, len;
 	PyObject *restrictions = NULL;
-	Pattern *_restrictions = NULL;
-	int restrictions_sz = 0;
-	int len;
+	Hashtable *_restrictions = NULL;
+
 	if (self->scanner != NULL) {
 		if (PyArg_ParseTuple(args, "i|O", &token_num, &restrictions)) {
 			if (restrictions != NULL) {
-				size = PySequence_Size(restrictions);
-				if (size != -1) {
-					_restrictions = PyMem_New(Pattern, size);
-					iter = PyObject_GetIter(restrictions);
-					while ((item = PyIter_Next(iter))) {
-						if (PyUnicode_Check(item)) {
-							_restrictions[restrictions_sz].tok = scss_pyunicode_to_utf8(item, &len);
-							_restrictions[restrictions_sz].expr = NULL;
-							restrictions_sz++;
+				hash = PyObject_Hash(restrictions);
+				_restrictions = Hashtable_get(self->scanner->restrictions_cache, &hash, sizeof(hash));
+				if (_restrictions == NULL) {
+					size = PySequence_Size(restrictions);
+					if (size != -1) {
+						_restrictions = Hashtable_create(64);
+						iter = PyObject_GetIter(restrictions);
+						while ((item = PyIter_Next(iter))) {
+							if (PyUnicode_Check(item)) {
+								tok = scss_pyunicode_to_utf8(item, &len);
+								Hashtable_set(_restrictions, tok, len + 1, (void *)-1);
+							}
+							Py_DECREF(item);
 						}
-						Py_DECREF(item);
+						Py_DECREF(iter);
 					}
-					Py_DECREF(iter);
+					Hashtable_set(self->scanner->restrictions_cache, &hash, sizeof(hash), _restrictions);
 				}
 			}
-			p_token = Scanner_token(self->scanner, token_num, _restrictions, restrictions_sz);
 
-			if (_restrictions != NULL) PyMem_Del(_restrictions);
+			p_token = Scanner_token(self->scanner, token_num, _restrictions);
 
 			if (p_token == (Token *)SCANNER_EXC_BAD_TOKEN
 				|| p_token == (Token *)SCANNER_EXC_RESTRICTED)

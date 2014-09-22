@@ -43,14 +43,15 @@ typedef struct {
 } Restriction;
 
 typedef struct {
+	Hashtable *restrictions_cache;
 	char exc[MAX_EXC_STRING];
-    Hashtable *ignore;
-    int tokens_sz;
-    int tokens_bsz;
-    Token *tokens;
-    Restriction *restrictions;
-    int input_sz;
-    char *input;
+	Hashtable *ignore;
+	int tokens_sz;
+	int tokens_bsz;
+	Token *tokens;
+	Restriction *restrictions;
+	int input_sz;
+	char *input;
 	int pos;
 } Scanner;
 
@@ -62,7 +63,7 @@ void Scanner_reset(Scanner *self, char *input, int input_sz);
 Scanner *Scanner_new(Pattern *, int, Pattern *, int, char *, int);
 void Scanner_del(Scanner *);
 
-Token* Scanner_token(Scanner *, int, Pattern *, int);
+Token* Scanner_token(Scanner *, int, Hashtable *restrictions);
 void Scanner_rewind(Scanner *, int);
 
 #endif

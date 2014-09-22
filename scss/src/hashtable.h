@@ -17,11 +17,12 @@ typedef struct Entry_s {
 typedef struct {
 	int size;
 	Entry **table;
+	unsigned long *map;
 } Hashtable;
 
 Hashtable *Hashtable_create(const unsigned int size);
 void Hashtable_del(Hashtable *hashtable);
-void Hashtable_set(Hashtable *hashtable, const char *key, void *value);
-void *Hashtable_get(Hashtable *hashtable, const char *key);
-
+void Hashtable_set(Hashtable *hashtable, const void *key, const size_t len, void *value);
+void *Hashtable_get(Hashtable *hashtable, const void *key, const size_t len);
+int Hashtable_in(Hashtable *a, Hashtable *b);
 #endif

@@ -70,7 +70,7 @@ Hashtable *
 Hashtable_create(const unsigned int size) {
 	/* Create a new hashtable */
 
-	unsigned int i;
+	unsigned int i, map_size;
 	Hashtable *hashtable = NULL;
 
 	if (size < 1) return NULL;
@@ -86,6 +86,14 @@ Hashtable_create(const unsigned int size) {
 	}
 	for (i = 0; i < size; i++) {
 		hashtable->table[i] = NULL;
+	}
+
+	map_size = (size + sizeof(unsigned long) - 1) / (8 * sizeof(unsigned long));
+	if ((hashtable->map = malloc(map_size)) == NULL) {
+		return NULL;
+	}
+	for (i = 0; i < map_size; i++) {
+		hashtable->map[i] = 0;
 	}
 
 	hashtable->size = size;
@@ -111,21 +119,13 @@ Hashtable_del(Hashtable *hashtable) {
 			free(last);
 		}
 	}
+	free(hashtable->map);
 	free(hashtable->table);
 	free(hashtable);
 }
 
-static unsigned int
-_Hashtable_hash(Hashtable *hashtable, const char *key, const size_t len) {
-	/* Hash a string for a particular hash table */
-
-	unsigned int hash = murmurhash3(key, len, 0x9747b28c);
-
-	return hash % hashtable->size;
-}
-
 static Entry *
-_Hashtable_newpair(const char *key, const size_t len, void *value) {
+_Hashtable_newpair(const void *key, const size_t len, void *value) {
 	/* Create a key-value pair */
 
 	Entry *newpair;
@@ -145,25 +145,44 @@ _Hashtable_newpair(const char *key, const size_t len, void *value) {
 	return newpair;
 }
 
-void Hashtable_set(Hashtable *hashtable, const char *key, void *value) {
+int
+Hashtable_in(Hashtable *a, Hashtable *b) {
+	int i, map_size;
+
+	if (a->size == b->size) {
+		map_size = (a->size + sizeof(unsigned long) - 1) / (8 * sizeof(unsigned long));
+		for (i = 0; i < map_size; i++) {
+			if ((a->map[i] & b->map[i]) != a->map[i]) {
+				return 0;
+			}
+		}
+		return 1;
+	}
+	return 0;
+}
+
+void
+Hashtable_set(Hashtable *hashtable, const void *key, const size_t len, void *value) {
 	/* Insert a key-value pair into a hash table */
 
-	int bin = 0;
-	const size_t len = strlen(key) + 1;
+	unsigned int hash = murmurhash3(key, len, 0x9747b28c);
+
 	Entry *newpair = NULL;
 	Entry *next = NULL;
 	Entry *last = NULL;
 
-	bin = _Hashtable_hash(hashtable, key, len);
+	unsigned int bin = hash % hashtable->size;
+
+	hashtable->map[bin / (8 * sizeof(unsigned long))] |= bin % (8 * sizeof(unsigned long));
 
 	next = hashtable->table[bin];
 
-	while (next != NULL && next->key != NULL && strcmp(key, next->key) > 0) {
+	while (next != NULL && next->key != NULL && memcmp(key, next->key, len) > 0) {
 		last = next;
 		next = next->next;
 	}
 
-	if( next != NULL && next->key != NULL && strcmp( key, next->key ) == 0 ) {
+	if( next != NULL && next->key != NULL && memcmp(key, next->key, len) == 0 ) {
 		/* There's already a pair. Let's replace that value. */
 		next->value = value;
 
@@ -188,23 +207,25 @@ void Hashtable_set(Hashtable *hashtable, const char *key, void *value) {
 	}
 }
 
-void *Hashtable_get(Hashtable *hashtable, const char *key) {
+void *
+Hashtable_get(Hashtable *hashtable, const void *key, const size_t len) {
 	/* Retrieve a key-value pair from a hash table */
 
-	int bin = 0;
+	unsigned int hash = murmurhash3(key, len, 0x9747b28c);
+
 	Entry *pair;
 
-	bin = _Hashtable_hash(hashtable, key, strlen(key) + 1);
+	unsigned int bin = hash % hashtable->size;
 
 	/* Step through the bin, looking for our value. */
 	pair = hashtable->table[bin];
-	while (pair != NULL && pair->key != NULL && strcmp(key, pair->key) > 0) {
+	while (pair != NULL && pair->key != NULL && memcmp(key, pair->key, len) > 0) {
 		pair = pair->next;
 	}
 
 	/* Did we actually find anything? */
-	if (pair == NULL || pair->key == NULL || strcmp(key, pair->key) != 0) {
-		return 0;
+	if (pair == NULL || pair->key == NULL || memcmp(key, pair->key, len) != 0) {
+		return NULL;
 	} else {
 		return pair->value;
 	}
