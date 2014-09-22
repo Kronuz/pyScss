@@ -16,11 +16,8 @@ log = logging.getLogger(__name__)
 
 
 def normalize_var(name):
-    if isinstance(name, six.string_types):
-        return name.replace('_', '-')
-    else:
-        log.warn("Variable name doesn't look like a string: %r", name)
-        return name
+    assert isinstance(name, six.string_types)
+    return name.replace('_', '-')
 
 
 class Scope(object):
