@@ -145,7 +145,7 @@ class Parser(object):
         """
         Returns the matched text, and moves to the next token
         """
-        tok = self._scanner.token(self._pos, set([type]))
+        tok = self._scanner.token(self._pos, frozenset([type]))
         self._char_pos = tok[0]
         if tok[2] != type:
             raise SyntaxError("SyntaxError[@ char %s: %s]" % (repr(tok[0]), "Trying to find " + type))

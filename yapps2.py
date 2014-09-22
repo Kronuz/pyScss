@@ -267,7 +267,7 @@ class Generator:
             self.write("\n")
 
         for n, s in self.sets.items():
-            self.write("    %s = %s\n" % (n, set(s)))
+            self.write("    %s = %s\n" % (n, frozenset(s)))
 
         if self.postparser is not None:
             self.write(self.postparser)
@@ -686,6 +686,7 @@ class NoMoreTokens(Exception):
     """
     pass
 
+
 class Scanner(object):
     def __init__(self, patterns, ignore, input=None):
         """
@@ -875,7 +876,7 @@ class Parser(object):
         """
         Returns the matched text, and moves to the next token
         """
-        tok = self._scanner.token(self._pos, set([type]))
+        tok = self._scanner.token(self._pos, frozenset([type]))
         if tok[2] != type:
             err = SyntaxError("SyntaxError[@ char %s: %s]" % (repr(tok[0]), "Trying to find " + type))
             err.pos = tok[0]
@@ -985,7 +986,7 @@ class ParserDescription(Parser):
 
     def Options(self):
         opt = {}
-        while self._peek(set(['"option"', '"token"', '"ignore"', 'END', '"rule"'])) == '"option"':
+        while self._peek(frozenset(['"option"', '"token"', '"ignore"', 'END', '"rule"'])) == '"option"':
             self._scan('"option"')
             self._scan('":"')
             Str = self.Str()
@@ -994,8 +995,8 @@ class ParserDescription(Parser):
 
     def Tokens(self):
         tok = []
-        while self._peek(set(['"token"', '"ignore"', 'END', '"rule"'])) in ['"token"', '"ignore"']:
-            _token_ = self._peek(set(['"token"', '"ignore"']))
+        while self._peek(frozenset(['"token"', '"ignore"', 'END', '"rule"'])) in ['"token"', '"ignore"']:
+            _token_ = self._peek(frozenset(['"token"', '"ignore"']))
             if _token_ == '"token"':
                 self._scan('"token"')
                 ID = self._scan('ID')
@@ -1011,7 +1012,7 @@ class ParserDescription(Parser):
 
     def Rules(self, tokens):
         rul = []
-        while self._peek(set(['"rule"', 'END'])) == '"rule"':
+        while self._peek(frozenset(['"rule"', 'END'])) == '"rule"':
             self._scan('"rule"')
             ID = self._scan('ID')
             OptParam = self.OptParam()
@@ -1023,7 +1024,7 @@ class ParserDescription(Parser):
     def ClauseA(self, tokens):
         ClauseB = self.ClauseB(tokens)
         v = [ClauseB]
-        while self._peek(set(['OR', 'RP', 'RB', '"rule"', 'END'])) == 'OR':
+        while self._peek(frozenset(['OR', 'RP', 'RB', '"rule"', 'END'])) == 'OR':
             OR = self._scan('OR')
             ClauseB = self.ClauseB(tokens)
             v.append(ClauseB)
@@ -1031,14 +1032,14 @@ class ParserDescription(Parser):
 
     def ClauseB(self, tokens):
         v = []
-        while self._peek(set(['STR', 'ID', 'LP', 'LB', 'STMT', 'OR', 'RP', 'RB', '"rule"', 'END'])) in ['STR', 'ID', 'LP', 'LB', 'STMT']:
+        while self._peek(frozenset(['STR', 'ID', 'LP', 'LB', 'STMT', 'OR', 'RP', 'RB', '"rule"', 'END'])) in ['STR', 'ID', 'LP', 'LB', 'STMT']:
             ClauseC = self.ClauseC(tokens)
             v.append(ClauseC)
         return cleanup_sequence(v)
 
     def ClauseC(self, tokens):
         ClauseD = self.ClauseD(tokens)
-        _token_ = self._peek(set(['PLUS', 'STAR', 'STR', 'ID', 'LP', 'LB', 'STMT', 'OR', 'RP', 'RB', '"rule"', 'END']))
+        _token_ = self._peek(frozenset(['PLUS', 'STAR', 'STR', 'ID', 'LP', 'LB', 'STMT', 'OR', 'RP', 'RB', '"rule"', 'END']))
         if _token_ == 'PLUS':
             PLUS = self._scan('PLUS')
             return Plus(ClauseD)
@@ -1049,7 +1050,7 @@ class ParserDescription(Parser):
             return ClauseD
 
     def ClauseD(self, tokens):
-        _token_ = self._peek(set(['STR', 'ID', 'LP', 'LB', 'STMT']))
+        _token_ = self._peek(frozenset(['STR', 'ID', 'LP', 'LB', 'STMT']))
         if _token_ == 'STR':
             STR = self._scan('STR')
             t = (STR, eval(STR, {}, {}))
@@ -1075,7 +1076,7 @@ class ParserDescription(Parser):
             return Eval(STMT[2:-2])
 
     def OptParam(self):
-        if self._peek(set(['ATTR', '":"', 'PLUS', 'STAR', 'STR', 'ID', 'LP', 'LB', 'STMT', 'OR', 'RP', 'RB', '"rule"', 'END'])) == 'ATTR':
+        if self._peek(frozenset(['ATTR', '":"', 'PLUS', 'STAR', 'STR', 'ID', 'LP', 'LB', 'STMT', 'OR', 'RP', 'RB', '"rule"', 'END'])) == 'ATTR':
             ATTR = self._scan('ATTR')
             return ATTR[2:-2]
         return ''
