@@ -153,7 +153,7 @@ class SourceFile(object):
             is_sass=is_sass,
         )
 
-    def parse_scss_line(self, line_no, line, state):
+    def parse_scss_line(self, line, state):
         ret = ''
 
         if line is None:
@@ -171,7 +171,6 @@ class SourceFile(object):
         output = output.strip()
 
         state['prev_line'] = line
-        state['prev_line_no'] = line_no
 
         if output:
             output += '\n'
@@ -179,7 +178,7 @@ class SourceFile(object):
 
         return ret
 
-    def parse_sass_line(self, line_no, line, state):
+    def parse_sass_line(self, line, state):
         ret = ''
 
         if line is None:
@@ -225,7 +224,6 @@ class SourceFile(object):
 
         state['prev_indent'] = indent
         state['prev_line'] = line
-        state['prev_line_no'] = line_no
 
         if output:
             output += '\n'
@@ -233,12 +231,9 @@ class SourceFile(object):
         return ret
 
     def prepare_source(self, codestr, sass=False):
-        # Decorate lines with their line numbers and a delimiting NUL and
-        # remove empty lines
         state = {
             'line_buffer': '',
             'prev_line': '',
-            'prev_line_no': 0,
             'prev_indent': 0,
             'nested_blocks': 0,
             'indent_marker': 0,
@@ -249,10 +244,10 @@ class SourceFile(object):
             parse_line = self.parse_scss_line
         _codestr = codestr
         codestr = ''
-        for line_no, line in enumerate(_codestr.splitlines()):
-            codestr += parse_line(line_no, line, state)
+        for line in _codestr.splitlines():
+            codestr += parse_line(line, state)
         # parse the last line stored in prev_line buffer
-        codestr += parse_line(None, None, state)
+        codestr += parse_line(None, state)
 
         # protects codestr: "..." strings
         codestr = _strings_re.sub(
