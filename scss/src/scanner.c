@@ -150,7 +150,7 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 	Token best_token, *p_token;
 	Restriction *p_restriction;
 	Pattern *regex;
-	int j, k, max, skip;
+	int j, k, skip;
 
 	#ifdef DEBUG
 		fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
@@ -159,6 +159,7 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 	while (1) {
 		regex = NULL;
 		best_token.regex = NULL;
+
 		/* Search the patterns for a match, with earlier
 		   tokens in the list having preference */
 		for (j = 0; j < Pattern_patterns_sz; j++) {
@@ -166,25 +167,23 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 			#ifdef DEBUG
 				fprintf(stderr, "\tTrying %s: %s at pos %d -> %s\n", repr(regex->tok), repr(regex->expr), self->pos, repr(self->input));
 			#endif
+
 			/* First check to see if we're restricting to this token */
-			skip = restrictions_sz;
-			if (skip) {
-				max = (restrictions_sz > self->ignore_sz) ? restrictions_sz : self->ignore_sz;
-				for (k = 0; k < max; k++) {
-					if (k < restrictions_sz && strcmp(regex->tok, restrictions[k].tok) == 0) {
-						skip = 0;
-						break;
+			if (restrictions_sz) {
+				if (Hashtable_get(self->ignore, regex->tok) == NULL) {
+					skip = 1;
+					for (k = 0; k < restrictions_sz; k++) {
+						if (strcmp(restrictions[k].tok, regex->tok) == 0) {
+							skip = 0;
+							break;
+						}
 					}
-					if (k < self->ignore_sz && regex == self->ignore[k]) {
-						skip = 0;
-						break;
+					if (skip) {
+						continue;
+						#ifdef DEBUG
+							fprintf(stderr, "\tSkipping %s!\n", repr(regex->tok));
+						#endif
 					}
-				}
-				if (skip) {
-					continue;
-					#ifdef DEBUG
-						fprintf(stderr, "\tSkipping %s!\n", repr(regex->tok));
-					#endif
 				}
 			}
 			if (Pattern_match(
@@ -200,6 +199,7 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 				break;
 			}
 		}
+
 		/* If we didn't find anything, raise an error */
 		if (best_token.regex == NULL) {
 			if (restrictions_sz) {
@@ -207,20 +207,16 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 			}
 			return SCANNER_EXC_BAD_TOKEN;
 		}
+
 		/* If we found something that isn't to be ignored, return it */
-		skip = 0;
-		for (k = 0; k < self->ignore_sz; k++) {
-			if (best_token.regex == self->ignore[k]) {
-				/* This token should be ignored... */
-				self->pos += best_token.string_sz;
-				skip = 1;
-				break;
-			}
-		}
-		if (!skip) {
+		if (Hashtable_get(self->ignore, best_token.regex->tok) == NULL) {
 			break;
 		}
+
+		/* This token should be ignored... */
+		self->pos += best_token.string_sz;
 	}
+
 	if (best_token.regex) {
 		self->pos = (int)(best_token.string - self->input + best_token.string_sz);
 		/* Only add this token if it's not in the list (to prevent looping) */
@@ -239,17 +235,15 @@ _Scanner_scan(Scanner *self, Pattern *restrictions, int restrictions_sz)
 			memcpy(&self->tokens[self->tokens_sz], &best_token, sizeof(Token));
 			p_restriction = &self->restrictions[self->tokens_sz];
 			if (restrictions_sz) {
-				p_restriction->patterns = PyMem_New(Pattern *, restrictions_sz);
-				p_restriction->patterns_sz = 0;
+				p_restriction->patterns = Hashtable_create(1024);
 				for (j = 0; j < restrictions_sz; j++) {
 					regex = Pattern_regex(restrictions[j].tok, restrictions[j].expr);
 					if (regex) {
-						p_restriction->patterns[p_restriction->patterns_sz++] = regex;
+						Hashtable_set(p_restriction->patterns, restrictions[j].tok, regex);
 					}
 				}
 			} else {
 				p_restriction->patterns = NULL;
-				p_restriction->patterns_sz = 0;
 			}
 			self->tokens_sz++;
 			return 1;
@@ -270,9 +264,8 @@ Scanner_reset(Scanner *self, char *input, int input_sz) {
 	#endif
 
 	for (i = 0; i < self->tokens_sz; i++) {
-		PyMem_Del(self->restrictions[i].patterns);
+		Hashtable_del(self->restrictions[i].patterns);
 		self->restrictions[i].patterns = NULL;
-		self->restrictions[i].patterns_sz = 0;
 	}
 	self->tokens_sz = 0;
 
@@ -297,12 +290,12 @@ Scanner_del(Scanner *self) {
 	#endif
 
 	if (self->ignore != NULL) {
-		PyMem_Del(self->ignore);
+		Hashtable_del(self->ignore);
 	}
 
 	if (self->tokens != NULL) {
 		for (i = 0; i < self->tokens_sz; i++) {
-			PyMem_Del(self->restrictions[i].patterns);
+			Hashtable_del(self->restrictions[i].patterns);
 		}
 		PyMem_Del(self->tokens);
 		PyMem_Del(self->restrictions);
@@ -329,6 +322,7 @@ Scanner_new(Pattern patterns[], int patterns_sz, Pattern ignore[], int ignore_sz
 	self = PyMem_New(Scanner, 1);
 	memset(self, 0, sizeof(Scanner));
 	if (self) {
+		/* Initialize patterns */
 		for (i = 0; i < patterns_sz; i++) {
 			regex = Pattern_regex(patterns[i].tok, patterns[i].expr);
 			#ifdef DEBUG
@@ -337,12 +331,13 @@ Scanner_new(Pattern patterns[], int patterns_sz, Pattern ignore[], int ignore_sz
 			}
 			#endif
 		}
+		/* Initialize ignored */
 		if (ignore_sz) {
-			self->ignore = PyMem_New(Pattern *, ignore_sz);
+			self->ignore = Hashtable_create(1024);
 			for (i = 0; i < ignore_sz; i++) {
 				regex = Pattern_regex(ignore[i].tok, ignore[i].expr);
 				if (regex) {
-					self->ignore[self->ignore_sz++] = regex;
+					Hashtable_set(self->ignore, ignore[i].tok, regex);
 					#ifdef DEBUG
 						fprintf(stderr, "\tIgnoring token %s\n", repr(regex->tok));
 					#endif
@@ -385,7 +380,7 @@ Scanner_finalize(void)
 Token*
 Scanner_token(Scanner *self, int i, Pattern restrictions[], int restrictions_sz)
 {
-	int j, k, found;
+	int j;
 	long result;
 
 	#ifdef DEBUG
@@ -398,19 +393,10 @@ Scanner_token(Scanner *self, int i, Pattern restrictions[], int restrictions_sz)
 			return (Token *)result;
 		}
 	} else if (i >= 0 && i < self->tokens_sz) {
-		if (self->restrictions[i].patterns_sz) {
-			for (j = 0; j < restrictions_sz; j++) {
-				found = 0;
-				for (k = 0; k < self->restrictions[i].patterns_sz; k++) {
-					if (strcmp(restrictions[j].tok, self->restrictions[i].patterns[k]->tok) == 0) {
-						found = 1;
-						break;
-					}
-				}
-				if (!found) {
-					sprintf(self->exc, "Unimplemented: restriction set changed");
-					return (Token *)SCANNER_EXC_UNIMPLEMENTED;
-				}
+		for (j = 0; j < restrictions_sz; j++) {
+			if (Hashtable_get(self->restrictions[i].patterns, restrictions[j].tok) == NULL) {
+				sprintf(self->exc, "Unimplemented: restriction set changed");
+				return (Token *)SCANNER_EXC_UNIMPLEMENTED;
 			}
 		}
 	}

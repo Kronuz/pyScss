@@ -23,7 +23,7 @@ if len(sys.argv) == 1:
 setup(ext_modules=[
     Extension(
         '_scanner',
-        sources=['_speedups.c', 'block_locator.c', 'scanner.c'],
+        sources=['_speedups.c', 'block_locator.c', 'scanner.c', 'hashtable.c'],
         libraries=['pcre'],
     ),
 ], cmdclass={'build_ext': build_ext})

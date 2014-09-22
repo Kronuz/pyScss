@@ -30,7 +30,7 @@ speedups = Feature(
         # include headers in an sdist (since they're typically in /usr/lib)
         Extension(
             'scss.grammar._scanner',
-            sources=['scss/src/_speedups.c', 'scss/src/block_locator.c', 'scss/src/scanner.c'],
+            sources=['scss/src/_speedups.c', 'scss/src/block_locator.c', 'scss/src/scanner.c', 'scss/src/hashtable.c'],
             libraries=['pcre']
         ),
     ],

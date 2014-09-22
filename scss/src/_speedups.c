@@ -567,7 +567,6 @@ MOD_INIT(_scanner)
 	Py_INCREF(PyExc_scss_NoMoreTokens);
 	PyModule_AddObject(m, "NoMoreTokens", (PyObject *)PyExc_scss_NoMoreTokens);
 #if PY_MAJOR_VERSION >= 3
-    
     return m;
 #endif
 }

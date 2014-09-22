@@ -11,6 +11,8 @@
 #ifndef SCANNER_H
 #define SCANNER_H
 
+#include "hashtable.h"
+
 #define PCRE_STATIC
 #include <pcre.h>
 
@@ -37,14 +39,12 @@ typedef struct {
 } Token;
 
 typedef struct {
-	int patterns_sz;
-	Pattern **patterns;
+	Hashtable *patterns;
 } Restriction;
 
 typedef struct {
 	char exc[MAX_EXC_STRING];
-    int ignore_sz;
-    Pattern **ignore;
+    Hashtable *ignore;
     int tokens_sz;
     int tokens_bsz;
     Token *tokens;
