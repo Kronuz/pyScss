@@ -318,7 +318,7 @@ parser SassExpression:
             SINGLE_STRING_GUTS      {{ parts.append(unescape(SINGLE_STRING_GUTS)) }}
         )*
         SINGLE_QUOTE                {{ return parts }}
-        
+
     rule interpolated_string_double:
         DOUBLE_QUOTE
         DOUBLE_STRING_GUTS          {{ parts = [unescape(DOUBLE_STRING_GUTS)] }}
@@ -327,7 +327,7 @@ parser SassExpression:
             DOUBLE_STRING_GUTS      {{ parts.append(unescape(DOUBLE_STRING_GUTS)) }}
         )*
         DOUBLE_QUOTE                {{ return parts }}
-        
+
     rule interpolated_bareword:
         # This one is slightly fiddly because it can't be /completely/ empty,
         # and any space between tokens ends the bareword (via early return).
