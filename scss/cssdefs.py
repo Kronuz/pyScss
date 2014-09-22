@@ -156,6 +156,7 @@ COLOR_NAMES = {
 }
 COLOR_LOOKUP = dict((v, k) for (k, v) in COLOR_NAMES.items())
 
+
 # ------------------------------------------------------------------------------
 # Built-in CSS units
 # See: http://www.w3.org/TR/2013/CR-css3-values-20130730/#numeric-types
@@ -344,6 +345,7 @@ def is_builtin_css_function(name):
 
     return False
 
+
 # ------------------------------------------------------------------------------
 # CSS character set determination
 # Based upon: http://www.w3.org/TR/CSS2/syndata.html#charset
@@ -427,6 +429,15 @@ def determine_encoding(buf):
 
 # ------------------------------------------------------------------------------
 # Bits and pieces of grammar, mostly as regexen
+
+# These are the only pseudo-elements allowed to be specified with a single
+# colon, for backwards compatibility
+CSS2_PSEUDO_ELEMENTS = frozenset((
+    ':after',
+    ':before',
+    ':first-line',
+    ':first-letter',
+))
 
 # CSS escape sequences are either a backslash followed by a single character,
 # or a backslash followed by one to six hex digits and a single optional

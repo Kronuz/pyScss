@@ -3,6 +3,8 @@ from __future__ import print_function
 import re
 from warnings import warn
 
+from scss.cssdefs import CSS2_PSEUDO_ELEMENTS
+
 # Super dumb little selector parser.
 
 # Yes, yes, this is a regex tokenizer.  The actual meaning of the
@@ -52,26 +54,9 @@ SELECTOR_TOKENIZER = re.compile(r'''
 ''', re.VERBOSE | re.MULTILINE)
 
 
-# Maps the first character of a token to a rough ordering.  The default
-# (element names) is zero.
-TOKEN_TYPE_ORDER = {
-    '#': 2,
-    '.': 3,
-    '[': 3,
-    ':': 3,
-    '%': 4,
-}
-TOKEN_SORT_KEY = lambda token: TOKEN_TYPE_ORDER.get(token[0], 0)
-
-PSEUDO_ELEMENTS = (
-    ':after',
-    ':before',
-    ':first-line',
-    ':first-letter',
-)
-# Psudo elements must go after any other simple selectors
-# ref: http://www.w3.org/TR/selectors/#pseudo-elements
-TOKEN_RENDER_SORT_KEY = lambda token: any([token.endswith(x) for x in PSEUDO_ELEMENTS])
+# Set of starting squiggles that are known to mean "this is a general
+# commutative token", i.e., not an element
+BODY_TOKEN_SIGILS = frozenset('#.[:%')
 
 
 def _is_combinator_subset_of(specific, general, is_first=True):
@@ -110,9 +95,9 @@ class SimpleSelector(object):
     def __init__(self, combinator, tokens):
         self.combinator = combinator
         # TODO enforce that only one element name (including *) appears in a
-        # selector
-        # TODO remove duplicates
-        self.tokens = tuple(sorted(tokens, key=TOKEN_SORT_KEY))
+        # selector.  only one pseudo, too.
+        # TODO remove duplicates?
+        self.tokens = tuple(tokens)
 
     def __repr__(self):
         return "<%s: %r>" % (type(self).__name__, self.render())
@@ -134,9 +119,10 @@ class SimpleSelector(object):
 
     @property
     def has_placeholder(self):
-        return any(
-            token[0] == '%'
-            for token in self.tokens)
+        for token in self.tokens:
+            if token.startswith('%'):
+                return True
+        return False
 
     def is_superset_of(self, other, soft_combinator=False):
         """Return True iff this selector matches the same elements as `other`,
@@ -213,9 +199,39 @@ class SimpleSelector(object):
         selector = (root,) + selector[1:]
         return tuple(selector)
 
-    # TODO just use set ops for these, once the constructor removes dupes
-    def merge_with(self, other):
-        new_tokens = self.tokens + tuple(token for token in other.tokens if token not in set(self.tokens))
+    def merge_into(self, other):
+        """Merge two simple selectors together.  This is expected to be the
+        selector being injected into `other` -- that is, `other` is the
+        selector for a block using ``@extend``, and `self` is a selector being
+        extended.
+
+        Element tokens must come first, and pseudo-element tokens must come
+        last, and there can only be one of each.  The final selector thus looks
+        something like::
+
+            [element] [misc self tokens] [misc other tokens] [pseudo-element]
+
+        This method does not check for duplicate tokens; those are assumed to
+        have been removed earlier, during the search for a hinge.
+        """
+        # TODO it shouldn't be possible to merge two elements or two pseudo
+        # elements, /but/ it shouldn't just be a fatal error here -- it
+        # shouldn't even be considered a candidate for extending!
+        # TODO this is slightly inconsistent with ruby, which treats a trailing
+        # set of self tokens like ':before.foo' as a single unit to be stuck at
+        # the end.  but that's completely bogus anyway.
+        element = []
+        middle = []
+        pseudo = []
+        for token in self.tokens + other.tokens:
+            if token in CSS2_PSEUDO_ELEMENTS or token.startswith('::'):
+                pseudo.append(token)
+            elif token[0] in BODY_TOKEN_SIGILS:
+                middle.append(token)
+            else:
+                element.append(token)
+        new_tokens = element + middle + pseudo
+
         if self.combinator == ' ' or self.combinator == other.combinator:
             combinator = other.combinator
         elif other.combinator == ' ':
@@ -233,7 +249,6 @@ class SimpleSelector(object):
 
     def render(self):
         # TODO fail if there are no tokens, or if one is a placeholder?
-        self.tokens = tuple(sorted(self.tokens, key=TOKEN_RENDER_SORT_KEY))
         rendered = ''.join(self.tokens)
         if self.combinator != ' ':
             rendered = ' '.join((self.combinator, rendered))
@@ -333,15 +348,17 @@ class Selector(object):
 
     @property
     def has_parent_reference(self):
-        return any(
-            simple.has_parent_reference
-            for simple in self.simple_selectors)
+        for simple in self.simple_selectors:
+            if simple.has_parent_reference:
+                return True
+        return False
 
     @property
     def has_placeholder(self):
-        return any(
-            simple.has_placeholder
-            for simple in self.simple_selectors)
+        for simple in self.simple_selectors:
+            if simple.has_placeholder:
+                return True
+        return False
 
     def with_parent(self, parent):
         saw_parent_ref = False
@@ -418,7 +435,7 @@ class Selector(object):
 
         # TODO what if the prefix doesn't match?  who wins?  should we even get
         # this far?
-        focal_nodes = (p_extras.merge_with(r_extras),)
+        focal_nodes = (p_extras.merge_into(r_extras),)
 
         befores = _merge_selectors(p_before, r_trail)
 
