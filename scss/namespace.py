@@ -47,12 +47,10 @@ class Scope(object):
         self.set(key, value)
 
     def __contains__(self, key):
-        try:
-            self[key]
-        except KeyError:
-            return False
-        else:
-            return True
+        for map in self.maps:
+            if key in map:
+                return True
+        return False
 
     def keys(self):
         # For mapping interface
