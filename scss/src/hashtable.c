@@ -22,15 +22,19 @@ murmurhash3(const void *key, const size_t len, const unsigned int seed) {
 	const unsigned int r2 = 13;
 	const unsigned int m = 5;
 	const unsigned int n = 0xe6546b64;
+	const unsigned char *tail;
 
+	size_t i;
+	unsigned int k;
+	unsigned int k1 = 0;
 	unsigned int hash = seed;
 
 	const size_t nblocks = len / 4;
 	const unsigned int *blocks = (const unsigned int *) key;
-	size_t i;
+
 
 	for (i = 0; i < nblocks; i++) {
-		unsigned int k = blocks[i];
+		k = blocks[i];
 		k *= c1;
 		k = (k << r1) | (k >> (32 - r1));
 		k *= c2;
@@ -39,8 +43,7 @@ murmurhash3(const void *key, const size_t len, const unsigned int seed) {
 		hash = ((hash << r2) | (hash >> (32 - r2))) * m + n;
 	}
 
-	const unsigned char *tail = (const unsigned char *) (key + nblocks * 4);
-	unsigned int k1 = 0;
+	tail = (const unsigned char *)(key + nblocks * 4);
 
 	switch (len & 3) {
 		case 3:
