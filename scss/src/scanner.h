@@ -16,8 +16,8 @@
 #define PCRE_STATIC
 #include <pcre.h>
 
-#define BLOCK_SIZE_PATTERNS 50
-#define BLOCK_SIZE_TOKENS 50
+#define BLOCK_SIZE_PATTERNS 64
+#define BLOCK_SIZE_TOKENS 256
 
 #define MAX_EXC_STRING 4096
 
