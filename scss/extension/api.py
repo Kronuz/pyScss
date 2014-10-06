@@ -27,6 +27,9 @@ class Extension(object):
     def __init__(self):
         pass
 
+    def __repr__(self):
+        return "<{0}>".format(type(self).__name__)
+
     def handle_import(self, name, compilation, rule):
         """Attempt to resolve an import.  Called once for every Sass string
         listed in an ``@import`` statement.  Imports that Sass dictates should

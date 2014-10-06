@@ -4,6 +4,7 @@ from __future__ import division
 from __future__ import print_function
 
 import logging
+from pathlib import Path
 
 import pytest
 
@@ -99,22 +100,25 @@ class SassItem(pytest.Item):
         excinfo.traceback = excinfo.traceback.cut(__file__)
 
     def runtest(self):
-        scss_file = self.fspath
-        css_file = scss_file.new(ext='css')
+        scss_file = Path(str(self.fspath))
+        css_file = scss_file.with_suffix('.css')
 
         with css_file.open('rb') as fh:
             # Output is Unicode, so decode this here
             expected = fh.read().decode('utf8')
 
-        scss.config.STATIC_ROOT = str(scss_file.dirpath('static'))
+        scss.config.STATIC_ROOT = str(scss_file.parent / 'static')
+
+        search_path = []
+        include = scss_file.parent / 'include'
+        if include.exists():
+            search_path.append(include)
+        search_path.append(scss_file.parent)
 
         actual = compile_file(
-            str(scss_file),
+            scss_file,
             output_style='expanded',
-            search_path=[
-                str(scss_file.dirpath('include')),
-                str(scss_file.dirname),
-            ],
+            search_path=search_path,
             extensions=[
                 CoreExtension,
                 ExtraExtension,

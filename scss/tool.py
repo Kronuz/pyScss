@@ -176,7 +176,7 @@ def do_build(options, args):
     source_files = []
     for path in args:
         if path == '-':
-            source = SourceFile.from_file(sys.stdin, "<stdin>", is_sass=options.is_sass)
+            source = SourceFile.from_file(sys.stdin, relpath="<stdin>", is_sass=options.is_sass)
         else:
             source = SourceFile.from_filename(path, is_sass=options.is_sass)
         source_files.append(source)

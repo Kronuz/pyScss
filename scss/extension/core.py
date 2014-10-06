@@ -7,6 +7,7 @@ from __future__ import unicode_literals
 from itertools import product
 import math
 import os.path
+from pathlib import PurePosixPath
 
 from six.moves import xrange
 
@@ -25,44 +26,60 @@ class CoreExtension(Extension):
         """Implementation of the core Sass import mechanism, which just looks
         for files on disk.
         """
-        name, ext = os.path.splitext(name)
-        if ext:
-            search_exts = [ext]
+        # TODO virtually all of this is the same as the django stuff, except
+        # for the bit that actually looks for and tries to open the file.
+        # would be much easier if you could just stick an object in the search
+        # path that implements the pathlib API.  the only problem is what to do
+        # when one path is a child of another, so the same file has two names,
+        # but tbh i'm not actually sure that's something worth protecting
+        # against...?  like, the only cost is that we'll parse twice (or, later
+        # on, not respect single-import), and the fix is to just Not Do That
+        # TODO i think with the new origin semantics, i've made it possible to
+        # import relative to the current file even if the current file isn't
+        # anywhere in the search path.  is that right?
+        path = PurePosixPath(name)
+        if path.suffix:
+            search_exts = [path.suffix]
         else:
             search_exts = ['.scss', '.sass']
 
-        dirname, basename = os.path.split(name)
+        dirname = path.parent
+        basename = path.stem
 
-        # Search relative to the importing file first
-        search_path = [
-            os.path.normpath(os.path.abspath(
-                os.path.dirname(rule.source_file.path)))]
+        search_path = []  # tuple of (origin, start_from)
+        if dirname.is_absolute():
+            relative_to = PurePosixPath(*dirname.parts[1:])
+        elif rule.source_file.origin:
+            # Search relative to the current file first, only if not doing an
+            # absolute import
+            relative_to = rule.source_file.relpath.parent / dirname
+            search_path.append(rule.source_file.origin)
+        else:
+            relative_to = dirname
         search_path.extend(compilation.compiler.search_path)
 
         for prefix, suffix in product(('_', ''), search_exts):
             filename = prefix + basename + suffix
-            for directory in search_path:
-                path = os.path.normpath(
-                    os.path.join(directory, dirname, filename))
+            for origin in search_path:
+                relpath = relative_to / filename
+                # Lexically (ignoring symlinks!) eliminate .. from the part
+                # of the path that exists within Sass-space.  pathlib
+                # deliberately doesn't do this, but os.path does.
+                relpath = PurePosixPath(os.path.normpath(str(relpath)))
 
-                if path == rule.source_file.path:
+                if rule.source_file.key == (origin, relpath):
                     # Avoid self-import
                     # TODO is this what ruby does?
                     continue
 
-                if not os.path.exists(path):
-                    continue
-
-                # Ensure that no one used .. to escape the search path
-                for valid_path in compilation.compiler.search_path:
-                    rel = os.path.relpath(path, start=valid_path)
-                    if not rel.startswith('../'):
-                        break
-                else:
+                path = origin / relpath
+                if not path.exists():
                     continue
 
                 # All good!
-                return SourceFile.from_filename(path)
+                # TODO if this file has already been imported, we'll do the
+                # source preparation twice.  make it lazy.
+                return SourceFile.read(origin, relpath)
 
 
 # Alias to make the below declarations less noisy

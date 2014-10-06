@@ -3,6 +3,8 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import division
 
+from pathlib import Path
+
 import six
 
 from scss.calculator import Calculator
@@ -42,7 +44,6 @@ _default_scss_vars = {
 }
 
 
-# TODO move this to a back-compat module so init is finally empty
 # TODO using this should spew an actual deprecation warning
 class Scss(object):
     """Original programmatic interface to the compiler.
@@ -121,6 +122,13 @@ class Scss(object):
         elif output_style is False:
             output_style = 'legacy'
 
+        fixed_search_path = []
+        for path in search_paths:
+            if isinstance(path, six.string_types):
+                fixed_search_path.append(Path(path))
+            else:
+                fixed_search_path.append(path)
+
         # Build the compiler
         compiler = Compiler(
             namespace=root_namespace,
@@ -131,7 +139,7 @@ class Scss(object):
                 CompassExtension,
                 BootstrapExtension,
             ],
-            search_path=search_paths,
+            search_path=fixed_search_path,
             live_errors=self.live_errors,
             generate_source_map=self._scss_opts.get('debug_info', False),
             output_style=output_style,
@@ -152,22 +160,25 @@ class Scss(object):
         elif scss_string is not None:
             source = SourceFile.from_string(
                 scss_string,
-                path=filename,
+                relpath=filename,
                 is_sass=is_sass,
             )
             compilation.add_source(source)
         elif scss_file is not None:
-            source = SourceFile.from_filename(
-                scss_file,
-                path=filename,
-                is_sass=is_sass,
-            )
+            # This is now the only way to allow forcibly overriding the
+            # filename a source "thinks" it is
+            with open(scss_file, 'rb') as f:
+                source = SourceFile.from_file(
+                    scss_file,
+                    relpath=filename or scss_file,
+                    is_sass=is_sass,
+                )
             compilation.add_source(source)
 
         # Plus the ones from the constructor
         if self._scss_files:
             for name, contents in list(self._scss_files.items()):
-                source = SourceFile.from_string(contents, path=name)
+                source = SourceFile.from_string(contents, relpath=name)
                 compilation.add_source(source)
 
         return compiler.call_and_catch_errors(compilation.run)

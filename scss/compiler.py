@@ -5,10 +5,8 @@ from __future__ import division
 
 from collections import defaultdict
 from enum import Enum
-import glob
-from itertools import product
 import logging
-import os.path
+from pathlib import Path
 import re
 import sys
 import warnings
@@ -86,7 +84,7 @@ class Compiler(object):
     compilation.  Main entry point into compiling Sass.
     """
     def __init__(
-            self, root='', search_path=(),
+            self, root=Path(), search_path=(),
             namespace=None, extensions=(CoreExtension,),
             output_style='nested', generate_source_map=False,
             live_errors=False, warn_unused_imports=False,
@@ -100,16 +98,21 @@ class Compiler(object):
         :param root: Directory to treat as the "project root".  Search paths
             and some custom extensions (e.g. Compass) are relative to this
             directory.  Defaults to the current directory.
+        :type root: :class:`pathlib.Path`
         :param search_path: List of paths to search for ``@import``s, relative
             to ``root``.  Absolute and parent paths are allowed here, but
             ``@import`` will refuse to load files that aren't in one of the
             directories here.  Defaults to only the root.
+        :type search_path: list of :class:`pathlib.Path` objects, or something
+            that implements a similar interface (useful for custom pseudo
+            filesystems)
         """
+        # TODO perhaps polite to automatically cast any string paths to Path?
+        # but have to be careful since the api explicitly allows dummy objects.
         if root is None:
             self.root = None
         else:
-            # normpath() will (textually) eliminate any use of ..
-            self.root = os.path.normpath(os.path.abspath(root))
+            self.root = root.resolve()
 
         self.search_path = tuple(
             self.normalize_path(path)
@@ -144,13 +147,11 @@ class Compiler(object):
         self.super_selector = super_selector
 
     def normalize_path(self, path):
+        if path.is_absolute():
+            return path
         if self.root is None:
-            if not os.path.isabs(path):
-                raise IOError("Can't make absolute path when root is None")
-        else:
-            path = os.path.join(self.root, path)
-
-        return os.path.normpath(path)
+            raise IOError("Can't make absolute path when root is None")
+        return self.root / path
 
     def make_compilation(self):
         return Compilation(self)
@@ -192,17 +193,20 @@ class Compiler(object):
 
 
 def compile_file(filename, compiler_class=Compiler, **kwargs):
-    """Compile a single file, and return a string of CSS.
+    """Compile a single file (provided as a :class:`pathlib.Path`), and return
+    a string of CSS.
 
     Keyword arguments are passed along to the underlying `Compiler`.
 
     Note that the search path is set to the file's containing directory by
     default, unless you explicitly pass a ``search_path`` kwarg.
+
+    :param filename: Path to the file to compile.
+    :type filename: str, bytes, or :class:`pathlib.Path`
     """
+    filename = Path(filename)
     if 'search_path' not in kwargs:
-        kwargs['search_path'] = [
-            os.path.abspath(os.path.dirname(filename)),
-        ]
+        kwargs['search_path'] = [filename.parent.resolve()]
 
     compiler = compiler_class(**kwargs)
     return compiler.compile(filename)
@@ -245,10 +249,11 @@ class Compilation(object):
             'control_scoping', self.compiler.loops_have_own_scopes)
 
     def add_source(self, source):
-        if source.path in self.source_index:
-            raise KeyError("Duplicate source %r" % source.path)
+        if source.key in self.source_index:
+            return self.source_index[source.key]
         self.sources.append(source)
-        self.source_index[source.path] = source
+        self.source_index[source.key] = source
+        return source
 
     def run(self):
         # this will compile and manage rule: child objects inside of a node
@@ -844,9 +849,7 @@ class Compilation(object):
                 # Didn't find anything!
                 raise SassImportError(name, self.compiler, rule=rule)
 
-            if source.path not in self.source_index:
-                self.add_source(source)
-            source = self.source_index[source.path]
+            source = self.add_source(source)
 
             if rule.namespace.has_import(source):
                 # If already imported in this scope, skip

@@ -163,7 +163,7 @@ class SassImportError(SassBaseError):
             .format(
                 self.bad_name,
                 ", ".join(repr(ext) for ext in self.compiler.extensions),
-                "\n  ".join(self.compiler.search_path),
+                "\n  ".join(str(path) for path in self.compiler.search_path),
             )
         )
 
