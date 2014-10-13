@@ -10,7 +10,8 @@ from setuptools import setup, Extension, Feature
 
 # this imports PROJECT, URL, VERSION, AUTHOR, AUTHOR_EMAIL, LICENSE,
 # DOWNLOAD_URL
-exec(open('scss/scss_meta.py').read())
+with open('scss/scss_meta.py') as f:
+    exec(f.read().decode('utf8'))
 
 # Dependencies
 install_requires = ['six']
@@ -75,7 +76,8 @@ def echo(msg=''):
 
 def read(fname):
     try:
-        return open(os.path.join(os.path.dirname(__file__), fname)).read().strip()
+        with open(os.path.join(os.path.dirname(__file__), fname)) as f:
+            return f.read().decode('utf8').strip()
     except IOError:
         return ''
 
