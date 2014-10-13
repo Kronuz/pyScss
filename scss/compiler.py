@@ -92,7 +92,7 @@ class Compiler(object):
             loops_have_own_scopes=True,
             undefined_variables_fatal=True,
             super_selector='',
-        ):
+            ):
         """Configure a compiler.
 
         :param root: Directory to treat as the "project root".  Search paths
@@ -103,9 +103,9 @@ class Compiler(object):
             to ``root``.  Absolute and parent paths are allowed here, but
             ``@import`` will refuse to load files that aren't in one of the
             directories here.  Defaults to only the root.
-        :type search_path: list of :class:`pathlib.Path` objects, or something
-            that implements a similar interface (useful for custom pseudo
-            filesystems)
+        :type search_path: list of strings, :class:`pathlib.Path` objects, or
+            something that implements a similar interface (useful for custom
+            pseudo filesystems)
         """
         # TODO perhaps polite to automatically cast any string paths to Path?
         # but have to be careful since the api explicitly allows dummy objects.
@@ -147,6 +147,8 @@ class Compiler(object):
         self.super_selector = super_selector
 
     def normalize_path(self, path):
+        if isinstance(path, six.string_types):
+            path = Path(path)
         if path.is_absolute():
             return path
         if self.root is None:
