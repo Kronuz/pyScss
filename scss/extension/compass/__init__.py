@@ -116,4 +116,4 @@ __all__ = ['CompassExtension']
 import scss.extension.compass.gradients
 import scss.extension.compass.helpers
 import scss.extension.compass.images
-import scss.extension.compass.sprites
+import scss.extension.compass.sprites  # NOQA
