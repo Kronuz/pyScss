@@ -30,6 +30,7 @@ from scss.extension import Extension
 from scss.namespace import Namespace
 from scss.types import Boolean, List, String, Url
 from scss.util import getmtime, make_data_url, make_filename_hash
+from scss.extension import Cache
 
 log = logging.getLogger(__name__)
 
@@ -76,8 +77,13 @@ class FontsExtension(Extension):
 # Alias to make the below declarations less noisy
 ns = FontsExtension.namespace
 
-font_sheets = {}
-_font_sheet_cache = {}
+
+def _assets_root():
+    return config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets')
+
+
+def _get_cache(prefix):
+    return Cache((config.CACHE_ROOT or _assets_root(), prefix))
 
 
 def ttfautohint(ttf):
@@ -124,6 +130,8 @@ def ttf2eot(ttf):
 def font_sheet(g, **kwargs):
     if not fontforge:
         raise Exception("Fonts manipulation require fontforge")
+
+    font_sheets = _get_cache('font_sheets')
 
     now_time = time.time()
 
@@ -181,7 +189,7 @@ def font_sheet(g, **kwargs):
             'ttf': key + '.ttf',
             'svg': key + '.svg',
         }
-        ASSETS_ROOT = config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets')
+        ASSETS_ROOT = _assets_root()
         asset_paths = dict((type_, os.path.join(ASSETS_ROOT, asset_file)) for type_, asset_file in asset_files.items())
         cache_path = os.path.join(config.CACHE_ROOT or ASSETS_ROOT, key + '.cache')
 
@@ -370,8 +378,9 @@ def font_sheet(g, **kwargs):
                     del font_sheets[a]
                 log.warning("Exceeded maximum number of font sheets (%s)" % MAX_FONT_SHEETS)
             font_sheets[asset.render()] = font_sheet
+        font_sheet_cache = _get_cache('font_sheet_cache')
         for file_, codepoint in codepoints:
-            _font_sheet_cache[file_] = codepoint
+            font_sheet_cache[file_] = codepoint
     # TODO this sometimes returns an empty list, or is never assigned to
     return asset
 
@@ -380,6 +389,7 @@ def font_sheet(g, **kwargs):
 @ns.declare
 def glyphs(sheet, remove_suffix=False):
     sheet = sheet.render()
+    font_sheets = _get_cache('font_sheets')
     font_sheet = font_sheets.get(sheet, {})
     return List([String.unquoted(f) for f in sorted(set(f.rsplit('-', 1)[0] if remove_suffix else f for f in font_sheet if not f.startswith('*')))])
 
@@ -391,6 +401,7 @@ def glyph_classes(sheet):
 
 @ns.declare
 def font_url(sheet, type_, only_path=False, cache_buster=True):
+    font_sheets = _get_cache('font_sheets')
     font_sheet = font_sheets.get(sheet.render())
     type_ = String.unquoted(type_).render()
     if font_sheet:
@@ -425,6 +436,7 @@ def font_format(type_):
 @ns.declare
 def has_glyph(sheet, glyph):
     sheet = sheet.render()
+    font_sheets = _get_cache('font_sheets')
     font_sheet = font_sheets.get(sheet)
     glyph_name = String.unquoted(glyph).value
     glyph = font_sheet and font_sheet.get(glyph_name)
@@ -436,6 +448,7 @@ def has_glyph(sheet, glyph):
 @ns.declare
 def glyph_code(sheet, glyph):
     sheet = sheet.render()
+    font_sheets = _get_cache('font_sheets')
     font_sheet = font_sheets.get(sheet)
     glyph_name = String.unquoted(glyph).value
     glyph = font_sheet and font_sheet.get(glyph_name)

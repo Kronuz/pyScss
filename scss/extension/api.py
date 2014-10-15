@@ -35,6 +35,12 @@ class Cache(object):
         else:
             self.__class__._cache.clear()
 
+    def __len__(self):
+        return len(self.__class__._cache.setdefault(self.prefix, {}))
+
+    def __iter__(self):
+        return iter(self.__class__._cache.setdefault(self.prefix, {}))
+
     def __getitem__(self, key):
         return self.get(key, _no_default)
 

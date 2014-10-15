@@ -30,12 +30,12 @@ except ImportError:
 
 from six.moves import xrange
 
-from . import _image_size_cache
 from . import CompassExtension
 from .layouts import PackedSpritesLayout, HorizontalSpritesLayout, VerticalSpritesLayout, DiagonalSpritesLayout
 from scss import config
 from scss.types import Color, List, Number, String, Boolean
 from scss.util import escape, getmtime, make_data_url, make_filename_hash
+from scss.extension import Cache
 
 log = logging.getLogger(__name__)
 ns = CompassExtension.namespace
@@ -44,11 +44,16 @@ MAX_SPRITE_MAPS = 4096
 KEEP_SPRITE_MAPS = int(MAX_SPRITE_MAPS * 0.8)
 
 
+def _assets_root():
+    return config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets')
+
+
+def _get_cache(prefix):
+    return Cache((config.CACHE_ROOT or _assets_root(), prefix))
+
+
 # ------------------------------------------------------------------------------
 # Compass-like functionality for sprites and images
-
-sprite_maps = {}
-
 
 def alpha_composite(im1, im2, offset=None, box=None, opacity=1):
     im1size = im1.size
@@ -118,6 +123,8 @@ def sprite_map(g, **kwargs):
     if not Image:
         raise Exception("Images manipulation require PIL")
 
+    sprite_maps = _get_cache('sprite_maps')
+
     now_time = time.time()
 
     globs = String(g, quotes=None).value
@@ -167,7 +174,7 @@ def sprite_map(g, **kwargs):
         key = [f for (f, s) in files] + [repr(kwargs), config.ASSETS_URL]
         key = map_name + '-' + make_filename_hash(key)
         asset_file = key + '.png'
-        ASSETS_ROOT = config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets')
+        ASSETS_ROOT = _assets_root()
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
         cache_path = os.path.join(config.CACHE_ROOT or ASSETS_ROOT, asset_file + '.cache')
 
@@ -409,8 +416,9 @@ def sprite_map(g, **kwargs):
                     del sprite_maps[a]
                 log.warning("Exceeded maximum number of sprite maps (%s)" % MAX_SPRITE_MAPS)
             sprite_maps[asset.render()] = sprite_map
+        image_size_cache = _get_cache('image_size_cache')
         for file_, size in sizes:
-            _image_size_cache[file_] = size
+            image_size_cache[file_] = size
     # TODO this sometimes returns an empty list, or is never assigned to
     return asset
 
@@ -422,6 +430,7 @@ def sprite_map_name(map):
     contains the sprites.
     """
     map = map.render()
+    sprite_maps = _get_cache('sprite_maps')
     sprite_map = sprite_maps.get(map)
     if not sprite_map:
         log.error("No sprite map found: %s", map, extra={'stack': True})
@@ -438,6 +447,7 @@ def sprite_file(map, sprite):
     image_width and image_height helpers.
     """
     map = map.render()
+    sprite_maps = _get_cache('sprite_maps')
     sprite_map = sprite_maps.get(map)
     sprite_name = String.unquoted(sprite).value
     sprite = sprite_map and sprite_map.get(sprite_name)
@@ -454,6 +464,7 @@ def sprite_file(map, sprite):
 @ns.declare
 def sprites(map, remove_suffix=False):
     map = map.render()
+    sprite_maps = _get_cache('sprite_maps')
     sprite_map = sprite_maps.get(map, {})
     return List([String.unquoted(s) for s in sorted(set(s.rsplit('-', 1)[0] if remove_suffix else s for s in sprite_map if not s.startswith('*')))])
 
@@ -470,6 +481,7 @@ def sprite(map, sprite, offset_x=None, offset_y=None, cache_buster=True):
     property
     """
     map = map.render()
+    sprite_maps = _get_cache('sprite_maps')
     sprite_map = sprite_maps.get(map)
     sprite_name = String.unquoted(sprite).value
     sprite = sprite_map and sprite_map.get(sprite_name)
@@ -498,6 +510,7 @@ def sprite_url(map, cache_buster=True):
     Returns a url to the sprite image.
     """
     map = map.render()
+    sprite_maps = _get_cache('sprite_maps')
     sprite_map = sprite_maps.get(map)
     if not sprite_map:
         log.error("No sprite map found: %s", map, extra={'stack': True})
@@ -513,6 +526,7 @@ def sprite_url(map, cache_buster=True):
 @ns.declare
 def has_sprite(map, sprite):
     map = map.render()
+    sprite_maps = _get_cache('sprite_maps')
     sprite_map = sprite_maps.get(map)
     sprite_name = String.unquoted(sprite).value
     sprite = sprite_map and sprite_map.get(sprite_name)
@@ -528,6 +542,7 @@ def sprite_position(map, sprite, offset_x=None, offset_y=None):
     This is suitable for use as a value to background-position.
     """
     map = map.render()
+    sprite_maps = _get_cache('sprite_maps')
     sprite_map = sprite_maps.get(map)
     sprite_name = String.unquoted(sprite).value
     sprite = sprite_map and sprite_map.get(sprite_name)

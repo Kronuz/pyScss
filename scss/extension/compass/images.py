@@ -10,12 +10,12 @@ import os.path
 import six
 from six.moves import xrange
 
-from . import _image_size_cache
 from . import CompassExtension
 from .helpers import add_cache_buster
 from scss import config
 from scss.types import Color, List, Number, String, Url
-from scss.util import escape, getmtime, make_data_url, make_filename_hash
+from scss.util import getmtime, make_data_url, make_filename_hash
+from scss.extension import Cache
 
 try:
     from PIL import Image
@@ -33,6 +33,14 @@ def _images_root():
     return config.STATIC_ROOT if config.IMAGES_ROOT is None else config.IMAGES_ROOT
 
 
+def _assets_root():
+    return config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets')
+
+
+def _get_cache(prefix):
+    return Cache((config.CACHE_ROOT or _assets_root(), prefix))
+
+
 def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_color=None, inline=False, mime_type=None, spacing=None, collapse_x=None, collapse_y=None):
     """
     src_color - a list of or a single color to be replaced by each corresponding dst_color colors
@@ -42,6 +50,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
     if inline or dst_color or spacing:
         if not Image:
             raise Exception("Images manipulation require PIL")
+
     filepath = String.unquoted(path).value
     fileext = os.path.splitext(filepath)[1].lstrip('.').lower()
     if mime_type:
@@ -89,7 +98,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
         file_name, file_ext = os.path.splitext(os.path.normpath(filepath).replace(os.sep, '_'))
         key = (filetime, src_color, dst_color, spacing)
         asset_file = file_name + '-' + make_filename_hash(key) + file_ext
-        ASSETS_ROOT = config.ASSETS_ROOT or os.path.join(config.STATIC_ROOT, 'assets')
+        ASSETS_ROOT = _assets_root()
         asset_path = os.path.join(ASSETS_ROOT, asset_file)
 
         if os.path.exists(asset_path):
@@ -215,10 +224,13 @@ def image_width(image):
     """
     if not Image:
         raise Exception("Images manipulation require PIL")
+
+    image_size_cache = _get_cache('image_size_cache')
+
     filepath = String.unquoted(image).value
     path = None
     try:
-        width = _image_size_cache[filepath][0]
+        width = image_size_cache[filepath][0]
     except KeyError:
         width = 0
         IMAGES_ROOT = _images_root()
@@ -237,7 +249,7 @@ def image_width(image):
             image = Image.open(path)
             size = image.size
             width = size[0]
-            _image_size_cache[filepath] = size
+            image_size_cache[filepath] = size
     return Number(width, 'px')
 
 
@@ -247,12 +259,13 @@ def image_height(image):
     Returns the height of the image found at the path supplied by `image`
     relative to your project's images directory.
     """
+    image_size_cache = _get_cache('image_size_cache')
     if not Image:
         raise Exception("Images manipulation require PIL")
     filepath = String.unquoted(image).value
     path = None
     try:
-        height = _image_size_cache[filepath][1]
+        height = image_size_cache[filepath][1]
     except KeyError:
         height = 0
         IMAGES_ROOT = _images_root()
@@ -271,5 +284,5 @@ def image_height(image):
             image = Image.open(path)
             size = image.size
             height = size[1]
-            _image_size_cache[filepath] = size
+            image_size_cache[filepath] = size
     return Number(height, 'px')

@@ -15,11 +15,6 @@ from scss.types import Number
 from scss.types import String
 
 
-# Global cache of image sizes, shared between sprites and images libraries.
-# TODO put on the extension, somehow.
-_image_size_cache = {}
-
-
 class CompassExtension(Extension):
     name = 'compass'
     namespace = Namespace()
