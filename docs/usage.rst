@@ -9,8 +9,11 @@ known to work.  Install with pip::
 
     pip install pyScss
 
-Its lone Python dependency is the ``six`` library, which pip should install for
-you.
+It has a handful of pure-Python dependencies, which pip should install for you:
+
+* ``six``
+* ``enum34`` (for Python 3.3 and below)
+* ``pathlib`` (for Python 3.3 and below)
 
 There's also an optional C speedup module, which requires having ``libpcre``
 and its development headers installed, with UTF-8 support enabled (which it is
@@ -22,17 +25,17 @@ Usage
 
 Run from the command line by using ``-m``::
 
-    python -mscss < file.scss
+    python -m scss < file.scss
 
 Specify directories to search for imports with ``-I``.  See ``python -mscss
 --help`` for more options.
 
 .. note::
 
-    ``-mscss`` will only work in Python 2.7 and above.  For Python 2.5 and 2.6,
-    ``-m`` doesn't work with packages, and you need to invoke::
+    ``-mscss`` will only work in Python 2.7 and above.  In Python 2.6, ``-m``
+    doesn't work with packages, and you need to invoke this instead::
 
-        python -mscss.tool
+        python -m scss.tool
 
 
 
@@ -66,8 +69,8 @@ Example session::
 Compass example
 ---------------
 
-With ``--load-path`` or ``scss.config.LOAD_PATHS`` set to Compass and Blueprint
-roots, you can compile with Compass like with the following::
+With ``--load-path`` set to Compass and Blueprint roots, you can compile with
+Compass like with the following::
 
     @option compress: no;
 

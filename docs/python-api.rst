@@ -1,8 +1,19 @@
 Python API
 ==========
 
+Legacy API
+----------
+
+.. warning::
+
+    This API is still supported while the new API below is worked out, but it's
+    slated for deprecation and eventual removal.  If you don't need any of the
+    features not yet available with the new API, consider porting as soon as
+    possible.
+
+
 Compiling files
----------------
+***************
 
 Very basic usage is simple enough::
 
@@ -12,10 +23,10 @@ Very basic usage is simple enough::
 
 
 Configuration
--------------
+*************
 
-There are several configuration variables in the ``scss.config`` module that
-you may wish to change.
+There are several configuration variables in the :py:mod:`scss.config` module
+that you may wish to change.
 
 ``PROJECT_ROOT``: Root of your entire project.  Used only to construct defaults
 for other variables.  Defaults to the root of the pyScss installation, which is
@@ -44,19 +55,9 @@ spritesheet.  Defaults to ``vertical``; may be changed to ``horizontal``,
 
 ``DEBUG``: Set to true to make parse errors fatal.  Defaults to false.
 
-.. warning::
-
-    Configuration via monkeypatching is fraught with issues.  If you don't need
-    the Compass sprite functionality, stick with passing ``search_paths`` to
-    the ``Scss`` constructor, and don't touch these variables at all.
-
-    The current plan is to introduce a new mechanism for Compass configuration
-    in 1.3 with deprecation warnings, and remove ``scss.config`` entirely in
-    2.0.
-
 
 Django example
---------------
+**************
 
 A rough example of using pyScss with Django::
 
@@ -136,12 +137,105 @@ A rough example of using pyScss with Django::
     underscored functions.
 
 
+New API
+-------
+
+The simplest example::
+
+    from scss.compiler import compile_string
+
+    print(compile_string("a { color: red + green; }"))
+
+:py:func:`scss.compiler.compile_string` is just a simple wrapper around the
+:py:class:`scss.compiler.Compiler` class::
+
+    from scss.compiler import Compiler
+
+    compiler = Compiler()
+    print(compiler.compile_string("a { color: red + green; }"))
+
+The most common arguments passed to `Compiler` are:
+
+**search_path**
+    A list of paths to search for ``@import``\ s.  May be either strings or
+    :py:class:`pathlib.Path` objects.
+
+
 Extending pyScss
 ----------------
 
-There is some support for adding custom functions from Python, but the API is
-explicitly undocumented and subject to change.  Watch this space.
+A significant advantage to using pyScss is that you can inject Python values
+and code into the Sass compilation process.
 
-.. todo::
+Injecting values
+****************
 
-    Document the extension API once it's final.
+You can define Sass values by creating and populating a :class:`scss.namespace.Namespace`::
+
+    from scss.namespace import Namespace
+    from scss.types import String
+
+    namespace = Namespace()
+    namespace.set_variable('$base-url', String('http://localhost/'))
+    compiler = Compiler(namespace=namespace)
+    compiler.compile_string('div { background: url($base-url); }')
+
+Now, ``$base-url`` will be available to the compiled Sass code, just like any
+other variable.  Note that the value given must be one of the Sass types
+defined in :py:mod:`scss.types`.
+
+Injecting functions
+*******************
+
+You can inject functions the same way::
+
+    def square(x):
+        return x * x
+
+    namespace.set_function('square', 1, square)
+
+This creates a function ``square`` for use in your Sass source.  Optional
+arguments, keyword arguments, and slurpy arguments are all supported
+automatically.  The arguments are Sass types, and the return value must be one
+as well.
+
+The second argument is the arity — the number of required arguments, or None if
+any number of arguments is allowed.  Sass functions can be overloaded by arity,
+so this is required.  For functions with optional arguments, adding the same
+function multiple times can be tedious and error-prone, so the ``declare``
+decorator is also available::
+
+    @namespace.declare
+    def square(x):
+        return x * x
+
+This will inspect the arguments for you and register the function with all
+arities it accepts.  The function name is determined from the Python name:
+underscores become hyphens, and trailing underscores are removed.  If you'd
+prefer to be more explicit, there's also a ``declare_alias``::
+
+    @namespace.declare_alias('square')
+    def square(x):
+        return x * x
+
+
+API reference
+-------------
+
+scss.compiler
+*************
+
+.. automodule:: scss.compiler
+    :members:
+
+scss.namespace
+**************
+
+.. automodule:: scss.namespace
+    :members:
+
+scss.extension
+**************
+
+.. automodule:: scss.extension
+    :members:
