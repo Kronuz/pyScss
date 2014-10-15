@@ -43,19 +43,17 @@ class CoreExtension(Extension):
         else:
             search_exts = ['.scss', '.sass']
 
-        dirname = path.parent
+        relative_to = path.parent
         basename = path.stem
 
         search_path = []  # tuple of (origin, start_from)
-        if dirname.is_absolute():
-            relative_to = PurePosixPath(*dirname.parts[1:])
+        if relative_to.is_absolute():
+            relative_to = PurePosixPath(*relative_to.parts[1:])
         elif rule.source_file.origin:
             # Search relative to the current file first, only if not doing an
             # absolute import
-            relative_to = rule.source_file.relpath.parent / dirname
-            search_path.append(rule.source_file.origin)
-        else:
-            relative_to = dirname
+            search_path.append(
+                rule.source_file.origin / rule.source_file.relpath.parent)
         search_path.extend(compilation.compiler.search_path)
 
         for prefix, suffix in product(('_', ''), search_exts):
