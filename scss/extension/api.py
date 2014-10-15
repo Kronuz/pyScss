@@ -4,6 +4,47 @@ from __future__ import division
 from __future__ import print_function
 
 
+_no_default = object()
+
+
+class Cache(object):
+    """Serves as a local memory cache storage for extensions usage.
+    """
+    _cache = {}
+
+    def __init__(self, prefix=None):
+        self.prefix = prefix
+
+    def get(self, key, default=None):
+        try:
+            return self.__class__._cache[self.prefix][key]
+        except KeyError:
+            if default is _no_default:
+                raise
+            return default
+
+    def set(self, key, value):
+        self.__class__._cache.setdefault(self.prefix, {})[key] = value
+
+    def clear_cache(self, key=None):
+        if key:
+            try:
+                del self.__class__._cache[self.prefix][key]
+            except KeyError:
+                pass
+        else:
+            self.__class__._cache.clear()
+
+    def __getitem__(self, key):
+        return self.get(key, _no_default)
+
+    def __setitem__(self, key, value):
+        return self.set(key, value)
+
+    def __delitem__(self, key):
+        self.clear_cache(key)
+
+
 class Extension(object):
     """An extension to the Sass compile process.  Subclass to add your own
     behavior.

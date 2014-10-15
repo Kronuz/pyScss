@@ -6,8 +6,9 @@ from __future__ import division
 from __future__ import print_function
 
 # Re-export
+from .api import Cache
 from .api import Extension
 from .api import NamespaceAdapterExtension
 
 
-__all__ = ['Extension', 'NamespaceAdapterExtension']
+__all__ = ['Cache', 'Extension', 'NamespaceAdapterExtension']
