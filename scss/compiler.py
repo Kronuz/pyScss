@@ -283,21 +283,13 @@ class Compilation(object):
                 exceeded = " (IE exceeded!)"
                 log.error("Maximum number of supported selectors in Internet Explorer (4095) exceeded!")
             if files > 1 and self.compiler.generate_source_map:
-                if not source_file.is_real_file:
-                    final_cont += "/* %s %s generated add up to a total of %s %s accumulated%s */\n" % (
-                        total_selectors,
-                        'selector' if total_selectors == 1 else 'selectors',
-                        all_selectors,
-                        'selector' if all_selectors == 1 else 'selectors',
-                        exceeded)
-                else:
-                    final_cont += "/* %s %s generated from '%s' add up to a total of %s %s accumulated%s */\n" % (
-                        total_selectors,
-                        'selector' if total_selectors == 1 else 'selectors',
-                        source_file.path,
-                        all_selectors,
-                        'selector' if all_selectors == 1 else 'selectors',
-                        exceeded)
+                final_cont += "/* %s %s generated from '%s' add up to a total of %s %s accumulated%s */\n" % (
+                    total_selectors,
+                    'selector' if total_selectors == 1 else 'selectors',
+                    source_file.path,
+                    all_selectors,
+                    'selector' if all_selectors == 1 else 'selectors',
+                    exceeded)
             final_cont += fcont
 
         return final_cont
