@@ -1,0 +1,16 @@
+@option style:legacy;
+
+$images: sprite-map("squares/*.png", $cache-buster: false);
+
+.mod {
+  background: $images;
+  &.ten-by-ten {
+    background: sprite($images, "ten-by-ten", $use-percentages: true, $cache-buster: false);
+  }
+  &.twenty-by-twenty {
+    $file: sprite-file($images, "twenty-by-twenty");
+    width: image-width($file);
+    height: image-height($file);
+    background-position: sprite-position($images, "twenty-by-twenty", $use-percentages: true);
+  }
+}

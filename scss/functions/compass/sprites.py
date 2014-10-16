@@ -410,6 +410,7 @@ def sprite_map(g, **kwargs):
             sprite_map['*k*'] = key
             sprite_map['*n*'] = map_name
             sprite_map['*t*'] = filetime
+            sprite_map['*s*'] = new_image.size
 
             sizes = zip(files, sizes)
             cache_tmp = tempfile.NamedTemporaryFile(delete=False, dir=ASSETS_ROOT)
@@ -485,7 +486,9 @@ def sprite_classes(map):
 @register('sprite', 3)
 @register('sprite', 4)
 @register('sprite', 5)
-def sprite(map, sprite, offset_x=None, offset_y=None, cache_buster=True):
+@register('sprite', 6)
+def sprite(map, sprite, offset_x=None, offset_y=None, use_percentages=False,
+           cache_buster=True):
     """
     Returns the image and background position for use in a single shorthand
     property
@@ -502,14 +505,20 @@ def sprite(map, sprite, offset_x=None, offset_y=None, cache_buster=True):
         url = '%s%s' % (config.ASSETS_URL, sprite_map['*f*'])
         if cache_buster:
             url += '?_=%s' % sprite_map['*t*']
-        x = Number(offset_x or 0, 'px')
-        y = Number(offset_y or 0, 'px')
-        if not x.value or (x.value <= -1 or x.value >= 1) and not x.is_simple_unit('%'):
-            x -= Number(sprite[2], 'px')
-        if not y.value or (y.value <= -1 or y.value >= 1) and not y.is_simple_unit('%'):
-            y -= Number(sprite[3], 'px')
+        unit = '%' if use_percentages else 'px'
+        coors = [Number(offset_x or 0, unit), Number(offset_y or 0, unit)]
+        map_size = sprite_map['*s*']
+        for i, coor in enumerate(coors):
+            if not coor.value or (coor.value <= -1 or coor.value >= 1) \
+            and (coor.is_simple_unit('%') and unit == '%' or
+                 coor.is_simple_unit('px') and unit == 'px'):
+                value = sprite[i + 2]
+                if use_percentages and value:
+                    value = -100.0 * value / (map_size[i] - sprite[0][i])
+                coors[i] -= Number(value, unit)
+
         url = "url(%s)" % escape(url)
-        return List([String.unquoted(url), x, y])
+        return List([String.unquoted(url)] + coors)
     return List([Number(0), Number(0)])
 
 
@@ -546,7 +555,9 @@ def has_sprite(map, sprite):
 @register('sprite-position', 2)
 @register('sprite-position', 3)
 @register('sprite-position', 4)
-def sprite_position(map, sprite, offset_x=None, offset_y=None):
+@register('sprite-position', 5)
+def sprite_position(map, sprite, offset_x=None, offset_y=None,
+                    use_percentages=False):
     """
     Returns the position for the original image in the sprite.
     This is suitable for use as a value to background-position.
@@ -560,25 +571,33 @@ def sprite_position(map, sprite, offset_x=None, offset_y=None):
     elif not sprite:
         log.error("No sprite found: %s in %s", sprite_name, sprite_map['*n*'], extra={'stack': True})
     if sprite:
-        x = None
-        if offset_x is not None and not isinstance(offset_x, Number):
-            x = offset_x
-        if not x or x.value not in ('left', 'right', 'center'):
-            if x:
-                offset_x = None
-            x = Number(offset_x or 0, 'px')
-            if not x.value or (x.value <= -1 or x.value >= 1) and not x.is_simple_unit('%'):
-                x -= Number(sprite[2], 'px')
-        y = None
-        if offset_y is not None and not isinstance(offset_y, Number):
-            y = offset_y
-        if not y or y.value not in ('top', 'bottom', 'center'):
-            if y:
-                offset_y = None
-            y = Number(offset_y or 0, 'px')
-            if not y.value or (y.value <= -1 or y.value >= 1) and not y.is_simple_unit('%'):
-                y -= Number(sprite[3], 'px')
-        return List([x, y])
+        unit = '%' if use_percentages else 'px'
+        map_size = sprite_map['*s*']
+
+        coors = [offset_x, offset_y]
+        positions = (('left', 'right', 'center'), ('top', 'bottom', 'center'))
+
+        for i, coor in enumerate(coors):
+            c = None
+            if coor is not None and not isinstance(coor, Number):
+                c = coor
+            if not c or c.value not in positions[i]:
+                if c:
+                    coor = None
+                c = Number(offset_x or 0, unit)
+                if not c.value or (c.value <= -1 or c.value >= 1) \
+                and (c.is_simple_unit('%') and unit == '%' or
+                     c.is_simple_unit('px') and unit == 'px'):
+                    value = sprite[i + 2]
+                    if use_percentages and value:
+                        value = -100.0 * value / (map_size[i] - sprite[0][i])
+                    coors[i] = c - Number(value, unit)
+                else:
+                    coors[i] = c
+            else:
+                coors[i] = None
+
+        return List(coors)
     return List([Number(0), Number(0)])
 
 
