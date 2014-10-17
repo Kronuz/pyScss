@@ -158,7 +158,8 @@ parser SassExpression:
         )
 
     rule map_item:
-        atom ":" expr_slst          {{ return (atom, expr_slst) }}
+        expr_slst                   {{ left = expr_slst }}
+        ":" expr_slst               {{ return (left, expr_slst) }}
 
 
     # Lists:

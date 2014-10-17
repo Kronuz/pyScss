@@ -185,10 +185,11 @@ class SassExpression(Parser):
             return ListLiteral(items) if use_list else items[0]
 
     def map_item(self):
-        atom = self.atom()
+        expr_slst = self.expr_slst()
+        left = expr_slst
         self._scan('":"')
         expr_slst = self.expr_slst()
-        return (atom, expr_slst)
+        return (left, expr_slst)
 
     def expr_lst(self):
         expr_slst = self.expr_slst()
@@ -514,7 +515,7 @@ class SassExpression(Parser):
         return Interpolation.maybe(parts)
 
     atom_chks_ = frozenset(['BAREWORD', 'INTERP_START'])
-    expr_map_or_list_rsts__ = frozenset(['LPAR', 'DOUBLE_QUOTE', 'BAREWORD', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'ALPHA_FUNCTION', 'RPAR', 'VAR', 'NUM', 'FNCT', 'LITERAL_FUNCTION', 'BANG_IMPORTANT', 'SINGLE_QUOTE', '","'])
+    expr_map_or_list_rsts__ = frozenset(['LPAR', 'DOUBLE_QUOTE', 'VAR', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'RPAR', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE', '","'])
     u_expr_chks = frozenset(['LPAR', 'DOUBLE_QUOTE', 'BAREWORD', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'ALPHA_FUNCTION', 'VAR', 'NUM', 'FNCT', 'LITERAL_FUNCTION', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
     m_expr_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
     interpolated_bare_url_rsts_ = frozenset(['RPAR', 'INTERP_START', 'BAREURL', 'SPACE'])
