@@ -26,6 +26,7 @@ except:
     fontforge = None
 
 from scss import config
+from scss.errors import SassMissingDependency
 from scss.extension import Extension
 from scss.namespace import Namespace
 from scss.types import Boolean, List, String, Url
@@ -129,7 +130,7 @@ def ttf2eot(ttf):
 @ns.declare
 def font_sheet(g, **kwargs):
     if not fontforge:
-        raise Exception("Fonts manipulation require fontforge")
+        raise SassMissingDependency('fontforge', 'font manipulation')
 
     font_sheets = _get_cache('font_sheets')
 

@@ -12,6 +12,7 @@ import six
 from six.moves import xrange
 
 from scss import config
+from scss.errors import SassMissingDependency
 from scss.extension import Extension
 from scss.namespace import Namespace
 from scss.types import Color, Number, String, List
@@ -275,7 +276,7 @@ def _image_brushed(pixdata, size, density=None, intensity=None, color=None, opac
 @ns.declare
 def background_noise(density=None, opacity=None, size=None, monochrome=False, intensity=(), color=None, background=None, inline=False):
     if not Image:
-        raise Exception("Images manipulation require PIL")
+        raise SassMissingDependency('PIL', 'image manipulation')
 
     density = [Number(v).value for v in List.from_maybe(density)]
     intensity = [Number(v).value for v in List.from_maybe(intensity)]
@@ -325,7 +326,7 @@ def background_noise(density=None, opacity=None, size=None, monochrome=False, in
 @ns.declare
 def background_brushed(density=None, intensity=None, color=None, opacity=None, size=None, monochrome=False, direction=(), spread=(), background=None, inline=False):
     if not Image:
-        raise Exception("Images manipulation require PIL")
+        raise SassMissingDependency('PIL', 'image manipulation')
 
     density = [Number(v).value for v in List.from_maybe(density)]
     intensity = [Number(v).value for v in List.from_maybe(intensity)]
@@ -378,7 +379,7 @@ def background_brushed(density=None, intensity=None, color=None, opacity=None, s
 @ns.declare
 def grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=None, baseline_color=None, background_color=None, inline=False):
     if not Image:
-        raise Exception("Images manipulation require PIL")
+        raise SassMissingDependency('PIL', 'image manipulation')
     if grid_color is None:
         grid_color = (120, 170, 250, 15)
     else:
@@ -443,7 +444,7 @@ def grid_image(left_gutter, width, right_gutter, height, columns=1, grid_color=N
 @ns.declare
 def image_color(color, width=1, height=1):
     if not Image:
-        raise Exception("Images manipulation require PIL")
+        raise SassMissingDependency('PIL', 'image manipulation')
     w = int(Number(width).value)
     h = int(Number(height).value)
     if w <= 0 or h <= 0:

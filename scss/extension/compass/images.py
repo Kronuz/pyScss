@@ -13,6 +13,7 @@ from six.moves import xrange
 from . import CompassExtension
 from .helpers import add_cache_buster
 from scss import config
+from scss.errors import SassMissingDependency
 from scss.types import Color, List, Number, String, Url
 from scss.util import getmtime, make_data_url, make_filename_hash
 from scss.extension import Cache
@@ -49,7 +50,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
     """
     if inline or dst_color or spacing:
         if not Image:
-            raise Exception("Images manipulation require PIL")
+            raise SassMissingDependency('PIL', 'image manipulation')
 
     filepath = String.unquoted(path).value
     fileext = os.path.splitext(filepath)[1].lstrip('.').lower()
@@ -223,7 +224,7 @@ def image_width(image):
     relative to your project's images directory.
     """
     if not Image:
-        raise Exception("Images manipulation require PIL")
+        raise SassMissingDependency('PIL', 'image manipulation')
 
     image_size_cache = _get_cache('image_size_cache')
 
@@ -261,7 +262,7 @@ def image_height(image):
     """
     image_size_cache = _get_cache('image_size_cache')
     if not Image:
-        raise Exception("Images manipulation require PIL")
+        raise SassMissingDependency('PIL', 'image manipulation')
     filepath = String.unquoted(image).value
     path = None
     try:

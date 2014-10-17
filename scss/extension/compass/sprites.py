@@ -33,6 +33,7 @@ from six.moves import xrange
 from . import CompassExtension
 from .layouts import PackedSpritesLayout, HorizontalSpritesLayout, VerticalSpritesLayout, DiagonalSpritesLayout
 from scss import config
+from scss.errors import SassMissingDependency
 from scss.types import Color, List, Number, String, Boolean
 from scss.util import escape, getmtime, make_data_url, make_filename_hash
 from scss.extension import Cache
@@ -121,7 +122,7 @@ def sprite_map(g, **kwargs):
     $collapse-y  - Collapses a size for `y`.
     """
     if not Image:
-        raise Exception("Images manipulation require PIL")
+        raise SassMissingDependency('PIL', 'image manipulation')
 
     sprite_maps = _get_cache('sprite_maps')
 

@@ -168,6 +168,22 @@ class SassImportError(SassBaseError):
         )
 
 
+class SassMissingDependency(SassBaseError):
+    """Error raised when an optional library (e.g., PIL or fontforge) is
+    missing.
+    """
+
+    def __init__(self, library, activity, **kwargs):
+        super(SassMissingDependency, self).__init__(**kwargs)
+
+        self.library = library
+        self.activity = activity
+
+    def format_message(self):
+        return "{0} requires {1}, which is not installed".format(
+            self.activity, self.library)
+
+
 class SassError(SassBaseError):
     """Error class that wraps another exception and attempts to bolt on some
     useful context.

@@ -20,6 +20,7 @@ import pytest
 from scss import config
 from scss.calculator import Calculator
 from scss.extension.compass import CompassExtension
+from scss.tests.util import needs_PIL
 
 
 # TODO many of these tests could also stand to test for failure cases
@@ -36,6 +37,7 @@ def test_image_url(calc):
 
 
 # inline-image
+@needs_PIL
 def test_inline_image(calc, monkeypatch):
     monkeypatch.setattr(config, 'IMAGES_ROOT', os.path.join(config.PROJECT_ROOT, 'tests/files/images'))
 
@@ -45,6 +47,7 @@ def test_inline_image(calc, monkeypatch):
 
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='cur mimetype is defined on windows')
+@needs_PIL
 def test_inline_cursor(calc, monkeypatch):
     monkeypatch.setattr(config, 'IMAGES_ROOT', os.path.join(config.PROJECT_ROOT, 'tests/files/cursors'))
 

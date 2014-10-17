@@ -11,6 +11,8 @@ import pytest
 import scss
 from scss.compiler import compile_file
 import scss.config
+from scss.errors import SassEvaluationError
+from scss.errors import SassMissingDependency
 from scss.extension.core import CoreExtension
 from scss.extension.extra import ExtraExtension
 from scss.extension.fonts import FontsExtension
@@ -115,17 +117,27 @@ class SassItem(pytest.Item):
             search_path.append(include)
         search_path.append(scss_file.parent)
 
-        actual = compile_file(
-            scss_file,
-            output_style='expanded',
-            search_path=search_path,
-            extensions=[
-                CoreExtension,
-                ExtraExtension,
-                FontsExtension,
-                CompassExtension,
-            ],
-        )
+        try:
+            actual = compile_file(
+                scss_file,
+                output_style='expanded',
+                search_path=search_path,
+                extensions=[
+                    CoreExtension,
+                    ExtraExtension,
+                    FontsExtension,
+                    CompassExtension,
+                ],
+            )
+        except SassEvaluationError as e:
+            # Treat any missing dependencies (PIL not installed, fontforge not
+            # installed) as skips
+            # TODO this is slightly cumbersome and sorta defeats the purpose of
+            # having separate exceptions
+            if isinstance(e.exc, SassMissingDependency):
+                pytest.skip(e.format_message())
+            else:
+                raise
 
         # Normalize leading and trailing newlines
         actual = actual.strip('\n')

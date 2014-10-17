@@ -8,25 +8,30 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import scss.extension.extra as libextra
+from scss.tests.util import needs_PIL
 from scss.types import Boolean, Color, Number
 
 
 # TODO: currently these all just call the functions and make sure they pass.
 # would be nice to check the output, though that's a little tedious.
 
+@needs_PIL
 def test_background_noise():
     libextra.background_noise(Number(0.5), Number(0.5), Number(100), Boolean(True), color=Color.from_name('green'))
 
 
+@needs_PIL
 def test_background_brushed():
     libextra.background_brushed(Number(0.5), Number(0.5), Color.from_name('red'), Number(0.5))
 
 
+@needs_PIL
 def test_grid_image():
     # TODO this should accept sass values only  :|
     libextra.grid_image(5, 100, 5, 100)
 
 
+@needs_PIL
 def test_image_color():
     libextra.image_color(Color.from_rgb(1, 1, 0))
     assert True
