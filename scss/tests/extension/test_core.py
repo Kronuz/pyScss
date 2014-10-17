@@ -11,9 +11,6 @@ from scss.calculator import Calculator
 from scss.extension.core import CoreExtension
 from scss.types import Color, Number, String
 
-import pytest
-xfail = pytest.mark.xfail
-
 
 # TODO many of these tests could also stand to test for failure cases
 
@@ -21,8 +18,12 @@ def calc(expression):
     return Calculator(CoreExtension.namespace).evaluate_expression(expression)
 
 
+def render(expression):
+    return calc(expression).render()
+
+
 def assert_equivalent(actual, expected):
-    assert calc(actual).render() == calc(expected).render()
+    assert render(actual) == render(expected)
 
 
 # ------------------------------------------------------------------------------
@@ -165,10 +166,9 @@ def test_alpha_opacity():
     assert calc('opacity(rgba(black, 0))') == Number(0.)
 
 
-@xfail(reason="currently a parse error -- so it still works in practice, but...")
 def test_alpha_ie_filter():
     # alpha() is supposed to leave the IE filter syntax alone
-    assert calc('alpha(filter=20)') == "alpha(filter=20)"
+    assert render('alpha(opacity=20)') == "alpha(opacity=20)"
 
 
 def test_opacify_fadein():
