@@ -19,9 +19,8 @@ Usage::
 
 Python API::
 
-    from scss import Scss
-    compiler = Scss()
-    compiler.compile("a { color: red + green; }")
+    from scss import Compiler
+    Compiler().compile_string("a { color: red + green; }")
 
 
 Features
