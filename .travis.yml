@@ -7,5 +7,7 @@ python:
     - "3.4"
     - pypy
     - pypy3
-install: pip install .
+install:
+    - pip install .
+    - pip install pillow fontforge
 script: py.test
