@@ -6,6 +6,14 @@
 pyScss, a Sass compiler for Python
 ==================================
 
+|build-status| |coverage|
+
+.. |build-status| image:: https://travis-ci.org/Kronuz/pyScss.svg?branch=master
+    :target: https://travis-ci.org/Kronuz/pyScss
+
+.. |coverage| image:: https://coveralls.io/repos/Kronuz/pyScss/badge.png
+    :target: https://coveralls.io/r/Kronuz/pyScss
+
 pyScss is a Python implementation of `Sass`_, a CSS preprocessing language that
 adds variables, expressions, nested rules, mixins, inheritance, and other
 features that help ease the maintenance of large stylesheets.

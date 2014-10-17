@@ -57,13 +57,3 @@ URL = 'http://github.com/Kronuz/pyScss'
 DOWNLOAD_URL = 'http://github.com/Kronuz/pyScss/tarball/v' + VERSION
 LICENSE = "MIT"
 PROJECT = "pyScss"
-
-if __name__ == "__main__":
-    print('VERSION      = ' + VERSION)
-    print('REVISION     = ' + REVISION)
-    print('BUILD_INFO   = ' + BUILD_INFO)
-    print('AUTHOR       = ' + AUTHOR)
-    print('AUTHOR_EMAIL = ' + AUTHOR_EMAIL)
-    print('URL          = ' + URL)
-    print('LICENSE      = ' + LICENSE)
-    print('PROJECT      = ' + PROJECT)
