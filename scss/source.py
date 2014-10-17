@@ -186,7 +186,12 @@ class SourceFile(object):
             return cls.from_file(f, origin, relpath, **kwargs)
 
     # back-compat
-    from_filename = from_path
+    @classmethod
+    def from_filename(cls, path_string, origin=MISSING, **kwargs):
+        """ Read Sass source from a String specifying the path
+        """
+        path = Path(path_string)
+        return cls.from_path(path, origin, **kwargs)
 
     @classmethod
     def from_file(cls, f, origin=MISSING, relpath=MISSING, **kwargs):

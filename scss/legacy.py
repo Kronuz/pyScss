@@ -169,7 +169,7 @@ class Scss(object):
             # filename a source "thinks" it is
             with open(scss_file, 'rb') as f:
                 source = SourceFile.from_file(
-                    scss_file,
+                    f,
                     relpath=filename or scss_file,
                     is_sass=is_sass,
                 )
