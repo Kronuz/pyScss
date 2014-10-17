@@ -2,6 +2,7 @@
 """Tests for miscellaneous features that should maybe be broken out into their
 own files, maybe.
 """
+from __future__ import unicode_literals
 
 try:
     from collections import OrderedDict
@@ -108,7 +109,7 @@ def test_extend_across_files():
 
 def test_unicode_files():
     compiler = Scss(scss_opts=dict(style='expanded'))
-    unicode_input = u"""q {
+    unicode_input = """q {
   quotes: "“" "”" "‘" "’";
   content: "•";
 }
