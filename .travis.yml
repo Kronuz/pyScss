@@ -9,5 +9,5 @@ python:
     - pypy3
 install:
     - pip install .
-    - pip install pillow fontforge
+    - pip install pillow
 script: py.test
