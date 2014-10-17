@@ -67,6 +67,16 @@ working hours.  Yelp does not claim copyright.
 Changelog
 ---------
 
+1.3.2 (Oct 17, 2014)
+^^^^^^^^^^^^^^^^^^^^
+
+* Fix another couple embarrassing bugs, this time with the CLI.
+* Fix the auto behavior of ``join()`` to match Ruby.
+* Fully allow arbitrary expressions as map keys; previously, this only worked
+  for the first key.  LL(1) is hard.
+* Restore Python 3.2 compatibility.
+* Travis CI and Coveralls are now enabled.
+
 1.3.1 (Oct 16, 2014)
 ^^^^^^^^^^^^^^^^^^^^
 
