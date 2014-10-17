@@ -683,12 +683,30 @@ def nth(lst, n):
 
 
 @ns.declare
-def join(lst1, lst2, separator=None):
+def join(lst1, lst2, separator=String.unquoted('auto')):
+    expect_type(separator, String)
+
     ret = []
     ret.extend(List.from_maybe(lst1))
     ret.extend(List.from_maybe(lst2))
 
-    use_comma = __parse_separator(separator, default_from=lst1)
+    if separator.value == 'comma':
+        use_comma = True
+    elif separator.value == 'space':
+        use_comma = False
+    elif separator.value == 'auto':
+        # The Sass docs are slightly misleading here, but the algorithm is: use
+        # the delimiter from the first list that has at least 2 items, or
+        # default to spaces.
+        if len(lst1) > 1:
+            use_comma = lst1.use_comma
+        elif len(lst2) > 1:
+            use_comma = lst2.use_comma
+        else:
+            use_comma = False
+    else:
+        raise ValueError("separator for join() must be comma, space, or auto")
+
     return List(ret, use_comma=use_comma)
 
 

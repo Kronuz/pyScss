@@ -17,20 +17,23 @@ xfail = pytest.mark.xfail
 
 # TODO many of these tests could also stand to test for failure cases
 
-@pytest.fixture
-def calc():
-    return Calculator(CoreExtension.namespace).evaluate_expression
+def calc(expression):
+    return Calculator(CoreExtension.namespace).evaluate_expression(expression)
+
+
+def assert_equivalent(actual, expected):
+    assert calc(actual).render() == calc(expected).render()
 
 
 # ------------------------------------------------------------------------------
 # RGB functions
 
-def test_rgb(calc):
+def test_rgb():
     assert calc('rgb(128, 192, 224)') == Color.from_rgb(128/255, 192/255, 224/255)
     assert calc('rgb(20%, 40%, 60%)') == Color.from_rgb(0.2, 0.4, 0.6)
 
 
-def test_rgba(calc):
+def test_rgba():
     # four args (css-style)
     assert calc('rgba(128, 192, 224, 0.5)') == Color.from_rgb(128/255, 192/255, 224/255, 0.5)
     assert calc('rgba(20%, 40%, 60%, 0.7)') == Color.from_rgb(0.2, 0.4, 0.6, 0.7)
@@ -39,19 +42,19 @@ def test_rgba(calc):
     assert calc('rgba(red, 0.4)') == Color.from_rgb(1., 0., 0., 0.4)
 
 
-def test_red(calc):
+def test_red():
     assert calc('red(orange)') == Number(255)
 
 
-def test_green(calc):
+def test_green():
     assert calc('green(orange)') == Number(165)
 
 
-def test_blue(calc):
+def test_blue():
     assert calc('blue(orange)') == Number(0)
 
 
-def test_mix(calc):
+def test_mix():
     # Examples from the Ruby docs
     # Note that the results have been adjusted slightly; Ruby floors the mixed
     # channels, but we round
@@ -63,7 +66,7 @@ def test_mix(calc):
 # ------------------------------------------------------------------------------
 # HSL functions
 
-def test_hsl(calc):
+def test_hsl():
     # Examples from the CSS 3 color spec, which Sass uses
     # (http://www.w3.org/TR/css3-color/#hsl-color)
     assert calc('hsl(0, 100%, 50%)') == Color.from_rgb(1., 0., 0.)
@@ -73,76 +76,76 @@ def test_hsl(calc):
     assert calc('hsl(120, 75%, 75%)') == Color.from_rgb(0.5625, 0.9375, 0.5625)
 
 
-def test_hsla(calc):
+def test_hsla():
     # Examples from the CSS 3 color spec
     assert calc('hsla(120, 100%, 50%, 1)') == Color.from_rgb(0., 1., 0.,)
     assert calc('hsla(240, 100%, 50%, 0.5)') == Color.from_rgb(0., 0., 1., 0.5)
     assert calc('hsla(30, 100%, 50%, 0.1)') == Color.from_rgb(1., 0.5, 0., 0.1)
 
 
-def test_hue(calc):
+def test_hue():
     assert calc('hue(yellow)') == Number(60, unit='deg')
 
 
-def test_saturation(calc):
+def test_saturation():
     assert calc('saturation(yellow)') == Number(100, unit='%')
 
 
-def test_lightness(calc):
+def test_lightness():
     assert calc('lightness(yellow)') == Number(50, unit='%')
 
 
 # HSL manipulation functions
 
-def test_adjust_hue(calc):
+def test_adjust_hue():
     # Examples from the Ruby docs
     assert calc('adjust-hue(hsl(120, 30%, 90%), 60deg)') == calc('hsl(180, 30%, 90%)')
     assert calc('adjust-hue(hsl(120, 30%, 90%), -60deg)') == calc('hsl(60, 30%, 90%)')
     assert calc('adjust-hue(#811, 45deg)') == Color.from_rgb(136/255, 106.25/255, 17/255)
 
 
-def test_lighten(calc):
+def test_lighten():
     # Examples from the Ruby docs
     assert calc('lighten(hsl(0, 0%, 0%), 30%)') == calc('hsl(0, 0, 30)')
     assert calc('lighten(#800, 20%)') == calc('#e00')
 
 
-def test_darken(calc):
+def test_darken():
     # Examples from the Ruby docs
     assert calc('darken(hsl(25, 100%, 80%), 30%)') == calc('hsl(25, 100%, 50%)')
     assert calc('darken(#800, 20%)') == calc('#200')
 
 
-def test_saturate(calc):
+def test_saturate():
     # Examples from the Ruby docs
     assert calc('saturate(hsl(120, 30%, 90%), 20%)') == calc('hsl(120, 50%, 90%)')
     assert calc('saturate(#855, 20%)') == Color.from_rgb(158.1/255, 62.9/255, 62.9/255)
 
 
-def test_desaturate(calc):
+def test_desaturate():
     # Examples from the Ruby docs
     assert calc('desaturate(hsl(120, 30%, 90%), 20%)') == calc('hsl(120, 10%, 90%)')
     assert calc('desaturate(#855, 20%)') == Color.from_rgb(113.9/255, 107.1/255, 107.1/255)
 
 
-def test_grayscale(calc):
+def test_grayscale():
     assert calc('grayscale(black)') == Color.from_rgb(0., 0., 0.)
     assert calc('grayscale(white)') == Color.from_rgb(1., 1., 1.)
     assert calc('grayscale(yellow)') == Color.from_rgb(0.5, 0.5, 0.5)
 
 
-def test_grayscale_css_filter(calc):
+def test_grayscale_css_filter():
     # grayscale(number) is a CSS filter and should be left alone
     assert calc('grayscale(1)') == String("grayscale(1)")
 
 
-def test_complement(calc):
+def test_complement():
     assert calc('complement(black)') == Color.from_rgb(0., 0., 0.)
     assert calc('complement(white)') == Color.from_rgb(1., 1., 1.)
     assert calc('complement(yellow)') == Color.from_rgb(0., 0., 1.)
 
 
-def test_invert(calc):
+def test_invert():
     assert calc('invert(black)') == Color.from_rgb(1., 1., 1.)
     assert calc('invert(white)') == Color.from_rgb(0., 0., 0.)
     assert calc('invert(yellow)') == Color.from_rgb(0., 0., 1.)
@@ -151,7 +154,7 @@ def test_invert(calc):
 # ------------------------------------------------------------------------------
 # Opacity functions
 
-def test_alpha_opacity(calc):
+def test_alpha_opacity():
     assert calc('alpha(black)') == Number(1.)
     assert calc('alpha(rgba(black, 0.5))') == Number(0.5)
     assert calc('alpha(rgba(black, 0))') == Number(0.)
@@ -163,12 +166,12 @@ def test_alpha_opacity(calc):
 
 
 @xfail(reason="currently a parse error -- so it still works in practice, but...")
-def test_alpha_ie_filter(calc):
+def test_alpha_ie_filter():
     # alpha() is supposed to leave the IE filter syntax alone
     assert calc('alpha(filter=20)') == "alpha(filter=20)"
 
 
-def test_opacify_fadein(calc):
+def test_opacify_fadein():
     # Examples from the Ruby docs
     assert calc('opacify(rgba(0, 0, 0, 0.5), 0.1)') == calc('rgba(0, 0, 0, 0.6)')
     assert calc('opacify(rgba(0, 0, 17, 0.8), 0.2)') == calc('#001')
@@ -178,7 +181,7 @@ def test_opacify_fadein(calc):
     assert calc('fade-in(rgba(0, 0, 17, 0.8), 0.2)') == calc('#001')
 
 
-def test_transparentize_fadeout(calc):
+def test_transparentize_fadeout():
     # Examples from the Ruby docs
     assert calc('transparentize(rgba(0, 0, 0, 0.5), 0.1)') == calc('rgba(0, 0, 0, 0.4)')
     assert calc('transparentize(rgba(0, 0, 0, 0.8), 0.2)') == calc('rgba(0, 0, 0, 0.6)')
@@ -191,21 +194,21 @@ def test_transparentize_fadeout(calc):
 # ------------------------------------------------------------------------------
 # Other color functions
 
-def test_adjust_color(calc):
+def test_adjust_color():
     # Examples from the Ruby docs
     assert calc('adjust-color(#102030, $blue: 5)') == calc('#102035')
     assert calc('adjust-color(#102030, $red: -5, $blue: 5)') == calc('#0b2035')
     assert calc('adjust-color(hsl(25, 100%, 80%), $lightness: -30%, $alpha: -0.4)') == calc('hsla(25, 100%, 50%, 0.6)')
 
 
-def test_scale_color(calc):
+def test_scale_color():
     # Examples from the Ruby docs
     assert calc('scale-color(hsl(120, 70, 80), $lightness: 50%)') == calc('hsl(120, 70, 90)')
     assert calc('scale-color(rgb(200, 150, 170), $green: -40%, $blue: 70%)') == calc('rgb(200, 90, 229)')
     assert calc('scale-color(hsl(200, 70, 80), $saturation: -90%, $alpha: -30%)') == calc('hsla(200, 7, 80, 0.7)')
 
 
-def test_change_color(calc):
+def test_change_color():
     # Examples from the Ruby docs
     assert calc('change-color(#102030, $blue: 5)') == calc('#102005')
     assert calc('change-color(#102030, $red: 120, $blue: 5)') == calc('#782005')
@@ -214,7 +217,7 @@ def test_change_color(calc):
     assert calc('change-color(red, $hue: 240)') == calc('blue')
 
 
-def test_ie_hex_str(calc):
+def test_ie_hex_str():
     # Examples from the Ruby docs
     assert calc('ie-hex-str(#abc)') == calc('"#FFAABBCC"')
     assert calc('ie-hex-str(#3322BB)') == calc('"#FF3322BB"')
@@ -224,7 +227,7 @@ def test_ie_hex_str(calc):
 # ------------------------------------------------------------------------------
 # String functions
 
-def test_unquote(calc):
+def test_unquote():
     # Examples from the Ruby docs
     ret = calc('unquote("foo")')
     assert ret == String('foo')
@@ -236,7 +239,7 @@ def test_unquote(calc):
     assert calc('unquote((one, two, three))') == String('one, two, three')
 
 
-def test_quote(calc):
+def test_quote():
     # Examples from the Ruby docs
     ret = calc('quote("foo")')
     assert ret == String('foo')
@@ -247,12 +250,12 @@ def test_quote(calc):
 
 
 # TODO more of these need quote checking too
-def test_str_length(calc):
+def test_str_length():
     # Examples from the Ruby docs
     assert calc('str-length("foo")') == calc('3')
 
 
-def test_str_insert(calc):
+def test_str_insert():
     # Examples from the Ruby docs
     assert calc('str-insert("abcd", "X", 1)') == calc('"Xabcd"')
     assert calc('str-insert("abcd", "X", 4)') == calc('"abcXd"')
@@ -260,7 +263,7 @@ def test_str_insert(calc):
     assert calc('str-insert("abcd", "X", 5)') == calc('"abcdX"')
 
 
-def test_str_index(calc):
+def test_str_index():
     # Examples from the Ruby docs
     assert calc('str-index(abcd, a)') == calc('1')
     assert calc('str-index(abcd, ab)') == calc('1')
@@ -268,7 +271,7 @@ def test_str_index(calc):
     assert calc('str-index(abcd, c)') == calc('3')
 
 
-def test_str_slice(calc):
+def test_str_slice():
     # Examples from the Ruby docs
     assert calc('str-slice("abcd", 2, 3)') == calc('"bc"')
     assert calc('str-slice("abcd", 2)') == calc('"bcd"')
@@ -276,12 +279,12 @@ def test_str_slice(calc):
     assert calc('str-slice("abcd", 2, -2)') == calc('"bc"')
 
 
-def test_to_upper_case(calc):
+def test_to_upper_case():
     # Examples from the Ruby docs
     assert calc('to-upper-case(abcd)') == calc('ABCD')
 
 
-def test_to_lower_case(calc):
+def test_to_lower_case():
     # Examples from the Ruby docs
     assert calc('to-lower-case(ABCD)') == calc('abcd')
 
@@ -289,42 +292,42 @@ def test_to_lower_case(calc):
 # ------------------------------------------------------------------------------
 # Number functions
 
-def test_percentage(calc):
+def test_percentage():
     # Examples from the Ruby docs
     assert calc('percentage(100px / 50px)') == calc('200%')
 
 
-def test_round(calc):
+def test_round():
     # Examples from the Ruby docs
     assert calc('round(10.4px)') == calc('10px')
     assert calc('round(10.6px)') == calc('11px')
 
 
-def test_ceil(calc):
+def test_ceil():
     # Examples from the Ruby docs
     assert calc('ceil(10.4px)') == calc('11px')
     assert calc('ceil(10.6px)') == calc('11px')
 
 
-def test_floor(calc):
+def test_floor():
     # Examples from the Ruby docs
     assert calc('floor(10.4px)') == calc('10px')
     assert calc('floor(10.6px)') == calc('10px')
 
 
-def test_abs(calc):
+def test_abs():
     # Examples from the Ruby docs
     assert calc('abs(10px)') == calc('10px')
     assert calc('abs(-10px)') == calc('10px')
 
 
-def test_min(calc):
+def test_min():
     # Examples from the Ruby docs
     assert calc('min(1px, 4px)') == calc('1px')
     assert calc('min(5em, 3em, 4em)') == calc('3em')
 
 
-def test_max(calc):
+def test_max():
     # Examples from the Ruby docs
     assert calc('max(1px, 4px)') == calc('4px')
     assert calc('max(5em, 3em, 4em)') == calc('5em')
@@ -333,13 +336,13 @@ def test_max(calc):
 # ------------------------------------------------------------------------------
 # List functions
 
-def test_length(calc):
+def test_length():
     # Examples from the Ruby docs
     assert calc('length(10px)') == calc('1')
     assert calc('length(10px 20px 30px)') == calc('3')
 
 
-def test_nth(calc):
+def test_nth():
     # Examples from the Ruby docs
     assert calc('nth(10px 20px 30px, 1)') == calc('10px')
     assert calc('nth((Helvetica, Arial, sans-serif), 3)') == calc('sans-serif')
@@ -348,16 +351,16 @@ def test_nth(calc):
     assert calc('nth(10px 20px 30px, -1)') == calc('30px')
 
 
-def test_join(calc):
+def test_join():
     # Examples from the Ruby docs
-    assert calc('join(10px 20px, 30px 40px)') == calc('10px 20px 30px 40px')
-    assert calc('join((blue, red), (#abc, #def))') == calc('blue, red, #abc, #def')
-    assert calc('join(10px, 20px)') == calc('10px 20px')
-    assert calc('join(10px, 20px, comma)') == calc('10px, 20px')
-    assert calc('join((blue, red), (#abc, #def), space)') == calc('blue red #abc #def')
+    assert_equivalent('join(10px 20px, 30px 40px)', '10px 20px 30px 40px')
+    assert_equivalent('join((blue, red), (#abc, #def))', 'blue, red, #abc, #def')
+    assert_equivalent('join(10px, 20px)', '10px 20px')
+    assert_equivalent('join(10px, 20px, comma)', '10px, 20px')
+    assert_equivalent('join((blue, red), (#abc, #def), space)', 'blue red #abc #def')
 
 
-def test_append(calc):
+def test_append():
     # Examples from the Ruby docs
     assert calc('append(10px 20px, 30px)') == calc('10px 20px 30px')
     assert calc('append((blue, red), green)') == calc('blue, red, green')
@@ -369,25 +372,25 @@ def test_append(calc):
     assert calc('append((a, b), c)') == calc('a, b, c')
 
 
-def test_zip(calc):
+def test_zip():
     # Examples from the Ruby docs
     assert calc('zip(1px 1px 3px, solid dashed solid, red green blue)') == calc('1px solid red, 1px dashed green, 3px solid blue')
 
 
-def test_index(calc):
+def test_index():
     # Examples from the Ruby docs
     assert calc('index(1px solid red, solid)') == calc('2')
     assert calc('index(1px solid red, dashed)') == calc('false')
 
 
-def test_list_separator(calc):
+def test_list_separator():
     # Examples from the Ruby docs
     assert calc('list-separator(1px 2px 3px)') == calc('space')
     assert calc('list-separator(1px, 2px, 3px)') == calc('comma')
     assert calc('list-separator("foo")') == calc('space')
 
 
-def test_set_nth(calc):
+def test_set_nth():
     # Examples from the Ruby docs
     assert calc('set-nth($list: 10px 20px 30px, $n: 2, $value: -20px)') == calc('10px -20px 30px')
 
@@ -396,31 +399,31 @@ def test_set_nth(calc):
 # Map functions
 
 
-def test_map_get(calc):
+def test_map_get():
     # Examples from the Ruby docs
     assert calc('map-get(("foo": 1, "bar": 2), "foo")') == calc('1')
     assert calc('map-get(("foo": 1, "bar": 2), "bar")') == calc('2')
     assert calc('map-get(("foo": 1, "bar": 2), "baz")') == calc('null')
 
 
-def test_map_merge(calc):
+def test_map_merge():
     # Examples from the Ruby docs
     assert calc('map-merge(("foo": 1), ("bar": 2))') == calc('("foo": 1, "bar": 2)')
     assert calc('map-merge(("foo": 1, "bar": 2), ("bar": 3))') == calc('("foo": 1, "bar": 3)')
 
 
-def test_map_keys(calc):
+def test_map_keys():
     # Examples from the Ruby docs
     assert calc('map-keys(("foo": 1, "bar": 2))') == calc('"foo", "bar"')
 
 
-def test_map_values(calc):
+def test_map_values():
     # Examples from the Ruby docs
     assert calc('map-values(("foo": 1, "bar": 2))') == calc('1, 2')
     assert calc('map-values(("foo": 1, "bar": 2, "baz": 1))') == calc('1, 2, 1')
 
 
-def test_map_has_key(calc):
+def test_map_has_key():
     # Examples from the Ruby docs
     assert calc('map-has-key(("foo": 1, "bar": 2), "foo")') == calc('true')
     assert calc('map-has-key(("foo": 1, "bar": 2), "baz")') == calc('false')
@@ -429,7 +432,7 @@ def test_map_has_key(calc):
 # ------------------------------------------------------------------------------
 # Introspection functions
 
-def test_type_of(calc):
+def test_type_of():
     # Examples from the Ruby docs
     assert calc('type-of(100px)') == calc('number')
     assert calc('type-of(asdf)') == calc('string')
@@ -439,7 +442,7 @@ def test_type_of(calc):
     assert calc('type-of(blue)') == calc('color')
 
 
-def test_unit(calc):
+def test_unit():
     # Examples from the Ruby docs
     assert calc('unit(100)') == calc('""')
     assert calc('unit(100px)') == calc('"px"')
@@ -450,13 +453,13 @@ def test_unit(calc):
     assert calc('unit(10px * 5em / 30cm / 1rem)') == calc('"em/rem"')
 
 
-def test_unitless(calc):
+def test_unitless():
     # Examples from the Ruby docs
     assert calc('unitless(100)') == calc('true')
     assert calc('unitless(100px)') == calc('false')
 
 
-def test_comparable(calc):
+def test_comparable():
     # Examples from the Ruby docs
     assert calc('comparable(2px, 1px)') == calc('true')
     assert calc('comparable(100px, 3em)') == calc('false')
@@ -466,7 +469,7 @@ def test_comparable(calc):
 # ------------------------------------------------------------------------------
 # Miscellaneous functions
 
-def test_if(calc):
+def test_if():
     # Examples from the Ruby docs
     assert calc('if(true, 1px, 2px)') == calc('1px')
     assert calc('if(false, 1px, 2px)') == calc('2px')
