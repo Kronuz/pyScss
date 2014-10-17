@@ -67,6 +67,11 @@ working hours.  Yelp does not claim copyright.
 Changelog
 ---------
 
+1.3.1 (Oct 16, 2014)
+^^^^^^^^^^^^^^^^^^^^
+
+Fixes an embarrassing crash when compiling multiple files together.
+
 1.3.0 (Oct 15, 2014)
 ^^^^^^^^^^^^^^^^^^^^
 
