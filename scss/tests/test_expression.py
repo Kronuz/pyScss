@@ -55,6 +55,11 @@ def test_reference_operations():
     assert calc('#{$font-size}/#{$line-height}') == String('12px / 30px')
                                             # uses #{}; does no division
 
+    # Modulo
+    assert calc('29 % 12') == Number(5)
+    assert calc('29px % 12') == Number(5, 'px')
+    assert calc('29px % 12px') == Number(5, 'px')
+
     # Color operations
     ns.set_variable('$translucent-red', Color.from_rgb(1, 0, 0, 0.5))
     ns.set_variable('$green', Color.from_name('lime'))
