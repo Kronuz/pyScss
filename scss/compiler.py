@@ -86,6 +86,7 @@ class Compiler(object):
     def __init__(
             self, root=Path(), search_path=(),
             namespace=None, extensions=(CoreExtension,),
+            import_static_css=False,
             output_style='nested', generate_source_map=False,
             live_errors=False, warn_unused_imports=False,
             ignore_parse_errors=False,
@@ -136,6 +137,13 @@ class Compiler(object):
                     "Expected an Extension or Namespace, got: {0!r}"
                     .format(extension)
                 )
+
+        if import_static_css:
+            self.dynamic_extensions = ('.scss', '.sass', '.css')
+            self.static_extensions = ()
+        else:
+            self.dynamic_extensions = ('.scss', '.sass')
+            self.static_extensions = ('.css',)
 
         self.output_style = output_style
         self.generate_source_map = generate_source_map
@@ -827,7 +835,7 @@ class Compilation(object):
                     # If the filename begins with an http protocol
                     sass_path.value.startswith(('http://', 'https://')) or
                     # If the filename ends with .css
-                    sass_path.value.endswith('.css')):
+                    sass_path.value.endswith(self.compiler.static_extensions)):
                 css_imports.append(sass_path.render(compress=False))
                 continue
 

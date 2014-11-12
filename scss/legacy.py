@@ -83,7 +83,7 @@ class Scss(object):
     def compile(
             self, scss_string=None, scss_file=None, source_files=None,
             super_selector=None, filename=None, is_sass=None,
-            line_numbers=True):
+            line_numbers=True, import_static_css=False):
         """Compile Sass to CSS.  Returns a single CSS string.
 
         This method is DEPRECATED; see :mod:`scss.compiler` instead.
@@ -140,6 +140,7 @@ class Scss(object):
                 BootstrapExtension,
             ],
             search_path=fixed_search_path,
+            import_static_css=import_static_css,
             live_errors=self.live_errors,
             generate_source_map=self._scss_opts.get('debug_info', False),
             output_style=output_style,

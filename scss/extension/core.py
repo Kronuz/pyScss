@@ -41,7 +41,7 @@ class CoreExtension(Extension):
         if path.suffix:
             search_exts = [path.suffix]
         else:
-            search_exts = ['.scss', '.sass']
+            search_exts = compilation.compiler.dynamic_extensions
 
         relative_to = path.parent
         basename = path.stem
