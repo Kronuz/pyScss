@@ -26,14 +26,10 @@ class CoreExtension(Extension):
         """Implementation of the core Sass import mechanism, which just looks
         for files on disk.
         """
-        # TODO virtually all of this is the same as the django stuff, except
-        # for the bit that actually looks for and tries to open the file.
-        # would be much easier if you could just stick an object in the search
-        # path that implements the pathlib API.  the only problem is what to do
-        # when one path is a child of another, so the same file has two names,
-        # but tbh i'm not actually sure that's something worth protecting
-        # against...?  like, the only cost is that we'll parse twice (or, later
-        # on, not respect single-import), and the fix is to just Not Do That
+        # TODO this is all not terribly well-specified by Sass.  at worst,
+        # it's unclear how far "upwards" we should be allowed to go.  but i'm
+        # also a little fuzzy on e.g. how relative imports work from within a
+        # file that's not actually in the search path.
         # TODO i think with the new origin semantics, i've made it possible to
         # import relative to the current file even if the current file isn't
         # anywhere in the search path.  is that right?
