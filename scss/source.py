@@ -5,7 +5,6 @@ from __future__ import division
 
 import hashlib
 import logging
-import os
 from pathlib import Path
 import re
 
@@ -43,6 +42,11 @@ class MISSING(object):
 MISSING = MISSING()
 
 
+# TODO i'm still not entirely happy with this, nor with the concept of an
+# "origin".  it should really be a "loader", with a defined API.  also, even
+# with all these helpful classmethods, i'm still having to do a lot of manual
+# mucking around in django-pyscss, where all i'm given is a file path and a
+# string of the contents, and i want to /not/ re-read the file.
 class SourceFile(object):
     """A single input file to be fed to the compiler.  Detects the encoding
     (according to CSS spec rules) and performs some light pre-processing.

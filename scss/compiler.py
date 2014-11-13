@@ -195,6 +195,14 @@ class Compiler(object):
             compilation.add_source(source)
         return self.call_and_catch_errors(compilation.run)
 
+    def compile_sources(self, *sources):
+        # TODO this api is not the best please don't use it.  this all needs to
+        # be vastly simplified, still, somehow.
+        compilation = self.make_compilation()
+        for source in sources:
+            compilation.add_source(source)
+        return self.call_and_catch_errors(compilation.run)
+
     def compile_string(self, string):
         source = SourceFile.from_string(string)
         compilation = self.make_compilation()
