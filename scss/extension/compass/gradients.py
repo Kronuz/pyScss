@@ -22,7 +22,7 @@ ns = CompassExtension.namespace
 def __color_stops(percentages, *args):
     if len(args) == 1:
         if isinstance(args[0], (list, tuple, List)):
-            list(args[0])
+            return list(args[0])
         elif isinstance(args[0], (String, six.string_types)):
             color_stops = []
             colors = split_params(getattr(args[0], 'value', args[0]))
