@@ -29,6 +29,7 @@ from scss.types import Map
 from scss.types import Null
 from scss.types import String
 from scss.types import Undefined
+from scss.types import Url
 from scss.types import Value
 from scss.util import normalize_var
 
@@ -506,7 +507,14 @@ class FunctionLiteral(Expression):
             # TODO compress
             contents = child.render()
             quotes = None
-        return Function(contents, self.function_name, quotes=quotes)
+
+        # TODO unclear if this is the right place for this logic, or if it
+        # should go in the Function constructor, or should be passed in
+        # explicitly by the grammar, or even if Url should go away entirely
+        if self.function_name == "url":
+            return Url(contents, quotes=quotes)
+        else:
+            return Function(contents, self.function_name, quotes=quotes)
 
 
 class AlphaFunctionLiteral(Expression):
