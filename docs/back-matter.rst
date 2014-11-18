@@ -67,6 +67,13 @@ working hours.  Yelp does not claim copyright.
 Changelog
 ---------
 
+1.3.3 (Nov 18, 2014)
+^^^^^^^^^^^^^^^^^^^^
+
+* URLs with quotes now parse as the `Url` type, not as generic functions.  Fixes some uses of ``@import``.
+* A ``return`` got lost in the Compass gradient code, which would break some uses of gradients.
+* Some API work in an attempt to get django-pyscss working against 1.3.
+
 1.3.2 (Oct 17, 2014)
 ^^^^^^^^^^^^^^^^^^^^
 
