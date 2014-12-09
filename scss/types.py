@@ -396,6 +396,24 @@ class Number(Value):
 
         return Number(amount, unit_numer=numer, unit_denom=denom)
 
+    def __mod__(self, other):
+        if not isinstance(other, Number):
+            return NotImplemented
+
+        amount = self.value % other.value
+
+        if self.is_unitless:
+            return Number(amount)
+
+        if not other.is_unitless:
+            left = self.to_base_units()
+            right = other.to_base_units()
+
+            if left.unit_numer != right.unit_numer or left.unit_denom != right.unit_denom:
+                raise ValueError("Can't reconcile units: %r and %r" % (self, other))
+
+        return Number(amount, unit_numer=self.unit_numer, unit_denom=self.unit_denom)
+
     def __add__(self, other):
         # Numbers auto-cast to strings when added to other strings
         if isinstance(other, String):

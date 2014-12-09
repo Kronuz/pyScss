@@ -61,6 +61,7 @@ parser SassExpression:
     token END: "$"
     token MUL: "[*]"
     token DIV: "/"
+    token MOD: "(?<=\s)%"
     token ADD: "[+]"
     token SUB: "-\s"
     token SIGN: "-(?![a-zA-Z_])"
@@ -218,6 +219,7 @@ parser SassExpression:
         (
             MUL u_expr              {{ v = BinaryOp(operator.mul, v, u_expr) }}
             | DIV u_expr            {{ v = BinaryOp(operator.truediv, v, u_expr) }}
+            | MOD u_expr            {{ v = BinaryOp(operator.mod, v, u_expr) }}
         )*                          {{ return v }}
 
     rule u_expr:
