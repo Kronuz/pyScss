@@ -87,10 +87,10 @@ class Value(object):
 
     def __sub__(self, other):
         # Default behavior is to treat the whole expression like one string
-        return String(self.render() + "-" + other.render())
+        return String.unquoted(self.render() + "-" + other.render())
 
     def __div__(self, other):
-        return String(self.render() + "/" + other.render())
+        return String.unquoted(self.render() + "/" + other.render())
 
     # Sass types have no notion of floor vs true division
     def __truediv__(self, other):
