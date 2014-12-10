@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import logging
+import re
 
 from scss.namespace import Namespace
 
@@ -239,17 +240,17 @@ class BlockHeader(object):
 
         # Minor parsing
         if prop.startswith('@'):
-            if prop.lower().startswith('@else if '):
-                directive = '@else if'
-                argument = prop[9:]
-            else:
-                chunks = prop.split(None, 1)
-                if len(chunks) == 2:
-                    directive, argument = chunks
-                else:
-                    directive, argument = prop, None
-                directive = directive.lower()
-
+            # This pattern MUST NOT BE ABLE TO FAIL!
+            # This is slightly more lax than the CSS syntax technically allows,
+            # e.g. identifiers aren't supposed to begin with three hyphens.
+            # But we don't care, and will just spit it back out anyway.
+            m = re.match(
+                u'@(else if|[-_a-zA-Z0-9\U00000080-\U0010FFFF]*)\\b',
+                prop, re.I)
+            directive = m.group(0).lower()
+            argument = prop[len(directive):].strip()
+            if not argument:
+                argument = None
             return BlockAtRuleHeader(directive, argument, num_lines)
         elif prop.split(None, 1)[0].endswith(':'):
             # Syntax is "<scope>: [prop]" -- if the optional prop exists, it

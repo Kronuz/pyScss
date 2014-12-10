@@ -428,7 +428,7 @@ def determine_encoding(buf):
 
 
 # ------------------------------------------------------------------------------
-# Bits and pieces of grammar, mostly as regexen
+# Bits and pieces of the official CSS grammar
 
 # These are the only pseudo-elements allowed to be specified with a single
 # colon, for backwards compatibility
@@ -443,8 +443,7 @@ CSS2_PSEUDO_ELEMENTS = frozenset((
 # or a backslash followed by one to six hex digits and a single optional
 # whitespace.  Escaped newlines become nothing.
 # Ref: http://dev.w3.org/csswg/css-syntax-3/#consume-an-escaped-code-point
-unescape_rx = re.compile(
-    r"\\([0-9a-fA-F]{1,6})[\n\t ]?|\\(.)|\\\n", re.DOTALL)
+escape_rx = re.compile(r"(?s)\\([0-9a-fA-F]{1,6})[\n\t ]?|\\(.)|\\\n")
 
 
 def _unescape_one(match):
@@ -460,8 +459,11 @@ def unescape(string):
     """Given a raw CSS string (i.e. taken directly from CSS source with no
     processing), eliminate all backslash escapes.
     """
-    return unescape_rx.sub(_unescape_one, string)
+    return escape_rx.sub(_unescape_one, string)
 
+
+# ------------------------------------------------------------------------------
+# Ad-hoc regexes specific to pyscss
 
 _expr_glob_re = re.compile(r'''
     \#\{(.*?)\}                   # Global Interpolation only
