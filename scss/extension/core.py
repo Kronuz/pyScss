@@ -39,22 +39,26 @@ class CoreExtension(Extension):
         else:
             search_exts = compilation.compiler.dynamic_extensions
 
-        relative_to = path.parent
         basename = path.stem
-
+        relative_to = path.parent
         search_path = []  # tuple of (origin, start_from)
         if relative_to.is_absolute():
             relative_to = PurePosixPath(*relative_to.parts[1:])
         elif rule.source_file.origin:
             # Search relative to the current file first, only if not doing an
             # absolute import
-            search_path.append(
-                rule.source_file.origin / rule.source_file.relpath.parent)
-        search_path.extend(compilation.compiler.search_path)
+            search_path.append((
+                rule.source_file.origin,
+                rule.source_file.relpath.parent / relative_to,
+            ))
+        search_path.extend(
+            (origin, relative_to)
+            for origin in compilation.compiler.search_path
+        )
 
         for prefix, suffix in product(('_', ''), search_exts):
             filename = prefix + basename + suffix
-            for origin in search_path:
+            for origin, relative_to in search_path:
                 relpath = relative_to / filename
                 # Lexically (ignoring symlinks!) eliminate .. from the part
                 # of the path that exists within Sass-space.  pathlib
