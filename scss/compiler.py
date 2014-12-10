@@ -1139,7 +1139,11 @@ class Compilation(object):
         # generally?
         calculator = self._make_calculator(rule.namespace)
         if block.header.argument:
-            block.header.argument = calculator.apply_vars(block.header.argument)
+            # TODO is this correct?  do ALL at-rules ALWAYS allow both vars and
+            # interpolation?
+            node = calculator.parse_vars_and_interpolations(
+                block.header.argument)
+            block.header.argument = node.evaluate(calculator).render()
 
         # TODO merge into RuleAncestry
         new_ancestry = list(rule.ancestry.headers)

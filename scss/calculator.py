@@ -113,12 +113,12 @@ class Calculator(object):
         return cont
 
     def calculate(self, expression, divide=False):
-        expression = self.evaluate_expression(expression, divide=divide)
+        result = self.evaluate_expression(expression, divide=divide)
 
-        if expression is None:
+        if result is None:
             return String.unquoted(self.apply_vars(expression))
 
-        return expression
+        return result
 
     # TODO only used by magic-import...?
     def interpolate(self, var):
@@ -179,6 +179,18 @@ class Calculator(object):
         # must not have any interpolations, right?
         if '#' not in string:
             return Literal(String.unquoted(string))
-        return self.parse_expression(string, 'goal_interpolated_anything')
+        return self.parse_expression(string, 'goal_interpolated_literal')
+
+    def parse_vars_and_interpolations(self, string):
+        """Parse a string for variables and interpolations, but don't treat
+        anything else as Sass syntax.  Returns an AST node.
+        """
+        # Shortcut: if there are no #s or $s in the string in the first place,
+        # it must not have anything of interest.
+        if '#' not in string and '$' not in string:
+            return Literal(String.unquoted(string))
+        return self.parse_expression(
+            string, 'goal_interpolated_literal_with_vars')
+
 
 __all__ = ('Calculator',)

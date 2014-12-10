@@ -48,6 +48,7 @@ class SassExpressionScanner(Scanner):
         ('SINGLE_STRING_GUTS', "([^'\\\\#]|[\\\\].|#(?![{]))*"),
         ('DOUBLE_STRING_GUTS', '([^"\\\\#]|[\\\\].|#(?![{]))*'),
         ('INTERP_ANYTHING', '([^#]|#(?![{]))*'),
+        ('INTERP_NO_VARS', '([^#$]|#(?![{]))*'),
         ('INTERP_NO_PARENS', '([^#()]|#(?![{]))*'),
         ('INTERP_START_URL_HACK', '(?=[#][{])'),
         ('INTERP_START', '#[{]'),
@@ -508,14 +509,30 @@ class SassExpression(Parser):
             parts[-1] += RPAR + INTERP_NO_PARENS
         return parts
 
-    def goal_interpolated_anything(self):
+    def goal_interpolated_literal(self):
         INTERP_ANYTHING = self._scan('INTERP_ANYTHING')
         parts = [INTERP_ANYTHING]
-        while self._peek(self.goal_interpolated_anything_rsts) == 'INTERP_START':
+        while self._peek(self.goal_interpolated_literal_rsts) == 'INTERP_START':
             interpolation = self.interpolation()
             parts.append(interpolation)
             INTERP_ANYTHING = self._scan('INTERP_ANYTHING')
             parts.append(INTERP_ANYTHING)
+        END = self._scan('END')
+        return Interpolation.maybe(parts)
+
+    def goal_interpolated_literal_with_vars(self):
+        INTERP_NO_VARS = self._scan('INTERP_NO_VARS')
+        parts = [INTERP_NO_VARS]
+        while self._peek(self.goal_interpolated_literal_with_vars_rsts) != 'END':
+            _token_ = self._peek(self.goal_interpolated_literal_with_vars_rsts_)
+            if _token_ == 'INTERP_START':
+                interpolation = self.interpolation()
+                parts.append(interpolation)
+            else:  # == 'VAR'
+                VAR = self._scan('VAR')
+                parts.append(Variable(VAR))
+            INTERP_NO_VARS = self._scan('INTERP_NO_VARS')
+            parts.append(INTERP_NO_VARS)
         END = self._scan('END')
         return Interpolation.maybe(parts)
 
@@ -527,7 +544,9 @@ class SassExpression(Parser):
     argspec_items_rsts = frozenset(['RPAR', 'END', '","'])
     expr_slst_chks = frozenset(['INTERP_END', 'RPAR', 'END', '":"', '","'])
     expr_lst_rsts = frozenset(['INTERP_END', 'RPAR', 'END', '","'])
+    goal_interpolated_literal_rsts = frozenset(['END', 'INTERP_START'])
     expr_map_or_list_rsts = frozenset(['RPAR', '":"', '","'])
+    goal_interpolated_literal_with_vars_rsts = frozenset(['VAR', 'END', 'INTERP_START'])
     argspec_item_chks = frozenset(['LPAR', 'DOUBLE_QUOTE', 'VAR', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
     a_expr_chks = frozenset(['ADD', 'SUB'])
     interpolated_function_parens_rsts = frozenset(['LPAR', 'RPAR', 'INTERP_START'])
@@ -555,7 +574,7 @@ class SassExpression(Parser):
     interpolated_string_rsts = frozenset(['DOUBLE_QUOTE', 'SINGLE_QUOTE'])
     interpolated_bareword_rsts__ = frozenset(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'MOD', 'OR', '","'])
     m_expr_chks = frozenset(['MUL', 'DIV', 'MOD'])
-    goal_interpolated_anything_rsts = frozenset(['END', 'INTERP_START'])
+    goal_interpolated_literal_with_vars_rsts_ = frozenset(['VAR', 'INTERP_START'])
     interpolated_bare_url_rsts = frozenset(['RPAR', 'INTERP_START'])
     argspec_items_chks = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'VAR', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
     argspec_rsts = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'END', 'SLURPYVAR', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'DOTDOTDOT', 'INTERP_START', 'RPAR', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'VAR', 'FNCT', 'NOT', 'SIGN', 'SINGLE_QUOTE'])

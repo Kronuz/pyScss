@@ -45,6 +45,7 @@ parser SassExpression:
     token SINGLE_STRING_GUTS: '([^\'\\\\#]|[\\\\].|#(?![{]))*'
     token DOUBLE_STRING_GUTS: "([^\"\\\\#]|[\\\\].|#(?![{]))*"
     token INTERP_ANYTHING: "([^#]|#(?![{]))*"
+    token INTERP_NO_VARS: "([^#$]|#(?![{]))*"
     token INTERP_NO_PARENS: "([^#()]|#(?![{]))*"
 
     # This is a stupid lookahead used for diverting url(#{...}) to its own
@@ -374,7 +375,7 @@ parser SassExpression:
         )*                          {{ return parts }}
 
 
-    rule goal_interpolated_anything:
+    rule goal_interpolated_literal:
         # This isn't part of the grammar, but rather a separate goal, used for
         # text that might contain interpolations but should not be parsed
         # outside of them -- e.g., selector strings.
@@ -382,6 +383,19 @@ parser SassExpression:
         (
             interpolation           {{ parts.append(interpolation) }}
             INTERP_ANYTHING         {{ parts.append(INTERP_ANYTHING) }}
+        )*
+        END                         {{ return Interpolation.maybe(parts) }}
+
+    rule goal_interpolated_literal_with_vars:
+        # Another goal used for literal text that might contain interpolations
+        # OR variables.  Created for the header of @media blocks.
+        INTERP_NO_VARS              {{ parts = [INTERP_NO_VARS] }}
+        (
+            (
+                interpolation       {{ parts.append(interpolation) }}
+                | VAR               {{ parts.append(Variable(VAR)) }}
+            )
+            INTERP_NO_VARS          {{ parts.append(INTERP_NO_VARS) }}
         )*
         END                         {{ return Interpolation.maybe(parts) }}
 
