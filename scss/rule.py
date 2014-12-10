@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 from __future__ import print_function
+from __future__ import unicode_literals
 
 import logging
 import re
@@ -77,6 +78,8 @@ class SassRule(object):
         self.descendants = 0
 
     def __repr__(self):
+        # TODO probably want to encode this with string_escape on python 2, and
+        # similar elsewhere, especially since this file has unicode_literals
         return "<SassRule %s, %d props>" % (
             self.ancestry,
             len(self.properties),
@@ -245,7 +248,7 @@ class BlockHeader(object):
             # e.g. identifiers aren't supposed to begin with three hyphens.
             # But we don't care, and will just spit it back out anyway.
             m = re.match(
-                u'@(else if|[-_a-zA-Z0-9\U00000080-\U0010FFFF]*)\\b',
+                '@(else if|[-_a-zA-Z0-9\U00000080-\U0010FFFF]*)\\b',
                 prop, re.I)
             directive = m.group(0).lower()
             argument = prop[len(directive):].strip()
