@@ -340,6 +340,7 @@ class Compilation(object):
         for source_file in self.sources:
             rule = SassRule(
                 source_file=source_file,
+                lineno=1,
 
                 unparsed_contents=source_file.contents,
                 namespace=root_namespace,
@@ -1163,6 +1164,7 @@ class Compilation(object):
             source_file=rule.source_file,
             import_key=rule.import_key,
             lineno=block.lineno,
+            num_header_lines=block.header.num_lines,
             unparsed_contents=block.unparsed_contents,
 
             legacy_compiler_options=rule.legacy_compiler_options,
@@ -1204,6 +1206,7 @@ class Compilation(object):
             source_file=rule.source_file,
             import_key=rule.import_key,
             lineno=block.lineno,
+            num_header_lines=block.header.num_lines,
             unparsed_contents=block.unparsed_contents,
 
             legacy_compiler_options=rule.legacy_compiler_options,

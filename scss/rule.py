@@ -34,6 +34,7 @@ class SassRule(object):
 
     def __init__(
             self, source_file, import_key=None, unparsed_contents=None,
+            num_header_lines=0,
             options=None, legacy_compiler_options=None, properties=None,
             namespace=None,
             lineno=0, extends_selectors=frozenset(),
@@ -48,6 +49,7 @@ class SassRule(object):
         self.import_key = import_key
         self.lineno = lineno
 
+        self.num_header_lines = num_header_lines
         self.unparsed_contents = unparsed_contents
         self.legacy_compiler_options = legacy_compiler_options or {}
         self.options = options or {}
@@ -211,6 +213,7 @@ class BlockHeader(object):
 
     @classmethod
     def parse(cls, prop, has_contents=False):
+        num_lines = prop.count('\n')
         prop = prop.strip()
 
         # Simple pre-processing
@@ -247,24 +250,26 @@ class BlockHeader(object):
                     directive, argument = prop, None
                 directive = directive.lower()
 
-            return BlockAtRuleHeader(directive, argument)
+            return BlockAtRuleHeader(directive, argument, num_lines)
         elif prop.split(None, 1)[0].endswith(':'):
             # Syntax is "<scope>: [prop]" -- if the optional prop exists, it
             # becomes the first rule with no suffix
             scope, unscoped_value = prop.split(':', 1)
             scope = scope.rstrip()
             unscoped_value = unscoped_value.lstrip()
-            return BlockScopeHeader(scope, unscoped_value)
+            return BlockScopeHeader(scope, unscoped_value, num_lines)
         else:
-            return BlockSelectorHeader(prop)
+            return BlockSelectorHeader(prop, num_lines)
 
 
 class BlockAtRuleHeader(BlockHeader):
     is_atrule = True
 
-    def __init__(self, directive, argument):
+    def __init__(self, directive, argument, num_lines=0):
         self.directive = directive
         self.argument = argument
+
+        self.num_lines = num_lines
 
     def __repr__(self):
         return "<%s %r %r>" % (type(self).__name__, self.directive, self.argument)
@@ -279,8 +284,10 @@ class BlockAtRuleHeader(BlockHeader):
 class BlockSelectorHeader(BlockHeader):
     is_selector = True
 
-    def __init__(self, selectors):
+    def __init__(self, selectors, num_lines=0):
         self.selectors = tuple(selectors)
+
+        self.num_lines = num_lines
 
     def __repr__(self):
         return "<%s %r>" % (type(self).__name__, self.selectors)
@@ -295,13 +302,15 @@ class BlockSelectorHeader(BlockHeader):
 class BlockScopeHeader(BlockHeader):
     is_scope = True
 
-    def __init__(self, scope, unscoped_value):
+    def __init__(self, scope, unscoped_value, num_lines=0):
         self.scope = scope
 
         if unscoped_value:
             self.unscoped_value = unscoped_value
         else:
             self.unscoped_value = None
+
+        self.num_lines = num_lines
 
 
 class UnparsedBlock(object):
@@ -329,7 +338,8 @@ class UnparsedBlock(object):
         self.header = BlockHeader.parse(prop, has_contents=bool(unparsed_contents))
 
         # Basic properties
-        self.lineno = lineno
+        self.lineno = (
+            parent_rule.lineno - parent_rule.num_header_lines + lineno - 1)
         self.prop = prop
         self.unparsed_contents = unparsed_contents
 

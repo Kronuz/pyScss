@@ -474,7 +474,6 @@ _sl_comment_re = re.compile(r'(?<!\burl[(])(?<!\w{2}:)\/\/.*')
 _escape_chars_re = re.compile(r'([^-a-zA-Z0-9_])')
 _interpolate_re = re.compile(r'(#\{\s*)?(\$[-\w]+)(?(1)\s*\})')
 _spaces_re = re.compile(r'\s+')
-_expand_rules_space_re = re.compile(r'\s*{')
 _collapse_properties_space_re = re.compile(r'([:#])\s*{')
 _variable_re = re.compile('^\\$[-a-zA-Z0-9_]+$')
 

@@ -12,7 +12,7 @@ import six
 
 from scss.cssdefs import (
     _ml_comment_re, _sl_comment_re,
-    _expand_rules_space_re, _collapse_properties_space_re,
+    _collapse_properties_space_re,
     _strings_re,
 )
 from scss.cssdefs import determine_encoding
@@ -261,7 +261,7 @@ class SourceFile(object):
         if line is None:
             line = ''
 
-        line = state['line_buffer'] + line.rstrip()  # remove EOL character
+        line = state['line_buffer'] + line
 
         if line and line[-1] == '\\':
             state['line_buffer'] = line[:-1]
@@ -274,10 +274,8 @@ class SourceFile(object):
 
         state['prev_line'] = line
 
-        if output:
-            output += '\n'
-            ret += output
-
+        ret += output
+        ret += '\n'
         return ret
 
     def parse_sass_line(self, line, state):
@@ -286,7 +284,7 @@ class SourceFile(object):
         if line is None:
             line = ''
 
-        line = state['line_buffer'] + line.rstrip()  # remove EOL character
+        line = state['line_buffer'] + line
 
         if line and line[-1] == '\\':
             state['line_buffer'] = line[:-1]
@@ -327,9 +325,8 @@ class SourceFile(object):
         state['prev_indent'] = indent
         state['prev_line'] = line
 
-        if output:
-            output += '\n'
-            ret += output
+        ret += output
+        ret += '\n'
         return ret
 
     def prepare_source(self, codestr, sass=False):
@@ -351,6 +348,9 @@ class SourceFile(object):
         # parse the last line stored in prev_line buffer
         codestr += parse_line(None, state)
 
+        # pop off the extra \n parse_line puts at the beginning
+        codestr = codestr[1:]
+
         # protects codestr: "..." strings
         codestr = _strings_re.sub(
             lambda m: _reverse_safe_strings_re.sub(
@@ -365,9 +365,6 @@ class SourceFile(object):
 
         codestr = _safe_strings_re.sub(
             lambda m: _safe_strings[m.group(0)], codestr)
-
-        # expand the space in rules
-        codestr = _expand_rules_space_re.sub(' {', codestr)
 
         # collapse the space in properties blocks
         codestr = _collapse_properties_space_re.sub(r'\1{', codestr)
