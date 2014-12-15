@@ -67,6 +67,18 @@ working hours.  Yelp does not claim copyright.
 Changelog
 ---------
 
+1.3.4 (Dec 15, 2014)
+^^^^^^^^^^^^^^^^^^^^
+
+* The modulus (``%``) operator is now supported.
+* ``/`` and ``-`` inside an expression work correctly; this fixes some cases of using vanilla CSS's ``/`` syntax.
+* Relative imports have been more fixed.
+* Line numbers in error messages are...  more likely to be correct.
+* Sass at-blocks now parse correctly even when there's no space after the block name, e.g. ``@if(foo){...}``.
+* A few more cases of ``#{...}`` being replaced lexically have been switched to real parsing.
+
+With these changes, pyScss can now successfully compile Zurb Foundation 5.
+
 1.3.3 (Nov 18, 2014)
 ^^^^^^^^^^^^^^^^^^^^
 
