@@ -250,8 +250,8 @@ def watch_sources(options):
                 dest_path = os.path.join(os.path.dirname(src_path), fname)
 
             print("Compiling %s => %s" % (src_path, dest_path))
-            dest_file = open(dest_path, 'w')
-            dest_file.write(self.css.compile(scss_file=src_path))
+            dest_file = open(dest_path, 'wb')
+            dest_file.write(self.css.compile(scss_file=src_path).encode('utf-8'))
 
         def on_moved(self, event):
             super(ScssEventHandler, self).on_moved(event)
