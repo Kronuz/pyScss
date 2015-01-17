@@ -1043,10 +1043,8 @@ class Compilation(object):
         _rule = rule.copy()
         _rule.unparsed_contents = block.unparsed_contents
         _rule.namespace = rule.namespace
-        _rule.properties = {}
+        _rule.properties = []
         self.manage_children(_rule, scope)
-        for name, value in _rule.properties.items():
-            rule.namespace.set_variable(name, value)
     _at_vars = _at_variables
 
     # @print_timing(10)
