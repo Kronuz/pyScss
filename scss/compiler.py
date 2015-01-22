@@ -182,6 +182,13 @@ class Compiler(object):
                 raise
 
     def compile(self, *filenames):
+        # TODO this doesn't spit out the compilation itself, so if you want to
+        # get something out besides just the output, you have to copy this
+        # method.  that sucks.
+        # TODO i think the right thing is to get all the constructors out of
+        # SourceFile, since it's really the compiler that knows the import
+        # paths and should be consulted about this.  reconsider all this (but
+        # preserve it for now, SIGH) once importers are a thing
         compilation = self.make_compilation()
         for filename in filenames:
             # TODO maybe SourceFile should not be exposed to the end user, and
