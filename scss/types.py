@@ -1023,7 +1023,7 @@ class Color(Value):
                 sp = ''
             else:
                 sp = ' '
-            candidates.append("rgba(%d,%s%d,%s%d,%s%.2g)" % (r, sp, g, sp, b, sp, a))
+            candidates.append("rgba(%d,%s%d,%s%d,%s%.6g)" % (r, sp, g, sp, b, sp, a))
 
         if compress:
             return min(candidates, key=len)
