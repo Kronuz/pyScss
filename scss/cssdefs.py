@@ -448,7 +448,11 @@ escape_rx = re.compile(r"(?s)\\([0-9a-fA-F]{1,6})[\n\t ]?|\\(.)|\\\n")
 
 def _unescape_one(match):
     if match.group(1) is not None:
-        return six.unichr(int(match.group(1), 16))
+        try:
+            return six.unichr(int(match.group(1), 16))
+        except ValueError:
+            return (r'\U%08x' % int(match.group(1), 16)).decode(
+                'unicode-escape')
     elif match.group(2) is not None:
         return match.group(2)
     else:
