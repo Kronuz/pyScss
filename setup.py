@@ -120,6 +120,7 @@ def run_setup(with_binary):
         entry_points="""
         [console_scripts]
         pyscss = scss.tool:main
+        less2scss = scss.less2scss:main
         """,
     )
 
