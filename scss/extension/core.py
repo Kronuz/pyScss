@@ -725,7 +725,7 @@ def max_(*lst):
 
 
 @ns.declare
-def append(lst, val, separator=None):
+def append(lst, val, separator="space"):
     ret = []
     ret.extend(List.from_maybe(lst))
     ret.append(val)
