@@ -45,6 +45,14 @@ def test_inline_image(calc, monkeypatch):
         font_base64 = f.read()
     assert 'url(data:image/png;base64,%s)' % font_base64 == calc('inline_image("/test-qr.png")').render()
 
+@needs_PIL
+def test_inline_plaintext_image(calc, monkeypatch):
+    monkeypatch.setattr(config, 'IMAGES_ROOT', os.path.join(config.PROJECT_ROOT, 'tests/files/images'))
+
+    with open(os.path.join(config.PROJECT_ROOT, 'tests/files/images/test-svg.base64.txt'), 'r') as f:
+        svg_base64 = f.read()
+    assert 'url(data:image/svg+xml;base64,%s)' % svg_base64 == calc('inline_image("/test-svg.svg")').render()
+
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='cur mimetype is defined on windows')
 @needs_PIL

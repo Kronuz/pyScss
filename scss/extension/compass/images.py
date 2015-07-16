@@ -124,6 +124,7 @@ def _image_url(path, only_path=False, cache_buster=True, dst_color=None, src_col
                     image = Image.open(path)
                 except IOError:
                     if not collapse_x and not collapse_y and not dst_colors:
+                        path.seek(0)
                         simply_process = True
 
             if simply_process:
