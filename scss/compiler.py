@@ -1068,7 +1068,7 @@ class Compilation(object):
         except IndexError:
             is_var = False
         if is_var:
-            warn_deprecated(rule, "Assignment with = is deprecated; use :.")
+            warn_deprecated(rule, "Assignment with = is deprecated; use : instead.")
         calculator = self._make_calculator(rule.namespace)
         prop = prop.strip()
         prop = calculator.do_glob_math(prop)
@@ -1273,7 +1273,7 @@ class Compilation(object):
                     # TODO implement !optional
                     warn_deprecated(
                         rule,
-                        "Can't find any matching rules to extend {0!r} -- this"
+                        "Can't find any matching rules to extend {0!r} -- this "
                         "will be fatal in 2.0, unless !optional is specified!"
                         .format(selector.render()))
                     continue
