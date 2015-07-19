@@ -3,7 +3,9 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import division
 
+import os
 from pathlib import Path
+from collections import namedtuple
 
 import six
 
@@ -42,6 +44,8 @@ _default_scss_vars = {
     '$--curlybracketopen': String.unquoted('{'),
     '$--curlybracketclosed': String.unquoted('}'),
 }
+
+SourceFileTuple = namedtuple('SourceFileTuple', ('parent_dir', 'filename'))
 
 
 # TODO using this should spew an actual deprecation warning
@@ -182,7 +186,9 @@ class Scss(object):
                 source = SourceFile.from_string(contents, relpath=name)
                 compilation.add_source(source)
 
-        return compiler.call_and_catch_errors(compilation.run)
+        compiled = compiler.call_and_catch_errors(compilation.run)
+        self.source_files = list(SourceFileTuple(*os.path.split(s.path)) for s in compilation.source_index.values())
+        return compiled
 
     # Old, old alias
     Compilation = compile
