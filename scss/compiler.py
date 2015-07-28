@@ -805,7 +805,7 @@ class Compilation(object):
             nested=rule.nested,
         )
 
-        _rule.options['@content'] = block.unparsed_contents
+        _rule.options['@content'] = _rule.unparsed_contents
         self.manage_children(_rule, scope)
 
     # @print_timing(10)
