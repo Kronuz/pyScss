@@ -277,6 +277,9 @@ def test_str_slice():
     assert calc('str-slice("abcd", 2)') == calc('"bcd"')
     assert calc('str-slice("abcd", -3, -2)') == calc('"bc"')
     assert calc('str-slice("abcd", 2, -2)') == calc('"bc"')
+    assert calc('str-slice("abcd", 0, 3)') == calc('"abc"')
+    assert calc('str-slice("abcd", 1, 3)') == calc('"abc"')
+    assert calc('str-slice("abcd", 1, 30)') == calc('"abcd"')
 
 
 def test_to_upper_case():
