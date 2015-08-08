@@ -576,9 +576,13 @@ def str_index(string, substring):
 def str_slice(string, start_at, end_at=None):
     expect_type(string, String)
     expect_type(start_at, Number, unit=None)
-    py_start_at = start_at.to_python_index(len(string.value))
 
-    if end_at is None:
+    if int(start_at) == 0:
+        py_start_at = 0
+    else:
+        py_start_at = start_at.to_python_index(len(string.value))
+
+    if end_at is None or int(end_at) > len(string.value):
         py_end_at = None
     else:
         expect_type(end_at, Number, unit=None)
