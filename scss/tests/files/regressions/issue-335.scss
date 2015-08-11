@@ -1,0 +1,24 @@
+@option style:legacy;
+
+@function test-append($values) {
+  $max: length($values);
+  $remValues: ();
+  @for $i from 1 through $max {
+    $remValues: append($remValues, nth($values, $i));
+  }
+  @return $remValues;
+}
+
+@function test-append-comma($values) {
+  $max: length($values);
+  $remValues: ();
+  @for $i from 1 through $max {
+    $remValues: append($remValues, nth($values, $i), comma);
+  }
+  @return $remValues;
+}
+
+a {
+  padding: test-append(10 20 30 40);
+  margin: test-append-comma((10, 20, 30, 40));
+}
