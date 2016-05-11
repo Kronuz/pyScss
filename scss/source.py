@@ -5,7 +5,10 @@ from __future__ import division
 
 import hashlib
 import logging
-from pathlib import Path
+try:
+    from pathlib import Path
+except ImportError:
+    from pathlib2 import Path
 import re
 
 import six

@@ -6,7 +6,10 @@ from __future__ import division
 from collections import defaultdict
 from enum import Enum
 import logging
-from pathlib import Path
+try:
+    from pathlib import Path
+except ImportError:
+    from pathlib2 import Path
 import re
 import sys
 import warnings

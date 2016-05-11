@@ -4,7 +4,10 @@ from __future__ import unicode_literals
 from __future__ import division
 
 import os
-from pathlib import Path
+try:
+    from pathlib import Path
+except ImportError:
+    from pathlib2 import Path
 from collections import namedtuple
 
 import six
