@@ -281,41 +281,29 @@ class Compilation(object):
         return source
 
     def run(self):
-        # this will compile and manage rule: child objects inside of a node
-        self.parse_children()
+        # Any @import will add the source file to self.sources and infect this
+        # list, so make a quick copy to insulate against that
+        # TODO maybe @import should just not do that?
+        for source_file in list(self.sources):
+            rule = SassRule(
+                source_file=source_file,
+                lineno=1,
 
-        # this will manage @extends
+                unparsed_contents=source_file.contents,
+                namespace=self.root_namespace,
+            )
+            self.rules.append(rule)
+            self.manage_children(rule, scope=None)
+            self._warn_unused_imports(rule)
+
+        # Run through all the rules and apply @extends in a separate pass
         self.rules = self.apply_extends(self.rules)
 
-        rules_by_file, css_files = self.parse_properties()
+        output, total_selectors = self.create_css(self.rules)
+        if total_selectors >= 4096:
+            log.error("Maximum number of supported selectors in Internet Explorer (4095) exceeded!")
 
-        all_rules = 0
-        all_selectors = 0
-        exceeded = ''
-        final_cont = ''
-        files = len(css_files)
-        for source_file in css_files:
-            rules = rules_by_file[source_file]
-            fcont, total_rules, total_selectors = self.create_css(rules)
-            all_rules += total_rules
-            all_selectors += total_selectors
-            # TODO i would love for the output of this function to be something
-            # useful for producing stats, so this stuff can live on the Scss
-            # class only
-            if not exceeded and all_selectors > 4095:
-                exceeded = " (IE exceeded!)"
-                log.error("Maximum number of supported selectors in Internet Explorer (4095) exceeded!")
-            if files > 1 and self.compiler.generate_source_map:
-                final_cont += "/* %s %s generated from '%s' add up to a total of %s %s accumulated%s */\n" % (
-                    total_selectors,
-                    'selector' if total_selectors == 1 else 'selectors',
-                    source_file.path,
-                    all_selectors,
-                    'selector' if all_selectors == 1 else 'selectors',
-                    exceeded)
-            final_cont += fcont
-
-        return final_cont
+        return output
 
     def parse_selectors(self, raw_selectors):
         """
@@ -339,26 +327,6 @@ class Compilation(object):
         parents = [Selector.parse_one(parent) for parent in unparsed_parents]
 
         return selectors, parents
-
-    # @print_timing(3)
-    def parse_children(self, scope=None):
-        children = []
-        root_namespace = self.root_namespace
-        for source_file in self.sources:
-            rule = SassRule(
-                source_file=source_file,
-                lineno=1,
-
-                unparsed_contents=source_file.contents,
-                namespace=root_namespace,
-            )
-            self.rules.append(rule)
-            children.append(rule)
-
-        for rule in children:
-            self.manage_children(rule, scope)
-
-        self._warn_unused_imports(self.rules[0])
 
     def _warn_unused_imports(self, rule):
         if not rule.legacy_compiler_options.get(
@@ -1321,25 +1289,6 @@ class Compilation(object):
         return [rule for rule in rules if not rule.is_pure_placeholder]
 
     # @print_timing(3)
-    def parse_properties(self):
-        css_files = []
-        seen_files = set()
-        rules_by_file = {}
-
-        for rule in self.rules:
-            source_file = rule.source_file
-            rules_by_file.setdefault(source_file, []).append(rule)
-
-            if rule.is_empty:
-                continue
-
-            if source_file not in seen_files:
-                seen_files.add(source_file)
-                css_files.append(source_file)
-
-        return rules_by_file, css_files
-
-    # @print_timing(3)
     def create_css(self, rules):
         """
         Generate the final CSS string
@@ -1412,7 +1361,6 @@ class Compilation(object):
 
         prev_ancestry_headers = []
 
-        total_rules = 0
         total_selectors = 0
 
         result = ''
@@ -1493,7 +1441,6 @@ class Compilation(object):
                     header_string = header.render()
                 result += tb * (i + nesting) + header_string + sp + '{' + nl
 
-                total_rules += 1
                 if header.is_selector:
                     total_selectors += 1
 
@@ -1512,7 +1459,7 @@ class Compilation(object):
         if not result.endswith('\n'):
             result += '\n'
 
-        return (result, total_rules, total_selectors)
+        return (result, total_selectors)
 
     def _print_properties(self, properties, sc=True, sp=' ', tb='', nl='\n', lnl=' '):
         result = ''

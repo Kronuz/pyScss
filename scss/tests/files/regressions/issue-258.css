@@ -3,6 +3,7 @@
     any-property: any-value;
   }
 }
+
 #B {
   my-property: this-should-be-before-media-query;
 }

@@ -348,6 +348,7 @@ class SassRepl(object):
                     self.compilation._at_options(self.calculator, rule, scope, block)
                     continue
                 elif code == '@import':
+                    # TODO this doesn't really work either since there's no path
                     self.compilation._at_import(self.calculator, rule, scope, block)
                     continue
                 elif code == '@include':
@@ -357,6 +358,7 @@ class SassRepl(object):
                     if code:
                         final_cont += code
                     if children:
+                        # TODO this almost certainly doesn't work, and is kind of goofy anyway since @mixin isn't supported
                         self.compilation.children.extendleft(children)
                         self.compilation.parse_children()
                         code = self.compilation._create_css(self.compilation.rules).rstrip('\n')
