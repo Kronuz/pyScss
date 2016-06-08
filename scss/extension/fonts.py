@@ -260,7 +260,7 @@ def font_sheet(g, **kwargs):
                         height = float(m.group(1))
                     else:
                         height = None
-                    _glyph = tempfile.NamedTemporaryFile(delete=False, suffix=".svg")
+                    _glyph = tempfile.NamedTemporaryFile(delete=False, suffix=".svg", mode='w')
                     _glyph.file.write(svgtext)
                     _glyph.file.close()
                     yield _glyph.name, width, height
@@ -294,7 +294,7 @@ def font_sheet(g, **kwargs):
                     try:
                         if type_ == 'eot':
                             ttf_path = asset_paths['ttf']
-                            with open(ttf_path) as ttf_fh:
+                            with open(ttf_path, 'rb') as ttf_fh:
                                 contents = ttf2eot(ttf_fh.read())
                                 if contents is not None:
                                     with open(asset_path, 'wb') as asset_fh:
@@ -304,7 +304,7 @@ def font_sheet(g, **kwargs):
                             if type_ == 'ttf':
                                 contents = None
                                 if autohint:
-                                    with open(asset_path) as asset_fh:
+                                    with open(asset_path, 'rb') as asset_fh:
                                         contents = ttfautohint(asset_fh.read())
                                 if contents is not None:
                                     with open(asset_path, 'wb') as asset_fh:
@@ -330,7 +330,7 @@ def font_sheet(g, **kwargs):
                     contents = None
                     if type_ == 'eot':
                         ttf_path = asset_paths['ttf']
-                        with open(ttf_path) as ttf_fh:
+                        with open(ttf_path, 'rb') as ttf_fh:
                             contents = ttf2eot(ttf_fh.read())
                             if contents is None:
                                 continue
@@ -338,7 +338,7 @@ def font_sheet(g, **kwargs):
                         _tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.' + type_)
                         _tmp.file.close()
                         font.generate(_tmp.name)
-                        with open(_tmp.name) as asset_fh:
+                        with open(_tmp.name, 'rb') as asset_fh:
                             if autohint:
                                 if type_ == 'ttf':
                                     _contents = asset_fh.read()
