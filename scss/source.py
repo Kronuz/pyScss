@@ -13,7 +13,7 @@ import six
 from scss.cssdefs import (
     _ml_comment_re, _sl_comment_re,
     _collapse_properties_space_re,
-    _strings_re,
+    _strings_re, _urls_re,
 )
 from scss.cssdefs import determine_encoding
 
@@ -353,6 +353,10 @@ class SourceFile(object):
 
         # protects codestr: "..." strings
         codestr = _strings_re.sub(
+            lambda m: _reverse_safe_strings_re.sub(
+                lambda n: _reverse_safe_strings[n.group(0)], m.group(0)),
+            codestr)
+        codestr = _urls_re.sub(
             lambda m: _reverse_safe_strings_re.sub(
                 lambda n: _reverse_safe_strings[n.group(0)], m.group(0)),
             codestr)

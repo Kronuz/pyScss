@@ -480,6 +480,8 @@ _collapse_properties_space_re = re.compile(r'([:#])\s*{')
 _variable_re = re.compile('^\\$[-a-zA-Z0-9_]+$')
 
 _strings_re = re.compile(r'([\'"]).*?\1')
+# TODO i know, this is clumsy and won't always work; it's better than nothing
+_urls_re = re.compile(r'url[(].*?[)]')
 
 _has_placeholder_re = re.compile(r'(?<!\w)([a-z]\w*)?%')
 _prop_split_re = re.compile(r'[:=]')

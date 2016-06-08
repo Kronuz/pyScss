@@ -1,0 +1,5 @@
+// Two slashes inside a URL were being stripped as a comment, leaving bogus SCSS
+// https://github.com/Kronuz/pyScss/issues/350
+.logo {
+  background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAYAAAAGCAYAAADgzO9IAAAAP0lEQVQIHWWMAQoAIAgDR/QJ/Ub//04+w7ZICBwcOg5FZi5iBB82AGzixEglJrd4TVK5XUJpskSTEvpdFzX9AB2pGziSQcvAAAAAAElFTkSuQmCC);
+}
