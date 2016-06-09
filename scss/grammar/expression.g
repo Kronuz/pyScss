@@ -96,9 +96,9 @@ parser SassExpression:
     token VAR: "\$[-a-zA-Z0-9_]+"
 
     # Cheating, to make sure these only match function names.
-    # The last of these is the IE filter nonsense
     token LITERAL_FUNCTION: "(calc|expression|progid:[\w.]+)(?=[(])"
     token ALPHA_FUNCTION: "alpha(?=[(])"
+    token OPACITY: "(?:(?i)opacity)"
     token URL_FUNCTION: "url(?=[(])"
     # This must come AFTER the above
     token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
@@ -244,7 +244,7 @@ parser SassExpression:
         # filter syntax, where it appears as alpha(opacity=NN).  Since = isn't
         # normally valid Sass, we have to special-case it here
         | ALPHA_FUNCTION LPAR (
-            "opacity" "=" atom RPAR
+            OPACITY "=" atom RPAR
                 {{ return AlphaFunctionLiteral(atom) }}
             | argspec RPAR          {{ return CallOp("alpha", argspec) }}
             )

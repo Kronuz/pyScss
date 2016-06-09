@@ -42,7 +42,6 @@ class SassExpressionScanner(Scanner):
     patterns = None
     _patterns = [
         ('"="', '='),
-        ('"opacity"', 'opacity'),
         ('":"', ':'),
         ('","', ','),
         ('SINGLE_STRING_GUTS', "([^'\\\\#]|[\\\\].|#(?![{]))*"),
@@ -86,6 +85,7 @@ class SassExpressionScanner(Scanner):
         ('VAR', '\\$[-a-zA-Z0-9_]+'),
         ('LITERAL_FUNCTION', '(calc|expression|progid:[\\w.]+)(?=[(])'),
         ('ALPHA_FUNCTION', 'alpha(?=[(])'),
+        ('OPACITY', '(?:(?i)opacity)'),
         ('URL_FUNCTION', 'url(?=[(])'),
         ('FNCT', '[-a-zA-Z_][-a-zA-Z0-9_]*(?=\\()'),
         ('BAREWORD', '(?!\\d)(\\\\[0-9a-fA-F]{1,6}|\\\\.|[-a-zA-Z0-9_])+'),
@@ -339,8 +339,8 @@ class SassExpression(Parser):
             ALPHA_FUNCTION = self._scan('ALPHA_FUNCTION')
             LPAR = self._scan('LPAR')
             _token_ = self._peek(self.atom_rsts_)
-            if _token_ == '"opacity"':
-                self._scan('"opacity"')
+            if _token_ == 'OPACITY':
+                OPACITY = self._scan('OPACITY')
                 self._scan('"="')
                 atom = self.atom()
                 RPAR = self._scan('RPAR')
@@ -560,7 +560,7 @@ class SassExpression(Parser):
     and_expr_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'ALPHA_FUNCTION', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NUM', '":"', 'BAREWORD', 'END', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'FNCT', 'VAR', 'AND', 'OR', 'NOT', 'SINGLE_QUOTE', '","'])
     comparison_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'ALPHA_FUNCTION', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'ADD', 'FNCT', 'VAR', 'EQ', 'AND', 'GE', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
     argspec_chks = frozenset(['DOTDOTDOT', 'SLURPYVAR'])
-    atom_rsts_ = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'SLURPYVAR', 'ALPHA_FUNCTION', 'RPAR', 'BANG_IMPORTANT', '"opacity"', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NUM', 'BAREWORD', 'END', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'FNCT', 'VAR', 'DOTDOTDOT', 'NOT', 'SINGLE_QUOTE'])
+    atom_rsts_ = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'SLURPYVAR', 'ALPHA_FUNCTION', 'RPAR', 'BANG_IMPORTANT', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NUM', 'BAREWORD', 'END', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'FNCT', 'VAR', 'OPACITY', 'DOTDOTDOT', 'NOT', 'SINGLE_QUOTE'])
     interpolated_string_double_rsts = frozenset(['DOUBLE_QUOTE', 'INTERP_START'])
     atom_chks__ = frozenset(['COLOR', 'VAR'])
     expr_map_or_list_rsts_ = frozenset(['RPAR', '","'])
