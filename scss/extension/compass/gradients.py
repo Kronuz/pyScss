@@ -19,6 +19,11 @@ log = logging.getLogger(__name__)
 ns = CompassExtension.namespace
 
 
+def _is_color(value):
+    # currentColor is not a Sass color value, but /is/ a CSS color value
+    return isinstance(value, Color) or value == String('currentColor')
+
+
 def __color_stops(percentages, *args):
     if len(args) == 1:
         if isinstance(args[0], (list, tuple, List)):
@@ -42,7 +47,7 @@ def __color_stops(percentages, *args):
     prev_color = False
     for c in args:
         for c in List.from_maybe(c):
-            if isinstance(c, Color):
+            if _is_color(c):
                 if prev_color:
                     stops.append(None)
                 colors.append(c)
@@ -169,7 +174,7 @@ def _get_gradient_position_and_angle(args):
         ret = None
         skip = False
         for a in arg:
-            if isinstance(a, Color):
+            if _is_color(a):
                 skip = True
                 break
             elif isinstance(a, Number):
@@ -205,7 +210,7 @@ def _get_gradient_color_stops(args):
     color_stops = []
     for arg in args:
         for a in List.from_maybe(arg):
-            if isinstance(a, Color):
+            if _is_color(a):
                 color_stops.append(arg)
                 break
     return color_stops or None
