@@ -1095,6 +1095,8 @@ class Compilation(object):
                 # TODO kill this branch
                 pass
             else:
+                if value.is_null:
+                    return
                 style = rule.legacy_compiler_options.get(
                     'style', self.compiler.output_style)
                 compress = style == 'compressed'
