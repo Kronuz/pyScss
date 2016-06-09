@@ -46,8 +46,8 @@ from __future__ import unicode_literals
 
 import sys
 
-VERSION_INFO = (1, 3, 4)
-DATE_INFO = (2014, 12, 15)  # YEAR, MONTH, DAY
+VERSION_INFO = (1, 3, 5)
+DATE_INFO = (2016, 6, 8)  # YEAR, MONTH, DAY
 VERSION = '.'.join(str(i) for i in VERSION_INFO)
 REVISION = '%04d%02d%02d' % DATE_INFO
 BUILD_INFO = "pyScss v" + VERSION + " (" + REVISION + ")"
