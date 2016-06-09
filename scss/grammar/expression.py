@@ -26,6 +26,7 @@ from scss.ast import MapLiteral
 from scss.ast import ArgspecLiteral
 from scss.ast import FunctionLiteral
 from scss.ast import AlphaFunctionLiteral
+from scss.ast import TernaryOp
 from scss.cssdefs import unescape
 from scss.types import Color
 from scss.types import Function
@@ -87,6 +88,7 @@ class SassExpressionScanner(Scanner):
         ('ALPHA_FUNCTION', 'alpha(?=[(])'),
         ('OPACITY', '((?i)opacity)'),
         ('URL_FUNCTION', 'url(?=[(])'),
+        ('IF_FUNCTION', 'if(?=[(])'),
         ('FNCT', '[-a-zA-Z_][-a-zA-Z0-9_]*(?=\\()'),
         ('BAREWORD', '(?!\\d)(\\\\[0-9a-fA-F]{1,6}|\\\\.|[-a-zA-Z0-9_])+'),
         ('BANG_IMPORTANT', '!\\s*important'),
@@ -349,6 +351,12 @@ class SassExpression(Parser):
                 argspec = self.argspec()
                 RPAR = self._scan('RPAR')
                 return CallOp("alpha", argspec)
+        elif _token_ == 'IF_FUNCTION':
+            IF_FUNCTION = self._scan('IF_FUNCTION')
+            LPAR = self._scan('LPAR')
+            expr_lst = self.expr_lst()
+            RPAR = self._scan('RPAR')
+            return TernaryOp(expr_lst)
         elif _token_ == 'LITERAL_FUNCTION':
             LITERAL_FUNCTION = self._scan('LITERAL_FUNCTION')
             LPAR = self._scan('LPAR')
@@ -537,9 +545,9 @@ class SassExpression(Parser):
         return Interpolation.maybe(parts)
 
     atom_chks_ = frozenset(['BAREWORD', 'INTERP_START'])
-    expr_map_or_list_rsts__ = frozenset(['LPAR', 'DOUBLE_QUOTE', 'VAR', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'RPAR', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE', '","'])
-    u_expr_chks = frozenset(['LPAR', 'DOUBLE_QUOTE', 'BAREWORD', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'ALPHA_FUNCTION', 'VAR', 'NUM', 'FNCT', 'LITERAL_FUNCTION', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
-    m_expr_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'MOD', 'OR', '","'])
+    expr_map_or_list_rsts__ = frozenset(['LPAR', 'RPAR', 'BANG_IMPORTANT', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'DOUBLE_QUOTE', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'VAR', 'FNCT', 'NOT', 'IF_FUNCTION', 'SINGLE_QUOTE', '","'])
+    u_expr_chks = frozenset(['LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'VAR', 'NUM', 'FNCT', 'LITERAL_FUNCTION', 'IF_FUNCTION', 'SINGLE_QUOTE'])
+    m_expr_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'IF_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'MOD', 'OR', '","'])
     interpolated_bare_url_rsts_ = frozenset(['RPAR', 'INTERP_START', 'BAREURL', 'SPACE'])
     argspec_items_rsts = frozenset(['RPAR', 'END', '","'])
     expr_slst_chks = frozenset(['INTERP_END', 'RPAR', 'END', '":"', '","'])
@@ -547,39 +555,39 @@ class SassExpression(Parser):
     goal_interpolated_literal_rsts = frozenset(['END', 'INTERP_START'])
     expr_map_or_list_rsts = frozenset(['RPAR', '":"', '","'])
     goal_interpolated_literal_with_vars_rsts = frozenset(['VAR', 'END', 'INTERP_START'])
-    argspec_item_chks = frozenset(['LPAR', 'DOUBLE_QUOTE', 'VAR', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
+    argspec_item_chks = frozenset(['LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'VAR', 'FNCT', 'NOT', 'IF_FUNCTION', 'SINGLE_QUOTE'])
     a_expr_chks = frozenset(['ADD', 'SUB'])
     interpolated_function_parens_rsts = frozenset(['LPAR', 'RPAR', 'INTERP_START'])
-    expr_slst_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'VAR', 'END', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'FNCT', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'RPAR', '":"', 'NOT', 'INTERP_END', 'BANG_IMPORTANT', 'SINGLE_QUOTE', '","'])
-    interpolated_bareword_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SPACE', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'MOD', 'OR', '","'])
-    atom_rsts__ = frozenset(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'VAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'UNITS', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'MOD', 'OR', '","'])
-    or_expr_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'ALPHA_FUNCTION', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NUM', '":"', 'BAREWORD', 'END', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'FNCT', 'VAR', 'OR', 'NOT', 'SINGLE_QUOTE', '","'])
+    expr_slst_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'ALPHA_FUNCTION', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NUM', '":"', 'BAREWORD', 'IF_FUNCTION', 'END', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'FNCT', 'VAR', 'NOT', 'SINGLE_QUOTE', '","'])
+    interpolated_bareword_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'IF_FUNCTION', 'GT', 'END', 'SPACE', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'MOD', 'OR', '","'])
+    atom_rsts__ = frozenset(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'VAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'IF_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'UNITS', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'MOD', 'OR', '","'])
+    or_expr_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'ALPHA_FUNCTION', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NUM', '":"', 'BAREWORD', 'IF_FUNCTION', 'END', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'FNCT', 'VAR', 'OR', 'NOT', 'SINGLE_QUOTE', '","'])
     argspec_chks_ = frozenset(['END', 'RPAR'])
     interpolated_string_single_rsts = frozenset(['SINGLE_QUOTE', 'INTERP_START'])
-    interpolated_bareword_rsts_ = frozenset(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'INTERP_END', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'BAREWORD', 'GT', 'END', 'SPACE', 'SIGN', 'LITERAL_FUNCTION', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'MOD', 'OR', '","'])
-    and_expr_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'ALPHA_FUNCTION', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NUM', '":"', 'BAREWORD', 'END', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'FNCT', 'VAR', 'AND', 'OR', 'NOT', 'SINGLE_QUOTE', '","'])
-    comparison_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'ALPHA_FUNCTION', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'ADD', 'FNCT', 'VAR', 'EQ', 'AND', 'GE', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
+    interpolated_bareword_rsts_ = frozenset(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'MUL', 'DIV', 'BANG_IMPORTANT', 'INTERP_END', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'BAREWORD', 'IF_FUNCTION', 'GT', 'END', 'SPACE', 'SIGN', 'LITERAL_FUNCTION', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'MOD', 'OR', '","'])
+    and_expr_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'ALPHA_FUNCTION', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NUM', '":"', 'BAREWORD', 'IF_FUNCTION', 'END', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'FNCT', 'VAR', 'AND', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
+    comparison_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'ALPHA_FUNCTION', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'IF_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'ADD', 'FNCT', 'VAR', 'EQ', 'AND', 'GE', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
     argspec_chks = frozenset(['DOTDOTDOT', 'SLURPYVAR'])
-    atom_rsts_ = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'SLURPYVAR', 'ALPHA_FUNCTION', 'RPAR', 'BANG_IMPORTANT', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NUM', 'BAREWORD', 'END', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'FNCT', 'VAR', 'OPACITY', 'DOTDOTDOT', 'NOT', 'SINGLE_QUOTE'])
+    atom_rsts_ = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'SLURPYVAR', 'ALPHA_FUNCTION', 'RPAR', 'BANG_IMPORTANT', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NUM', 'BAREWORD', 'IF_FUNCTION', 'END', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'FNCT', 'VAR', 'OPACITY', 'DOTDOTDOT', 'NOT', 'SINGLE_QUOTE'])
     interpolated_string_double_rsts = frozenset(['DOUBLE_QUOTE', 'INTERP_START'])
     atom_chks__ = frozenset(['COLOR', 'VAR'])
     expr_map_or_list_rsts_ = frozenset(['RPAR', '","'])
-    u_expr_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'BAREWORD', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'ALPHA_FUNCTION', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'LITERAL_FUNCTION', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
+    u_expr_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'SIGN', 'VAR', 'ADD', 'NUM', 'FNCT', 'LITERAL_FUNCTION', 'IF_FUNCTION', 'SINGLE_QUOTE'])
     interpolated_url_chks = frozenset(['INTERP_START_URL_HACK', 'BAREURL_HEAD_HACK'])
-    atom_chks = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'END', 'SLURPYVAR', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'DOTDOTDOT', 'INTERP_START', 'RPAR', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'VAR', 'FNCT', 'NOT', 'SIGN', 'SINGLE_QUOTE'])
-    interpolated_url_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'VAR', 'SINGLE_QUOTE', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'FNCT', 'NOT', 'INTERP_START_URL_HACK', 'BANG_IMPORTANT', 'BAREURL_HEAD_HACK'])
+    atom_chks = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'SLURPYVAR', 'ALPHA_FUNCTION', 'RPAR', 'BANG_IMPORTANT', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NUM', 'BAREWORD', 'IF_FUNCTION', 'END', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'FNCT', 'VAR', 'DOTDOTDOT', 'NOT', 'SINGLE_QUOTE'])
+    interpolated_url_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'SINGLE_QUOTE', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'VAR', 'FNCT', 'NOT', 'INTERP_START_URL_HACK', 'IF_FUNCTION', 'BAREURL_HEAD_HACK'])
     comparison_chks = frozenset(['GT', 'GE', 'NE', 'LT', 'LE', 'EQ'])
-    argspec_items_rsts_ = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'VAR', 'END', 'SLURPYVAR', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'DOTDOTDOT', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'RPAR', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
-    a_expr_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
+    argspec_items_rsts_ = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'SLURPYVAR', 'ALPHA_FUNCTION', 'RPAR', 'BANG_IMPORTANT', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NUM', 'BAREWORD', 'IF_FUNCTION', 'END', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'FNCT', 'VAR', 'DOTDOTDOT', 'NOT', 'SINGLE_QUOTE'])
+    a_expr_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'INTERP_END', 'BANG_IMPORTANT', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'IF_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'OR', '","'])
     interpolated_string_rsts = frozenset(['DOUBLE_QUOTE', 'SINGLE_QUOTE'])
-    interpolated_bareword_rsts__ = frozenset(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'MOD', 'OR', '","'])
+    interpolated_bareword_rsts__ = frozenset(['LPAR', 'DOUBLE_QUOTE', 'SUB', 'ALPHA_FUNCTION', 'RPAR', 'MUL', 'INTERP_END', 'BANG_IMPORTANT', 'DIV', 'LE', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NE', 'LT', 'NUM', '":"', 'LITERAL_FUNCTION', 'IF_FUNCTION', 'GT', 'END', 'SIGN', 'BAREWORD', 'GE', 'FNCT', 'VAR', 'EQ', 'AND', 'ADD', 'SINGLE_QUOTE', 'NOT', 'MOD', 'OR', '","'])
     m_expr_chks = frozenset(['MUL', 'DIV', 'MOD'])
     goal_interpolated_literal_with_vars_rsts_ = frozenset(['VAR', 'INTERP_START'])
     interpolated_bare_url_rsts = frozenset(['RPAR', 'INTERP_START'])
-    argspec_items_chks = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'VAR', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
-    argspec_rsts = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'END', 'SLURPYVAR', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'DOTDOTDOT', 'INTERP_START', 'RPAR', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'VAR', 'FNCT', 'NOT', 'SIGN', 'SINGLE_QUOTE'])
-    atom_rsts = frozenset(['LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'VAR', 'FNCT', 'NOT', 'RPAR', 'SINGLE_QUOTE'])
-    argspec_items_rsts__ = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'VAR', 'SLURPYVAR', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'DOTDOTDOT', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'FNCT', 'NOT', 'BANG_IMPORTANT', 'SINGLE_QUOTE'])
-    argspec_rsts_ = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'END', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'VAR', 'FNCT', 'NOT', 'RPAR', 'SINGLE_QUOTE'])
+    argspec_items_chks = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'VAR', 'FNCT', 'NOT', 'IF_FUNCTION', 'SINGLE_QUOTE'])
+    argspec_rsts = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'SLURPYVAR', 'ALPHA_FUNCTION', 'RPAR', 'BANG_IMPORTANT', 'URL_FUNCTION', 'INTERP_START', 'COLOR', 'NUM', 'BAREWORD', 'IF_FUNCTION', 'END', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'FNCT', 'VAR', 'DOTDOTDOT', 'NOT', 'SINGLE_QUOTE'])
+    atom_rsts = frozenset(['BANG_IMPORTANT', 'LPAR', 'DOUBLE_QUOTE', 'IF_FUNCTION', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'VAR', 'FNCT', 'NOT', 'RPAR', 'SINGLE_QUOTE'])
+    argspec_items_rsts__ = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'BANG_IMPORTANT', 'SLURPYVAR', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'DOTDOTDOT', 'INTERP_START', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'VAR', 'FNCT', 'NOT', 'IF_FUNCTION', 'SINGLE_QUOTE'])
+    argspec_rsts_ = frozenset(['KWVAR', 'LPAR', 'DOUBLE_QUOTE', 'IF_FUNCTION', 'END', 'URL_FUNCTION', 'BAREWORD', 'COLOR', 'ALPHA_FUNCTION', 'INTERP_START', 'BANG_IMPORTANT', 'SIGN', 'LITERAL_FUNCTION', 'ADD', 'NUM', 'VAR', 'FNCT', 'NOT', 'RPAR', 'SINGLE_QUOTE'])
 
 

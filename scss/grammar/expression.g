@@ -26,6 +26,7 @@ from scss.ast import MapLiteral
 from scss.ast import ArgspecLiteral
 from scss.ast import FunctionLiteral
 from scss.ast import AlphaFunctionLiteral
+from scss.ast import TernaryOp
 from scss.cssdefs import unescape
 from scss.types import Color
 from scss.types import Function
@@ -100,6 +101,7 @@ parser SassExpression:
     token ALPHA_FUNCTION: "alpha(?=[(])"
     token OPACITY: "((?i)opacity)"
     token URL_FUNCTION: "url(?=[(])"
+    token IF_FUNCTION: "if(?=[(])"
     # This must come AFTER the above
     token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
 
@@ -248,6 +250,9 @@ parser SassExpression:
                 {{ return AlphaFunctionLiteral(atom) }}
             | argspec RPAR          {{ return CallOp("alpha", argspec) }}
             )
+        # This is a ternary operator, disguised as a function
+        | IF_FUNCTION LPAR expr_lst RPAR
+            {{ return TernaryOp(expr_lst) }}
         | LITERAL_FUNCTION LPAR interpolated_function RPAR
             {{ return Interpolation.maybe(interpolated_function, type=Function, function_name=LITERAL_FUNCTION) }}
         | FNCT LPAR argspec RPAR    {{ return CallOp(FNCT, argspec) }}

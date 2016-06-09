@@ -1,0 +1,6 @@
+p {
+    // if()'s arguments are evaluated lazily.  $bogus doesn't exist, so if
+    // those expressions are ever evaluated, pyscss will die with an error
+    color: if(false, $bogus, red);
+    color: if(true, blue, $bogus);
+}

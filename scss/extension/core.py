@@ -941,11 +941,3 @@ def comparable(number1, number2):
 
 
 # TODO call
-
-
-# ------------------------------------------------------------------------------
-# Miscellaneous
-
-@ns.declare
-def if_(condition, if_true, if_false=Null()):
-    return if_true if condition else if_false

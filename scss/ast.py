@@ -533,3 +533,33 @@ class AlphaFunctionLiteral(Expression):
             # TODO compress
             contents = child.render()
         return Function('opacity=' + contents, 'alpha', quotes=None)
+
+
+class TernaryOp(Expression):
+    """Sass implements this with a function:
+
+        prop: if(condition, true-value, false-value);
+
+    However, the second and third arguments are guaranteed not to be evaluated
+    unless necessary.  Functions always receive evaluated arguments, so this is
+    a syntactic construct in disguise.
+    """
+    def __repr__(self):
+        return '<%s(%r, %r, %r)>' % (
+            self.__class__.__name__,
+            self.condition,
+            self.true_expression,
+            self.false_expression,
+        )
+
+    def __init__(self, list_literal):
+        args = list_literal.items
+        if len(args) != 3:
+            raise SyntaxError("if() must have exactly 3 arguments")
+        self.condition, self.true_expression, self.false_expression = args
+
+    def evaluate(self, calculator, divide=False):
+        if self.condition.evaluate(calculator, divide=True):
+            return self.true_expression.evaluate(calculator, divide=True)
+        else:
+            return self.false_expression.evaluate(calculator, divide=True)
