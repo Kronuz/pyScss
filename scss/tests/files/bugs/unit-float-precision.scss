@@ -1,0 +1,7 @@
+// A number of pixels is actually stored internally as millimeters, which
+// causes some slight precision issues in corner cases.  In this case, the
+// answer came out as 701px rather than 702px, because the subtraction yielded
+// 701.99999999px.
+a {
+    width: floor(742px - 40px);
+}

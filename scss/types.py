@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 
 from collections import Iterable
 import colorsys
+from fractions import Fraction
 import operator
 import re
 import string
@@ -255,7 +256,21 @@ class Number(Value):
             self.unit_denom = amount.unit_denom
             return
 
-        if not isinstance(amount, (int, float)):
+        # Numbers with units are stored internally as a "base" unit, which can
+        # involve float division, which can lead to precision errors in obscure
+        # cases.  Storing the original units would only partially solve this
+        # problem, because there'd still be a possible loss of precision when
+        # converting in Sass-land.  Almost all of the conversion factors are
+        # simple ratios of small whole numbers, so using Fraction across the
+        # board preserves as much precision as possible.
+        # TODO in fact, i wouldn't mind parsing Sass values as fractions of a
+        # power of ten!
+        # TODO this slowed the test suite down by about 10%, ha
+        if isinstance(amount, (int, float)):
+            amount = Fraction.from_float(amount)
+        elif isinstance(amount, Fraction):
+            pass
+        else:
             raise TypeError("Expected number, got %r" % (amount,))
 
         if unit is not None:
