@@ -34,12 +34,12 @@ class CoreExtension(Extension):
         # import relative to the current file even if the current file isn't
         # anywhere in the search path.  is that right?
         path = PurePosixPath(name)
-        if path.suffix:
-            search_exts = [path.suffix]
-        else:
-            search_exts = compilation.compiler.dynamic_extensions
 
-        basename = path.stem
+        search_exts = list(compilation.compiler.dynamic_extensions)
+        if path.suffix and path.suffix in search_exts:
+            basename = path.stem
+        else:
+            basename = path.name
         relative_to = path.parent
         search_path = []  # tuple of (origin, start_from)
         if relative_to.is_absolute():
