@@ -626,26 +626,6 @@ ns.set_function('floor', 1, Number.wrap_python_function(math.floor))
 # ------------------------------------------------------------------------------
 # List functions
 
-def __parse_separator(separator, default_from=None):
-    if separator is None:
-        separator = 'auto'
-    separator = String.unquoted(separator).value
-
-    if separator == 'comma':
-        return True
-    elif separator == 'space':
-        return False
-    elif separator == 'auto':
-        if not default_from:
-            return True
-        elif len(default_from) < 2:
-            return True
-        else:
-            return default_from.use_comma
-    else:
-        raise ValueError('Separator must be auto, comma, or space')
-
-
 # TODO get the compass bit outta here
 @ns.declare_alias('-compass-list-size')
 @ns.declare
@@ -729,12 +709,26 @@ def max_(*lst):
 
 
 @ns.declare
-def append(lst, val, separator=None):
+def append(lst, val, separator=String.unquoted('auto')):
+    expect_type(separator, String)
+
     ret = []
     ret.extend(List.from_maybe(lst))
     ret.append(val)
 
-    use_comma = __parse_separator(separator, default_from=lst)
+    separator = separator.value
+    if separator == 'comma':
+        use_comma = True
+    elif separator == 'space':
+        use_comma = False
+    elif separator == 'auto':
+        if len(lst) < 2:
+            use_comma = False
+        else:
+            use_comma = lst.use_comma
+    else:
+        raise ValueError('Separator must be auto, comma, or space')
+
     return List(ret, use_comma=use_comma)
 
 

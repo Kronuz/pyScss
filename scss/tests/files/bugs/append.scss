@@ -1,0 +1,10 @@
+// Default when the first list has < 2 elements is space
+$a: append((), 1);
+$b: append(append((), 1, comma), 2);
+$c: append((1, 2), 3);
+
+p {
+  a: $a;
+  b: $b;
+  c: $c;
+}
