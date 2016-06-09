@@ -91,6 +91,15 @@ class SimpleSelector(object):
 
     For lack of a better name, each of the individual parts is merely called a
     "token".
+
+    Note that it's possible to have zero tokens.  This isn't legal CSS, but
+    it's perfectly legal Sass, since you might nest blocks like so:
+
+        body > {
+            div {
+                ...
+            }
+        }
     """
     def __init__(self, combinator, tokens):
         self.combinator = combinator
@@ -250,10 +259,12 @@ class SimpleSelector(object):
     def render(self):
         # TODO fail if there are no tokens, or if one is a placeholder?
         rendered = ''.join(self.tokens)
-        if self.combinator != ' ':
-            rendered = ' '.join((self.combinator, rendered))
-
-        return rendered
+        if self.combinator == ' ':
+            return rendered
+        elif rendered:
+            return self.combinator + ' ' + rendered
+        else:
+            return self.combinator
 
 
 class Selector(object):
@@ -287,6 +298,10 @@ class Selector(object):
 
         def promote_selector():
             promote_simple()
+            if pending['combinator'] != ' ':
+                pending['simples'].append(
+                    SimpleSelector(pending['combinator'], []))
+                pending['combinator'] = ' '
             if pending['simples']:
                 ret.append(cls(pending['simples']))
             pending['simples'] = []
@@ -310,7 +325,6 @@ class Selector(object):
 
             if token == ',':
                 # End current selector
-                # TODO what about "+ ,"?  what do i even do with that
                 promote_selector()
             elif token in ' +>~':
                 # End current simple selector

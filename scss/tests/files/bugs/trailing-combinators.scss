@@ -1,0 +1,18 @@
+div ~ {
+  p,
+  blockquote {
+    background-color: blue;
+  }
+}
+div > {
+  p,
+  blockquote {
+    background-color: blue;
+  }
+}
+div + {
+  p,
+  blockquote {
+    background-color: blue;
+  }
+}
