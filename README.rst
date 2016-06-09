@@ -17,7 +17,7 @@ programming capabilities and some other syntactic sugar.
 Quickstart
 ----------
 
-You need Python 2.6+ or 3.2+.  PyPy is also supported.
+You need Python 2.6+ or 3.3+.  PyPy is also supported.
 
 Installation::
 
