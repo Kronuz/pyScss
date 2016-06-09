@@ -378,6 +378,12 @@ def invert(color):
     """Returns the inverse (negative) of a color.  The red, green, and blue
     values are inverted, while the opacity is left alone.
     """
+    if isinstance(color, Number):
+        # invert(n) and invert(n%) are CSS3 filters and should be left
+        # intact
+        return String.unquoted("invert(%s)" % (color.render(),))
+
+    expect_type(color, Color)
     r, g, b, a = color.rgba
     return Color.from_rgb(1 - r, 1 - g, 1 - b, alpha=a)
 

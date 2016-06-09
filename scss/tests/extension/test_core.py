@@ -152,6 +152,11 @@ def test_invert():
     assert calc('invert(yellow)') == Color.from_rgb(0., 0., 1.)
 
 
+def test_invert_css_filter():
+    # invert(number) is a CSS filter and should be left alone
+    assert calc('invert(50%)') == String("invert(50%)")
+
+
 # ------------------------------------------------------------------------------
 # Opacity functions
 
