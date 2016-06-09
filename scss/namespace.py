@@ -157,7 +157,17 @@ class Namespace(object):
 
         return decorator
 
-    def _auto_register_function(self, function, name):
+    def declare_internal(self, function):
+        """Like declare(), but the registered function will also receive the
+        current namespace as its first argument.  Useful for functions that
+        inspect the state of the compilation, like ``variable-exists()``.
+        Probably not so useful for anything else.
+        """
+        function._pyscss_needs_namespace = True
+        self._auto_register_function(function, function.__name__, 1)
+        return function
+
+    def _auto_register_function(self, function, name, ignore_args=0):
         name = name.replace('_', '-').rstrip('-')
         argspec = inspect.getargspec(function)
 
@@ -170,7 +180,7 @@ class Namespace(object):
                 num_optional = len(argspec.defaults)
             else:
                 num_optional = 0
-            num_args = len(argspec.args)
+            num_args = len(argspec.args) - ignore_args
             arities = range(num_args - num_optional, num_args + 1)
 
         for arity in arities:

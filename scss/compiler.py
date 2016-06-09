@@ -684,6 +684,7 @@ class Compilation(object):
                         return e.retval
                     else:
                         return Null()
+                __call._pyscss_needs_namespace = True
                 return __call
             _mixin = _call(mixin)
             _mixin.mixin = mixin

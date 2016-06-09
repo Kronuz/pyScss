@@ -840,8 +840,71 @@ def map_merge_deep(*maps):
     return Map(pairs)
 
 
+@ns.declare
+def keywords(value):
+    """Extract named arguments, as a map, from an argument list."""
+    expect_type(value, Arglist)
+    return value.extract_keywords()
+
+
 # ------------------------------------------------------------------------------
-# Meta functions
+# Introspection functions
+
+# TODO feature-exists
+
+@ns.declare_internal
+def variable_exists(namespace, name):
+    expect_type(name, String)
+    try:
+        namespace.variable('$' + name.value)
+    except KeyError:
+        return Boolean(False)
+    else:
+        return Boolean(True)
+
+
+@ns.declare_internal
+def global_variable_exists(namespace, name):
+    expect_type(name, String)
+
+    # TODO this is...  imperfect and invasive, but should be a good
+    # approximation
+    scope = namespace._variables
+    while len(scope.maps) > 1:
+        scope = scope.maps[-1]
+
+    try:
+        scope['$' + name.value]
+    except KeyError:
+        return Boolean(False)
+    else:
+        return Boolean(True)
+
+
+@ns.declare_internal
+def function_exists(namespace, name):
+    expect_type(name, String)
+    # TODO invasive, but there's no other way to ask for this at the moment
+    for fname, arity in namespace._functions.keys():
+        if name.value == fname:
+            return Boolean(True)
+    return Boolean(False)
+
+
+@ns.declare_internal
+def mixin_exists(namespace, name):
+    expect_type(name, String)
+    # TODO invasive, but there's no other way to ask for this at the moment
+    for fname, arity in namespace._mixins.keys():
+        if name.value == fname:
+            return Boolean(True)
+    return Boolean(False)
+
+
+@ns.declare
+def inspect(value):
+    return String.unquoted(value.render())
+
 
 @ns.declare
 def type_of(obj):  # -> bool, number, string, color, list
@@ -877,11 +940,7 @@ def comparable(number1, number2):
         and left.unit_denom == right.unit_denom)
 
 
-@ns.declare
-def keywords(value):
-    """Extract named arguments, as a map, from an argument list."""
-    expect_type(value, Arglist)
-    return value.extract_keywords()
+# TODO call
 
 
 # ------------------------------------------------------------------------------

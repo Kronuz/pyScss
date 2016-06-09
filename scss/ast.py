@@ -212,10 +212,6 @@ class CallOp(Expression):
         funct = None
         try:
             funct = calculator.namespace.function(func_name, argspec_len)
-            # @functions take a ns as first arg.  TODO: Python functions possibly
-            # should too
-            if getattr(funct, '__name__', None) == '__call':
-                funct = partial(funct, calculator.namespace)
         except KeyError:
             try:
                 # DEVIATION: Fall back to single parameter
@@ -226,7 +222,12 @@ class CallOp(Expression):
                     log.error("Function not found: %s:%s", func_name, argspec_len, extra={'stack': True})
 
         if funct:
-            ret = funct(*args, **kwargs)
+            if getattr(funct, '_pyscss_needs_namespace', False):
+                # @functions and some Python functions take the namespace as an
+                # extra first argument
+                ret = funct(calculator.namespace, *args, **kwargs)
+            else:
+                ret = funct(*args, **kwargs)
             if not isinstance(ret, Value):
                 raise TypeError("Expected Sass type as return value, got %r" % (ret,))
             return ret

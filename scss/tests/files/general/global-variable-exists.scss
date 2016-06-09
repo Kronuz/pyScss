@@ -1,0 +1,27 @@
+@mixin myblockquote {
+  blockquote {
+    @if global-variable-exists(blockquote-color) {
+      background: $blockquote-color;
+    }
+    @else {
+      background: lime;
+    }
+
+    @if mixin-exists(myblockquote) {
+      color: red;
+    }
+    @else {
+      color: blue;
+    }
+
+    @if variable-exists(foo) {
+      float: left;
+    }
+    $foo: 1;
+    @if variable-exists(foo) {
+      float: right;
+    }
+  }
+}
+
+@include myblockquote;
