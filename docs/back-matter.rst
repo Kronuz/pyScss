@@ -46,7 +46,7 @@ License and copyright
 ---------------------
 
 Copyright © 2012 German M. Bravo (Kronuz), with additional heavy contributions
-by Eevee (Alex Munroe).  Licensed under the `MIT license`_.
+by Eevee (Lexy Munroe).  Licensed under the `MIT license`_.
 
 .. _MIT license: http://www.opensource.org/licenses/mit-license.php
 
@@ -66,6 +66,36 @@ working hours.  Yelp does not claim copyright.
 
 Changelog
 ---------
+
+1.3.5 (June 8, 2016)
+^^^^^^^^^^^^^^^^^^^^
+
+* The new ``less2scss`` module attempts to convert Less syntax to SCSS.
+* The ``*-exists`` functions from Sass 3.3 are now supported.
+* The contents of a file ``@import``-ed in the middle of an input file now
+  appears in the expected place, not at the end of the output.
+* Double-slashes within URLs, as often happens with base64-encoded data URLs,
+  are no longer stripped as comments.
+* Nesting selectors that end with a combinator, e.g. ``div > { p { ... } }``,
+  now works correctly.
+* ``invert()`` is now left alone when the argument is a number, indicating the
+  CSS filter rather than the Sass function.
+* ``if()`` now evaluates its arguments lazily.
+* ``str-slice()`` now silently corrects out-of-bounds indices.
+* ``append()`` now defaults to returning a space-delimited list, when the given
+  list has fewer than two elements.
+* ``-moz-calc`` and ``-webkit-calc`` are recognized as variants of the
+  ``calc()`` CSS function.
+* Filenames containing dots can now be imported.
+* Properties with a computed value of ``null`` are now omitted from the output.
+* The ``opacity`` token in IE's strange ``alpha(opacity=N)`` construct is now
+  recognized case-insensitively.
+* The Compass gradient functions now recognize ``currentColor`` as a color.
+* The fonts extension should now work under Python 3.
+* Escaped astral plane characters no longer crash narrow Python 2 builds.
+* The alpha value in ``rgba(...)`` is no longer truncated to only two decimal places.
+* Some edge cases with float precision were fixed, so 742px - 40px is no longer
+  701.99999999px.
 
 1.3.4 (Dec 15, 2014)
 ^^^^^^^^^^^^^^^^^^^^
