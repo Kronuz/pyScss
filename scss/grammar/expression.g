@@ -96,9 +96,9 @@ parser SassExpression:
     token VAR: "\$[-a-zA-Z0-9_]+"
 
     # Cheating, to make sure these only match function names.
-    token LITERAL_FUNCTION: "(calc|expression|progid:[\w.]+)(?=[(])"
+    token LITERAL_FUNCTION: "(-moz-calc|-webkit-calc|calc|expression|progid:[\w.]+)(?=[(])"
     token ALPHA_FUNCTION: "alpha(?=[(])"
-    token OPACITY: "(?:(?i)opacity)"
+    token OPACITY: "((?i)opacity)"
     token URL_FUNCTION: "url(?=[(])"
     # This must come AFTER the above
     token FNCT: "[-a-zA-Z_][-a-zA-Z0-9_]*(?=\()"
