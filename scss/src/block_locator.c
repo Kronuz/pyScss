@@ -398,6 +398,12 @@ BlockLocator_iternext(BlockLocator *self)
 		if (c == '\\') {
 			/* Start of an escape sequence; ignore next character */
 			self->codestr_ptr++;
+		} else if (c == '}' && self->depth == 0) {
+			self->block.error = -1;
+			sprintf(self->exc, "Unexpected closing brace on line %d", self->lineno);
+			#ifdef DEBUG
+				fprintf(stderr, "\t%s\n", self->exc);
+			#endif
 		}
 		/* only ASCII is special syntactically */
 		else if (c < 256) {
