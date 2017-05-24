@@ -42,6 +42,10 @@ class CoreExtension(Extension):
             basename = path.name
         relative_to = path.parent
         search_path = []  # tuple of (origin, start_from)
+        search_path.extend(
+            (origin, relative_to)
+            for origin in compilation.compiler.search_path
+        )
         if relative_to.is_absolute():
             relative_to = PurePosixPath(*relative_to.parts[1:])
         elif rule.source_file.origin:
@@ -51,10 +55,6 @@ class CoreExtension(Extension):
                 rule.source_file.origin,
                 rule.source_file.relpath.parent / relative_to,
             ))
-        search_path.extend(
-            (origin, relative_to)
-            for origin in compilation.compiler.search_path
-        )
 
         for prefix, suffix in product(('_', ''), search_exts):
             filename = prefix + basename + suffix
