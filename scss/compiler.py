@@ -786,7 +786,7 @@ class Compilation(object):
             log.error("Content string not found for @content (%s)", rule.file_and_line)
         content = rule.options.pop('@content', '')
         if content is None:
-            rule.unparsed_content = ''
+            rule.unparsed_contents = ''
         else:
             rule.unparsed_contents = content
         self.manage_children(rule, scope)
