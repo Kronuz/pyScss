@@ -94,6 +94,7 @@ def run_setup(with_binary):
         author=AUTHOR,
         author_email=AUTHOR_EMAIL,
         url=URL,
+        zip_safe=False,
         download_url=DOWNLOAD_URL,
         license=LICENSE,
         keywords='css oocss xcss sass scss less precompiler',
