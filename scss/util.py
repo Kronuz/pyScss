@@ -14,6 +14,11 @@ import six
 
 from scss import config
 
+try:
+    from pathlib2 import Path, PurePosixPath
+except ImportError:
+    from pathlib import Path, PurePosixPath
+
 BASE_DIR = os.path.dirname(__file__)
 
 
