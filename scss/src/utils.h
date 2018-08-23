@@ -7,10 +7,11 @@ PyMem_Strndup(const char *str, size_t len)
 {
 	if (str != NULL) {
 		char *copy = PyMem_New(char, len + 1);
-		if (copy != NULL)
+		if (copy != NULL) {
 			memcpy(copy, str, len);
 			copy[len] = '\0';
 			return copy;
+		}
 	}
 	return NULL;
 }
