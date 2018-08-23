@@ -107,11 +107,11 @@ Pattern_initialize(Pattern *patterns, int patterns_sz) {
 
 	for (i = 0; i < patterns_sz; i++) {
 		regex = Pattern_regex(patterns[i].tok, patterns[i].expr);
-		#ifdef DEBUG
 		if (regex) {
-			fprintf(stderr, "\tAdded regex pattern %s: %s\n", repr(regex->tok), repr(regex->expr));
+			#ifdef DEBUG
+				fprintf(stderr, "\tAdded regex pattern %s: %s\n", repr(regex->tok), repr(regex->expr));
+			#endif
 		}
-		#endif
 	}
 
 	Pattern_patterns_initialized = 1;
