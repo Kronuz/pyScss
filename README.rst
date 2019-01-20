@@ -17,17 +17,23 @@ programming capabilities and some other syntactic sugar.
 Quickstart
 ----------
 
-You need Python 2.6+ or 3.3+.  PyPy is also supported.
+You need Python 2.7 or 3.3+.  PyPy is also supported.
 
-Installation::
+Installation:
+
+.. code-block:: console
 
     pip install pyScss
 
-Usage::
+Usage:
+
+.. code-block:: console
 
     python -mscss < style.scss
 
-Python API::
+Python API:
+
+.. code-block:: python
 
     from scss import Compiler
     Compiler().compile_string("a { color: red + green; }")

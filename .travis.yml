@@ -1,16 +1,17 @@
 language: python
 python:
-    - "2.6"
-    - "2.7"
-    - "3.3"
-    - "3.4"
-    - "3.5"
-    - pypy
-    - pypy3
+  - "2.7"
+  - "3.3"
+  - "3.4"
+  - "3.5"
+  - "3.6"
+  - "3.7-dev"
+  - pypy
+  - pypy3
 install:
-    - pip install .
-    - pip install pillow pytest-cov coveralls
+  - pip install .
+  - pip install pillow pytest-cov coveralls
 script:
-    py.test --cov scss
+  py.test --cov scss
 after_success:
-    coveralls
+  coveralls
