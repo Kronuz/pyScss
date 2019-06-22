@@ -33,7 +33,7 @@ SELECTOR_TOKENIZER = re.compile(r'''
 
     # Square brackets are attribute tests
     # TODO: this doesn't handle ] within a string
-    | [[] .+? []]
+    | \[ .+? \]
 
     # Dot and pound start class/id selectors.  Percent starts a Sass
     # extend-target faux selector.
