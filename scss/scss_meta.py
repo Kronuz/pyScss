@@ -46,14 +46,14 @@ from __future__ import unicode_literals
 
 import sys
 
-VERSION_INFO = (1, 3, 5)
-DATE_INFO = (2016, 6, 8)  # YEAR, MONTH, DAY
+VERSION_INFO = (1, 0, 0)
+DATE_INFO = (2020, 3, 13)  # YEAR, MONTH, DAY
 VERSION = '.'.join(str(i) for i in VERSION_INFO)
 REVISION = '%04d%02d%02d' % DATE_INFO
-BUILD_INFO = "pyScss v" + VERSION + " (" + REVISION + ")"
-AUTHOR = "German M. Bravo (Kronuz)"
-AUTHOR_EMAIL = 'german.mb@gmail.com'
-URL = 'http://github.com/Kronuz/pyScss'
-DOWNLOAD_URL = 'http://github.com/Kronuz/pyScss/tarball/v' + VERSION
+BUILD_INFO = "pyScss2 v" + VERSION + " (" + REVISION + ")"
+AUTHOR = "Ivan Kolodyazhny (e0ne)"
+AUTHOR_EMAIL = 'e0ne@e0ne.info'
+URL = 'http://github.com/e0ne/pyScss'
+DOWNLOAD_URL = 'http://github.com/e0ne/pyScss/tarball/v' + VERSION
 LICENSE = "MIT"
-PROJECT = "pyScss"
+PROJECT = "pyScss2"
