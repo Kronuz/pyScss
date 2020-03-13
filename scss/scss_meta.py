@@ -46,7 +46,7 @@ from __future__ import unicode_literals
 
 import sys
 
-VERSION_INFO = (1, 0, 0)
+VERSION_INFO = (2, 0, 0)
 DATE_INFO = (2020, 3, 13)  # YEAR, MONTH, DAY
 VERSION = '.'.join(str(i) for i in VERSION_INFO)
 REVISION = '%04d%02d%02d' % DATE_INFO
