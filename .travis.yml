@@ -1,5 +1,12 @@
 language: python
 
+dist: bionic
+
+addons:
+  apt:
+    packages:
+      - libpcre2-dev
+
 arch:
   - arm64
   - amd64
@@ -11,10 +18,13 @@ python:
     - "3.7"
     - "3.8"
     - pypy3
+
 install:
     - pip install .
     - pip install pillow pytest-cov coveralls
+
 script:
     py.test --cov scss
+
 after_success:
     coveralls
