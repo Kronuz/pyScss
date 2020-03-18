@@ -10,8 +10,8 @@ addons:
 arch:
   - arm64
   - amd64
-    #  - ppc64le
-    #  - s390x
+  - ppc64le
+  - s390x
 
 python:
     - "3.6"
