@@ -19,6 +19,12 @@ python:
     - "3.8"
     - pypy3
 
+# there is no pypy3 for arm64 on Travis CI      
+jobs:
+  exclude:
+    - arch: arm64
+      python: pypy3
+
 install:
     - pip install .
     - pip install pillow pytest-cov coveralls
