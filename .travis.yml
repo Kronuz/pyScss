@@ -10,19 +10,18 @@ addons:
 arch:
   - arm64
   - amd64
-    #  - ppc64le
-    #  - s390x
+  - ppc64le
+  - s390x
 
 python:
     - "3.6"
     - "3.7"
     - "3.8"
-    - pypy3
 
-# there is no pypy3 for arm64 on Travis CI      
+# pypy3 is available only for amd64
 jobs:
-  exclude:
-    - arch: arm64
+  include:
+    - arch: amd64
       python: pypy3
 
 install:
