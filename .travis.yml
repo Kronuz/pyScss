@@ -1,36 +1,30 @@
 language: python
-
 dist: bionic
-
 addons:
   apt:
     packages:
-      - libpcre2-dev
-
+    - libpcre2-dev
 arch:
-  - arm64
-  - amd64
-    #  - ppc64le
-    #  - s390x
-
+- arm64
+- amd64
 python:
-    - "3.6"
-    - "3.7"
-    - "3.8"
-    - pypy3
-
-# there is no pypy3 for arm64 on Travis CI      
+- '3.6'
+- '3.7'
+- '3.8'
+- pypy3
 jobs:
   exclude:
-    - arch: arm64
-      python: pypy3
-
+  - arch: arm64
+    python: pypy3
 install:
-    - pip install .
-    - pip install pillow pytest-cov coveralls
-
-script:
-    py.test --cov scss
-
-after_success:
-    coveralls
+- pip install .
+- pip install pillow pytest-cov coveralls
+script: py.test --cov scss
+after_success: coveralls
+deploy:
+  provider: pypi
+  user: __token__
+  password:
+    secure: J5RfXq1B9p1/xZmtqVeCeFm4wx816KzTCmuej7bAVNC7u9amNL0QV5HkzLGHYM/SxY0zJs9pN0+TS20NoAatNDrvRjZ6Wh+d/mqgGjMqrNCQruFOe8yzS9XE5IlOgaMgsvWfISXGOmwUHpLcMq/RlyoX3f0S2PW1OTb/AmV7Kc8=
+  on:
+    tags: true
