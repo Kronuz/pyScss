@@ -35,9 +35,6 @@ ext_modules = [
     ),
 ]
 
-extra_opts = {}
-extra_opts['ext_modules'] = ext_modules
-
 ext_errors = (CCompilerError, DistutilsExecError, DistutilsPlatformError)
 if sys.platform == 'win32' and sys.version_info > (2, 6):
     # 2.6's distutils.msvc9compiler can raise an IOError when failing to
@@ -83,6 +80,11 @@ def read(fname):
 
 
 def run_setup(with_binary):
+    if with_binary:
+        extra_opts = {}
+        extra_opts['ext_modules'] = ext_modules
+    else:
+        extra_opts = {}
     setup(
         name=PROJECT,
         version=VERSION,
