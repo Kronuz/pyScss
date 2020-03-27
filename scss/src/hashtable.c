@@ -43,7 +43,7 @@ murmurhash3(const void *key, const size_t len, const unsigned int seed) {
 		hash = ((hash << r2) | (hash >> (32 - r2))) * m + n;
 	}
 
-	tail = (const unsigned char *)(key + nblocks * 4);
+	tail = (const unsigned char *)(key) + nblocks * 4;
 
 	switch (len & 3) {
 		case 3:
