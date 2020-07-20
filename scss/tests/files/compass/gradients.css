@@ -82,3 +82,7 @@
 .bg-linear-gradient-to {
   background: linear-gradient(to right, red, green);
 }
+
+.panel {
+  background-image: linear-gradient(to bottom, red, green);
+}

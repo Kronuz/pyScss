@@ -59,7 +59,7 @@ def __color_stops(percentages, *args):
     if prev_color:
         stops.append(None)
     stops = stops[:len(colors)]
-    if stops[0] is None:
+    if stops[0] is None or stops[0] == Number(0):
         stops[0] = Number(0, '%')
     if stops[-1] is None:
         stops[-1] = Number(100, '%')
