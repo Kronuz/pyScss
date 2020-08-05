@@ -58,7 +58,10 @@ def pytest_collect_file(path, parent):
         parts = str(path).split(path.sep)
         # -4 tests / -3 files / -2 directory / -1 file.scss
         if parts[-4:-2] == ['tests', 'files']:
-            return SassFile(path, parent)
+            if hasattr(SassFile, "from_parent"):
+                return SassFile.from_parent(parent, fspath=path)
+            else:
+                return SassFile(path, parent)
 
 
 class SassFile(pytest.File):
@@ -67,7 +70,10 @@ class SassFile(pytest.File):
         if not fontforge and parent_name == 'fonts':
             pytest.skip("font tests require fontforge")
 
-        yield SassItem(str(self.fspath), self)
+        if hasattr(SassItem, "from_parent"):
+            yield SassItem.from_parent(parent=self, name=str(self.fspath))
+        else:
+            yield SassItem(str(self.fspath), self)
 
 
 class SassItem(pytest.Item):
