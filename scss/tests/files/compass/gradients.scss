@@ -93,3 +93,8 @@
 .bg-linear-gradient-to {
   background: linear-gradient(to right, red 0%, green 100%);
 }
+
+// Issue #404
+.panel {
+	background-image: linear-gradient(to bottom, red 0, green 100%);
+}
