@@ -5,7 +5,7 @@ from __future__ import division
 
 import hashlib
 import logging
-from pathlib import Path
+from .util import Path
 import re
 
 import six

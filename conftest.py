@@ -4,7 +4,6 @@ from __future__ import division
 from __future__ import print_function
 
 import logging
-from pathlib import Path
 
 import pytest
 
@@ -17,6 +16,7 @@ from scss.extension.core import CoreExtension
 from scss.extension.extra import ExtraExtension
 from scss.extension.fonts import FontsExtension
 from scss.extension.compass import CompassExtension
+from scss.util import Path
 
 try:
     import fontforge

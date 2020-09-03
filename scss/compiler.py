@@ -6,7 +6,7 @@ from __future__ import division
 from collections import defaultdict
 from enum import Enum
 import logging
-from pathlib import Path
+from .util import Path
 import re
 import sys
 import warnings

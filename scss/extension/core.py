@@ -7,7 +7,7 @@ from __future__ import unicode_literals
 from itertools import product
 import math
 import os.path
-from pathlib import PurePosixPath
+from ..util import PurePosixPath
 
 from six.moves import xrange
 
