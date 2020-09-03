@@ -220,6 +220,8 @@ def dash_o(*args):
 # ------------------------------------------------------------------------------
 # Selector generation
 
+# selector-append is a Sass function
+@ns.declare_alias('selector-append')
 @ns.declare
 def append_selector(selector, to_append):
     if isinstance(selector, List):
