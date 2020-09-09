@@ -300,8 +300,8 @@ class Compilation(object):
         self.rules = self.apply_extends(self.rules)
 
         output, total_selectors = self.create_css(self.rules)
-        if total_selectors >= 4096:
-            log.error("Maximum number of supported selectors in Internet Explorer (4095) exceeded!")
+        if total_selectors > 65534:
+            log.warning("Maximum number of supported selectors in Internet Explorer (65534) exceeded!")
 
         return output
 
