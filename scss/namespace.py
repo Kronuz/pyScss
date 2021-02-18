@@ -169,9 +169,16 @@ class Namespace(object):
 
     def _auto_register_function(self, function, name, ignore_args=0):
         name = name.replace('_', '-').rstrip('-')
-        argspec = inspect.getargspec(function)
+        try:
+            argspec = inspect.getfullargspec(function)
+            varkw = argspec.varkw
+        except AttributeError:
+            # In python 2.7, getfulargspec does not exist.
+            # Let's use getargspec as fallback.
+            argspec = inspect.getargspec(function)
+            varkw = argspec.keywords
 
-        if argspec.varargs or argspec.keywords:
+        if argspec.varargs or varkw:
             # Accepts some arbitrary number of arguments
             arities = [None]
         else:
