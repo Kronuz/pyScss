@@ -8,6 +8,7 @@
 * MIT license (http://www.opensource.org/licenses/mit-license.php)
 * Copyright (c) 2011 German M. Bravo (Kronuz), All rights reserved.
 */
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
 #include <stdio.h>
@@ -50,7 +51,7 @@ Pattern_regex(char *tok, char *expr) {
 }
 
 static int
-Pattern_match(Pattern *regex, char *string, int string_sz, int start_at, Token *p_token) {
+Pattern_match(Pattern *regex, char *string, Py_ssize_t string_sz, int start_at, Token *p_token) {
 	int options = PCRE_ANCHORED | PCRE_UTF8;
 	const char *errptr;
 	int ret, erroffset, ovector[3];
@@ -243,7 +244,7 @@ _Scanner_scan(Scanner *self, Hashtable *restrictions)
 /* Scanner public interface */
 
 void
-Scanner_reset(Scanner *self, char *input, int input_sz) {
+Scanner_reset(Scanner *self, char *input, Py_ssize_t input_sz) {
 	int i;
 
 	#ifdef DEBUG
@@ -290,7 +291,7 @@ Scanner_del(Scanner *self) {
 }
 
 Scanner*
-Scanner_new(Pattern patterns[], int patterns_sz, Pattern ignore[], int ignore_sz, char *input, int input_sz)
+Scanner_new(Pattern patterns[], int patterns_sz, Pattern ignore[], int ignore_sz, char *input, Py_ssize_t input_sz)
 {
 	int i;
 	size_t len;

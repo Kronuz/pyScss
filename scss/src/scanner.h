@@ -11,6 +11,9 @@
 #ifndef SCANNER_H
 #define SCANNER_H
 
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+
 #include "hashtable.h"
 
 #define PCRE_STATIC
@@ -50,7 +53,7 @@ typedef struct {
 	int tokens_bsz;
 	Token *tokens;
 	Restriction *restrictions;
-	int input_sz;
+	Py_ssize_t input_sz;
 	char *input;
 	int pos;
 } Scanner;
@@ -59,8 +62,8 @@ int Scanner_initialized(void);
 void Scanner_initialize(Pattern *, int);
 void Scanner_finalize(void);
 
-void Scanner_reset(Scanner *self, char *input, int input_sz);
-Scanner *Scanner_new(Pattern *, int, Pattern *, int, char *, int);
+void Scanner_reset(Scanner *self, char *input, Py_ssize_t input_sz);
+Scanner *Scanner_new(Pattern *, int, Pattern *, int, char *, Py_ssize_t);
 void Scanner_del(Scanner *);
 
 Token* Scanner_token(Scanner *, int, Hashtable *restrictions);

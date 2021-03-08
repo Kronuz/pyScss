@@ -8,6 +8,7 @@
 * MIT license (http://www.opensource.org/licenses/mit-license.php)
 * Copyright (c) 2011 German M. Bravo (Kronuz), All rights reserved.
 */
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include "py3defs.h"
 #include "block_locator.h"
@@ -22,7 +23,7 @@ typedef struct {
 } scss_BlockLocator;
 
 static char*
-scss_pyunicode_to_utf8(PyObject* obj, int* len)
+scss_pyunicode_to_utf8(PyObject* obj, Py_ssize_t* len)
 {
 	char* internal_buffer;
 	char* ret;
@@ -188,7 +189,8 @@ scss_Scanner_token(scss_Scanner *self, PyObject *args)
 	PyObject *py_token;
 
 	char *tok;
-	int token_num, len;
+	int token_num;
+	Py_ssize_t len;
 	PyObject *restrictions = NULL;
 	Hashtable *_restrictions = NULL;
 
@@ -272,7 +274,7 @@ static PyObject *
 scss_Scanner_reset(scss_Scanner *self, PyObject *args, PyObject *kwds)
 {
 	char *input = NULL;
-	int input_sz = 0;
+	Py_ssize_t input_sz = 0;
 
 	if (self->scanner != NULL) {
 		if (PyArg_ParseTuple(args, "|z#", &input, &input_sz)) {
@@ -289,11 +291,11 @@ scss_Scanner_setup_patterns(PyObject *self, PyObject *patterns)
 {
 	PyObject *item, *item0, *item1;
 	int i, is_tuple, _is_tuple;
-	long size;
+	Py_ssize_t size;
 
 	Pattern *_patterns = NULL;
 	int patterns_sz = 0;
-	int len;
+	Py_ssize_t len;
 	if (!Scanner_initialized()) {
 		is_tuple = PyTuple_Check(patterns);
 		if (is_tuple || PyList_Check(patterns)) {
@@ -325,17 +327,17 @@ scss_Scanner_init(scss_Scanner *self, PyObject *args, PyObject *kwds)
 {
 	PyObject *item, *item0, *item1;
 	int i, is_tuple, _is_tuple;
-	long size;
+	Py_ssize_t size;
 
 	PyObject *patterns, *ignore;
 	Pattern *_patterns = NULL;
 	int patterns_sz = 0;
-	int len;
+	Py_ssize_t len;
 	Pattern *_ignore = NULL;
 	int ignore_sz = 0;
 	PyObject *py_input = NULL;
 	char *encoded_input = NULL;
-	int encoded_input_sz = 0;
+	Py_ssize_t encoded_input_sz = 0;
 
 	self->scanner = NULL;
 
