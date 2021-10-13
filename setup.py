@@ -17,7 +17,7 @@ with open('scss/scss_meta.py', 'rb') as f:
 install_requires = ['six']
 if sys.version_info < (3, 4):
     install_requires.append('enum34')
-    install_requires.append('pathlib')
+    install_requires.append('pathlib2')
 if sys.version_info < (2, 7):
     install_requires.append('ordereddict')
 
