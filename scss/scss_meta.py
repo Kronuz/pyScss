@@ -3,7 +3,7 @@
 pyScss, a Scss compiler for Python
 
 @author     German M. Bravo (Kronuz) <german.mb@gmail.com>
-@version    1.3.7
+@version    1.4.0
 @see        https://github.com/Kronuz/pyScss
 @copyright  (c) 2012-2013 German M. Bravo (Kronuz)
 @license    MIT License
@@ -46,8 +46,8 @@ from __future__ import unicode_literals
 
 import sys
 
-VERSION_INFO = (1, 3, 7)
-DATE_INFO = (2020, 3, 26)  # YEAR, MONTH, DAY
+VERSION_INFO = (1, 4, 0)
+DATE_INFO = (2022, 2, 23)  # YEAR, MONTH, DAY
 VERSION = '.'.join(str(i) for i in VERSION_INFO)
 REVISION = '%04d%02d%02d' % DATE_INFO
 BUILD_INFO = "pyScss v" + VERSION + " (" + REVISION + ")"
