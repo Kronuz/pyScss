@@ -240,7 +240,7 @@ class tmemoize(object):
 def getmtime(filename, storage=None):
     try:
         if storage:
-            d_obj = storage.modified_time(filename)
+            d_obj = storage.get_modified_time(filename)
             return int(time.mktime(d_obj.timetuple()))
         else:
             return int(os.path.getmtime(filename))
