@@ -86,7 +86,7 @@ class SassExpressionScanner(Scanner):
         ('VAR', '\\$[-a-zA-Z0-9_]+'),
         ('LITERAL_FUNCTION', '(-moz-calc|-webkit-calc|calc|expression|progid:[\\w.]+)(?=[(])'),
         ('ALPHA_FUNCTION', 'alpha(?=[(])'),
-        ('OPACITY', '((?i)opacity)'),
+        ('OPACITY', '(?i)(opacity)'),
         ('URL_FUNCTION', 'url(?=[(])'),
         ('IF_FUNCTION', 'if(?=[(])'),
         ('FNCT', '[-a-zA-Z_][-a-zA-Z0-9_]*(?=\\()'),
