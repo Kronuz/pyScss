@@ -118,7 +118,7 @@ def make_filename_hash(key):
         # this is to make sure the hash is the same on win and unix platforms
         key_repr = key_repr.replace(b'\\\\', b'/')
     key_repr = re.sub(b"\\bu'", b"'", key_repr)
-    key_hash = hashlib.md5(key_repr).digest()
+    key_hash = hashlib.sha256(key_repr).digest()
     return base64.b64encode(key_hash, b'__').decode('ascii').rstrip('=')
 
 
