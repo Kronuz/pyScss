@@ -1,0 +1,9 @@
+@mixin test() {
+  @content;
+
+  a {
+    color: blue;
+  }
+}
+
+@include test();
